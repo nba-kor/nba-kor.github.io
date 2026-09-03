@@ -16,8 +16,12 @@
 ```
 data/players.json     한국 서버 출시 선수 39명 (자동 생성 — 직접 수정 금지)
 data/upcoming.json    미출시 선수 58명, 중국·글로벌 서버 기준 (직접 관리)
-assets/players/*.png  얼굴 이미지 (id.png, 181x180)
+assets/players/*.png  얼굴 이미지 (id.png, 181x180 원형)
 ```
+
+얼굴 이미지는 97명 중 78명이 있다. 한국 출시 선수는 공식 홈페이지의 카드 이미지를 그대로 쓰고,
+미출시 선수는 중국 서버 공식 사이트의 전신 아트에서 얼굴만 잘라낸 것이다(`tools/cn-faces`).
+이미지가 없는 선수는 이름 이니셜 아바타가 자동으로 생성되므로 화면은 깨지지 않는다.
 
 ### 신규 선수 반영
 
@@ -47,8 +51,33 @@ node tools/update-players.mjs
 
 현재 58명이 들어 있다(2026-09 조사 기준). 중국 서버 공식 공략 인덱스(TapTap app 242139),
 `dunkcitymobile.com/news` 글로벌 패치노트, `qmx.163.com` 업데이트 공지를 교차 확인해
-한국 서버에 없는 선수만 추렸다. 얼굴 이미지는 대부분 공식 소스를 확보하지 못해 비워 두었다
-(자말 머레이만 예외 — 공식 사이트 번들에 `dlt` 로 아트가 이미 올라와 있다).
+한국 서버에 없는 선수만 추렸다.
+
+### 미출시 선수 얼굴 이미지
+
+```sh
+node tools/cn-faces/fetch.mjs
+```
+
+중국 서버 공식 사이트(`qmx.163.com/m/`)의 CSS에 선수 전신 아트 58장이 들어 있다.
+이 스크립트가 전부 받아서 얼굴만 잘라 `assets/players/` 에 넣고 `upcoming.json` 의 `img` 를 채운다.
+현재 40명이 채워졌고 18명(잭 라빈, 시아캄, 터너, 로페즈 등 주로 글로벌 서버 신규 선수)은 아직 아트가 없다.
+
+전신 아트라 얼굴 위치를 자동으로 찾아야 해서 OpenCV 얼굴 검출을 쓴다. 준비:
+
+```sh
+uv venv tools/cn-faces/.venv
+VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy pillow
+```
+
+검출이 빗나가 엉뚱한 데가 잘리면 `tools/cn-faces/tune.json` 에 좌표를 비율로 적어준다.
+
+```jsonc
+{ "ttm": { "face": [0.525, 0.32, 0.12], "dy": 0.22 } }   // 중심x, 중심y, 얼굴폭 (모두 0~1)
+```
+
+누구인지 모르는 새 id 가 나오면 스크립트가 경고하며, `fetch.mjs` 의 `CN2EN` 표에 한 줄 추가하면 된다.
+(id 별 한자 이름은 중국 사이트 PC CSS 의 `<id>-name.png` 이미지로 확인할 수 있다.)
 전술판·티어표 양쪽의 **"미출시 선수 포함"** 체크박스로 켜고 끌 수 있고,
 이 체크 상태는 두 페이지가 공유한다.
 

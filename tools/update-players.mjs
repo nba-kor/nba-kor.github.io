@@ -47,9 +47,10 @@ const ALIAS = {
 
 // 확률 공지에만 있고 라인업 페이지에는 없는 선수. 공식 프로필·이미지가 없어 최소 정보만 채운다.
 // 나중에 라인업에 정식 등재되면 그쪽 데이터가 우선한다.
+// img 는 중국 서버 공식 사이트에서 가져온 얼굴 (tools/cn-faces 참고). 없으면 이니셜 아바타가 뜬다.
 const EXTRA = [
-  { id: 'clarkson', name: '조던 클락슨', short: '클락슨', en: 'Jordan Clarkson', pos: 2 },
-  { id: 'durant', name: '케빈 듀란트', short: '듀란트', en: 'Kevin Durant', pos: 3 },
+  { id: 'clarkson', name: '조던 클락슨', short: '클락슨', en: 'Jordan Clarkson', pos: 2, img: '' },
+  { id: 'durant', name: '케빈 듀란트', short: '듀란트', en: 'Kevin Durant', pos: 3, img: 'assets/players/durant.png' },
 ]
 
 const get = async (url, bin = false) => {
@@ -141,9 +142,9 @@ if (!rates) {
   for (const n of missing) {
     const e = EXTRA.find(x => x.short === n || x.name === n)
     if (e) players.push({
-      ...e, height: null, weight: null, birthday: '', nickname: '',
+      height: null, weight: null, birthday: '', nickname: '',
       desc: '공식 홈페이지 라인업에는 없지만 인게임에서 획득할 수 있는 선수입니다. (선수 획득 확률 공지 기준)',
-      img: '', server: 'kr',
+      server: 'kr', ...e,
     })
     else warnings.push(`확률 공지에 있는 "${n}" 이(가) 데이터에 없습니다 → tools/update-players.mjs 의 EXTRA 또는 ALIAS 에 추가하세요.`)
   }
@@ -159,7 +160,7 @@ await mkdir(`${ROOT}/assets/players`, { recursive: true })
 let downloaded = 0
 for (const p of players) {
   const url = asset(`./m/superstars/player/card-${p.id}.png`)
-  if (!url) continue                       // EXTRA 선수는 공식 얼굴 이미지가 없다 → 이니셜 아바타
+  if (!url) continue                       // EXTRA 선수는 라인업 카드가 없다 (EXTRA 의 img 를 그대로 쓴다)
   await writeFile(`${ROOT}/assets/players/${p.id}.png`, await get(url, true))
   p.img = `assets/players/${p.id}.png`
   downloaded++

@@ -187,18 +187,18 @@
       "server": "kr"
     },
     {
-      "id": "clarkson",
-      "name": "조던 클락슨",
-      "short": "클락슨",
-      "en": "Jordan Clarkson",
-      "pos": 2,
       "height": null,
       "weight": null,
       "birthday": "",
       "nickname": "",
       "desc": "공식 홈페이지 라인업에는 없지만 인게임에서 획득할 수 있는 선수입니다. (선수 획득 확률 공지 기준)",
-      "img": "",
-      "server": "kr"
+      "server": "kr",
+      "id": "clarkson",
+      "name": "조던 클락슨",
+      "short": "클락슨",
+      "en": "Jordan Clarkson",
+      "pos": 2,
+      "img": ""
     },
     {
       "id": "kl",
@@ -299,18 +299,18 @@
       "server": "kr"
     },
     {
-      "id": "durant",
-      "name": "케빈 듀란트",
-      "short": "듀란트",
-      "en": "Kevin Durant",
-      "pos": 3,
       "height": null,
       "weight": null,
       "birthday": "",
       "nickname": "",
       "desc": "공식 홈페이지 라인업에는 없지만 인게임에서 획득할 수 있는 선수입니다. (선수 획득 확률 공지 기준)",
-      "img": "",
-      "server": "kr"
+      "server": "kr",
+      "id": "durant",
+      "name": "케빈 듀란트",
+      "short": "듀란트",
+      "en": "Kevin Durant",
+      "pos": 3,
+      "img": "assets/players/durant.png"
     },
     {
       "id": "blqz",
