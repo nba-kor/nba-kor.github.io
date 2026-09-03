@@ -49,7 +49,7 @@ const ALIAS = {
 // 나중에 라인업에 정식 등재되면 그쪽 데이터가 우선한다.
 // img 는 중국 서버 공식 사이트에서 가져온 얼굴 (tools/cn-faces 참고). 없으면 이니셜 아바타가 뜬다.
 const EXTRA = [
-  { id: 'clarkson', name: '조던 클락슨', short: '클락슨', en: 'Jordan Clarkson', pos: 2, img: '' },
+  { id: 'clarkson', name: '조던 클락슨', short: '클락슨', en: 'Jordan Clarkson', pos: 2, img: 'assets/players/clarkson.png' },
   { id: 'durant', name: '케빈 듀란트', short: '듀란트', en: 'Kevin Durant', pos: 3, img: 'assets/players/durant.png' },
 ]
 

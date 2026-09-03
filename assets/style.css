@@ -110,6 +110,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .chip[data-server="cn"] { border-style: dashed; opacity: .92; }
 .chip[data-server="cn"] .nm::after { content: "미출시"; font-size: 9px; color: var(--accent); margin-left: 4px; vertical-align: 2px; }
 .chip.used { opacity: .3; pointer-events: none; }
+.chip.half { opacity: .58; }                 /* 공격·수비 중 한쪽에만 올라간 상태 — 반대쪽엔 아직 놓을 수 있다 */
 .chip.ghost {
   position: fixed;
   z-index: 999;

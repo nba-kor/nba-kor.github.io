@@ -140,8 +140,14 @@ function render() {
     lg.appendChild(cap)
   }
 
-  const used = new Set(state.tokens.map(t => t.playerId).filter(Boolean))
-  document.querySelectorAll('#roster-chips .chip').forEach(c => c.classList.toggle('used', used.has(c.dataset.id)))
+  // 같은 선수를 공격·수비에 하나씩 둘 수 있다. 양쪽에 다 올라가면 목록에서 잠근다.
+  const sides = new Map()
+  for (const t of state.tokens) if (t.playerId) sides.set(t.playerId, (sides.get(t.playerId) || new Set()).add(t.side))
+  document.querySelectorAll('#roster-chips .chip').forEach(c => {
+    const n = sides.get(c.dataset.id)?.size || 0
+    c.classList.toggle('used', n >= 2)
+    c.classList.toggle('half', n === 1)
+  })
   renderSelected()
   save()
 }
@@ -172,7 +178,9 @@ const nextKey = s => {
 }
 
 function place(playerId, nx, ny, target) {
-  state.tokens.forEach(t => { if (t.playerId === playerId) t.playerId = null })
+  // 인게임에서 같은 선수를 양 팀이 동시에 쓸 수 있으므로, 중복 제거는 같은 진영 안에서만 한다.
+  const to = target ? target.side : side
+  state.tokens.forEach(t => { if (t.playerId === playerId && t.side === to) t.playerId = null })
   if (target) { target.playerId = playerId; render(); return }
   const key = nextKey(side)
   if (key) {
@@ -299,10 +307,14 @@ function play() {
 
 // ---------------------------------------------------------------- 프리셋
 
-function autoAssign(slots, used) {
+/** 프리셋 자동 배정. 되도록 서로 다른 선수를 쓰되, 목록이 모자라면 상대 진영과 겹쳐서라도 채운다. */
+function autoAssign(slots, used, sideUsed = new Set()) {
   return slots.map(s => {
-    const p = pool.find(x => !used.has(x.id) && s.pos.includes(x.pos)) || pool.find(x => !used.has(x.id))
-    if (p) used.add(p.id)
+    const p = pool.find(x => !used.has(x.id) && s.pos.includes(x.pos))
+      || pool.find(x => !used.has(x.id))
+      || pool.find(x => !sideUsed.has(x.id) && s.pos.includes(x.pos))
+      || pool.find(x => !sideUsed.has(x.id))
+    if (p) { used.add(p.id); sideUsed.add(p.id) }
     return p ? p.id : null
   })
 }
@@ -312,8 +324,8 @@ function applyPreset(id, keep) {
   if (!pr) return
   const held = s => state.tokens.filter(t => t.side === s).map(t => t.playerId)
   const used = new Set(keep ? state.tokens.map(t => t.playerId).filter(Boolean) : [])
-  const offIds = keep ? held('off') : autoAssign(pr.offense, used)
-  const defIds = keep ? held('def') : autoAssign(pr.defense, used)
+  const offIds = keep ? held('off') : autoAssign(pr.offense, used, new Set())
+  const defIds = keep ? held('def') : autoAssign(pr.defense, used, new Set())
   const build = (slots, s, ids) => slots.map((sl, i) => ({
     key: `${s[0]}${i + 1}`, side: s, label: sl.label, playerId: ids[i] || null,
     x: sl.at[0], y: sl.at[1],
