@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NBA 덩크 시티 한국 서버 · 전술판 & 티어표</title>
+<meta name="description" content="NBA 덩크 시티(NBA Dunk City) 한국 서버 유저를 위한 3:3 전술판과 티어표. 한국 출시 선수 전원 지원, 미출시 선수도 체크 한 번으로.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">NBA 덩크 시티 <span>한국 서버</span></div>
+  <nav>
+    <a href="index.html">홈</a>
+    <a href="tactics.html">전술판</a>
+    <a href="tiers.html">티어표</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="stamp"></div>
+</header>
+
+<main class="home">
+  <h1>NBA 덩크 시티 한국 서버 도구함</h1>
+  <p class="lead">한국 서버에 출시된 선수로 3:3 전술을 짜고, 나만의 티어표를 만들어 공유하세요.</p>
+
+  <div class="grid">
+    <a href="tactics.html">
+      <h2>🏀 전술판</h2>
+      <p>하프코트에 선수를 배치하고 동선을 그려 3:3 전술을 시뮬레이션합니다. 픽 앤 롤, 기브 앤 고, 지역방어 등 기본 프리셋 14종 내장.</p>
+    </a>
+    <a href="tiers.html">
+      <h2>📊 티어표</h2>
+      <p>S~D 기본 티어에 선수를 드래그해 올리는 재미용 티어표. 티어 이름·개수도 바꿀 수 있고 링크로 공유됩니다.</p>
+    </a>
+  </div>
+
+  <div class="faces" id="faces"></div>
+
+  <footer>
+    <p id="count"></p>
+    <p>
+      선수 정보와 이미지는 <a href="https://www.dunkcitymobile.com/kr/" target="_blank" rel="noopener">「NBA 덩크 시티」 공식 홈페이지</a>에서 가져옵니다.
+      신규 선수가 추가되면 <code>node tools/update-players.mjs</code> 한 줄로 갱신됩니다.
+      미출시(중국·글로벌 서버) 선수는 <code>data/upcoming.json</code>에서 관리하며, 각 페이지의 <b>미출시 선수 포함</b> 체크박스로 켤 수 있습니다.
+    </p>
+    <p>본 사이트는 팬 제작 비공식 도구이며 NetEase / NBA와 무관합니다. 모든 상표와 이미지의 권리는 원저작자에게 있습니다.</p>
+  </footer>
+</main>
+
+<script type="module">
+import { loadPlayers, mountTop } from './assets/app.js'
+const { players, updatedAt } = await loadPlayers()
+mountTop('index.html', updatedAt)
+const kr = players.filter(p => p.server === 'kr')
+document.getElementById('faces').innerHTML = kr
+  .map(p => `<img src="${p.img}" alt="${p.name}" title="${p.name}" loading="lazy">`).join('')
+document.getElementById('count').textContent =
+  `한국 서버 출시 ${kr.length}명 · 미출시 등록 ${players.length - kr.length}명 · 데이터 ${updatedAt} 기준`
+</script>
+</body>
+</html>

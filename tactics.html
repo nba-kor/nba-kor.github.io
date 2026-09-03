@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>전술판 · NBA 덩크 시티 한국 서버</title>
+<meta name="description" content="NBA 덩크 시티 3:3 하프코트 전술판. 한국 서버 출시 선수를 코트에 배치하고 픽앤롤·기브앤고 등 기본 전술을 시뮬레이션해 보세요.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">NBA 덩크 시티 <span>한국 서버</span></div>
+  <nav>
+    <a href="index.html">홈</a>
+    <a href="tactics.html">전술판</a>
+    <a href="tiers.html">티어표</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="stamp"></div>
+</header>
+
+<main class="tactics">
+
+  <section class="roster">
+    <div class="filters"></div>
+    <div class="chips" id="roster-chips"></div>
+  </section>
+
+  <section class="court-wrap">
+    <div class="court-tools">
+      <button data-mode="move" class="on">이동</button>
+      <button data-mode="route">경로 그리기</button>
+      <span class="sep"></span>
+      <button data-kind="move" class="on">드리블·컷</button>
+      <button data-kind="pass">패스</button>
+      <button data-kind="screen">스크린</button>
+      <span class="sep"></span>
+      <button data-side="off" class="on">공격 배치</button>
+      <button data-side="def">수비 배치</button>
+      <span class="sep"></span>
+      <button id="play" class="primary">▶ 재생</button>
+    </div>
+
+    <svg id="court" viewBox="0 0 500 470" role="img" aria-label="하프코트 전술판"></svg>
+
+    <p class="hint">
+      왼쪽 목록에서 선수를 <b>코트로 끌어다 놓으면</b> 배치됩니다. 코트 위 선수를 드래그하면 위치가 바뀌고,
+      <b>경로 그리기</b> 모드에서 선수부터 손가락(마우스)을 끌면 그 선수의 동선이 그려집니다.
+      선수를 눌러 선택한 뒤 <b>경로 지우기</b>·<b>빼기</b>를 쓸 수 있습니다.
+    </p>
+  </section>
+
+  <aside class="side">
+    <div class="card">
+      <h3>기본 전술 프리셋</h3>
+      <select id="preset"></select>
+      <div class="row" style="margin-top:8px">
+        <button id="apply-preset" class="primary" style="flex:1">적용</button>
+        <button id="apply-keep" title="코트에 있는 선수는 그대로 두고 위치·동선만 적용">선수 유지</button>
+      </div>
+      <p class="preset-desc" id="preset-desc"></p>
+    </div>
+
+    <div class="card">
+      <h3>선택한 선수</h3>
+      <div id="sel-info" class="sel-info"></div>
+      <div class="row">
+        <button id="clear-routes">경로 지우기</button>
+        <button id="remove-token" class="danger">코트에서 빼기</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>보드</h3>
+      <div class="row">
+        <button id="reset" class="danger" style="flex:1">전체 초기화</button>
+        <button id="share" style="flex:1">공유 링크</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>범례</h3>
+      <div class="legend">
+        <div><i></i>드리블 · 컷 (선수 이동)</div>
+        <div><i class="pass"></i>패스</div>
+        <div><i class="screen"></i>스크린</div>
+        <div style="margin-top:4px">파란 원 = 공격 · 빨간 원 = 수비</div>
+      </div>
+    </div>
+  </aside>
+
+</main>
+
+<script type="module" src="assets/tactics.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+# NBA 덩크 시티 한국 서버 도구함
+
+「NBA 덩크 시티」(Dunk City Dynasty) 한국 서버 유저를 위한 팬 제작 정적 사이트.
+빌드 도구 없이 HTML + CSS + ES 모듈로만 돌아가며 GitHub Pages에 그대로 올라간다.
+
+| 페이지 | 설명 |
+| --- | --- |
+| `index.html` | 소개 / 선수 현황 |
+| `tactics.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종, 재생 |
+| `tiers.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유 |
+
+## 선수 데이터
+
+선수 정보와 얼굴 이미지는 **한 곳에서만** 관리하고 두 페이지가 같이 쓴다.
+
+```
+data/players.json     한국 서버 출시 선수 (자동 생성 — 직접 수정 금지)
+data/upcoming.json    미출시 선수, 중국·글로벌 서버 기준 (직접 관리)
+assets/players/*.png  얼굴 이미지 (id.png, 181x180)
+```
+
+### 신규 선수 반영
+
+한국 서버에 선수가 추가되면 공식 홈페이지를 다시 긁어오면 끝이다.
+
+```sh
+node tools/update-players.mjs
+```
+
+`https://www.dunkcitymobile.com/kr/` 의 "슈퍼스타 라인업" 데이터를 파싱해
+`data/players.json` 과 `assets/players/*.png` 를 통째로 갱신한다.
+영문명만 공식 사이트에 없어서 `tools/update-players.mjs` 의 `EN` 표에서 관리한다 —
+새 id가 나오면 스크립트가 콘솔에 알려주니 한 줄 추가하면 된다.
+
+### 미출시 선수
+
+`data/upcoming.json` 의 `players` 배열에 직접 넣는다. 파일 안에 `schema` 필드로
+형식이 적혀 있다. 얼굴 이미지가 없으면 이름 이니셜 아바타가 자동 생성되므로,
+`assets/players/<id>.png` 를 넣어주기 전까지도 그대로 쓸 수 있다.
+
+현재 60명이 들어 있다(2026-09 조사 기준). 중국 서버 공식 공략 인덱스(TapTap app 242139),
+`dunkcitymobile.com/news` 글로벌 패치노트, `qmx.163.com` 업데이트 공지를 교차 확인해
+한국 서버 37명에 없는 선수만 추렸다. 얼굴 이미지는 공식 소스를 확보하지 못해 비워 두었다.
+전술판·티어표 양쪽의 **"미출시 선수 포함"** 체크박스로 켜고 끌 수 있고,
+이 체크 상태는 두 페이지가 공유한다.
+
+해당 선수가 한국에 정식 출시되면 `upcoming.json` 에서 지우고
+`node tools/update-players.mjs` 를 실행하면 공식 데이터로 자동 편입된다.
+
+## 전술 프리셋
+
+`data/tactics.json` 에 좌표까지 전부 데이터로 들어 있다.
+좌표계는 `x` 0(왼쪽 사이드라인)~1(오른쪽), `y` 0(엔드라인·골밑)~1(하프라인).
+프리셋을 추가하려면 `presets` 배열에 항목 하나를 더 넣으면 된다.
+
+```jsonc
+{
+  "id": "my-play", "name": "내 전술", "tag": "공격", "desc": "설명",
+  "offense": [{ "label": "볼 핸들러", "pos": [1, 2], "at": [0.5, 0.66],
+                "routes": [{ "kind": "move", "pts": [[0.5, 0.66], [0.44, 0.24]] }] }],
+  "defense": [{ "label": "온볼 수비", "pos": [1, 2], "at": [0.5, 0.52] }]
+}
+```
+
+`pos` 는 선호 포지션(1=PG 2=SG 3=SF 4=PF 5=C)으로, 프리셋 적용 시 선수를 자동 배정하는 데 쓴다.
+`kind` 는 `move`(드리블·컷) / `pass`(패스) / `screen`(스크린).
+
+## 로컬에서 보기
+
+ES 모듈과 `fetch` 를 쓰므로 `file://` 로는 열리지 않는다.
+
+```sh
+python3 -m http.server 8000
+```
+
+## 라이선스 / 출처
+
+팬 제작 비공식 도구. 선수 정보와 이미지의 저작권은 NetEase / NBA 등 원저작자에게 있으며,
+[공식 홈페이지](https://www.dunkcitymobile.com/kr/)에서 가져온다.
