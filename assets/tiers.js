@@ -97,7 +97,7 @@ function render() {
 
 const boot = async () => {
   data = await loadPlayers()
-  mountTop('tiers.html', data.updatedAt)
+  mountTop('/tiers/', data.updatedAt)
 
   mountFilters(document.querySelector('#pool .filters'), data.players, list => { pool = list; render() })
 

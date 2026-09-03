@@ -341,8 +341,8 @@ function applyPreset(id, keep) {
 
 const boot = async () => {
   data = await loadPlayers()
-  mountTop('tactics.html', data.updatedAt)
-  tactics = await fetch('data/tactics.json', { cache: 'no-cache' }).then(r => r.json())
+  mountTop('/tactics/', data.updatedAt)
+  tactics = await fetch('/data/tactics.json', { cache: 'no-cache' }).then(r => r.json())
 
   $('#preset').innerHTML = ['공격', '수비'].map(tag =>
     `<optgroup label="${tag} 전술">${tactics.presets.filter(p => p.tag === tag)

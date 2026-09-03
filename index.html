@@ -5,16 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NBA 덩크 시티 한국 서버 · 전술판 & 티어표</title>
 <meta name="description" content="NBA 덩크 시티(NBA Dunk City) 한국 서버 유저를 위한 3:3 전술판과 티어표. 한국 출시 선수 전원 지원, 미출시 선수도 체크 한 번으로.">
-<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
 
 <header class="top">
   <div class="brand">NBA 덩크 시티 <span>한국 서버</span></div>
   <nav>
-    <a href="index.html">홈</a>
-    <a href="tactics.html">전술판</a>
-    <a href="tiers.html">티어표</a>
+    <a href="/">홈</a>
+    <a href="/tactics/">전술판</a>
+    <a href="/tiers/">티어표</a>
   </nav>
   <div class="spacer"></div>
   <div class="stamp"></div>
@@ -25,11 +25,11 @@
   <p class="lead">한국 서버에 출시된 선수로 3:3 전술을 짜고, 나만의 티어표를 만들어 공유하세요.</p>
 
   <div class="grid">
-    <a href="tactics.html">
+    <a href="/tactics/">
       <h2>🏀 전술판</h2>
       <p>하프코트에 선수를 배치하고 동선을 그려 3:3 전술을 시뮬레이션합니다. 픽 앤 롤, 기브 앤 고, 지역방어 등 기본 프리셋 14종 내장.</p>
     </a>
-    <a href="tiers.html">
+    <a href="/tiers/">
       <h2>📊 티어표</h2>
       <p>S~D 기본 티어에 선수를 드래그해 올리는 재미용 티어표. 티어 이름·개수도 바꿀 수 있고 링크로 공유됩니다.</p>
     </a>
@@ -52,9 +52,9 @@
 </main>
 
 <script type="module">
-import { loadPlayers, mountTop } from './assets/app.js'
+import { loadPlayers, mountTop } from '/assets/app.js'
 const { players, updatedAt } = await loadPlayers()
-mountTop('index.html', updatedAt)
+mountTop('/', updatedAt)
 const kr = players.filter(p => p.server === 'kr')
 document.getElementById('faces').innerHTML = kr
   .map(p => `<img src="${p.img}" alt="${p.name}" title="${p.name}" loading="lazy">`).join('')

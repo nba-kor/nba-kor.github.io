@@ -1,5 +1,9 @@
 // 전술판 / 티어표 공통 모듈 — 선수 데이터 로딩, 목록 렌더, 포인터 드래그.
 
+// 우클릭 메뉴를 막는다. 터치에서는 길게 누르기 메뉴도 같이 막혀,
+// 칩을 꾹 눌러 드래그를 시작할 때 OS 메뉴가 끼어들지 않는 이점도 있다.
+addEventListener('contextmenu', e => e.preventDefault())
+
 export const POS = ['', 'PG', 'SG', 'SF', 'PF', 'C']
 export const POS_KO = ['', '포인트가드', '슈팅가드', '스몰포워드', '파워포워드', '센터']
 
@@ -9,8 +13,8 @@ const FILTER_KEY = 'dc.filter'
 export async function loadPlayers() {
   const j = async (p, fallback) => fetch(p, { cache: 'no-cache' }).then(r => r.json()).catch(() => fallback)
   const [kr, up] = await Promise.all([
-    j('data/players.json', { players: [], updatedAt: '' }),
-    j('data/upcoming.json', { players: [] }),
+    j('/data/players.json', { players: [], updatedAt: '' }),
+    j('/data/upcoming.json', { players: [] }),
   ])
   const players = [...kr.players, ...up.players.map(p => ({ ...p, server: p.server || 'cn' }))]
   return { updatedAt: kr.updatedAt, players, byId: new Map(players.map(p => [p.id, p])) }

@@ -3,11 +3,16 @@
 「NBA 덩크 시티」(Dunk City Dynasty) 한국 서버 유저를 위한 팬 제작 정적 사이트.
 빌드 도구 없이 HTML + CSS + ES 모듈로만 돌아가며 GitHub Pages에 그대로 올라간다.
 
-| 페이지 | 설명 |
-| --- | --- |
-| `index.html` | 소개 / 선수 현황 |
-| `tactics.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종, 재생 |
-| `tiers.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유 |
+| URL | 파일 | 설명 |
+| --- | --- | --- |
+| `/` | `index.html` | 소개 / 선수 현황 |
+| `/tactics/` | `tactics/index.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종, 재생 |
+| `/tiers/` | `tiers/index.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유 |
+
+주소에 `.html` 이 드러나지 않도록 디렉터리 + `index.html` 구조를 쓴다.
+그래서 페이지가 루트가 아닌 깊이에 있어도 되도록 정적 자원은 전부 **루트 절대경로**(`/assets/...`,
+`/data/...`)로 참조한다. `data/*.json` 의 `img` 값도 같은 이유로 `/assets/players/...` 형태다.
+사이트를 하위 경로에 올리려면 이 접두사를 바꿔야 한다.
 
 ## 선수 데이터
 
@@ -110,10 +115,11 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
 
 ## 로컬에서 보기
 
-ES 모듈과 `fetch` 를 쓰므로 `file://` 로는 열리지 않는다.
+ES 모듈과 `fetch` 를 쓰므로 `file://` 로는 열리지 않는다. 루트 절대경로를 쓰므로
+**저장소 루트에서** 서버를 띄워야 한다.
 
 ```sh
-python3 -m http.server 8000
+python3 -m http.server 8000     # http://localhost:8000/tactics/
 ```
 
 ## 라이선스 / 출처

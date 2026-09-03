@@ -164,13 +164,13 @@ for (const [cn, en] of Object.entries(CN2EN)) {          // 캐러셀 우선 (�
   const p = byEn.get(norm(en))
   if (!p || done.has(p.id)) continue
   await copyFile(`${CUT}/${cn}.png`, `${ROOT}/assets/players/${p.id}.png`)
-  p.img = `assets/players/${p.id}.png`
+  p.img = `/assets/players/${p.id}.png`
   done.add(p.id); fromCarousel++
 }
 for (const p of up.players) {                            // 남은 선수는 아트 스테이션으로
   if (done.has(p.id) || !artCut.has(p.id)) continue
   await copyFile(`${ART_CUT}/${p.id}.png`, `${ROOT}/assets/players/${p.id}.png`)
-  p.img = `assets/players/${p.id}.png`
+  p.img = `/assets/players/${p.id}.png`
   done.add(p.id); fromArt++
 }
 

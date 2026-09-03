@@ -23,6 +23,7 @@ body {
   color: var(--text);
   font: 14px/1.5 "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   -webkit-text-size-adjust: 100%;
+  -webkit-touch-callout: none;   /* iOS 길게 누르기 팝업 차단 (우클릭 메뉴 차단과 한 쌍) */
 }
 
 a { color: var(--accent-2); }

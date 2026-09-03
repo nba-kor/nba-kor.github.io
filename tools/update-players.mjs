@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 공식 홈페이지(https://www.dunkcitymobile.com/kr/)에서 선수 데이터를 긁어
-// data/players.json 과 assets/players/<id>.png 를 갱신한다.
+// data/players.json 과 assets/players/<id>.png 를 갱신한다. (JSON 안의 img 는 웹 경로라 / 로 시작)
 //
 //   node tools/update-players.mjs
 //
@@ -49,8 +49,8 @@ const ALIAS = {
 // 나중에 라인업에 정식 등재되면 그쪽 데이터가 우선한다.
 // img 는 중국 서버 공식 사이트에서 가져온 얼굴 (tools/cn-faces 참고). 없으면 이니셜 아바타가 뜬다.
 const EXTRA = [
-  { id: 'clarkson', name: '조던 클락슨', short: '클락슨', en: 'Jordan Clarkson', pos: 2, img: 'assets/players/clarkson.png' },
-  { id: 'durant', name: '케빈 듀란트', short: '듀란트', en: 'Kevin Durant', pos: 3, img: 'assets/players/durant.png' },
+  { id: 'clarkson', name: '조던 클락슨', short: '클락슨', en: 'Jordan Clarkson', pos: 2, img: '/assets/players/clarkson.png' },
+  { id: 'durant', name: '케빈 듀란트', short: '듀란트', en: 'Kevin Durant', pos: 3, img: '/assets/players/durant.png' },
 ]
 
 const get = async (url, bin = false) => {
@@ -99,7 +99,7 @@ for (const m of js.matchAll(ROSTER)) {
     birthday: isoDate(birthday),
     nickname,
     desc: desc.replace(/\s+/g, ' ').trim(),
-    img: `assets/players/${id}.png`,
+    img: `/assets/players/${id}.png`,
     server: 'kr',
   })
 }
@@ -162,7 +162,7 @@ for (const p of players) {
   const url = asset(`./m/superstars/player/card-${p.id}.png`)
   if (!url) continue                       // EXTRA 선수는 라인업 카드가 없다 (EXTRA 의 img 를 그대로 쓴다)
   await writeFile(`${ROOT}/assets/players/${p.id}.png`, await get(url, true))
-  p.img = `assets/players/${p.id}.png`
+  p.img = `/assets/players/${p.id}.png`
   downloaded++
 }
 
