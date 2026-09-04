@@ -305,6 +305,31 @@ function play() {
   requestAnimationFrame(step)
 }
 
+// ---------------------------------------------------------------- 확대 / 축소
+
+// 코트 폭은 CSS 가 화면 높이에 맞춰 정하고(--court-chrome), 여기서는 배율만 곱한다.
+// 배율이 1을 넘으면 .court-view 가 스크롤되므로 좌표 계산(getBoundingClientRect)은 그대로 맞는다.
+const ZOOM_KEY = 'dc.zoom'
+let zoom = 1
+function setZoom(z) {
+  zoom = Math.round(clamp(z, .5, 2.5) * 100) / 100
+  document.documentElement.style.setProperty('--zoom', zoom)
+  $('#zoom-fit').textContent = `${Math.round(zoom * 100)}%`
+  localStorage.setItem(ZOOM_KEY, zoom)
+}
+
+function mountZoom() {
+  $('#zoom-in').onclick = () => setZoom(zoom * 1.15)
+  $('#zoom-out').onclick = () => setZoom(zoom / 1.15)
+  $('#zoom-fit').onclick = () => setZoom(1)
+  $('.court-view').addEventListener('wheel', e => {   // Ctrl(⌘) + 휠
+    if (!e.ctrlKey && !e.metaKey) return
+    e.preventDefault()
+    setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12))
+  }, { passive: false })
+  setZoom(+localStorage.getItem(ZOOM_KEY) || 1)
+}
+
 // ---------------------------------------------------------------- 프리셋
 
 /** 프리셋 자동 배정. 되도록 서로 다른 선수를 쓰되, 목록이 모자라면 상대 진영과 겹쳐서라도 채운다. */
@@ -349,6 +374,7 @@ const boot = async () => {
       .map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</optgroup>`).join('')
 
   drawCourt()
+  mountZoom()
 
   const chips = $('#roster-chips')
   mountFilters(document.querySelector('.roster .filters'), data.players, list => {

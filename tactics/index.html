@@ -40,9 +40,17 @@
       <button data-side="def">수비 배치</button>
       <span class="sep"></span>
       <button id="play" class="primary">▶ 재생</button>
+      <span class="sep"></span>
+      <div class="zoom">
+        <button id="zoom-out" title="축소" aria-label="축소">−</button>
+        <button id="zoom-fit" title="화면에 맞추기">100%</button>
+        <button id="zoom-in" title="확대" aria-label="확대">+</button>
+      </div>
     </div>
 
-    <svg id="court" viewBox="0 0 500 470" role="img" aria-label="하프코트 전술판"></svg>
+    <div class="court-view">
+      <svg id="court" viewBox="0 0 500 470" role="img" aria-label="하프코트 전술판"></svg>
+    </div>
 
     <p class="hint">
       왼쪽 목록에서 선수를 <b>코트로 끌어다 놓으면</b> 배치됩니다. 코트 위 선수를 드래그하면 위치가 바뀌고,
@@ -50,6 +58,7 @@
       선수를 눌러 선택한 뒤 <b>경로 지우기</b>·<b>빼기</b>를 쓸 수 있습니다.
       같은 선수를 <b>공격·수비에 하나씩</b> 둘 수 있어 미러 매치도 짜볼 수 있습니다
       (한쪽에 올라간 선수는 목록에서 흐리게, 양쪽 다 차면 잠깁니다).
+      코트는 화면에 꽉 차게 맞춰지며, 크기는 툴바의 <b>−/+</b> 또는 <b>Ctrl(⌘)+휠</b>로 조절할 수 있습니다.
     </p>
   </section>
 

@@ -11,6 +11,8 @@
   --def: #ff5d5d;
   --court: #1f2937;
   --court-line: #7d8896;
+  --zoom: 1;
+  --court-chrome: 210px;   /* 헤더 + 툴바 + 안내문 등 코트 위아래로 쓰이는 높이 */
   color-scheme: dark;
 }
 
@@ -142,7 +144,25 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .court-wrap { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
 .court-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; align-items: center; }
 .court-tools .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
-#court { display: block; width: 100%; height: auto; touch-action: pan-y; border-radius: 8px; background: var(--court); }
+/* 코트는 500x470 비율이 고정이라, 화면 높이에 맞는 폭으로 잘라 한눈에 들어오게 한다.
+   확대하면 이 폭에 --zoom 을 곱하고, 넘치는 만큼 .court-view 가 스크롤된다. */
+.court-view { display: flex; justify-content: center; justify-content: safe center; overflow: auto; }
+#court {
+  display: block;
+  height: auto;
+  flex: none;
+  width: calc(var(--zoom) * min(100%, (100dvh - var(--court-chrome)) * 500 / 470));
+  min-width: 260px;
+  touch-action: pan-x pan-y;
+  border-radius: 8px;
+  background: var(--court);
+}
+@supports not (height: 100dvh) {
+  #court { width: calc(var(--zoom) * min(100%, (100vh - var(--court-chrome)) * 500 / 470)); }
+}
+.zoom { display: flex; align-items: center; gap: 2px; }
+.zoom button { padding: 4px 9px; font-variant-numeric: tabular-nums; }
+.zoom button:first-child, .zoom button:last-child { font-size: 15px; line-height: 1; padding: 5px 10px; }
 .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
 
 .side { display: flex; flex-direction: column; gap: 12px; }
@@ -189,6 +209,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 @media (max-width: 1080px) {
   .tactics { grid-template-columns: 1fr; }
   .court-wrap { order: -1; }                 /* 좁은 화면에서는 코트를 먼저 보여준다 */
+  :root { --court-chrome: 250px; }           /* 툴바가 여러 줄로 접힌다 */
   .tactics .roster { position: static; max-height: 34vh; }
   .side { flex-direction: row; flex-wrap: wrap; }
   .side .card { flex: 1 1 240px; }
