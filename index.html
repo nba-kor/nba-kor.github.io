@@ -21,34 +21,77 @@
 </header>
 
 <main class="home">
-  <h1>NBA 덩크 시티 한국 서버 도구함</h1>
-  <p class="lead">한국 서버에 출시된 선수로 3:3 전술을 짜고, 나만의 티어표를 만들어 공유하세요.</p>
 
-  <div class="grid">
-    <a href="/tactics/">
-      <h2>🏀 전술판</h2>
-      <p>하프코트에 선수를 배치하고 동선을 그려 3:3 전술을 시뮬레이션합니다. 픽 앤 롤, 기브 앤 고, 지역방어 등 기본 프리셋 14종 내장.</p>
+  <section class="hero">
+    <h1>3:3 전술을 짜고,<br>나만의 티어를 매겨보세요</h1>
+    <p class="lead">한국 서버에 출시된 선수 전원을 그대로 씁니다. 아직 안 나온 선수도 체크 한 번이면 미리 써볼 수 있어요.</p>
+    <p class="stat" id="count"></p>
+  </section>
+
+  <nav class="picker" aria-label="도구 선택">
+    <a class="pick pick-tactics" href="/tactics/">
+      <svg class="pick-art" viewBox="0 0 120 100" aria-hidden="true">
+        <rect x="2" y="2" width="116" height="96" rx="6" fill="#1f2937" stroke="#3b4657"/>
+        <rect x="42" y="2" width="36" height="44" fill="none" stroke="#7d8896" stroke-width="1.4"/>
+        <circle cx="60" cy="46" r="13" fill="none" stroke="#7d8896" stroke-width="1.4"/>
+        <path d="M113,2 L113,32.8 A 57 55.6 0 0 1 7,32.8 L7,2" fill="none" stroke="#7d8896" stroke-width="1.4"/>
+        <path d="M50,9 L70,9" stroke="#7d8896" stroke-width="2"/>
+        <circle cx="60" cy="12.3" r="3.4" fill="none" stroke="#f5a623" stroke-width="1.8"/>
+        <path d="M60,72 C56,58 52,44 58,26" fill="none" stroke="#4d9eff" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M58,26 l-3.6,5.6 l7 .3 z" fill="#4d9eff"/>
+        <circle cx="60" cy="76" r="7" fill="#0b0f16" stroke="#4d9eff" stroke-width="2.4"/>
+        <circle cx="30" cy="60" r="7" fill="#0b0f16" stroke="#4d9eff" stroke-width="2.4"/>
+        <circle cx="94" cy="60" r="7" fill="#0b0f16" stroke="#ff5d5d" stroke-width="2.4"/>
+      </svg>
+      <div class="pick-body">
+        <h2>전술판</h2>
+        <p>하프코트에 선수를 끌어다 놓고 동선을 그리면, 그대로 움직여 보여줍니다.</p>
+        <ul class="pick-tags">
+          <li>기본 전술 14종</li><li>동선 재생</li><li>링크 공유</li>
+        </ul>
+      </div>
+      <span class="pick-go">전술판 열기</span>
     </a>
-    <a href="/tiers/">
-      <h2>📊 티어표</h2>
-      <p>S~D 기본 티어에 선수를 드래그해 올리는 재미용 티어표. 티어 이름·개수도 바꿀 수 있고 링크로 공유됩니다.</p>
+
+    <a class="pick pick-tiers" href="/tiers/">
+      <svg class="pick-art" viewBox="0 0 120 100" aria-hidden="true">
+        <rect x="2" y="2" width="116" height="96" rx="6" fill="#161b22" stroke="#3b4657"/>
+        <g>
+          <rect x="8" y="8" width="20" height="19" rx="3" fill="#ff7f7f"/>
+          <rect x="31" y="8" width="81" height="19" rx="3" fill="#1c2230"/>
+          <circle cx="42" cy="17.5" r="6.5" fill="#4d9eff"/><circle cx="57" cy="17.5" r="6.5" fill="#35c6a7"/>
+        </g>
+        <g>
+          <rect x="8" y="30" width="20" height="19" rx="3" fill="#ffbf7f"/>
+          <rect x="31" y="30" width="81" height="19" rx="3" fill="#1c2230"/>
+          <circle cx="42" cy="39.5" r="6.5" fill="#f5a623"/>
+        </g>
+        <g>
+          <rect x="8" y="52" width="20" height="19" rx="3" fill="#ffdf7f"/>
+          <rect x="31" y="52" width="81" height="19" rx="3" fill="#1c2230"/>
+          <circle cx="42" cy="61.5" r="6.5" fill="#d980ff"/><circle cx="57" cy="61.5" r="6.5" fill="#ff7a59"/>
+        </g>
+        <g>
+          <rect x="8" y="74" width="20" height="19" rx="3" fill="#bfff7f"/>
+          <rect x="31" y="74" width="81" height="19" rx="3" fill="#1c2230"/>
+        </g>
+      </svg>
+      <div class="pick-body">
+        <h2>티어표</h2>
+        <p>S부터 D까지, 선수를 끌어 올려 나만의 순위를 만들고 링크로 자랑하세요.</p>
+        <ul class="pick-tags">
+          <li>드래그 정렬</li><li>티어 직접 편집</li><li>링크 공유</li>
+        </ul>
+      </div>
+      <span class="pick-go">티어표 열기</span>
     </a>
-  </div>
+  </nav>
 
-  <div class="faces" id="faces"></div>
+  <section class="roster-strip">
+    <h3>한국 서버 출시 선수</h3>
+    <div class="faces" id="faces"></div>
+  </section>
 
-  <footer>
-    <p id="count"></p>
-    <p>
-      선수 정보와 얼굴 이미지는 <a href="https://www.dunkcitymobile.com/kr/" target="_blank" rel="noopener">「NBA 덩크 시티」 공식 홈페이지</a>와
-      공식 선수 획득 확률 공지를 기준으로 하며, 신규 선수가 나오면 갱신합니다.
-      아직 한국에 출시되지 않은 중국·글로벌 서버 선수는 각 페이지의 <b>미출시 선수 포함</b> 체크박스를 켜서 미리 써볼 수 있습니다.
-    </p>
-    <p>
-      본 사이트는 팬 제작 비공식 도구이며 NetEase / NBA와 무관합니다. 모든 상표와 이미지의 권리는 원저작자에게 있습니다.
-      데이터 출처와 갱신 방법은 <a href="https://github.com/nba-kor/nba-kor.github.io" target="_blank" rel="noopener">GitHub 저장소</a>에 정리해 두었습니다.
-    </p>
-  </footer>
 </main>
 
 <script type="module">
@@ -59,7 +102,7 @@ const kr = players.filter(p => p.server === 'kr')
 document.getElementById('faces').innerHTML = kr
   .map(p => `<img src="${p.img}" alt="${p.name}" title="${p.name}" loading="lazy">`).join('')
 document.getElementById('count').textContent =
-  `한국 서버 출시 ${kr.length}명 · 미출시 등록 ${players.length - kr.length}명 · 데이터 ${updatedAt} 기준`
+  `한국 서버 ${kr.length}명 · 미출시 ${players.length - kr.length}명 지원`
 </script>
 </body>
 </html>
