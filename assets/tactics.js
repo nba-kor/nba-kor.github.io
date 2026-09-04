@@ -1,5 +1,5 @@
 // 전술판 — 하프코트 3:3 배치 / 동선 / 프리셋 / 재생
-import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, mountTop, decodeState, share, POS_KO } from './app.js'
+import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, mountTop, decodeState, share, POS_KO } from './app.js?v=6bf8da50'
 
 const NS = 'http://www.w3.org/2000/svg'
 const W = 500, H = 470            // 1 unit = 0.1ft, 하프코트 50ft x 47ft

@@ -113,6 +113,29 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
 `pos` 는 선호 포지션(1=PG 2=SG 3=SF 4=PF 5=C)으로, 프리셋 적용 시 선수를 자동 배정하는 데 쓴다.
 `kind` 는 `move`(드리블·컷) / `pass`(패스) / `screen`(스크린).
 
+## 배포 전: 캐시 무효화
+
+```sh
+node tools/stamp-assets.mjs
+```
+
+GitHub Pages 는 모든 파일에 `Cache-Control: max-age=600` 만 준다. 그래서 CSS·JS 를 고쳐도
+최대 10분간 브라우저가 옛 파일을 쓴다. 이 스크립트가 파일 내용의 해시를 참조 뒤에 `?v=` 로 붙여,
+내용이 바뀌면 URL 도 바뀌게 만든다.
+
+```html
+<link rel="stylesheet" href="/assets/style.css?v=d6bc232a">
+```
+
+`assets/*.css` 나 `assets/*.js` 를 고쳤으면 **커밋 전에 한 번 돌린다.** 여러 번 돌려도 결과는 같고,
+바뀌지 않은 파일의 해시는 그대로라 불필요한 diff 가 생기지 않는다.
+`app.js` 는 다른 스크립트가 import 하므로 import 구문에도 같은 버전이 박힌다
+(그래야 `app.js` 만 고쳐도 새로 받는다).
+
+HTML 자체도 `max-age=600` 이라 새 HTML 이 퍼지기까지는 여전히 최대 10분이 걸린다. 정적 호스팅에서
+더 줄일 방법은 없다. 선수 얼굴 이미지는 대상이 아니다 — `data/*.json` 은 `fetch` 에서
+`cache: 'no-cache'` 로 매번 확인하지만, 이미지 파일 자체는 이름이 같으면 최대 10분 묵을 수 있다.
+
 ## 로컬에서 보기
 
 ES 모듈과 `fetch` 를 쓰므로 `file://` 로는 열리지 않는다. 루트 절대경로를 쓰므로

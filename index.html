@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NBA 덩크 시티 한국 서버 · 전술판 & 티어표</title>
 <meta name="description" content="NBA 덩크 시티(NBA Dunk City) 한국 서버 유저를 위한 3:3 전술판과 티어표. 한국 출시 선수 전원 지원, 미출시 선수도 체크 한 번으로.">
-<link rel="stylesheet" href="/assets/style.css">
+<link rel="stylesheet" href="/assets/style.css?v=d6bc232a">
 </head>
 <body>
 
@@ -95,7 +95,7 @@
 </main>
 
 <script type="module">
-import { loadPlayers, mountTop } from '/assets/app.js'
+import { loadPlayers, mountTop } from '/assets/app.js?v=6bf8da50'
 const { players, updatedAt } = await loadPlayers()
 mountTop('/', updatedAt)
 const kr = players.filter(p => p.server === 'kr')
