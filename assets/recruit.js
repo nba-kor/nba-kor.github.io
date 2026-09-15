@@ -359,13 +359,16 @@ function teamCard(t) {
 function showList() {
   $('#list-view').hidden = false
   const box = $('#team-list')
+  let quick = true   // 잠깐 난 서버 오류는 1분을 기다리지 않고 5초 뒤 한 번만 다시 읽는다(계속 실패하면 원래 주기로)
   const refresh = async () => {
     try {
       const { teams } = await api('/teams')
+      quick = true
       box.replaceChildren(...(teams.length ? teams.map(teamCard)
         : [h('p', { className: 'rc-note' }, '지금 모집 중인 팀이 없어요. 첫 팀을 만들어 보세요.')]))
     } catch (e) {
       box.replaceChildren(h('p', { className: 'rc-note rc-bad' }, e.message))
+      if (quick && (!e.status || e.status >= 500)) { quick = false; setTimeout(refresh, 5000) }
     }
   }
   refresh()

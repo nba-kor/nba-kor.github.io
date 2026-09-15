@@ -163,18 +163,28 @@ function supabase({ url = '', key = '', fetch, log }) {
   const headers = { apikey: key, 'content-type': 'application/json', accept: 'application/json' }
   return async (path, { method = 'GET', body } = {}) => {
     const where = `${method} ${path.split('?')[0]}`
-    let res, raw
-    try {
-      res = await fetch(base + path, { method, headers, body: body && JSON.stringify(body), signal: AbortSignal.timeout(8000) })
-      raw = await res.text()
-    } catch (e) {
-      log(`DB 연결 실패 ${where}: ${errText(e)}`)
-      fail(503, DB_DOWN)
+    let res, raw, json, tries = 0
+    for (;;) {
+      try {
+        res = await fetch(base + path, { method, headers, body: body && JSON.stringify(body), signal: AbortSignal.timeout(8000) })
+        raw = await res.text()
+      } catch (e) {
+        log(`DB 연결 실패 ${where}: ${errText(e)}`)
+        fail(503, DB_DOWN)
+      }
+      json = null
+      try { json = raw ? JSON.parse(raw) : null } catch {}
+      // 클라우드 앞단이 secret key 로 찍어 준 임시 JWT 의 발급 시각이 DB 시계보다 조금 앞서면 PGRST303 으로 거절된다
+      // (함수가 막 켜졌을 때 운영에서 실제로 났다). 인증 단계에서 거절돼 SQL 은 안 돌았으니 쓰기도 잠깐 뒤 다시 보내도 안전하다
+      if (!(res.status === 401 && json?.code === 'PGRST303') || ++tries > 2) break
+      await new Promise(r => setTimeout(r, 1000))
     }
-    let json = null
-    try { json = raw ? JSON.parse(raw) : null } catch {}
     if (res.ok) return json
     const { code, message } = json || {}
+    if (code === 'PGRST303') {
+      log(`DB 인증 시각 어긋남 ${where}: ${message}`)
+      fail(503, DB_DOWN)
+    }
     if (code === 'PT404') fail(404, NOT_FOUND)
     if (code === 'PT409' && NOT_OPEN[message]) fail(409, NOT_OPEN[message])
     if (code === '23505' && message?.includes('recruit_members_team_discord')) fail(409, '이미 이 팀에 있는 디스코드 닉네임이에요')

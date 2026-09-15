@@ -1024,7 +1024,7 @@ test('Data API 오류 → HTTP: PT404 · PT409(full) · 23505 는 사용자 문�
     seen.push({ method: init.method, path: u.pathname + u.search, headers: init.headers, body: init.body && JSON.parse(init.body) })
     if (u.pathname === '/rest/v1/rpc/recruit_hit') return [200, '1']
     if (u.pathname === '/rest/v1/rpc/recruit_create_team') return [200, JSON.stringify({ member: 1, voice: { id: '11', name: '음성 4' } })]
-    return u.pathname.startsWith('/rest/v1/rpc/') ? rpc : init.method === 'DELETE' ? [204, ''] : [200, JSON.stringify([row])]
+    return u.pathname.startsWith('/rest/v1/rpc/') ? (typeof rpc === 'function' ? rpc() : rpc) : init.method === 'DELETE' ? [204, ''] : [200, JSON.stringify([row])]
   }
   const elogs = []
   const keys = JSON.stringify({ default: 'sb_secret_from_keys', other: 'sb_secret_other' })
@@ -1080,6 +1080,18 @@ test('Data API 오류 → HTTP: PT404 · PT409(full) · 23505 는 사용자 문�
     assert.deepEqual([r.status, r.body], [status, { error }], reply.join(' '))
   }
   assert.equal(elogs.filter(l => l.startsWith('API 오류')).length, 3, '500 은 로그에 남긴다')
+
+  // PGRST303(앞단이 찍은 임시 JWT 의 발급 시각이 DB 시계보다 앞섬) — 운영에서 함수가 막 켜졌을 때 났다. 잠깐 뒤 다시 보낸다
+  const skew = [401, pg('PGRST303', 'JWT issued at future')]
+  let left = 1
+  rpc = () => left-- > 0 ? skew : [200, '7']
+  const retried = await join()
+  assert.deepEqual([retried.status, left], [201, -1], '한 번 거절돼도 다시 보내 성공한다')
+  rpc = skew
+  const calls = seen.length
+  const stuck = await join()
+  assert.deepEqual([stuck.status, stuck.body], [503, { error: DB_DOWN }], '계속 어긋나면 500 이 아니라 503(다시 시도할 수 있는 오류)')
+  assert.equal(seen.slice(calls).filter(s => s.path === '/rest/v1/rpc/recruit_join_team').length, 3, '처음 + 두 번 더')
   assert.ok(!elogs.join('\n').includes('sb_secret_'), '키는 로그에 남기지 않는다')
 })
 
