@@ -128,19 +128,62 @@ async function initAuth() {
   }
   // 로그인을 취소하면 ?error=... 가 남는다 — 다음 로그인의 redirectTo 에 딸려 가지 않게 걷는다 (?code 는 SDK 가 걷는다)
   const url = new URL(location.href)
-  if (url.searchParams.has('error')) {
-    for (const k of ['error', 'error_code', 'error_description']) url.searchParams.delete(k)
+  const failed = url.searchParams.has('error'), wantLogin = url.searchParams.has('login')
+  if (failed || wantLogin) {
+    for (const k of ['error', 'error_code', 'error_description', 'login']) url.searchParams.delete(k)
     history.replaceState(history.state, '', url)
   }
+  // 승인 화면을 건너뛰려다(prompt=none) 실패했으면 — 디스코드 쪽 승인이 풀렸거나 로그인이 끊긴 것 — 한 번만 승인 화면으로 다시 간다
+  const quietFailed = failed && store.get(QUIET_TRY)
+  store.del(QUIET_TRY)
+  if (quietFailed) { store.del(AUTHORIZED); return login() }
   sb.auth.onAuthStateChange((event, session) => {
+    if (session) store.set(AUTHORIZED, '1')   // 세션이 있다 = 이 브라우저에서 디스코드 승인을 끝냈다
     const id = session?.user?.id
     if (event !== 'INITIAL_SESSION' && id === uid) return   // 토큰 갱신 · 탭 복귀 때마다 /api/me 를 다시 읽지 않는다
     uid = id
     setTimeout(loadMe)   // 콜백 안에서 SDK 를 다시 부르면 잠금에 걸린다 — 한 박자 미룬다
   })
+  // 카카오톡에서 "로그인"을 눌러 바깥 브라우저로 넘어온 경우(?login=1) — 로그인이 안 돼 있으면 바로 이어서 로그인한다
+  if (wantLogin && !(await sb.auth.getSession()).data.session) login()
 }
 
-const login = () => sb?.auth.signInWithOAuth({ provider: 'discord', options: { redirectTo: `${location.origin}/recruit/${location.search}` } })
+// 이 브라우저에서 디스코드 승인을 끝낸 적이 있으면 다음부터 승인 화면을 건너뛴다(디스코드 prompt=none — Supabase 가 그대로 넘긴다)
+const AUTHORIZED = 'dc.recruit.discordAuthorized', QUIET_TRY = 'dc.recruit.quietLogin'
+const store = {
+  get: k => { try { return localStorage.getItem(k) } catch { return null } },
+  set: (k, v) => { try { localStorage.setItem(k, v) } catch {} },
+  del: k => { try { localStorage.removeItem(k) } catch {} },
+}
+const UA = navigator.userAgent
+const IN_KAKAO = /KAKAOTALK/i.test(UA)
+const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(UA)
+
+function login() {
+  if (!sb) return
+  // 카카오톡 인앱 브라우저에는 디스코드 로그인이 안 돼 있어 아이디 · 비밀번호를 매번 쳐야 한다 — 평소 쓰는 브라우저로 넘겨 거기서 로그인한다
+  if (IN_KAKAO) {
+    const next = new URL(location.href)
+    next.searchParams.set('login', '1')
+    location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(next)}`
+    // 카톡 버전에 따라 바깥 브라우저가 안 열리면 화면이 그대로 보인다 — 그때는 여기서 로그인한다
+    setTimeout(() => { if (document.visibilityState === 'visible') oauth() }, 1500)
+    return
+  }
+  return oauth()
+}
+
+function oauth() {
+  const quiet = store.get(AUTHORIZED) === '1'
+  if (quiet) store.set(QUIET_TRY, '1')
+  return sb.auth.signInWithOAuth({
+    provider: 'discord',
+    options: { redirectTo: `${location.origin}/recruit/${location.search}`, ...(quiet && { queryParams: { prompt: 'none' } }) },
+  })
+}
+
+// 로그아웃하면 다음 로그인은 승인 화면부터 — 다른 디스코드 계정으로 바꾸려는 경우일 수 있다
+const logout = () => { store.del(AUTHORIZED); return sb.auth.signOut() }
 
 function renderAuth() {
   const btn = (label, onclick, props = {}) => h('button', { type: 'button', onclick, ...props }, label)
@@ -149,11 +192,13 @@ function renderAuth() {
     down: [h('span', { className: 'rc-muted', title: '로그인 모듈을 불러오지 못했어요. 새로고침해 보세요' }, '로그인 불가')],
     out: [btn('디스코드 로그인', login, { className: 'rc-login' })],
     error: [h('span', { className: 'rc-muted rc-bad' }, '로그인 확인 실패'), btn('다시 시도', loadMe)],
-    in: me && [h('b', { className: 'rc-uname', title: '디스코드 계정' }, me.user.name), btn('내 프로필', () => openProfile()), btn('로그아웃', () => sb.auth.signOut())],
+    in: me && [h('b', { className: 'rc-uname', title: '디스코드 계정' }, me.user.name), btn('내 프로필', () => openProfile()), btn('로그아웃', logout)],
   }[auth])
   const need = $('#need')
   need.textContent = auth === 'down' ? '로그인을 불러오지 못해 지금은 팀을 만들거나 가입할 수 없어요. 새로고침해 보세요.'
-    : auth === 'out' ? '팀을 만들거나 가입하려면 디스코드 로그인이 필요해요.' : ''
+    : auth !== 'out' ? ''
+    : `팀을 만들거나 가입하려면 디스코드 로그인이 필요해요. ${IN_KAKAO ? '로그인을 누르면 평소 쓰는 브라우저로 열려요(카카오톡 안에서는 매번 비밀번호를 쳐야 해서요).'
+      : IS_MOBILE ? '' : 'PC에서는 디스코드 로그인 화면의 QR 코드를 휴대폰 디스코드 앱으로 찍으면 비밀번호 없이 로그인돼요.'}`.trim()
   need.hidden = !need.textContent
   $('#new-team').disabled = auth === 'down'
 }
