@@ -1,5 +1,5 @@
 {
-  "note": "팀원모집 설정 — 서버(server/index.mjs)와 화면(assets/recruit.js)이 같이 읽는다.",
+  "note": "팀원모집 설정 — 서버(server/index.mjs) · 화면(assets/recruit.js) · TNAB 봇이 같이 읽는다.",
   "teamSize": 3,
   "maxEntries": 3,
   "ttlHours": 3,
@@ -8,11 +8,14 @@
     "fun": "즐겜",
     "serious": "빡겜"
   },
+  "mics": {
+    "required": "필수",
+    "listen": "듣코가능",
+    "off": "필요없음"
+  },
   "limits": {
     "title": 30,
-    "memo": 100,
-    "passwordMin": 4,
-    "passwordMax": 20
+    "memo": 100
   },
   "maxPresets": 5
 }

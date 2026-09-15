@@ -1,5 +1,5 @@
 # Edge Function 배포 설정(npx supabase functions deploy 가 읽는다). 로컬 개발은 supabase start 대신 compose.yaml 을 쓴다.
 [functions.recruit]
-# 브라우저는 Supabase 키 없이 부르고, Authorization 에는 팀원 토큰(JWT 아님)을 싣는다 — 게이트웨이의 JWT 검사를 꺼야 함수까지 온다
+# 로그인 토큰 확인은 함수가 직접 한다(공개 목록은 로그인 없이, TNAB 봇은 Authorization: Bot <키>) — 게이트웨이의 JWT 검사를 꺼야 함수까지 온다
 verify_jwt = false
 entrypoint = "./functions/recruit/index.mjs"

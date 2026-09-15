@@ -2,7 +2,10 @@
 // 알림은 봇이 아니라 웹훅으로 보낸다(권한이 가장 적게 든다). 봇 토큰은 채널 목록(과 잠수 채널)을 읽는 데만 쓴다.
 
 const POS = ['', 'PG', 'SG', 'SF', 'PF', 'C']
-const COLOR = { start: 0xf5a623, join: 0x4d9eff, full: 0x35c6a7 }
+const COLOR = { start: 0xf5a623, join: 0x4d9eff, full: 0x35c6a7, leave: 0x8a94a6, disband: 0xe5534b }
+const MIC = { required: '🎙️ 마이크 필수', listen: '🎧 듣코가능', off: '🔇 마이크 필요없음' }
+const LEFT = { leave: '팀에서 나갔어요', kick: '팀장이 내보냈어요', move: '다른 팀으로 옮겼어요' }
+const DISBANDED = { disband: '팀장이 팀을 해제했어요', leader: '팀장이 나가서 팀이 해제됐어요', move: '팀장이 다른 팀으로 옮겨 팀이 해제됐어요', admin: '관리자가 팀을 해제했어요' }
 const UA = 'DiscordBot (https://nba-kor.github.io, 1.0)'   // 형식이 틀린 User-Agent 는 Cloudflare 가 막는다
 const ROOMS_MS = 60_000
 
@@ -16,7 +19,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 // ---------------------------------------------------------------- 웹훅 알림
 
 /**
- * 팀 알림을 하나씩 보낸다. API 응답과는 따로 돈다 — 실패해도 로그만 남긴다.
+ * 팀 알림을 하나씩 보낸다. API 응답과는 따로 돈다 — 실패해도 로그만 남긴다. 웹이든 봇이든 모든 동작이 이 함수를 지나므로 알림도 여기서만 보낸다.
  * 큐 promise 를 알림마다 waitUntil 에 넘긴다 — Edge Function 은 응답을 보낸 뒤에도 그게 끝날 때까지 워커를 살려 둔다.
  * ponytail: 큐는 워커(isolate) 하나 안에서만 순서를 지킨다 — 429 로 기다리는 사이 다른 워커가 받은 가입 · 완료 알림이 먼저 나갈 수 있다.
  * 순서가 중요해지면 DB outbox 로(429 재시도를 빼면 알림이 사라진다)
@@ -54,10 +57,15 @@ export function createNotifier({ webhookUrl, siteUrl, guildId, players, modes = 
 
   // embed 는 큐 안에서 만든다 — 만들다 터져도 API 응답은 이미 나갔고 로그만 남는다.
   // 넘기는 팀 뷰는 요청마다 새로 만든 객체라 나중에 만들어도 그 시점 스냅샷 그대로다.
+  // 멘션은 기본으로 전부 끈다(이름에 @everyone 을 넣어도 안 울린다). 모집 완료만 그 파티원 ID 를 골라 울린다
   const enqueue = make => {
     if (!url) return
     queue = queue
-      .then(() => send({ username: 'NBA 덩크 시티 팀원모집', embeds: [make()], allowed_mentions: { parse: [] } }))
+      .then(() => {
+        const [embed, users] = make()   // 멘션은 embed 안에서는 안 울린다 — content 에 싣는다
+        const mention = users ? { content: users.map(id => `<@${id}>`).join(' '), allowed_mentions: { users } } : { allowed_mentions: { parse: [] } }
+        return send({ username: 'NBA 덩크 시티 팀원모집', embeds: [embed], ...mention })
+      })
       .catch(e => log(`디스코드 웹훅 오류: ${errText(e)}`))
     waitUntil(queue)
   }
@@ -65,11 +73,11 @@ export function createNotifier({ webhookUrl, siteUrl, guildId, players, modes = 
   // 길이는 index.mjs 검증에서 묶어 둬서 embed 한도(제목 256 · 설명 4096 · 필드 1024)를 넘지 않는다.
   // 제목에서는 역슬래시 이스케이프가 그대로 보일 수 있다 — 이스케이프 대신 마크다운 기호를 뺀다(프리셋 이름엔 없다)
   const subject = t => [t.room.title, t.tactic.name].map(s => s.replace(/[\\*_~`|<>@#]/g, '').trim()).find(Boolean) || '전술 자유'
-  const meta = t => `${t.room.mic ? '🎙️ 마이크 O' : '🔇 마이크 X'} · ${modes[t.room.mode] ?? ''} · 전술 ${esc(t.tactic.name) || '자유'}`
+  const meta = t => `${MIC[t.room.mic] ?? ''} · ${modes[t.room.mode] ?? ''} · 전술 ${esc(t.tactic.name) || '자유'}`
   const line = m => {
     const [e] = m.entries, p = players.get(e.char) || { pos: 0, name: e.char }
     const more = m.entries.length - 1
-    return `**${esc(e.nick)}** (${e.tier}) · ${esc(m.discord)}\n${`${POS[p.pos]} ${p.name}`.trim()}${more ? ` 외 ${more}개` : ''}`
+    return `**${esc(m.name)}** (${e.tier}) · ${`${POS[p.pos]} ${p.name}`.trim()}${more ? ` 외 ${more}개` : ''} · 마이크 ${m.mic ? 'O' : 'X'}`
   }
   const voiceField = (t, lead) => ({
     name: '음성채널',
@@ -85,13 +93,20 @@ export function createNotifier({ webhookUrl, siteUrl, guildId, players, modes = 
   })
 
   return {
-    teamCreated: t => enqueue(() => ({
+    teamCreated: t => enqueue(() => [{
       ...embed(t, COLOR.start, `🏀 팀원 모집 시작 · ${subject(t)}`, `${line(t.members[0])}\n\n모집 ${t.members.length}/${t.size}`, [voiceField(t, '')]),
       thumbnail: { url: `${site}/assets/players/${t.members[0].entries[0].char}.png` },
-    })),
-    memberJoined: (t, memberId) => enqueue(() => t.members.length >= t.size
-      ? embed(t, COLOR.full, `🎉 모집 완료 · ${subject(t)}`, t.members.map(line).join('\n\n'), [voiceField(t, ' 로 모여주세요')])
-      : embed(t, COLOR.join, `✅ 팀원 합류 · ${subject(t)} (${t.members.length}/${t.size})`, line(t.members.find(m => m.id === memberId)))),
+    }]),
+    // count = 넣은 뒤 인원(RPC 가 잠금 안에서 센 값). 다시 읽은 팀 뷰에는 뒤이은 가입이 섞일 수 있어 인원은 이걸로 판단한다 — 완료 알림은 한 번만
+    memberJoined: (t, userId, count) => enqueue(() => count >= t.size
+      ? [embed(t, COLOR.full, `🎉 모집 완료 · ${subject(t)}`, t.members.map(line).join('\n'), [voiceField(t, ' 로 모여주세요')]), t.members.map(m => m.userId)]
+      : [embed(t, COLOR.join, `✅ 팀원 합류 · ${subject(t)} (${count}/${t.size})`, line(t.members.find(m => m.userId === userId)))]),
+    // t = 빠진 뒤의 팀, m = 빠진 사람. reason: leave 나가기 · kick 방출 · move 다른 팀으로 이동
+    memberLeft: (t, m, reason) => enqueue(() => [
+      embed(t, COLOR.leave, `👋 팀원 이탈 · ${subject(t)} (${t.members.length}/${t.size})`, `${line(m)}\n${LEFT[reason]}`),
+    ]),
+    // t = 지우기 전의 팀. reason: disband 팀장 해제 · leader 팀장 나감 · move 팀장 이동 · admin 관리자 해제
+    teamDisbanded: (t, reason) => enqueue(() => [embed(t, COLOR.disband, `🛑 팀 해제 · ${subject(t)}`, DISBANDED[reason])]),
   }
 }
 

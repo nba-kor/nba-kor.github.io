@@ -304,7 +304,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .recruit legend { padding: 0; margin-bottom: 10px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .recruit legend small { font-weight: 500; opacity: .8; margin-left: 4px; }
 .recruit input[type="text"], .recruit select { padding: 9px 11px; min-width: 0; }
-.recruit input[type="password"], .recruit textarea {
+.recruit textarea {
   font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
   padding: 9px 11px; min-width: 0; width: 100%;
 }
@@ -316,6 +316,15 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-muted { margin: 0; color: var(--muted); font-size: 13px; }
 .rc-note { margin: 0; color: var(--muted); font-size: 13.5px; }
 .rc-bad { color: var(--def); }
+
+/* 로그인 바 (상단 헤더 오른쪽) */
+.rc-auth { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.rc-auth button { padding: 5px 11px; font-size: 13px; font-weight: 600; }
+.rc-auth .rc-login { color: #fff; background: #5865f2; border-color: transparent; font-weight: 700; }
+.rc-auth .rc-login:hover { background: #4752c4; }
+.rc-uname { min-width: 0; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-need { margin-top: 6px; }
+.rc-ok { margin-top: 10px; color: #35c6a7; }
 
 /* 목록 */
 .rc-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -353,10 +362,11 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-tcard.is-full { background: transparent; border-style: dashed; }
 .rc-tcard.is-full .rc-faces { opacity: .5; filter: grayscale(.6); }
 
-/* 방 정보 뱃지 — 마이크 O/X · 즐겜/빡겜 */
+/* 방 정보 뱃지 — 마이크 필수/듣코가능/필요없음 · 즐겜/빡겜, 팀원 마이크 O/X */
 .rc-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; }
 .rc-tag { padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; border: 1px solid var(--line); color: var(--muted); }
-.rc-tag.is-mic { color: #35c6a7; border-color: #35c6a755; }
+:is(.rc-tag.mic-required, .rc-tag.mic-on) { color: #35c6a7; border-color: #35c6a755; }
+.rc-tag.mic-listen { color: #f5c542; border-color: #f5c54255; }
 .rc-tag.is-fun { color: var(--accent-2); border-color: #4d9eff55; }
 .rc-tag.is-serious { color: var(--def); border-color: #ff5d5d66; }
 .rc-tactic { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
@@ -393,7 +403,18 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-create .preset-desc { margin: 0; }
 
 .rc-person { display: flex; flex-direction: column; gap: 10px; }
-.rc-same-check { font-size: 13px; color: var(--muted); align-self: flex-start; }
+/* 내 프로필 */
+.rc-profile { max-width: 760px; margin-inline: auto; margin-bottom: 18px; }
+.rc-why { margin: -6px 0 14px; color: var(--accent); font-weight: 600; }
+.rc-profile-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 22px; flex-wrap: wrap; margin-bottom: 14px; }
+.rc-pname { font-size: 15px; overflow-wrap: anywhere; }
+/* 팀장 정보 · 가입 폼의 내 프로필 요약 */
+.rc-mecard { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; }
+.rc-mecard > p { flex: 1 1 200px; }
+.rc-mecard > div { flex: 1 1 160px; min-width: 0; }
+.rc-mecard img { width: 48px; height: 48px; border-radius: 50%; background: #0b0f16; flex: none; box-shadow: 0 0 0 2px var(--accent); }
+.rc-mecard small { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.rc-mecard button { flex: none; margin-left: auto; padding: 5px 11px; font-size: 12.5px; font-weight: 600; }
 .rc-entries-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .rc-entries-head small { font-weight: 500; font-size: 11.5px; }
 .rc-entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -503,6 +524,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-member.rc-empty .rc-hole { width: 40px; height: 40px; }
 .rc-mhead { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; min-width: 0; }
 .rc-mhead b { font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-mhead .rc-tag { flex: none; }
 .rc-mhead button { margin-left: auto; padding: 3px 10px; font-size: 12px; flex: none; }
 .rc-badge { flex: none; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 800; color: #1a1200; background: var(--accent); }
 .rc-badge.me { color: #06121f; background: var(--accent-2); }
@@ -541,10 +563,8 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 
 /* 팀장 관리 */
 .recruit button.danger:not(:hover) { color: var(--def); border-color: #ff5d5d55; }   /* 해제 · 방출 · 나가기 — 터치 화면엔 hover 가 없다 */
-.rc-manage summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); }
-.rc-manage summary:hover { color: var(--text); }
-.rc-manage[open] summary { margin-bottom: 10px; }
-.rc-manage > :not(summary) + :not(summary) { margin-top: 10px; }
+.rc-manage { border-color: #f5a62366; }
+.rc-manage > * + * { margin-top: 10px; }
 .rc-manage > p { margin-bottom: 0; }
 .rc-manage-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .rc-manage-row button { flex: 1 1 120px; padding: 8px 12px; font-weight: 700; }

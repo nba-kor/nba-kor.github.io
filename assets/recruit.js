@@ -1,4 +1,4 @@
-// 팀원모집 — 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
+// 팀원모집 — 디스코드 로그인 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
 import { loadPlayers, faceOf, mountTop, POS, POS_KO } from './app.js?v=6bf8da50'
 import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=081a7b3e'
 
@@ -8,10 +8,14 @@ import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=081a7b
 // 그 밖(로컬 docker compose 의 nginx 가 /api/ 를 같은 함수로 넘긴다)에서는 같은 도메인의 /api
 const API_ORIGIN = location.hostname === 'nba-kor.github.io' ? 'https://lgchgqxjjlapszmxarun.supabase.co/functions/v1/recruit' : ''
 const KAKAO_JS_KEY = '8f89f3ef476f72827c9a875ad0c23a72'    // Kakao Developers > 앱 > 플랫폼 키 > JavaScript 키. 비우면 공유 버튼이 링크 복사로 대체된다.
+// 디스코드 로그인 = Supabase Auth. publishable key 는 브라우저에 두라고 만든 공개 키다(표는 RLS 로 막혀 있어 이 키로는 아무것도 못 읽는다)
+const SUPABASE_URL = 'https://lgchgqxjjlapszmxarun.supabase.co'
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_NlTRTkRjbTv0iCHhNB8pZA_2Ov5In9Z'
+const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/+esm'   // 버전 고정. 동적 import 라 CDN 이 죽어도 목록·팀 화면은 뜬다
 
-const ME_KEY = 'dc.recruit.me'           // 마지막으로 낸 내 정보 { discord, same, entries } — 다음 폼을 미리 채운다
-const TOKENS_KEY = 'dc.recruit.tokens'   // { [teamId]: { token, memberId, leader } }
-const PRESETS_KEY = 'dc.recruit.presets' // [{ name, discord, same, entries }] — 자주 쓰는 구성, 최대 cfg.maxPresets 개
+const PRESETS_KEY = 'dc.recruit.presets' // [{ name, entries }] — 자주 쓰는 캐릭터 구성, 최대 cfg.maxPresets 개
+const LEFT_KEY = 'dc.recruit.left'       // 팀을 만들고 팀 화면으로 넘어갈 때 "기존 파티에서 빠졌어요" 를 들고 간다 (sessionStorage)
+const MOVE_ASK = '기존 파티에서 빠지고 이동할까요? (팀장이면 기존 파티는 해제돼요)'
 const NO_SERVER = '모집 서버에 연결할 수 없어요'
 const STATUS = { open: '모집 중', full: '모집 완료' }
 const LINK_RE = /:\/\/|www\.|discord\.gg/i   // 서버와 같은 규칙 — 이름에 링크 금지
@@ -45,13 +49,16 @@ const presetOf = id => tactics.presets.find(p => p.id === id)
 const charLine = e => { const p = P(e.char); return `${POS[p.pos] || '?'} · ${p.name}` }
 const titleOf = t => t.room.title || t.tactic.name || '전술 자유'
 const goneMsg = () => '없는 팀이에요 — 해제됐거나 시간이 다 돼 삭제됐어요'   // 연장한 팀은 3시간보다 오래 산다
+const MIC_TAG = { required: '마이크 필수', listen: '듣코가능', off: '마이크 필요없음' }
 const roomBadges = room => [
-  h('span', { className: `rc-tag ${room.mic ? 'is-mic' : 'no-mic'}` }, room.mic ? '마이크 O' : '마이크 X'),
+  h('span', { className: `rc-tag mic-${room.mic}` }, MIC_TAG[room.mic] || room.mic),
   h('span', { className: `rc-tag is-${room.mode}` }, cfg.modes[room.mode] || room.mode),
 ]
 
-async function api(path, { method = 'GET', body, token } = {}) {
+/** withToken = 로그인 토큰을 붙인다. 공개 GET 에는 붙이지 않는다 — Authorization 헤더가 붙으면 preflight 로 함수 호출이 두 배가 된다 */
+async function api(path, { method = 'GET', body, withToken } = {}) {
   let r
+  const token = withToken && (await sb?.auth.getSession())?.data.session?.access_token   // getSession 이 만료된 토큰을 갱신해 준다
   try {
     r = await fetch(`${API_ORIGIN}/api${path}`, {
       method, cache: 'no-store',
@@ -78,12 +85,115 @@ async function submit(form, call) {
   finally { btn.disabled = false; btn.textContent = label }
 }
 
-function remember(res, person, leader) {
-  const all = load(TOKENS_KEY, {})
-  all[res.team.id] = { token: res.member.token, memberId: res.member.id, leader }
-  saveJson(TOKENS_KEY, all)
-  saveJson(ME_KEY, person)
+const leftMsg = left => left && (left.disbanded ? '기존 파티를 해제하고 옮겼어요' : '기존 파티에서 빠지고 옮겼어요')
+
+// ---------------------------------------------------------------- 로그인 (Supabase Auth · Discord)
+
+let sb = null         // supabase 클라이언트 — 못 불러오면 null 로 남고 로그인만 안 된다
+let auth = 'loading'  // loading · down(SDK 못 불러옴) · out · in · error(로그인은 됐는데 /api/me 실패)
+let me = null         // auth === 'in' 이면 GET /api/me — { user: { id, name }, profile, teamId }
+let meSeq = 0, uid
+const meSubs = []     // me 가 바뀌면 부를 화면 갱신
+let meReady
+const meFirst = new Promise(r => { meReady = r })
+
+function setAuth(state, v = null) {
+  auth = state
+  me = v
+  meReady()
+  renderAuth()
+  for (const f of meSubs) f()
 }
+
+async function loadMe() {
+  const seq = ++meSeq
+  const session = sb && (await sb.auth.getSession()).data.session
+  if (seq !== meSeq) return
+  if (!session) return setAuth(sb ? 'out' : 'down')
+  try {
+    const v = await api('/me', { withToken: true })
+    if (seq === meSeq) setAuth('in', v)
+  } catch (e) {
+    if (seq === meSeq) setAuth(e.status === 401 ? 'out' : 'error')   // 401 = 토큰이 무효 — 다시 로그인하면 된다
+  }
+}
+
+async function initAuth() {
+  try {
+    const { createClient } = await import(SUPABASE_JS)
+    sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { flowType: 'pkce' } })
+  } catch (e) {
+    console.warn('로그인 모듈을 불러오지 못했어요', e)
+    return setAuth('down')
+  }
+  // 로그인을 취소하면 ?error=... 가 남는다 — 다음 로그인의 redirectTo 에 딸려 가지 않게 걷는다 (?code 는 SDK 가 걷는다)
+  const url = new URL(location.href)
+  if (url.searchParams.has('error')) {
+    for (const k of ['error', 'error_code', 'error_description']) url.searchParams.delete(k)
+    history.replaceState(history.state, '', url)
+  }
+  sb.auth.onAuthStateChange((event, session) => {
+    const id = session?.user?.id
+    if (event !== 'INITIAL_SESSION' && id === uid) return   // 토큰 갱신 · 탭 복귀 때마다 /api/me 를 다시 읽지 않는다
+    uid = id
+    setTimeout(loadMe)   // 콜백 안에서 SDK 를 다시 부르면 잠금에 걸린다 — 한 박자 미룬다
+  })
+}
+
+const login = () => sb?.auth.signInWithOAuth({ provider: 'discord', options: { redirectTo: `${location.origin}/recruit/${location.search}` } })
+
+function renderAuth() {
+  const btn = (label, onclick, props = {}) => h('button', { type: 'button', onclick, ...props }, label)
+  $('#auth').replaceChildren(...{
+    loading: [h('span', { className: 'rc-muted' }, '로그인 확인 중…')],
+    down: [h('span', { className: 'rc-muted', title: '로그인 모듈을 불러오지 못했어요. 새로고침해 보세요' }, '로그인 불가')],
+    out: [btn('디스코드 로그인', login, { className: 'rc-login' })],
+    error: [h('span', { className: 'rc-muted rc-bad' }, '로그인 확인 실패'), btn('다시 시도', loadMe)],
+    in: me && [h('b', { className: 'rc-uname', title: '디스코드 계정' }, me.user.name), btn('내 프로필', () => openProfile()), btn('로그아웃', () => sb.auth.signOut())],
+  }[auth])
+  const need = $('#need')
+  need.textContent = auth === 'down' ? '로그인을 불러오지 못해 지금은 팀을 만들거나 가입할 수 없어요. 새로고침해 보세요.'
+    : auth === 'out' ? '팀을 만들거나 가입하려면 디스코드 로그인이 필요해요.' : ''
+  need.hidden = !need.textContent
+  $('#new-team').disabled = auth === 'down'
+}
+
+/**
+ * 만들기 · 가입 직전 확인. 로그인과 프로필이 준비됐으면 최신 me, 아니면 로그인으로 보내거나(리다이렉트) 프로필 폼을 열고 null.
+ * 1인 1파티 확인창이 틀리지 않게 me(teamId) 는 매번 다시 읽는다.
+ */
+async function ready(again, why) {
+  await meFirst
+  if (auth === 'down') return null
+  if (auth === 'out') { await login(); return null }
+  await loadMe()
+  if (auth === 'out') { await login(); return null }
+  if (auth !== 'in') throw new Error('로그인 정보를 확인하지 못했어요 — 잠시 뒤 다시 눌러 주세요')
+  if (!me.profile) { openProfile(again, why); return null }
+  return me
+}
+
+/** 팀장 정보 · 가입 폼에 들어가는 "내 프로필" 요약 */
+function meCard() {
+  const box = h('div', { className: 'rc-mecard' })
+  const act = (label, onclick) => h('button', { type: 'button', onclick }, label)
+  if (auth === 'loading') box.append(h('p', { className: 'rc-muted' }, '로그인 확인 중…'))
+  else if (auth === 'down') box.append(h('p', { className: 'rc-muted' }, '로그인을 불러오지 못해 지금은 쓸 수 없어요.'))
+  else if (auth === 'out') box.append(h('p', { className: 'rc-muted' }, '디스코드로 로그인하면 내 프로필로 바로 만들고 가입해요.'), act('디스코드 로그인', login))
+  else if (auth === 'error') box.append(h('p', { className: 'rc-muted rc-bad' }, '로그인 정보를 확인하지 못했어요.'), act('다시 시도', loadMe))
+  else if (!me.profile) box.append(h('p', { className: 'rc-muted' }, h('b', {}, me.user.name), ' 님, 게임 계정과 마이크를 적은 프로필을 먼저 등록해 주세요.'), act('프로필 등록', () => openProfile()))
+  else {
+    const e = me.profile.entries[0], p = P(e.char), n = me.profile.entries.length - 1
+    box.append(h('img', { src: faceOf(p), alt: '' }),
+      h('div', {},
+        h('div', { className: 'rc-acct-name' }, h('b', {}, me.user.name), micTag(me.profile.mic)),
+        h('small', {}, `${e.nick} · ${e.tier} · ${charLine(e)}${n ? ` 외 ${n}개` : ''}`)),
+      act('프로필 수정', () => openProfile()))
+  }
+  return box
+}
+const micTag = on => h('span', { className: `rc-tag ${on ? 'mic-on' : 'mic-no'}` }, on ? '마이크 O' : '마이크 X')
+const renderMeCards = () => { for (const s of document.querySelectorAll('[data-mecard]')) s.replaceChildren(meCard()) }
 
 // ---------------------------------------------------------------- 코트 (보기 전용)
 
@@ -147,7 +257,7 @@ function pickChar(taken, current) {
   return new Promise(res => dlg.addEventListener('close', () => res(dlg.returnValue), { once: true }))
 }
 
-// ---------------------------------------------------------------- 내 정보 폼 (팀장·팀원 공용)
+// ---------------------------------------------------------------- 내 프로필 폼
 
 const nameErr = (s, max, empty, what = '이름') => !s ? empty : [...s].length > max ? `${max}자 이내로 입력하세요` : LINK_RE.test(s) ? `${what}에 링크는 넣을 수 없어요` : ''
 
@@ -164,12 +274,11 @@ function unflag(root) {
   for (const c of root.querySelectorAll('[aria-invalid]')) { c.removeAttribute('aria-invalid'); c.removeAttribute('aria-describedby') }
 }
 
-/** 저장해 둔 내 정보·프리셋은 옛 데이터일 수 있다 — 모양이 틀리면 버리고, 사라진 캐릭터·티어는 빈칸으로 둔다 */
+/** 프리셋 · 프로필은 옛 데이터일 수 있다 — 모양이 틀리면 버리고, 사라진 캐릭터·티어는 빈칸으로 둔다 (옛 프리셋의 디스코드 닉네임은 버린다) */
 function cleanPerson(v) {
   if (!Array.isArray(v?.entries) || !v.entries.length) return null
   const str = s => typeof s === 'string' ? s : ''
   return {
-    discord: str(v.discord), same: v.same === true,
     entries: v.entries.slice(0, cfg.maxEntries).map(e => ({
       nick: str(e?.nick), tier: cfg.tiers.includes(e?.tier) ? e.tier : '', char: kr.some(p => p.id === e?.char) ? e.char : '',
     })),
@@ -183,31 +292,25 @@ const loadPresets = () => {
   }).slice(0, cfg.maxPresets)
 }
 
-function personForm(slot) {
-  const el = $('#person-tpl').content.firstElementChild.cloneNode(true)
-  slot.replaceWith(el)
-  const discord = $('[name=discord]', el), same = $('[name=same]', el), list = $('.rc-entries', el)
+function personForm(el) {
+  const list = $('.rc-entries', el)
   $('.rc-entries-head small', el).textContent = `최대 ${cfg.maxEntries}개 · 첫 줄이 대표`
 
   // row: { kind: 'main'|'same'|'sub', nick, tier, char } — 'same' 줄은 대표 계정의 닉네임·티어를 따른다
   let rows = [{ kind: 'main', nick: '', tier: '', char: '' }]
-  /** cleanPerson 을 거친 { discord, same, entries } 로 폼을 채운다 (마지막 내 정보 · 프리셋) */
+  /** cleanPerson 을 거친 { entries } 로 폼을 채운다 (내 프로필 · 프리셋) */
   function fill(v) {
-    unflag(el)
-    discord.value = v.discord
-    same.checked = v.same
+    unflag(list)
     rows = v.entries.map((e, i) => ({ kind: !i ? 'main' : e.nick === v.entries[0].nick ? 'same' : 'sub', ...e }))
     render()
   }
-  const main = () => ({ nick: (same.checked ? discord.value : rows[0].nick).trim(), tier: rows[0].tier })
+  const main = () => ({ nick: rows[0].nick.trim(), tier: rows[0].tier })
   const acct = r => r.kind === 'sub' ? { nick: r.nick.trim(), tier: r.tier } : main()
   const taken = i => new Set(rows.filter((r, j) => j !== i && r.char && acct(r).nick === acct(rows[i]).nick).map(r => r.char))
 
-  // 대표 계정이 바뀌면 닉네임 미러링과 본인계정 줄의 "↳ 닉네임 · 티어" 를 맞춘다
+  // 대표 계정이 바뀌면 본인계정 줄의 "↳ 닉네임 · 티어" 를 맞춘다
   function sync() {
-    const nick0 = $('[name=nick]', list), m = main()
-    nick0.disabled = same.checked
-    if (same.checked) nick0.value = discord.value
+    const m = main()
     for (const s of list.querySelectorAll('.rc-same')) s.textContent = `↳ ${m.nick || '대표 닉네임'} · ${m.tier || '티어 미선택'}`
   }
 
@@ -251,11 +354,6 @@ function personForm(slot) {
     sync()
   }
 
-  discord.oninput = sync
-  same.onchange = () => {
-    if (!same.checked) rows[0].nick = discord.value   // 체크를 풀어도 보이던 닉네임은 그대로 둔다
-    sync()
-  }
   for (const b of el.querySelectorAll('[data-add]')) b.onclick = () => {
     if (rows.length >= cfg.maxEntries) return
     rows.push({ kind: b.dataset.add, nick: '', tier: '', char: '' })
@@ -264,37 +362,27 @@ function personForm(slot) {
     if (b.dataset.add === 'same') $('.rc-slot', li).click()   // 본인계정은 캐릭터만 고르면 끝이라 바로 모달을 연다
     else $('[name=nick]', li).focus()
   }
-  const saved = cleanPerson(load(ME_KEY, null))
-  saved ? fill(saved) : render()
+  render()
 
-  /** 검증을 통과하면 { discord, same, entries }, 아니면 칸마다 메시지를 띄우고 null. */
-  function read() {
-    unflag(el)
+  /** 검증을 통과하면 { entries }, 아니면 칸마다 메시지를 띄우고 null. focus = 첫 오류 칸으로 옮길지 */
+  function read(focus = true) {
+    unflag(list)
     const bad = [], flag = (...a) => flagErr(bad, ...a)
-
-    const d = discord.value.trim()
-    const dErr = nameErr(d, 32, '디스코드 닉네임을 입력하세요')
-    if (dErr) flag(discord, $('.rc-err', discord.closest('.rc-fld')), dErr)
-
     const seen = new Set()
     rows.forEach((r, i) => {
       const li = list.children[i], box = $('.rc-err', li), a = acct(r)
       if (!r.char) flag($('.rc-slot', li), box, '캐릭터를 선택하세요')
       if (r.kind !== 'same') {
-        const mirrored = !i && same.checked
         const m = nameErr(a.nick, 20, '게임 닉네임을 입력하세요')
-        if (m && !(mirrored && dErr)) flag(mirrored ? discord : $('[name=nick]', li), box, mirrored ? `게임 닉네임: ${m}` : m)
+        if (m) flag($('[name=nick]', li), box, m)
         if (!a.tier) flag($('[name=tier]', li), box, '티어를 선택하세요')
       }
       const key = `${a.nick}\n${r.char}`
       if (r.char && seen.has(key)) flag($('.rc-slot', li), box, '같은 계정에 같은 캐릭터가 이미 있어요')
       seen.add(key)
     })
-    if (bad.length) { bad[0].focus(); return null }
-    return {
-      discord: d, same: same.checked,
-      entries: rows.map(r => ({ ...acct(r), char: r.char })),
-    }
+    if (bad.length) { if (focus) bad[0].focus(); return null }
+    return { entries: rows.map(r => ({ ...acct(r), char: r.char })) }
   }
 
   // 프리셋 — 칩을 누르면 그 구성으로 채우고, ✕ 로 지운다. 저장은 검증을 통과한 구성만 (불러오면 바로 낼 수 있게)
@@ -319,23 +407,79 @@ function personForm(slot) {
     saveBtn.title = saveBtn.disabled ? `프리셋은 ${cfg.maxPresets}개까지예요 — 하나를 지우고 저장하세요` : ''
   }
   saveBtn.onclick = () => {
-    const me = read()
-    if (!me) return
-    const n = me.entries.length - 1, def = `${P(me.entries[0].char).name}${n ? ` 외 ${n}` : ''}`
+    const v = read()
+    if (!v) return
+    const n = v.entries.length - 1, def = `${P(v.entries[0].char).name}${n ? ` 외 ${n}` : ''}`
     const name = prompt('프리셋 이름', def)
     if (name == null) return
     const nm = [...(name.trim() || def)].slice(0, 20).join('')
     const all = loadPresets().filter(p => p.name !== nm)   // 같은 이름이면 덮어쓴다
     if (all.length >= cfg.maxPresets) return
-    saveJson(PRESETS_KEY, [...all, { name: nm, ...me }])
+    saveJson(PRESETS_KEY, [...all, { name: nm, ...v }])
     presets()
   }
   presets()
 
-  return { read }
+  return { read, fill }
 }
 
-const personBody = ({ discord, entries }) => ({ discord, entries })
+/** 고치면 그 칸(.rc-fld · .rc-seg)의 오류를 바로 걷는다(라디오도 input 이 온다) — 칸마다 컨트롤이 하나인 곳에만 쓴다 */
+function clearOnInput(root) {
+  root.addEventListener('input', e => {
+    const w = e.target.closest('.rc-fld, .rc-seg'), er = w && $('.rc-err', w)
+    if (!er || er.hidden) return
+    er.hidden = true
+    er.textContent = ''
+    for (const c of w.querySelectorAll('[aria-invalid]')) { c.removeAttribute('aria-invalid'); c.removeAttribute('aria-describedby') }
+  })
+}
+
+let profileAfter = null   // 프로필을 저장한 뒤 이어서 할 일 (만들기 · 가입)
+let person
+
+function profileForm() {
+  const form = $('#profile-form'), sec = $('#profile')
+  person = personForm($('.rc-person', form))
+  clearOnInput($('.rc-seg', form))
+  $('#profile-cancel').onclick = () => { sec.hidden = true; profileAfter = null }
+  form.onsubmit = async e => {
+    e.preventDefault()
+    const box = $('.rc-seg', form), mic = $('[name=mic]:checked', form), bad = []
+    unflag(box)
+    if (!mic) flagErr(bad, $('[name=mic]', form), $('.rc-err', box), '마이크 사용 여부를 고르세요')
+    const v = person.read(!bad.length)
+    if (bad.length) bad[0].focus()
+    if (bad.length || !v) return
+    const res = await submit(form, async () => {
+      if (auth !== 'in') throw new Error('디스코드로 로그인해 주세요')
+      return api('/me/profile', { method: 'PUT', withToken: true, body: { mic: mic.value === '1', entries: v.entries } })
+    })
+    if (!res) return
+    sec.hidden = true
+    const next = profileAfter
+    profileAfter = null
+    setAuth('in', { ...me, profile: res.profile })
+    next?.()
+  }
+}
+
+/** 프로필 폼을 연다. after = 저장하면 이어서 부를 함수, why = 왜 열렸는지 한 줄 */
+function openProfile(after = null, why = '') {
+  if (auth !== 'in') return
+  const form = $('#profile-form'), sec = $('#profile')
+  profileAfter = after
+  $('#profile-name').textContent = me.user.name
+  $('#profile-why').textContent = why
+  $('#profile-why').hidden = !why
+  $('.rc-form-err', form).hidden = true
+  unflag(form)
+  for (const r of form.querySelectorAll('[name=mic]')) r.checked = me.profile ? r.value === (me.profile.mic ? '1' : '0') : false
+  const saved = cleanPerson(me.profile)
+  if (saved) person.fill(saved)
+  sec.hidden = false
+  sec.scrollIntoView({ block: 'start' })
+  ;($('[name=mic]:checked', form) || $('[name=mic]', form)).focus({ preventScroll: true })
+}
 
 // ---------------------------------------------------------------- 모집 목록 + 팀 만들기
 
@@ -376,10 +520,13 @@ function showList() {
   setInterval(() => document.hidden || refresh(), 60000)
   document.addEventListener('visibilitychange', () => document.hidden || refresh())
 
-  let ready = false
+  let built = false
   const sec = $('#create'), open = $('#new-team')
-  open.onclick = () => {
-    if (!ready) { createForm(); ready = true }
+  meSubs.push(renderMeCards)
+  open.onclick = async () => {
+    if (!await ready(open.onclick, '팀을 만들기 전에 프로필을 먼저 등록해 주세요').catch(e => alert(e.message))) return
+    if (!built) { createForm(); built = true }
+    renderMeCards()
     sec.hidden = false
     open.hidden = true
     sec.scrollIntoView({ block: 'start' })
@@ -394,11 +541,13 @@ const PTS = 32
 const thin = pts => pts?.length > PTS ? Array.from({ length: PTS }, (_, i) => pts[Math.round(i * (pts.length - 1) / (PTS - 1))]) : pts
 const thinRoutes = t => Array.isArray(t?.routes) ? { ...t, routes: t.routes.map(r => ({ ...r, pts: thin(r?.pts) })) } : t
 
-/** 방 설정 — 제목·마이크·즐겜/빡겜·메모·비밀번호. read() → { room, bad } */
+/** 방 설정 — 제목·마이크(3단계)·즐겜/빡겜·메모. read() → { room, bad } */
 function roomForm() {
   const box = $('#room'), L = cfg.limits, f = n => $(`[name=${n}]`, box)
-  $('[data-modes]', box).append(...Object.entries(cfg.modes).map(([k, v]) =>
-    h('label', {}, h('input', { type: 'radio', name: 'mode', value: k, required: true }), h('span', {}, v))))
+  const seg = (name, opts) => Object.entries(opts).map(([k, v]) =>
+    h('label', {}, h('input', { type: 'radio', name, value: k, required: true }), h('span', {}, v)))
+  $('[data-mics]', box).append(...seg('mic', cfg.mics))
+  $('[data-modes]', box).append(...seg('mode', cfg.modes))
   const memo = f('memo'), count = $('.rc-count', box)
   memo.oninput = () => {
     const n = [...memo.value].length
@@ -406,36 +555,27 @@ function roomForm() {
     count.classList.toggle('rc-bad', n > L.memo)
   }
   memo.oninput()
-  // 고치면 그 칸의 오류는 바로 걷는다(라디오도 input 이 온다). 방 설정은 칸마다 컨트롤이 하나라 칸 단위로 지워도 된다
-  box.addEventListener('input', e => {
-    const w = e.target.closest('.rc-fld, .rc-seg'), er = w && $('.rc-err', w)
-    if (!er || er.hidden) return
-    er.hidden = true
-    er.textContent = ''
-    for (const c of w.querySelectorAll('[aria-invalid]')) { c.removeAttribute('aria-invalid'); c.removeAttribute('aria-describedby') }
-  })
+  clearOnInput(box)
 
   return () => {
     unflag(box)
     const bad = [], err = ctl => $('.rc-err', ctl.closest('.rc-fld, .rc-seg'))
-    const title = f('title').value.trim(), note = memo.value.trim(), pw = f('password').value
+    const title = f('title').value.trim(), note = memo.value.trim()
     const mic = $('[name=mic]:checked', box), mode = $('[name=mode]:checked', box)
     const tErr = nameErr(title, L.title, '', '방 제목')
     if (tErr) flagErr(bad, f('title'), err(f('title')), tErr)
-    if (!mic) flagErr(bad, f('mic'), err(f('mic')), '마이크 사용 여부를 고르세요')
+    if (!mic) flagErr(bad, f('mic'), err(f('mic')), '마이크 조건을 고르세요')
     if (!mode) flagErr(bad, f('mode'), err(f('mode')), '즐겜·빡겜 중 하나를 고르세요')
     // 메모만 줄바꿈을 허용한다 (탭 등 다른 제어문자는 서버가 거절)
     const mErr = /[\u0000-\u0009\u000b-\u001f\u007f]/.test(note) ? '메모에 쓸 수 없는 문자가 있어요' : nameErr(note, L.memo, '', '메모')
     if (mErr) flagErr(bad, memo, err(memo), mErr)
-    const n = [...pw].length
-    if (!pw.trim() || n < L.passwordMin || n > L.passwordMax) flagErr(bad, f('password'), err(f('password')), `비밀번호를 ${L.passwordMin}~${L.passwordMax}자로 입력하세요`)
-    return { bad, room: { title, mic: mic?.value === '1', mode: mode?.value, memo: note, password: pw } }
+    return { bad, room: { title, mic: mic?.value, mode: mode?.value, memo: note } }
   }
 }
 
 function createForm() {
   const form = $('#create-form'), sel = $('#tactic'), nameIn = $('#board-name')
-  const readRoom = roomForm(), person = personForm($('[data-person]', form))
+  const readRoom = roomForm()
 
   const board = load('dc.tactics', null)
   const hasBoard = Array.isArray(board?.tokens) && board.tokens.length > 0
@@ -463,7 +603,6 @@ function createForm() {
     nameBox.hidden = true
     nameIn.removeAttribute('aria-invalid')
     const { room, bad } = readRoom()
-    const me = person.read()
     const isBoard = sel.value === 'board'
     const nErr = isBoard && nameIn.value.trim() && nameErr(nameIn.value.trim(), 30, '')
     if (nErr) {
@@ -471,17 +610,23 @@ function createForm() {
       nameBox.hidden = false
       nameIn.setAttribute('aria-invalid', 'true')
     }
-    // 화면 위에서부터 첫 오류로 — 방 설정 → 전술 이름 → 팀장 정보(person.read 가 이미 옮겨 둠)
+    // 화면 위에서부터 첫 오류로 — 방 설정 → 전술 이름
     if (bad.length) bad[0].focus()
-    else if (nErr && me) nameIn.focus()
-    if (bad.length || !me || nErr) return
+    else if (nErr) nameIn.focus()
+    if (bad.length || nErr) return
 
     const tactic = isBoard
       ? { preset: presetOf(board.presetId) ? board.presetId : null, board: { tokens: board.tokens.map(thinRoutes) }, name: nameIn.value.trim() }
       : { preset: sel.value || null, board: null }
-    const res = await submit(form, () => api('/teams', { method: 'POST', body: { room, tactic, member: personBody(me) } }))
+    const again = () => form.requestSubmit()
+    const res = await submit(form, async () => {
+      const cur = await ready(again, '팀을 만들기 전에 프로필을 먼저 등록해 주세요')
+      if (!cur || (cur.teamId && !confirm(MOVE_ASK))) return null
+      try { return await api('/teams', { method: 'POST', withToken: true, body: { room, tactic } }) }
+      catch (e) { if (e.status === 428) { openProfile(again, e.message); return null } throw e }
+    })
     if (!res) return
-    remember(res, me, true)
+    try { if (res.left) sessionStorage.setItem(LEFT_KEY, leftMsg(res.left)) } catch {}
     location.assign(`?t=${encodeURIComponent(res.team.id)}`)
   }
 }
@@ -533,9 +678,7 @@ async function copyLink(btn, url) {
 }
 
 /** 팀이 없어졌을 때(해제·만료) — 팀 화면을 걷고 목록으로 가는 길만 남긴다 */
-function showGone(id, msg) {
-  const all = load(TOKENS_KEY, {})
-  if (all[id]) { delete all[id]; saveJson(TOKENS_KEY, all) }
+function showGone(msg) {
   $('#team-body').hidden = true
   $('#team-error').hidden = true
   const box = $('#team-gone')
@@ -552,7 +695,7 @@ async function showTeam(id) {
     if (!/^[A-Za-z0-9_-]{8}$/.test(id)) throw Object.assign(new Error(), { status: 404 })
     team = await api(`/teams/${id}`)
   } catch (e) {
-    if (e.status === 404) return showGone(id, goneMsg())
+    if (e.status === 404) return showGone(goneMsg())
     $('#team-error').textContent = e.message
     $('#team-error').hidden = false
     // 서버나 그 DB 가 잠깐 내려간 거면(재시작 · 503) 링크로 들어온 사람이 새로고침하지 않아도 다시 붙는다. 없는 팀은 다시 안 묻는다.
@@ -562,7 +705,7 @@ async function showTeam(id) {
   }
   $('#team-error').hidden = true
   $('#team-body').hidden = false
-  const end = msg => { dead = true; showGone(id, msg) }
+  const end = msg => { dead = true; showGone(msg) }
 
   const courtBox = $('#team-court'), court = viewer($('svg', courtBox))
   let courtKey = ''
@@ -572,22 +715,19 @@ async function showTeam(id) {
     setInterval(() => document.hidden || dead || court.play(), 4500)
   }
 
-  // 이 브라우저가 이 팀의 팀원인지 — 방출됐으면 들고 있던 토큰은 버린다
-  const mine = () => {
-    const all = load(TOKENS_KEY, {}), m = all[team.id]
-    if (m && team.members.some(x => x.id === m.memberId)) return m
-    if (m) { delete all[team.id]; saveJson(TOKENS_KEY, all) }
-    return null
-  }
+  // 로그인한 내가 이 팀의 누구인지 — 디스코드 ID(문자열)로 비교한다
+  const mine = () => auth === 'in' && team.members.find(m => m.userId === me.user.id) || null
+  const notMine = () => { if (me?.teamId === team.id) me.teamId = null }
 
-  // 팀원 본인의 나가기 (토큰)
-  const leave = async (btn, m, token) => {
+  // 팀원 본인의 나가기
+  const leave = async (btn, m) => {
     if (!confirm('이 팀에서 나갈까요?')) return
     const msg = $('#team-msg')
     msg.hidden = true
     btn.disabled = true
     try {
-      const res = await api(`/teams/${team.id}/members/${m.id}`, { method: 'DELETE', token })
+      const res = await api(`/teams/${team.id}/members/${m.userId}`, { method: 'DELETE', withToken: true })
+      notMine()
       if (!res.team) return end(goneMsg())
       team = res.team
       render()
@@ -599,14 +739,14 @@ async function showTeam(id) {
     }
   }
 
-  function roster(me) {
+  function roster(mm) {
     const items = team.members.map(m => {
-      const self = me?.memberId === m.id
+      const self = mm === m
       const head = h('div', { className: 'rc-mhead' },
         m.leader && h('span', { className: 'rc-badge' }, '팀장'),
         self && h('span', { className: 'rc-badge me' }, '나'),
-        h('b', { title: '디스코드 닉네임' }, m.discord))
-      if (self && !m.leader) head.append(h('button', { type: 'button', className: 'danger', onclick: e => leave(e.currentTarget, m, me.token) }, '나가기'))
+        h('b', { title: '디스코드 이름' }, m.name), micTag(m.mic))
+      if (self && !m.leader) head.append(h('button', { type: 'button', className: 'danger', onclick: e => leave(e.currentTarget, m) }, '나가기'))
       return h('li', { className: `rc-member${self ? ' is-me' : ''}` }, head,
         h('ul', { className: 'rc-accts' }, m.entries.map((e, i) => {
           const p = P(e.char)
@@ -622,49 +762,42 @@ async function showTeam(id) {
     $('#team-roster').replaceChildren(...items)
   }
 
-  // ---- 팀장 관리: 팀장 토큰이 있으면 바로, 없으면 방 비밀번호로 (연장 · 팀 해제 · 방출)
-  const box = $('#manage'), pwIn = $('#manage-pw input'), pwErr = $('#manage-err')
+  // ---- 팀장 관리: 로그인한 팀장에게만 (연장 · 팀 해제 · 방출)
+  const box = $('#manage'), mErr = $('#manage-err')
   $('[data-ttl]', box).textContent = cfg.ttlHours
 
-  function manage(me) {
-    const lead = !!me?.leader
-    if (lead && !box.classList.contains('is-lead')) box.open = true
-    box.classList.toggle('is-lead', lead)
-    $('summary', box).textContent = lead ? '팀장 관리' : '팀장 관리 (비밀번호)'
-    $('#manage-pw').hidden = lead
-    const ok = lead || [...pwIn.value].length >= cfg.limits.passwordMin
-    $('#extend').disabled = $('#disband').disabled = !ok
+  function manage(mm) {
+    box.hidden = !mm?.leader
+    if (box.hidden) return
     $('#kicks').replaceChildren(...team.members.filter(m => !m.leader).map(m => {
       const p = P(m.entries[0].char)
-      return h('li', {}, h('img', { src: faceOf(p), alt: '' }), h('b', {}, m.discord),
-        h('button', { type: 'button', className: 'danger', disabled: !ok, 'aria-label': `${m.discord} 방출`, onclick: e => kick(e.currentTarget, m) }, '방출'))
+      return h('li', {}, h('img', { src: faceOf(p), alt: '' }), h('b', {}, m.name),
+        h('button', { type: 'button', className: 'danger', 'aria-label': `${m.name} 방출`, onclick: e => kick(e.currentTarget, m) }, '방출'))
     }))
   }
 
-  /** 팀장 권한 요청 — 오류(비밀번호 403·429 포함)는 비밀번호 칸 바로 아래에 띄운다. 성공하면 응답, 아니면 null */
+  /** 팀장 권한 요청 — 오류(403 · 429 포함)는 관리 칸 안에 띄운다. 성공하면 응답, 아니면 null */
   async function asLeader(btn, ask, path, method) {
     if (ask && !confirm(ask)) return null
-    const me = mine(), token = me?.leader ? me.token : null
-    pwErr.hidden = true
+    mErr.hidden = true
     $('#manage-ok').hidden = true
     btn.disabled = true
     try {
-      return await api(path, { method, token, body: token ? undefined : { password: pwIn.value } })
+      return await api(path, { method, withToken: true })
     } catch (e) {
       // 404 는 팀이 없거나(해제 · 만료) 방출할 팀원이 이미 나갔거나다 — 팀을 다시 읽어 없을 때만 끝낸다
       if (e.status === 404) { await refresh(); if (dead) return null }
-      pwErr.textContent = e.message
-      pwErr.hidden = false
-      if (!token) pwIn.select()
+      mErr.textContent = e.message
+      mErr.hidden = false
       return null
     } finally {
       btn.disabled = false
     }
   }
   async function kick(btn, m) {
-    const res = await asLeader(btn, `${m.discord} 님을 방출할까요?`, `/teams/${team.id}/members/${m.id}`, 'DELETE')
+    const res = await asLeader(btn, `${m.name} 님을 방출할까요?`, `/teams/${team.id}/members/${m.userId}`, 'DELETE')
     if (!res) return
-    if (!res.team) return end('팀을 해제했어요.')
+    if (!res.team) { notMine(); return end('팀을 해제했어요.') }
     team = res.team
     render()
   }
@@ -678,9 +811,8 @@ async function showTeam(id) {
     $('#manage-ok').hidden = false
   }
   $('#disband').onclick = async e => {
-    if (await asLeader(e.currentTarget, '팀을 해제할까요? 팀이 바로 삭제되고 되돌릴 수 없어요.', `/teams/${team.id}`, 'DELETE')) end('팀을 해제했어요.')
+    if (await asLeader(e.currentTarget, '팀을 해제할까요? 팀이 바로 삭제되고 되돌릴 수 없어요.', `/teams/${team.id}`, 'DELETE')) { notMine(); end('팀을 해제했어요.') }
   }
-  pwIn.oninput = () => { pwErr.hidden = true; manage(mine()) }
 
   const tick = () => {
     const ms = team.expiresAt - Date.now()
@@ -689,7 +821,8 @@ async function showTeam(id) {
   }
 
   function render() {
-    const me = mine(), name = titleOf(team)
+    if (dead) return
+    const mm = mine(), name = titleOf(team)
     document.title = `${name} · 팀원모집 · NBA 덩크 시티 한국 서버`
     $('#team-title').textContent = name
     $('#team-status').textContent = `${STATUS[team.status]} ${team.members.length}/${team.size}`
@@ -707,8 +840,8 @@ async function showTeam(id) {
     const key = JSON.stringify(tokens?.map(t => t.playerId))
     if (tokens && key !== courtKey) { courtKey = key; court.show(tokens) }   // 팀원이 바뀔 때만 다시 그려 재생을 끊지 않는다
 
-    roster(me)
-    manage(me)
+    roster(mm)
+    manage(mm)
 
     const v = team.voice
     $('#team-voice').replaceChildren(v
@@ -716,12 +849,13 @@ async function showTeam(id) {
         /^https:\/\/discord\.com\//.test(v.url) && h('a', { className: 'rc-discord', href: v.url, target: '_blank', rel: 'noopener' }, '디스코드에서 열기'))
       : h('p', { className: 'rc-muted' }, '배정된 음성채널이 없어요 — 디스코드에서 자유롭게 모여주세요.'))
 
-    const cta = team.status === 'open' && !!me?.leader
+    const cta = team.status === 'open' && !!mm?.leader
     $('#lead-cta').hidden = !cta
     $('#share-bar').hidden = cta
 
-    $('#join').hidden = !(team.status === 'open' && !me)
-    $('#join-closed').hidden = !(!me && team.status === 'full')
+    $('#join').hidden = !(team.status === 'open' && !mm)
+    renderMeCards()
+    $('#join-closed').hidden = !(!mm && team.status === 'full')
     $('#join-closed').textContent = '팀이 다 찼어요. 누가 나가면 다시 모집해요 — 모집 목록에서 다른 팀도 찾아보세요.'
   }
 
@@ -744,22 +878,42 @@ async function showTeam(id) {
   }
   for (const b of document.querySelectorAll('[data-share=copy]')) b.onclick = () => copyLink(b, teamUrl(team))
 
-  const joinForm = $('#join-form'), person = personForm($('[data-person]', joinForm))
+  const ok = $('#team-ok')
+  const flash = msg => {
+    ok.textContent = msg || ''
+    ok.hidden = !msg
+    clearTimeout(flash.t)
+    flash.t = setTimeout(() => { ok.hidden = true }, 8000)
+  }
+  try { flash(sessionStorage.getItem(LEFT_KEY)); sessionStorage.removeItem(LEFT_KEY) } catch {}
+
+  const joinForm = $('#join-form'), again = () => joinForm.requestSubmit()
   joinForm.onsubmit = async e => {
     e.preventDefault()
-    const me = person.read()
-    if (!me) return
-    const res = await submit(joinForm, () => api(`/teams/${team.id}/members`, { method: 'POST', body: personBody(me) }))
-    if (!res) return refresh()   // 그새 팀이 찼거나 사라졌을 수 있다 — 찼으면 가입 폼이 내려간다
-    remember(res, me, false)
+    let failed = false
+    const res = await submit(joinForm, async () => {
+      const cur = await ready(again, '팀에 가입하기 전에 프로필을 먼저 등록해 주세요')
+      if (!cur || mine()) return null
+      if (cur.teamId && cur.teamId !== team.id && !confirm(MOVE_ASK)) return null
+      try { return await api(`/teams/${team.id}/members`, { method: 'POST', withToken: true }) }
+      catch (e) {
+        if (e.status === 428) { openProfile(again, e.message); return null }
+        failed = true
+        throw e
+      }
+    })
+    if (!res) { if (failed) refresh(); return }   // 그새 팀이 찼거나 사라졌을 수 있다 — 찼으면 가입 폼이 내려간다
+    me.teamId = res.team.id
     team = res.team
     render()
+    flash(leftMsg(res.left))
     $('#team-roster').scrollIntoView({ block: 'center' })
     $('#team-roster').focus({ preventScroll: true })   // 가입 폼이 사라져도 포커스가 body 로 떨어지지 않게
   }
 
   // 다 찬 팀도 계속 본다 — 누가 나가거나 방출되면 다시 모집 중이 되는데, 알림이 없어 이 화면이 유일한 신호다
   render()
+  meSubs.push(render)   // 로그인 · 로그아웃 · 프로필 수정이 로스터 · 가입 · 관리에 바로 보이게
   setInterval(() => document.hidden || refresh(), 20000)   // 팀 화면은 20초 — 가입 · 방출이 바로 보여야 한다(호출 수는 목록 주석 참고)
   setInterval(() => dead || tick(), 20000)   // 남은 시간은 분 단위라 20초면 충분 — 만료는 위 새로 읽기 · 다시 보일 때 새로 읽기가 404 로 알아챈다
   document.addEventListener('visibilitychange', () => document.hidden || refresh())
@@ -784,6 +938,9 @@ const boot = async () => {
   }))
 
   buildPicker()
+  profileForm()
+  renderAuth()
+  initAuth()
   const id = new URLSearchParams(location.search).get('t')
   if (id) showTeam(id)
   else showList()

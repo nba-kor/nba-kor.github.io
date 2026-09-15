@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>팀원모집 · NBA 덩크 시티 한국 서버</title>
 <meta name="description" content="NBA 덩크 시티 3:3 팀원모집. 원하는 전술과 캐릭터로 팀을 만들면 디스코드 알림과 음성채널이 배정되고, 카카오톡으로 바로 공유할 수 있어요.">
-<link rel="stylesheet" href="/assets/style.css?v=fc492b62">
+<link rel="stylesheet" href="/assets/style.css?v=572a195b">
 </head>
 <body>
 
@@ -19,9 +19,54 @@
   </nav>
   <div class="spacer"></div>
   <div class="stamp"></div>
+  <div class="rc-auth" id="auth" aria-live="polite"></div>
 </header>
 
 <main class="recruit">
+
+  <!-- 내 프로필 — 디스코드 로그인 계정에 붙는다. 팀을 만들거나 가입하기 전에 한 번 -->
+  <section id="profile" class="card rc-create rc-profile" hidden>
+    <form id="profile-form" novalidate>
+      <h2>내 프로필</h2>
+      <p class="rc-note rc-why" id="profile-why" hidden></p>
+      <div class="rc-profile-top">
+        <div class="rc-fld">
+          <span>디스코드 이름</span>
+          <b class="rc-pname" id="profile-name"></b>
+          <small class="rc-hint">로그인한 디스코드 계정 이름이 로스터에 보여요</small>
+        </div>
+        <fieldset class="rc-seg">
+          <legend>마이크</legend>
+          <div class="rc-seg-opts">
+            <label><input type="radio" name="mic" value="1" required><span>마이크 O</span></label>
+            <label><input type="radio" name="mic" value="0" required><span>마이크 X</span></label>
+          </div>
+          <small class="rc-err" hidden></small>
+        </fieldset>
+      </div>
+      <div class="rc-person">
+        <div class="rc-presets">
+          <span class="rc-presets-head">내 프리셋 <small></small></span>
+          <ul class="rc-chips"></ul>
+          <button type="button" class="rc-preset-save">현재 구성 저장</button>
+        </div>
+        <div class="rc-entries-head">
+          <span>게임 계정 · 사용 캐릭터</span>
+          <small></small>
+        </div>
+        <ol class="rc-entries"></ol>
+        <div class="rc-add">
+          <button type="button" data-add="same">+ 본인계정 캐릭터</button>
+          <button type="button" data-add="sub">+ 다중계정</button>
+        </div>
+      </div>
+      <p class="rc-form-err" role="alert" hidden></p>
+      <div class="rc-actions">
+        <button type="button" id="profile-cancel">취소</button>
+        <button type="submit" class="primary rc-big">프로필 저장</button>
+      </div>
+    </form>
+  </section>
 
   <!-- ?t 없음: 모집 목록 + 팀 만들기 -->
   <section id="list-view" hidden>
@@ -30,6 +75,7 @@
         <h1>팀원모집</h1>
         <p class="rc-lead">원하는 전술과 캐릭터를 적어 팀을 만들면 디스코드에 모집 알림과 빈 음성채널이 올라가요.
           링크는 카톡방에 바로 뿌리세요.</p>
+        <p class="rc-muted rc-need" id="need" hidden></p>
       </div>
       <button id="new-team" class="primary rc-big" type="button">+ 팀 만들기</button>
     </div>
@@ -48,10 +94,7 @@
             <div class="rc-segs">
               <fieldset class="rc-seg">
                 <legend>마이크</legend>
-                <div class="rc-seg-opts">
-                  <label><input type="radio" name="mic" value="1" required><span>마이크 O</span></label>
-                  <label><input type="radio" name="mic" value="0" required><span>마이크 X</span></label>
-                </div>
+                <div class="rc-seg-opts" data-mics></div>
                 <small class="rc-err" hidden></small>
               </fieldset>
               <fieldset class="rc-seg">
@@ -64,12 +107,6 @@
               <span>메모 <small>선택</small></span>
               <textarea name="memo" rows="2" placeholder="예) 디코 필수 · 매너 게임해요"></textarea>
               <small class="rc-count" aria-hidden="true"></small>
-              <small class="rc-err" hidden></small>
-            </label>
-            <label class="rc-fld">
-              <span>비밀번호</span>
-              <input type="password" name="password" autocomplete="off" aria-required="true">
-              <small class="rc-hint">팀 해제·방출·연장할 때 써요. 잊으면 이 브라우저에서만 관리할 수 있어요</small>
               <small class="rc-err" hidden></small>
             </label>
           </div>
@@ -91,7 +128,7 @@
           </fieldset>
           <fieldset>
             <legend>팀장 정보</legend>
-            <div data-person></div>
+            <div data-mecard></div>
           </fieldset>
         </div>
         <p class="rc-form-err" role="alert" hidden></p>
@@ -160,6 +197,7 @@
             <h3>로스터</h3>
             <ol class="rc-roster" id="team-roster" tabindex="-1"></ol>
             <p class="rc-form-err" id="team-msg" role="alert" hidden></p>
+            <p class="rc-muted rc-ok" id="team-ok" role="status" hidden></p>
           </section>
 
           <section class="card">
@@ -170,7 +208,7 @@
           <section class="card rc-join" id="join" hidden>
             <form id="join-form" novalidate>
               <h2>이 팀에 가입하기</h2>
-              <div data-person></div>
+              <div data-mecard></div>
               <p class="rc-form-err" role="alert" hidden></p>
               <div class="rc-actions">
                 <button type="submit" class="primary rc-big">팀 가입</button>
@@ -179,13 +217,9 @@
           </section>
           <p class="card rc-note" id="join-closed" hidden></p>
 
-          <!-- 팀장 토큰이 있으면 바로, 없으면 방 비밀번호로 연장·해제·방출 -->
-          <details class="card rc-manage" id="manage">
-            <summary></summary>
-            <label class="rc-fld" id="manage-pw">
-              <span>방 비밀번호</span>
-              <input type="password" autocomplete="off">
-            </label>
+          <!-- 로그인한 팀장에게만 — 연장 · 해제 · 방출 -->
+          <section class="card rc-manage" id="manage" hidden>
+            <h3>팀장 관리</h3>
             <p class="rc-err" id="manage-err" role="alert" hidden></p>
             <p class="rc-muted" id="manage-ok" role="status" hidden></p>
             <p class="rc-muted">연장하면 남은 시간이 지금부터 다시 <span data-ttl></span>시간이 돼요.</p>
@@ -194,39 +228,13 @@
               <button type="button" class="danger" id="disband">팀 해제</button>
             </div>
             <ul class="rc-kicks" id="kicks"></ul>
-          </details>
+          </section>
         </div>
       </div>
     </div>
   </section>
 
 </main>
-
-<!-- 팀장·팀원 공용 입력 — 대표 계정 한 줄 + 본인계정/다중계정 줄 추가 -->
-<template id="person-tpl">
-  <div class="rc-person">
-    <div class="rc-presets">
-      <span class="rc-presets-head">내 프리셋 <small></small></span>
-      <ul class="rc-chips"></ul>
-      <button type="button" class="rc-preset-save">현재 구성 저장</button>
-    </div>
-    <label class="rc-fld">
-      <span>디스코드 닉네임</span>
-      <input type="text" name="discord" autocomplete="nickname" aria-required="true">
-      <small class="rc-err" hidden></small>
-    </label>
-    <label class="check rc-same-check"><input type="checkbox" name="same"> 게임 닉네임이 디스코드 닉네임과 같아요</label>
-    <div class="rc-entries-head">
-      <span>게임 계정 · 사용 캐릭터</span>
-      <small></small>
-    </div>
-    <ol class="rc-entries"></ol>
-    <div class="rc-add">
-      <button type="button" data-add="same">+ 본인계정 캐릭터</button>
-      <button type="button" data-add="sub">+ 다중계정</button>
-    </div>
-  </div>
-</template>
 
 <dialog id="char-dialog" class="rc-dialog" aria-labelledby="char-title">
   <form method="dialog">
@@ -239,6 +247,6 @@
   </form>
 </dialog>
 
-<script type="module" src="/assets/recruit.js?v=5177d8c1"></script>
+<script type="module" src="/assets/recruit.js?v=6a88f076"></script>
 </body>
 </html>
