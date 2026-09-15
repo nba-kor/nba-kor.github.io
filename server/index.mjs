@@ -1,53 +1,55 @@
-#!/usr/bin/env node
-// 팀원모집 API 서버 — Node 내장 모듈만 쓴다(http · crypto · fetch). 저장소는 Supabase(Data API).
+// 팀원모집 API — Request 하나를 받아 Response 를 돌려주는 함수(createHandler) 하나. 저장소는 Supabase(Data API).
 //
-//   node server/index.mjs                     # 설정은 .env 또는 환경변수 (.env.example 참고)
-//   docker compose run --rm api node --test server/test.mjs
-//
-// 화면(recruit/)은 정적 사이트 그대로이고, 이 서버는 /api 만 맡는다. 로컬에서는 docker compose 의
-// nginx 가 /api/ 를 이리로 넘긴다. 운영에서 도메인이 다르면 CORS_ORIGIN 을 채운다.
-// 브라우저는 Supabase 에 붙지 않는다 — 검증 · 요청 수 제한 · 디스코드 봇 · secret key 가 전부 이 서버에 있다.
+// 운영은 Supabase Edge Function(supabase/functions/recruit/index.mjs)이 이 함수를 부르고, 로컬 docker compose 는 같은
+// edge-runtime 으로 띄운다(nginx 의 /api/ → 함수). 테스트(server/test.mjs)는 Node 에서 이 함수를 직접 부른다.
+// 그래서 웹 표준(fetch · Request · Response)과 node:crypto · node:buffer 만 쓴다 — node:http · node:fs 는 Deno 에서 못 쓴다.
+// 브라우저는 Supabase 에 붙지 않는다 — 검증 · 요청 수 제한 · secret key 가 전부 여기 있다.
 
-import { createServer } from 'node:http'
-import { isIPv6 } from 'node:net'
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { pathToFileURL } from 'node:url'
+import { Buffer } from 'node:buffer'
 import { promisify } from 'node:util'
-import { channelUrl, connectGateway, createNotifier, createVoiceState } from './discord.mjs'
+// 데이터는 글자 그대로의 import 로 읽는다 — 배포 CLI 가 이 구문만 보고 JSON 파일을 함수에 같이 묶는다(readFileSync 는 못 찾는다)
+import CFG from '../data/recruit.json' with { type: 'json' }
+import playersData from '../data/players.json' with { type: 'json' }
+import tacticsData from '../data/tactics.json' with { type: 'json' }
+import { channelUrl, createNotifier, errText, voiceRooms } from './discord.mjs'
 
-const data = f => JSON.parse(readFileSync(new URL(`../data/${f}`, import.meta.url), 'utf8'))
-const CFG = data('recruit.json')
-const PLAYERS = new Map(data('players.json').players.filter(p => p.server === 'kr').map(p => [p.id, p]))   // 한국 출시만
-const PRESETS = new Map(data('tactics.json').presets.map(p => [p.id, p.name]))
+const PLAYERS = new Map(playersData.players.filter(p => p.server === 'kr').map(p => [p.id, p]))   // 한국 출시만
+const PRESETS = new Map(tacticsData.presets.map(p => [p.id, p.name]))
 const TTL = CFG.ttlHours * 3_600_000
 const L = CFG.limits
 const MAX_BODY = 32 * 1024
 const MAX_LIST = 100
 const LIMIT = { max: 30, windowMs: 10 * 60_000 }        // IP 당 쓰기 요청
 const PW_LIMIT = { max: 5, teamMax: 20, windowMs: 10 * 60_000 }   // 틀린 비밀번호: 한 사람(IP)이 한 팀에 · 팀 전체
-const CLEANUP_MS = 5 * 60_000
 const ROUTE_KINDS = ['move', 'pass', 'screen']
 const LINK = /:\/\/|www\.|discord\.gg/i
 const TEAM_ID = /^[A-Za-z0-9_-]{8}$/
 const JSON_TYPE = /^application\/json\b/i
 // 받는 요청 — 메서드 + 경로 조각. 예: 'POST team members' = 가입, 'DELETE team members member' = 방출 · 나가기
 const ACTIONS = new Set(['GET', 'POST', 'GET team', 'DELETE team', 'POST team members', 'DELETE team members member', 'POST team extend'])
+// 브라우저는 authorization · content-type 만 보낸다(커스텀 x- 헤더는 운영 게이트웨이 preflight 에서 잘릴 수 있다)
+const PREFLIGHT = { 'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '600' }
 
 const sha256 = s => createHash('sha256').update(s).digest('hex')
-const scryptAsync = promisify(scrypt)
+const scryptAsync = promisify(scrypt)   // 비동기만 — scryptSync 는 워커 CPU 시간(2초)을 먹는다
 const fail = (status, error) => { throw Object.assign(new Error(error), { status }) }
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v)
 const matches = (re, v) => typeof v === 'string' && re.test(v)   // 정규식 test 는 배열도 문자열로 바꿔 통과시킨다
 const listOf = (a, max, min = 0) => Array.isArray(a) && a.length >= min && a.length <= max
 const r3 = v => Math.round(v * 1000) / 1000
 const enc = encodeURIComponent
-// IPv6 는 보통 한 가입자가 /64 를 통째로 받는다 — 앞 64비트로 센다(IPv4 · ::ffff:a.b.c.d 는 그대로)
+// IPv6 는 보통 한 가입자가 /64 를 통째로 받는다 — 앞 64비트로 센다(IPv4 · ::ffff:a.b.c.d · 이상한 값은 그대로)
 const rateKey = ip => {
-  if (!isIPv6(ip) || ip.includes('.')) return ip
-  const [a, b] = ip.split('%')[0].split('::'), head = a ? a.split(':') : [], tail = b ? b.split(':') : []
-  const full = b === undefined ? head : [...head, ...Array(8 - head.length - tail.length).fill('0'), ...tail]
+  const [a, b, ...extra] = ip.split('%')[0].split('::'), head = a ? a.split(':') : [], tail = b ? b.split(':') : []
+  const full = b === undefined ? head : [...head, ...Array(Math.max(0, 8 - head.length - tail.length)).fill('0'), ...tail]
+  if (extra.length || full.length !== 8 || !full.every(x => /^[0-9a-f]{1,4}$/i.test(x))) return ip
   return `${full.slice(0, 4).map(x => parseInt(x, 16).toString(16)).join(':')}::/64`
+}
+/** secret key — 운영은 Supabase 가 넣어 주는 SUPABASE_SECRET_KEYS(JSON 의 default), 로컬 compose 는 SUPABASE_SECRET_KEY */
+const secretKey = env => {
+  try { return JSON.parse(env.SUPABASE_SECRET_KEYS || '{}').default || env.SUPABASE_SECRET_KEY || '' }
+  catch { return env.SUPABASE_SECRET_KEY || '' }
 }
 
 // ---------------------------------------------------------------- 검증 (신뢰 경계 — 허용한 필드만 다시 만든다)
@@ -132,9 +134,10 @@ function tactic(v) {
   return { preset, name: b ? name || presetName || '커스텀 전술' : presetName, board: b }
 }
 
+
 // ---------------------------------------------------------------- 비밀번호
 
-// 솔트 붙인 scrypt 해시로만 저장한다. 비동기 scrypt 는 스레드풀에서 돌아 다른 요청을 막지 않는다
+// 솔트 붙인 scrypt 해시로만 저장한다. 비동기 scrypt 는 워커 스레드에서 돌아 CPU 시간 한도에 안 잡히고 다른 요청도 막지 않는다
 async function hashPassword(pw) {
   const salt = randomBytes(16)
   return `scrypt$${salt.toString('base64url')}$${(await scryptAsync(pw, salt, 32)).toString('base64url')}`
@@ -155,9 +158,9 @@ const NOT_OPEN = { full: '이미 다 찬 팀이에요' }   // 가입 RPC 의 PT4
  * 아니라서 Authorization 에 넣으면 거절된다(로컬은 nginx 가 apikey 를 Authorization 으로 옮긴다). 키 · 쿼리(토큰 해시)는 로그에 안 남긴다.
  * 연결 실패 · 시간 초과 · 5xx 는 503, 가입 거절(PTxxx) · 닉네임 중복(23505)은 사용자 문구, 나머지는 500(로그).
  */
-export function supabase({ SUPABASE_URL = '', SUPABASE_SECRET_KEY = '' }, log = console.log) {
-  const base = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1`
-  const headers = { apikey: SUPABASE_SECRET_KEY, 'content-type': 'application/json', accept: 'application/json' }
+function supabase({ url = '', key = '', fetch, log }) {
+  const base = `${url.replace(/\/+$/, '')}/rest/v1`
+  const headers = { apikey: key, 'content-type': 'application/json', accept: 'application/json' }
   return async (path, { method = 'GET', body } = {}) => {
     const where = `${method} ${path.split('?')[0]}`
     let res, raw
@@ -165,7 +168,7 @@ export function supabase({ SUPABASE_URL = '', SUPABASE_SECRET_KEY = '' }, log = 
       res = await fetch(base + path, { method, headers, body: body && JSON.stringify(body), signal: AbortSignal.timeout(8000) })
       raw = await res.text()
     } catch (e) {
-      log(`DB 연결 실패 ${where}: ${e.message}`)
+      log(`DB 연결 실패 ${where}: ${errText(e)}`)
       fail(503, DB_DOWN)
     }
     let json = null
@@ -186,28 +189,21 @@ export function supabase({ SUPABASE_URL = '', SUPABASE_SECRET_KEY = '' }, log = 
 // 팀원은 팀장 먼저, 들어온 순. 토큰 해시는 고르지 않는다
 const MEMBERS = 'members:recruit_members(id,discord,entries,leader,joined_at)&members.order=leader.desc,joined_at.asc,id.asc'
 
-// ---------------------------------------------------------------- 앱
+// ---------------------------------------------------------------- API
 
 /**
- * 듣기(listen) 전의 서버를 만든다. voice 는 createVoiceState() 결과(없으면 음성채널 배정 안 함),
- * now 는 테스트에서 시간을 돌리려고 받는다. idle() = 보낼 디스코드 알림이 다 나갈 때까지, cleanup() = 만료된 팀 지우기.
+ * (request: Request) => Promise<Response> 를 만든다. 경로는 /api/... (Edge Function 은 앞의 /recruit 를 떼고 넘긴다).
+ * now 는 테스트가 시간을 돌리려고, fetch 는 가짜 Data API · 디스코드를 끼우려고 받는다. waitUntil = 응답 뒤에도 끝내야 할 일(디스코드 알림),
+ * ipOf = 요청 수 제한에 쓸 접속 주소(권한 판단엔 안 쓴다). 워커 메모리에 믿고 두는 상태는 없다 — 제한 횟수 · 방 배정은 DB 가 센다.
  */
-export function createApp({ env = process.env, voice = null, now = Date.now, log = console.log } = {}) {
-  const db = supabase(env, log)
+export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fetch, waitUntil = p => p, ipOf = () => '', log = console.log } = {}) {
+  const db = supabase({ url: env.SUPABASE_URL, key: secretKey(env), fetch, log })
   const notifier = createNotifier({
-    webhookUrl: env.DISCORD_WEBHOOK_URL, siteUrl: env.SITE_URL, guildId: env.DISCORD_GUILD_ID, players: PLAYERS, modes: CFG.modes, log,
+    webhookUrl: env.DISCORD_WEBHOOK_URL, siteUrl: env.SITE_URL, guildId: env.DISCORD_GUILD_ID, players: PLAYERS, modes: CFG.modes, fetch, waitUntil, log,
   })
-  // CORS_ORIGIN 이 비면 CORS 헤더를 아예 안 붙인다(같은 도메인에서 nginx 가 프록시)
-  const cors = env.CORS_ORIGIN ? { 'access-control-allow-origin': env.CORS_ORIGIN } : {}
-  const preflight = {
-    ...cors, 'access-control-allow-methods': 'GET, POST, DELETE',
-    'access-control-allow-headers': 'content-type, authorization', 'access-control-max-age': '600',
-  }
-  const send = (res, code, body, extra) => {
-    const json = JSON.stringify(body)
-    res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...cors, ...extra })
-    res.end(json)
-  }
+  const rooms = () => voiceRooms({ botToken: env.DISCORD_BOT_TOKEN, guildId: env.DISCORD_GUILD_ID, categoryId: env.DISCORD_VOICE_CATEGORY_ID, fetch, now, log })
+  // 화면이 다른 도메인(GitHub Pages)에서 부른다 — 목록에 있는 Origin 만 그대로 돌려준다(쉼표로 여러 개)
+  const origins = (env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean)
 
   // 클라이언트가 보는 팀 모양은 이것 하나뿐 — 필드를 골라 새로 만든다(비밀번호 · 토큰 해시는 절대 넣지 않는다).
   // 목록 행은 tactic 대신 preset · name 만 온다.
@@ -232,57 +228,30 @@ export function createApp({ env = process.env, voice = null, now = Date.now, log
   const live = t => `expires_at=gt.${t}&created_at=lte.${t}`
   const disband = id => db(`/recruit_teams?id=eq.${enc(id)}`, { method: 'DELETE' })   // 팀원은 on delete cascade
 
-  /** 끝 방부터, 만료 전인 다른 팀이 잡아 둔 방은 건너뛴다. 봇이 없거나 아직 상태를 못 받았으면 null. */
-  async function pickVoice(t) {
-    if (!voice?.ready) return null
-    const taken = new Set((await db(`/recruit_teams?select=voice->>id&voice=not.is.null&${live(t)}`)).map(r => r.id))
-    const c = voice.emptyChannels().find(c => !taken.has(c.id))
-    return c ? { id: c.id, name: c.name } : null
-  }
-  // ponytail: 팀 만들기(빈 방 읽기 → 저장)를 프로세스 안에서 줄 세운다. 게이트웨이 봇 때문에 API 는 한 대만 띄우는 구성이라 충분하다.
-  //   여러 대로 늘리면 두 팀이 같은 방을 받을 수 있다 — 그때는 방 예약을 DB 제약이나 RPC 안으로 옮길 것
-  let creating = Promise.resolve()
-  const oneAtATime = fn => (creating = creating.then(fn, fn))
-
-  // ponytail: 메모리 고정 창 · 프로세스 하나 기준(IP 당 요청 수 · 팀 당 틀린 비밀번호) — 여러 대로 늘리면 Redis 같은 공유 저장소로 옮길 것
-  function counter(windowMs) {
-    const hits = new Map()
-    let sweepAt = 0
-    return (key, t, add = 1) => {
-      // 청소는 1분에 한 번만(매 요청 전체 훑기 = 키를 바꿔 가며 몰아치면 요청마다 O(n)). 그래도 넘치면 통째로 비운다 —
-      // 그만큼 키를 가진 쪽은 어차피 제한을 우회한다
-      if (hits.size > 10_000 && t >= sweepAt) {
-        for (const [k, h] of hits) if (t >= h.reset) hits.delete(k)
-        sweepAt = t + 60_000
-        if (hits.size > 50_000) hits.clear()
-      }
-      let h = hits.get(key)
-      if (!h || t >= h.reset) hits.set(key, h = { n: 0, reset: t + windowMs })
-      return h.n = Math.max(0, h.n + add)   // 되돌리기(-1)가 창이 바뀐 뒤에 와도 음수로 남는 기회를 만들지 않는다
-    }
-  }
-  const writes = counter(LIMIT.windowMs), wrongByIp = counter(PW_LIMIT.windowMs), wrongByTeam = counter(PW_LIMIT.windowMs)
-  const ipOf = req => rateKey((env.TRUST_PROXY === '1' && req.headers['x-forwarded-for']?.split(',')[0].trim()) || req.socket.remoteAddress || '')
+  // 고정 창 카운터(recruit_hit RPC) — 한 문장 upsert 라 워커 여러 개가 동시에 세도 틀리지 않는다. 늘어난 횟수를 돌려준다(-1 = 되돌리기)
+  const hit = (key, windowMs, add = 1) => db('/rpc/recruit_hit', { method: 'POST', body: { p_key: key, p_now: now(), p_window: windowMs, p_add: add } })
 
   /**
    * 관리 권한. 본문의 비밀번호 = 팀장 권한(틀리면 403, 10분에 한 IP 가 5번 · 팀 전체가 20번 틀리면 429).
    * 비밀번호가 없으면 Bearer 토큰 — 팀장 토큰이면 팀장, 팀원 토큰이면 자기 자신만.
    */
-  async function auth(req, body, row, t) {
+  async function auth(request, body, row, ip) {
     if (typeof body?.password === 'string' && body.password) {
       // 먼저 한 번 센다 — 확인과 증가 사이에 scrypt(await)가 끼면 동시에 온 요청이 전부 '아직 0번'을 보고 통과한다. 맞으면 되돌린다.
       // 팀 단위로만 막으면 링크를 받은 누구나 5번 틀려서 팀장을 10분씩 잠글 수 있다 — 막는 건 틀린 그 IP 이고,
-      // IP 를 바꿔 가며 찍는 건 팀 전체 20번에서 막는다(방은 최대 3시간이라 4자리 숫자도 몇 %밖에 못 찍는다)
-      const who = `${row.id} ${ipOf(req)}`
-      const byIp = wrongByIp(who, t), byTeam = wrongByTeam(row.id, t)
-      if (byIp > PW_LIMIT.max || byTeam > PW_LIMIT.teamMax) fail(429, '비밀번호를 너무 많이 틀렸어요. 10분 뒤에 다시 시도해 주세요')
+      // IP 를 바꿔 가며 찍는 건 팀 전체 20번에서 막는다(방은 최대 3시간이라 4자리 숫자도 몇 %밖에 못 찍는다).
+      // 이미 막힌 IP 의 요청은 팀 전체에 세지 않는다 — 같이 세면 한 IP 가 21번 보내 팀장까지 잠근다
+      const keys = [`pw ${row.id} ${ip}`, `pwt ${row.id}`]
+      if (await hit(keys[0], PW_LIMIT.windowMs) > PW_LIMIT.max || await hit(keys[1], PW_LIMIT.windowMs) > PW_LIMIT.teamMax) {
+        fail(429, '비밀번호를 너무 많이 틀렸어요. 10분 뒤에 다시 시도해 주세요')
+      }
       if (await passwordOk(body.password, row.password_hash)) {
-        wrongByIp(who, t, -1); wrongByTeam(row.id, t, -1)
+        await Promise.all(keys.map(k => hit(k, PW_LIMIT.windowMs, -1)))
         return { leader: true, id: null }
       }
       fail(403, '비밀번호가 맞지 않아요')
     }
-    const m = /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || '')
+    const m = /^Bearer\s+(\S+)$/i.exec(request.headers.get('authorization') || '')
     if (!m) fail(401, '팀 관리 권한이 없어요 — 비밀번호를 입력해 주세요')
     const [me] = await db(`/recruit_members?select=id,leader&team_id=eq.${enc(row.id)}&token_hash=eq.${sha256(m[1])}`)
     return me || fail(403, '권한이 없어요')
@@ -290,42 +259,42 @@ export function createApp({ env = process.env, voice = null, now = Date.now, log
 
   const newToken = () => randomBytes(18).toString('base64url')
 
-  function readJson(req) {
-    if (!JSON_TYPE.test(req.headers['content-type'] || '')) fail(415, 'JSON 으로 보내 주세요')
-    if (+req.headers['content-length'] > MAX_BODY) fail(413, '요청이 너무 커요')
-    return new Promise((resolve, reject) => {
-      const chunks = []
-      let size = 0
-      req.on('data', c => {
-        if ((size += c.length) <= MAX_BODY) return chunks.push(c)
-        req.removeAllListeners('data')
-        reject(Object.assign(new Error('요청이 너무 커요'), { status: 413 }))
-      })
-      req.on('end', () => {
-        const raw = Buffer.concat(chunks).toString('utf8')
-        try { resolve(raw ? JSON.parse(raw) : null) }   // 빈 본문 = 토큰만 보낸 관리 요청
-        catch { reject(Object.assign(new Error('요청 형식이 잘못됐어요'), { status: 400 })) }
-      })
-      req.on('error', reject)
-    })
+  // 본문은 32KB 까지만 읽는다 — content-length 가 없거나(chunked) 거짓이어도 읽으면서 센다
+  async function readJson(request) {
+    if (!JSON_TYPE.test(request.headers.get('content-type') || '')) fail(415, 'JSON 으로 보내 주세요')
+    if (+request.headers.get('content-length') > MAX_BODY) fail(413, '요청이 너무 커요')
+    const decoder = new TextDecoder()
+    let size = 0, raw = ''
+    if (request.body) for await (const chunk of request.body) {
+      if ((size += chunk.byteLength) > MAX_BODY) fail(413, '요청이 너무 커요')   // for await 를 던지며 나가면 스트림도 취소된다
+      raw += decoder.decode(chunk, { stream: true })
+    }
+    raw += decoder.decode()
+    try { return raw ? JSON.parse(raw) : null }   // 빈 본문 = 토큰만 보낸 관리 요청
+    catch { fail(400, '요청 형식이 잘못됐어요') }
   }
 
-  async function route(req, res) {
-    const { pathname } = URL.parse(req.url, 'http://x') ?? fail(400, '요청 주소가 잘못됐어요')   // 예: "//" 는 URL 이 못 된다
+  async function route(request) {
+    const { pathname } = new URL(request.url)
+    const method = request.method
+    if (pathname === '/api/health' && method === 'GET') return [200, { ok: true, voice: !!(env.DISCORD_BOT_TOKEN && env.DISCORD_GUILD_ID) }]
     const m = pathname.match(/^\/api\/teams(?:\/([^/]+)(?:\/(members|extend)(?:\/([^/]+))?)?)?$/)
-    const method = req.method
-
-    if (method === 'OPTIONS' && env.CORS_ORIGIN) { res.writeHead(204, preflight); return res.end() }
-    if (pathname === '/api/health' && method === 'GET') return send(res, 200, { ok: true, voice: !!voice?.ready })
     const [, id, sub, memberId] = m || []
     const action = m && [method, id && 'team', sub, memberId && 'member'].filter(Boolean).join(' ')
     if (!ACTIONS.has(action)) fail(404, '없는 주소예요')
-    if (method !== 'GET' && writes(ipOf(req), now()) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
+    // 헤더가 없으면 '-' 한 통으로 센다(제한이 풀리지 않게). 긴 헤더로 키를 부풀리지 못하게 자른다
+    const ip = rateKey(String(ipOf(request) || '').trim().slice(0, 64)) || '-'
+    const type = request.headers.get('content-type') || ''
+    // 쓰기로 세는 건 JSON 본문이나 토큰을 실은 요청만 — text/plain · 폼 POST 는 아무 사이트나 preflight 없이 보내 방문자의 한도를
+    // 태울 수 있고, JSON · 토큰이 없으면 아무것도 못 바꾼다(415 · 401)
+    if (method !== 'GET' && (JSON_TYPE.test(type) || request.headers.has('authorization')) && await hit(`w ${ip}`, LIMIT.windowMs) > LIMIT.max) {
+      fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
+    }
     if (id && !TEAM_ID.test(id)) fail(404, NOT_FOUND)
 
     // 만들기 · 가입은 JSON 필수. 관리(해제 · 방출 · 연장)는 토큰만 보낼 수도 있어 JSON 일 때만 읽는다(DELETE 본문 허용)
-    const body = action === 'POST' || action === 'POST team members' || JSON_TYPE.test(req.headers['content-type'] || '')
-      ? await readJson(req) : null
+    const body = action === 'POST' || action === 'POST team members' || JSON_TYPE.test(type)
+      ? await readJson(request) : null
     const t = now()
 
     switch (action) {
@@ -335,32 +304,31 @@ export function createApp({ env = process.env, voice = null, now = Date.now, log
         const list = op => db(`/recruit_teams?select=id,room,preset:tactic->>preset,name:tactic->>name,voice,created_at,expires_at,${MEMBERS}`
           + `&${live(t)}&recruit_member_count=${op}.${CFG.teamSize}&order=created_at.asc,id.asc&limit=${MAX_LIST}`)
         const [open, full] = await Promise.all([list('lt'), list('gte')])
-        return send(res, 200, { teams: [...open, ...full].slice(0, MAX_LIST).map(view) })
+        return [200, { teams: [...open, ...full].slice(0, MAX_LIST).map(view) }]
       }
 
       case 'POST': {
         if (!isObj(body)) fail(400, '요청 형식이 잘못됐어요')
         const r = room(body.room), tac = tactic(body.tactic), p = person(body.member)
         const teamId = randomBytes(6).toString('base64url'), token = newToken()
-        const passwordHash = await hashPassword(r.password)
-        // 팀 + 팀장은 RPC 한 트랜잭션으로 넣는다. 시각은 줄 안에서 잰다 — 앞 팀보다 이른 시각이면 그 팀이 잡은 방을 못 본다
-        const [memberId, at] = await oneAtATime(async () => {
-          const at = now()
-          return [await db('/rpc/recruit_create_team', {
-            method: 'POST',
-            body: {
-              p_id: teamId, p_room: r.room, p_tactic: tac, p_voice: await pickVoice(at), p_password_hash: passwordHash,
-              p_discord: p.discord, p_entries: p.entries, p_token_hash: sha256(token), p_now: at, p_expires_at: at + TTL,
-            },
-          }), at]
+        const [passwordHash, candidates] = await Promise.all([hashPassword(r.password), rooms()])
+        const at = now()
+        // 방 고르기(끝 방부터, 만료 전 팀이 안 잡은 첫 방) · 만료된 팀 청소 · 팀 + 팀장 저장을 RPC 가 전역 잠금 안에서 한 트랜잭션으로 한다 —
+        // 워커가 여럿이어도 두 팀이 같은 방을 받지 않는다
+        const { member } = await db('/rpc/recruit_create_team', {
+          method: 'POST',
+          body: {
+            p_id: teamId, p_room: r.room, p_tactic: tac, p_rooms: candidates, p_password_hash: passwordHash,
+            p_discord: p.discord, p_entries: p.entries, p_token_hash: sha256(token), p_now: at, p_expires_at: at + TTL,
+          },
         })
         const team = view(await teamOf(teamId, at))
         notifier.teamCreated(team)
-        return send(res, 201, { team, member: { id: memberId, token } })
+        return [201, { team, member: { id: member, token } }]
       }
 
       case 'GET team':
-        return send(res, 200, view(await teamOf(id, t)))
+        return [200, view(await teamOf(id, t))]
 
       case 'POST team members': {
         const p = person(body), token = newToken()
@@ -373,89 +341,54 @@ export function createApp({ env = process.env, voice = null, now = Date.now, log
         const team = view(await teamOf(id, t))
         // 다시 읽는 사이 다음 가입이 끼었을 수 있다. 알림은 내가 들어온 시점 기준으로 — 같은 팀의 member id 는 잠금 순서대로 커진다
         notifier.memberJoined({ ...team, members: team.members.filter(x => x.id <= mid) }, mid)
-        return send(res, 201, { team, member: { id: mid, token } })
+        return [201, { team, member: { id: mid, token } }]
       }
 
       case 'DELETE team': {   // 팀 해제 = 삭제
         const row = await teamOf(id, t)
-        if (!(await auth(req, body, row, t)).leader) fail(403, '팀장만 팀을 해제할 수 있어요')
+        if (!(await auth(request, body, row, ip)).leader) fail(403, '팀장만 팀을 해제할 수 있어요')
         await disband(id)
-        return send(res, 200, { ok: true })
+        return [200, { ok: true }]
       }
 
       case 'POST team extend': {
         const row = await teamOf(id, t)
-        if (!(await auth(req, body, row, t)).leader) fail(403, '팀장만 연장할 수 있어요')
+        if (!(await auth(request, body, row, ip)).leader) fail(403, '팀장만 연장할 수 있어요')
         // 남은 시간을 더하지 않고 지금부터 다시 TTL — 연장해도 최대 3시간
         await db(`/recruit_teams?id=eq.${enc(id)}&expires_at=gt.${t}`, { method: 'PATCH', body: { expires_at: t + TTL } })
-        return send(res, 200, { team: view(await teamOf(id, t)) })
+        return [200, { team: view(await teamOf(id, t)) }]
       }
 
       case 'DELETE team members member': {   // 방출(팀장) · 나가기(본인)
         const row = await teamOf(id, t)
-        const me = await auth(req, body, row, t)
+        const me = await auth(request, body, row, ip)
         const target = matches(/^\d{1,15}$/, memberId) && row.members.find(x => x.id === Number(memberId))
         if (!target) fail(404, '팀원을 찾을 수 없어요')
         if (!me.leader && me.id !== target.id) fail(403, '팀장만 다른 팀원을 내보낼 수 있어요')
         // 팀장이 빠지면 팀이 없어진다
         if (target.leader) {
           await disband(id)
-          return send(res, 200, { ok: true, team: null })
+          return [200, { ok: true, team: null }]
         }
         await db(`/recruit_members?team_id=eq.${enc(id)}&id=eq.${target.id}`, { method: 'DELETE' })
-        return send(res, 200, { ok: true, team: view(await teamOf(id, t)) })   // 다 찬 팀이면 다시 모집 중 → 목록에서 앞으로
+        return [200, { ok: true, team: view(await teamOf(id, t)) }]   // 다 찬 팀이면 다시 모집 중 → 목록에서 앞으로
       }
     }
   }
 
-  const server = createServer(async (req, res) => {
-    try {
-      await route(req, res)
-    } catch (e) {
-      if (!e.status) log(`API 오류 ${req.method} ${req.url}:`, e)
-      if (res.headersSent) return res.destroy()
-      // 너무 큰 본문은 다 받지 않는다 — 413 을 먼저 보내고 연결을 끊는다(먼저 끊으면 클라이언트는 소켓 오류만 본다)
-      if (e.status === 413) res.on('finish', () => req.destroy())
-      send(res, e.status || 500, { error: e.status ? e.message : '서버 오류가 났어요' }, e.status === 413 && { connection: 'close' })
-    }
-  })
-
-  // 만료된 팀을 지운다(팀원은 cascade). 읽기는 전부 expires_at > now 로 거르므로 지우기 전에도 보이지 않는다
-  const cleanup = () => db(`/recruit_teams?expires_at=lte.${now()}`, { method: 'DELETE' })
-
-  return { server, idle: notifier.idle, cleanup, close: () => {} }   // close: 붙잡고 있는 DB 연결이 없다(요청마다 fetch)
-}
-
-// ---------------------------------------------------------------- 직접 실행할 때만
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  try { process.loadEnvFile() } catch (e) { if (e.code !== 'ENOENT') throw e }   // .env 가 없으면 환경변수만 쓴다(이미 있는 값이 우선)
-  const env = process.env
-  if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) {
-    console.log('SUPABASE_URL · SUPABASE_SECRET_KEY 가 없어 시작하지 않습니다 (.env.example 참고)')
-    process.exit(1)
-  }
-  const bot = env.DISCORD_BOT_TOKEN && env.DISCORD_GUILD_ID
-  const voice = bot ? createVoiceState({ guildId: env.DISCORD_GUILD_ID, categoryId: env.DISCORD_VOICE_CATEGORY_ID }) : null
-  if (!bot) console.log('DISCORD_BOT_TOKEN · DISCORD_GUILD_ID 가 없어 음성채널을 배정하지 않습니다')
-  const app = createApp({ env, voice })
-  const gateway = voice && connectGateway({ token: env.DISCORD_BOT_TOKEN, intents: 129, onDispatch: voice.apply, onDisconnect: voice.reset })
-  const port = +env.PORT || 3000
-  app.server.listen(port, () => console.log(`팀원모집 API http://localhost:${port}/api/health`))
-
-  // 만료된 팀 청소: 켜고 15초 뒤(docker compose 에서는 api 가 nginx 보다 먼저 떠 곧바로 부르면 실패한다) + 5분마다. Supabase 무료 플랜은 7일 동안 DB 요청이 뜸하면 프로젝트를 일시정지하는데,
-  // 모집이 없는 주에도 이 요청이 계속 가서 그것도 막아 준다
-  const sweep = () => app.cleanup().catch(e => console.log(`만료된 팀 청소 실패: ${e.message}`))
-  setTimeout(sweep, 15_000).unref()
-  setInterval(sweep, CLEANUP_MS).unref()
-
-  // docker stop · node --watch 재시작: 새 요청을 끊고, 남은 알림을 보낸 뒤 끝낸다
-  const stop = () => {
-    gateway?.close()
-    app.server.close(async () => {
-      await app.idle()
-      process.exit(0)
+  return async request => {
+    const origin = request.headers.get('origin')
+    // Origin 마다 답이 달라지니 캐시가 섞이지 않게 Vary 를 늘 붙인다. 에러 응답에도 붙여야 화면이 오류 문구를 읽는다
+    const cors = origins.length ? { vary: 'Origin', ...(origins.includes(origin) && { 'access-control-allow-origin': origin }) } : {}
+    // preflight 는 운영 게이트웨이가 대신 답해 주지 않는다(요금도 안 센다). 목록에 없는 Origin 이면 허용 헤더 없이 204
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...cors, ...(cors['access-control-allow-origin'] && PREFLIGHT) } })
+    const [status, body] = await route(request).catch(e => {
+      if (!e.status) log(`API 오류 ${request.method} ${new URL(request.url).pathname}:`, e)
+      return [e.status || 500, { error: e.status ? e.message : '서버 오류가 났어요' }]
+    })
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...cors },
     })
   }
-  process.once('SIGTERM', stop).once('SIGINT', stop)
 }

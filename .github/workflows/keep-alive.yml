@@ -1,0 +1,12 @@
+# Supabase 무료 프로젝트는 7일 동안 DB 요청이 뜸하면 일시정지된다 — 하루 두 번 모집 목록을 읽어(DB select) 깨워 둔다.
+# 저장소에 60일 동안 활동이 없으면 GitHub 이 예약 실행을 끈다(Actions 탭에서 다시 켠다).
+name: keep-alive
+on:
+  schedule:
+    - cron: '17 3,15 * * *'   # UTC. 정각은 밀리거나 빠질 수 있어 피한다
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsS --retry 3 --max-time 20 https://lgchgqxjjlapszmxarun.supabase.co/functions/v1/recruit/api/teams > /dev/null

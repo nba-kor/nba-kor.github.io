@@ -4,7 +4,9 @@ import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=081a7b
 
 // ---------------------------------------------------------------- 설정
 
-const API_ORIGIN = ''      // 비우면 같은 도메인의 /api (로컬 docker compose 는 nginx 가 프록시). 운영에서 API 가 따로면 'https://api.example.com'
+// API = Supabase Edge Function 'recruit'. GitHub Pages 는 API 를 돌릴 수 없어 운영에서는 함수 주소로 부르고,
+// 그 밖(로컬 docker compose 의 nginx 가 /api/ 를 같은 함수로 넘긴다)에서는 같은 도메인의 /api
+const API_ORIGIN = location.hostname === 'nba-kor.github.io' ? 'https://lgchgqxjjlapszmxarun.supabase.co/functions/v1/recruit' : ''
 const KAKAO_JS_KEY = ''    // Kakao Developers > 앱 > 플랫폼 키 > JavaScript 키. 비우면 공유 버튼이 링크 복사로 대체된다.
 
 const ME_KEY = 'dc.recruit.me'           // 마지막으로 낸 내 정보 { discord, same, entries } — 다음 폼을 미리 채운다
@@ -367,7 +369,8 @@ function showList() {
     }
   }
   refresh()
-  setInterval(() => document.hidden || refresh(), 20000)
+  // 함수 호출은 무료 플랜 월 50만 번(오류 응답도 센다) — 목록은 1분마다, 탭이 보일 때만. 다시 보이면 바로 새로 읽는다
+  setInterval(() => document.hidden || refresh(), 60000)
   document.addEventListener('visibilitychange', () => document.hidden || refresh())
 
   let ready = false
@@ -549,8 +552,9 @@ async function showTeam(id) {
     if (e.status === 404) return showGone(id, goneMsg())
     $('#team-error').textContent = e.message
     $('#team-error').hidden = false
-    // 서버나 그 DB 가 잠깐 내려간 거면(재시작 · 503) 링크로 들어온 사람이 새로고침하지 않아도 다시 붙는다. 없는 팀은 다시 안 묻는다
-    if (!e.status || e.status >= 500) setTimeout(() => showTeam(id), 15000)
+    // 서버나 그 DB 가 잠깐 내려간 거면(재시작 · 503) 링크로 들어온 사람이 새로고침하지 않아도 다시 붙는다. 없는 팀은 다시 안 묻는다.
+    // 오류 응답도 호출 수에 세므로 팀 화면 폴링처럼 20초마다, 탭이 보일 때만
+    if (!e.status || e.status >= 500) setTimeout(function retry() { document.hidden ? setTimeout(retry, 20000) : showTeam(id) }, 20000)
     return
   }
   $('#team-error').hidden = true
@@ -753,8 +757,8 @@ async function showTeam(id) {
 
   // 다 찬 팀도 계속 본다 — 누가 나가거나 방출되면 다시 모집 중이 되는데, 알림이 없어 이 화면이 유일한 신호다
   render()
-  setInterval(() => document.hidden || refresh(), 15000)
-  setInterval(() => { if (dead) return; tick(); if (team.expiresAt <= Date.now()) refresh() }, 20000)   // 남은 시간은 분 단위라 20초면 충분
+  setInterval(() => document.hidden || refresh(), 20000)   // 팀 화면은 20초 — 가입 · 방출이 바로 보여야 한다(호출 수는 목록 주석 참고)
+  setInterval(() => dead || tick(), 20000)   // 남은 시간은 분 단위라 20초면 충분 — 만료는 위 새로 읽기 · 다시 보일 때 새로 읽기가 404 로 알아챈다
   document.addEventListener('visibilitychange', () => document.hidden || refresh())
 }
 

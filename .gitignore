@@ -1,4 +1,3 @@
-# 팀원모집 API 비밀값·로컬 DB
+# 팀원모집 비밀값 (.env.example 참고) · supabase CLI 가 만드는 임시 폴더
 .env
-*.db
-*.db-*
+supabase/.temp/
