@@ -1,0 +1,105 @@
+# 로컬 미리보기: docker compose up  →  http://localhost:8000
+services:
+  web:
+    image: nginx:1.29-alpine
+    ports:
+      - "8000:80"
+      # 로컬 Supabase Data API — 이 PC 에서만(127.0.0.1). 테스트 · 점검용이고 :8000 에는 열지 않는다
+      - "127.0.0.1:54321:8080"
+    volumes:
+      - .:/usr/share/nginx/html:ro
+    configs:
+      - source: nginx
+        target: /etc/nginx/conf.d/default.conf
+    depends_on: [api, rest]
+
+  # 팀원모집 API (server/index.mjs). 포트는 열지 않고 web 의 /api/ 로만 받는다.
+  api:
+    image: node:24-alpine
+    working_dir: /app
+    volumes:
+      - .:/app:ro
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "3000"                # nginx 가 이 포트로 넘기므로 .env 값과 상관없이 고정
+      TRUST_PROXY: "1"            # nginx 가 넣어준 X-Forwarded-For 로 요청 수를 센다
+      # 아래 db + rest 로 흉내 낸 로컬 Supabase. .env 보다 우선이라 로컬에서 클라우드 DB 를 건드릴 일이 없다
+      SUPABASE_URL: http://web:8080
+      # 로컬 전용 키: rest 의 PGRST_JWT_SECRET 으로 서명한 HS256 JWT {"role":"service_role"} (클라우드의 sb_secret_ 자리)
+      SUPABASE_SECRET_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.NiOp4mVq5e6xDvLfvFAAoXFCYH4Z7JEW1Vj5OToCA1U
+    command: node --watch server/index.mjs
+
+  # Supabase 가 쓰는 Postgres 이미지 그대로(anon · authenticated · service_role 역할, safeupdate 등). 받는 데 약 1.7GB
+  db:
+    image: supabase/postgres:17.6.1.171
+    environment:
+      POSTGRES_PASSWORD: postgres   # 로컬 전용
+    volumes:
+      - supabase-db:/var/lib/postgresql/data
+      - ./supabase/migrations:/migrations:ro
+    configs:
+      - source: db-init
+        target: /docker-entrypoint-initdb.d/zz-app.sh   # 이미지의 migrate.sh(역할 생성) 뒤에 돌도록 zz-
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 2s
+      retries: 60
+
+  # Supabase Data API 와 같은 PostgREST. web 의 8080(호스트에서는 127.0.0.1:54321)으로만 닿는다
+  rest:
+    image: postgrest/postgrest:v14.17
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PGRST_DB_URI: postgres://authenticator:postgres@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_EXTRA_SEARCH_PATH: public, extensions
+      PGRST_JWT_SECRET: nba-kor-local-only-postgrest-jwt-secret-0914   # 로컬 전용(32자 이상). 바꾸면 SUPABASE_SECRET_KEY 도 다시 만든다
+
+# 아래 nginx 설정을 고쳤으면 docker compose up -d --force-recreate web (up -d·restart 로는 반영되지 않는다)
+configs:
+  nginx:
+    content: |
+      server {
+        listen 80;
+        root /usr/share/nginx/html;
+        # /tactics → /tactics/ 리다이렉트가 :8000 포트를 잃지 않게
+        absolute_redirect off;
+        # 고친 CSS·JS 가 새로고침에 바로 반영되게
+        add_header Cache-Control "no-store" always;
+        # 저장소를 통째로 서비스하므로 .env(웹훅·봇 토큰)·.git·DB 파일은 막는다
+        location ~ /\.|\.db(-wal|-shm)?$$ { return 404; }
+
+        location /api/ {
+          proxy_pass http://api:3000;
+          # 클라이언트가 보낸 X-Forwarded-For 는 버리고 실제 접속 주소만 넘긴다(위조 방지)
+          proxy_set_header X-Forwarded-For $$remote_addr;
+        }
+      }
+
+      # 로컬 Supabase Data API. 사이트(:8000)와 포트를 나눠 호스트의 127.0.0.1:54321 에만 연다 — LAN 에서 DB 로 못 온다.
+      # 클라우드 게이트웨이처럼 apikey 헤더를 Authorization 으로 옮긴다(로컬 키는 그 자체가 JWT)
+      server {
+        listen 8080;
+        location ^~ /rest/v1/ {
+          proxy_pass http://rest:3000/;
+          proxy_set_header Authorization "Bearer $$http_apikey";
+        }
+        location / { return 404; }
+      }
+  # 빈 볼륨으로 처음 뜰 때만 돈다. PostgREST 가 붙을 authenticator 에 비밀번호를 주고(이미지 기본은 없음),
+  # 새 클라우드 프로젝트처럼 public 의 새 테이블·함수를 자동 공개하지 않게 한 뒤, 마이그레이션을 postgres 역할로 적용한다
+  db-init:
+    content: |
+      psql -v ON_ERROR_STOP=1 -U supabase_admin -d postgres -c "alter role authenticator with password '$$POSTGRES_PASSWORD'"
+      psql -v ON_ERROR_STOP=1 -U postgres -d postgres -c "
+        alter default privileges for role postgres in schema public revoke select, insert, update, delete on tables from anon, authenticated, service_role;
+        alter default privileges for role postgres in schema public revoke usage, select on sequences from anon, authenticated, service_role;
+        alter default privileges for role postgres in schema public revoke execute on functions from anon, authenticated, service_role;"
+      for f in /migrations/*.sql; do psql -v ON_ERROR_STOP=1 -U postgres -d postgres -f "$$f"; done
+
+volumes:
+  supabase-db:

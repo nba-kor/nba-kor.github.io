@@ -1,0 +1,785 @@
+// 팀원모집 — 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
+import { loadPlayers, faceOf, mountTop, POS, POS_KO } from './app.js?v=6bf8da50'
+import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=081a7b3e'
+
+// ---------------------------------------------------------------- 설정
+
+const API_ORIGIN = ''      // 비우면 같은 도메인의 /api (로컬 docker compose 는 nginx 가 프록시). 운영에서 API 가 따로면 'https://api.example.com'
+const KAKAO_JS_KEY = ''    // Kakao Developers > 앱 > 플랫폼 키 > JavaScript 키. 비우면 공유 버튼이 링크 복사로 대체된다.
+
+const ME_KEY = 'dc.recruit.me'           // 마지막으로 낸 내 정보 { discord, same, entries } — 다음 폼을 미리 채운다
+const TOKENS_KEY = 'dc.recruit.tokens'   // { [teamId]: { token, memberId, leader } }
+const PRESETS_KEY = 'dc.recruit.presets' // [{ name, discord, same, entries }] — 자주 쓰는 구성, 최대 cfg.maxPresets 개
+const NO_SERVER = '모집 서버에 연결할 수 없어요'
+const STATUS = { open: '모집 중', full: '모집 완료' }
+const LINK_RE = /:\/\/|www\.|discord\.gg/i   // 서버와 같은 규칙 — 이름에 링크 금지
+
+const $ = (s, root = document) => root.querySelector(s)
+/** DOM 생성. 문자열 자식은 텍스트 노드가 되므로 사용자 입력을 그대로 넣어도 안전하다. */
+const h = (tag, props = {}, ...kids) => {
+  const n = document.createElement(tag)
+  for (const [k, v] of Object.entries(props)) k in n ? n[k] = v : n.setAttribute(k, v)
+  n.append(...kids.flat().filter(k => k != null && k !== false))
+  return n
+}
+const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
+const saveJson = (k, v) => localStorage.setItem(k, JSON.stringify(v))
+const getJson = p => fetch(p, { cache: 'no-cache' }).then(r => r.json())
+const ago = ms => {
+  const m = Math.floor((Date.now() - ms) / 60000)
+  return m < 1 ? '방금' : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`
+}
+/** "2시간 41분 남음" — 분을 올림해서 막 만든 방이 "3시간 남음" 으로 보이게 한다 */
+const remain = at => {
+  const m = Math.ceil((at - Date.now()) / 60000)
+  return m <= 0 ? '곧 삭제돼요' : `${m >= 60 ? `${Math.floor(m / 60)}시간 ` : ''}${m % 60 ? `${m % 60}분 ` : ''}남음`
+}
+
+let data, cfg, tactics, kr, errSeq = 0
+
+/** 데이터에서 빠진 캐릭터여도 화면이 깨지지 않게 이니셜 아바타로 버틴다. */
+const P = id => data.byId.get(id) || { id, name: id, short: id, pos: 0 }
+const presetOf = id => tactics.presets.find(p => p.id === id)
+const charLine = e => { const p = P(e.char); return `${POS[p.pos] || '?'} · ${p.name}` }
+const titleOf = t => t.room.title || t.tactic.name || '전술 자유'
+const goneMsg = () => '없는 팀이에요 — 해제됐거나 시간이 다 돼 삭제됐어요'   // 연장한 팀은 3시간보다 오래 산다
+const roomBadges = room => [
+  h('span', { className: `rc-tag ${room.mic ? 'is-mic' : 'no-mic'}` }, room.mic ? '마이크 O' : '마이크 X'),
+  h('span', { className: `rc-tag is-${room.mode}` }, cfg.modes[room.mode] || room.mode),
+]
+
+async function api(path, { method = 'GET', body, token } = {}) {
+  let r
+  try {
+    r = await fetch(`${API_ORIGIN}/api${path}`, {
+      method, cache: 'no-store',
+      headers: { ...(body && { 'content-type': 'application/json' }), ...(token && { authorization: `Bearer ${token}` }) },
+      body: body && JSON.stringify(body),
+    })
+  } catch { throw new Error(NO_SERVER) }
+  const j = await r.json().catch(() => null)
+  // 정적 호스팅이 대신 답한 404·502 HTML 등은 서버가 없는 것으로 본다
+  if (!j) throw new Error(NO_SERVER)
+  if (!r.ok) throw Object.assign(new Error(j.error || NO_SERVER), { status: r.status })   // 404 = 해제·만료로 사라진 팀
+  return j
+}
+
+/** 제출 중에는 버튼을 잠그고, 실패하면 폼은 그대로 둔 채 메시지만 띄운다. */
+async function submit(form, call) {
+  const btn = $('[type=submit]', form), err = $('.rc-form-err', form), label = btn.textContent
+  if (btn.disabled) return null
+  btn.disabled = true
+  btn.textContent = '보내는 중…'
+  err.hidden = true
+  try { return await call() }
+  catch (e) { err.textContent = e.message; err.hidden = false; return null }
+  finally { btn.disabled = false; btn.textContent = label }
+}
+
+function remember(res, person, leader) {
+  const all = load(TOKENS_KEY, {})
+  all[res.team.id] = { token: res.member.token, memberId: res.member.id, leader }
+  saveJson(TOKENS_KEY, all)
+  saveJson(ME_KEY, person)
+}
+
+// ---------------------------------------------------------------- 코트 (보기 전용)
+
+function viewer(svg) {
+  let tokens = [], busy = false
+  const redraw = () => renderTokens(svg, tokens, data.byId)
+  drawCourt(svg)
+  return {
+    show(t) { tokens = t; redraw() },
+    // 재생은 토큰 좌표를 직접 바꾸므로 겹쳐 돌리지 않는다
+    async play() {
+      const run = !busy && play(svg, tokens, redraw)
+      if (!run) return
+      busy = true
+      await run
+      busy = false
+    },
+  }
+}
+
+const tacticDesc = (preset, board) => {
+  const pr = presetOf(preset)
+  if (!board) return pr?.desc || ''
+  return `전술판에서 직접 짠 전술${pr ? `\n기반 전술 · ${pr.name} — ${pr.desc}` : ''}`
+}
+
+// ---------------------------------------------------------------- 캐릭터 선택 모달
+
+let filterPos   // 모달 위 포지션 뱃지 — 0 = 전체
+
+function buildPicker() {
+  const dlg = $('#char-dialog')
+  const secs = [1, 2, 3, 4, 5].map(pos => h('section', { 'data-pos': pos },
+    h('h3', {}, h('span', { className: `rc-pos pos-${pos}` }, POS[pos]), POS_KO[pos]),
+    h('div', { className: 'rc-char-grid' }, kr.filter(p => p.pos === pos).map(p =>
+      h('button', { className: 'rc-char', value: p.id, title: p.name },
+        h('img', { src: faceOf(p), alt: '', loading: 'lazy' }), h('span', {}, p.short || p.name))))))
+  $('.rc-chars', dlg).append(...secs)
+  // form method=dialog 안이라 type=button 이 없으면 누르는 순간 모달이 닫힌다
+  const btns = [0, 1, 2, 3, 4, 5].map(pos => h('button', { type: 'button', className: 'rc-fbtn', 'data-pos': pos }, pos ? POS[pos] : '전체'))
+  filterPos = pos => {
+    for (const b of btns) b.setAttribute('aria-pressed', +b.dataset.pos === pos)
+    for (const s of secs) s.hidden = pos > 0 && +s.dataset.pos !== pos
+    dlg.scrollTop = 0
+  }
+  for (const b of btns) b.onclick = () => filterPos(+b.dataset.pos)
+  $('.rc-filter', dlg).append(...btns)
+  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close() })   // 바깥(backdrop) 누르면 닫기
+}
+
+/** 고른 캐릭터 id, 취소하면 ''. taken = 같은 계정의 다른 줄에서 이미 고른 캐릭터. */
+function pickChar(taken, current) {
+  const dlg = $('#char-dialog')
+  for (const b of dlg.querySelectorAll('.rc-char')) {
+    b.disabled = taken.has(b.value)
+    b.classList.toggle('cur', b.value === current)
+  }
+  dlg.returnValue = ''
+  dlg.showModal()
+  filterPos(0)
+  return new Promise(res => dlg.addEventListener('close', () => res(dlg.returnValue), { once: true }))
+}
+
+// ---------------------------------------------------------------- 내 정보 폼 (팀장·팀원 공용)
+
+const nameErr = (s, max, empty, what = '이름') => !s ? empty : [...s].length > max ? `${max}자 이내로 입력하세요` : LINK_RE.test(s) ? `${what}에 링크는 넣을 수 없어요` : ''
+
+/** 칸에 오류를 붙이고 bad 에 모은다. 같은 <label> 안의 메시지는 이름으로 이미 읽힌다 — 밖에 있는 메시지만 이어 준다 */
+function flagErr(bad, ctl, box, msg) {
+  ctl.setAttribute('aria-invalid', 'true')
+  if (!box.closest('label')?.contains(ctl)) ctl.setAttribute('aria-describedby', box.id ||= `rc-err-${++errSeq}`)
+  box.textContent = [box.textContent, msg].filter(Boolean).join(' · ')
+  box.hidden = false
+  bad.push(ctl)
+}
+function unflag(root) {
+  for (const e of root.querySelectorAll('.rc-err')) { e.textContent = ''; e.hidden = true }
+  for (const c of root.querySelectorAll('[aria-invalid]')) { c.removeAttribute('aria-invalid'); c.removeAttribute('aria-describedby') }
+}
+
+/** 저장해 둔 내 정보·프리셋은 옛 데이터일 수 있다 — 모양이 틀리면 버리고, 사라진 캐릭터·티어는 빈칸으로 둔다 */
+function cleanPerson(v) {
+  if (!Array.isArray(v?.entries) || !v.entries.length) return null
+  const str = s => typeof s === 'string' ? s : ''
+  return {
+    discord: str(v.discord), same: v.same === true,
+    entries: v.entries.slice(0, cfg.maxEntries).map(e => ({
+      nick: str(e?.nick), tier: cfg.tiers.includes(e?.tier) ? e.tier : '', char: kr.some(p => p.id === e?.char) ? e.char : '',
+    })),
+  }
+}
+const loadPresets = () => {
+  const v = load(PRESETS_KEY, [])
+  return (Array.isArray(v) ? v : []).flatMap(p => {
+    const c = typeof p?.name === 'string' && cleanPerson(p)
+    return c ? [{ name: p.name, ...c }] : []
+  }).slice(0, cfg.maxPresets)
+}
+
+function personForm(slot) {
+  const el = $('#person-tpl').content.firstElementChild.cloneNode(true)
+  slot.replaceWith(el)
+  const discord = $('[name=discord]', el), same = $('[name=same]', el), list = $('.rc-entries', el)
+  $('.rc-entries-head small', el).textContent = `최대 ${cfg.maxEntries}개 · 첫 줄이 대표`
+
+  // row: { kind: 'main'|'same'|'sub', nick, tier, char } — 'same' 줄은 대표 계정의 닉네임·티어를 따른다
+  let rows = [{ kind: 'main', nick: '', tier: '', char: '' }]
+  /** cleanPerson 을 거친 { discord, same, entries } 로 폼을 채운다 (마지막 내 정보 · 프리셋) */
+  function fill(v) {
+    unflag(el)
+    discord.value = v.discord
+    same.checked = v.same
+    rows = v.entries.map((e, i) => ({ kind: !i ? 'main' : e.nick === v.entries[0].nick ? 'same' : 'sub', ...e }))
+    render()
+  }
+  const main = () => ({ nick: (same.checked ? discord.value : rows[0].nick).trim(), tier: rows[0].tier })
+  const acct = r => r.kind === 'sub' ? { nick: r.nick.trim(), tier: r.tier } : main()
+  const taken = i => new Set(rows.filter((r, j) => j !== i && r.char && acct(r).nick === acct(rows[i]).nick).map(r => r.char))
+
+  // 대표 계정이 바뀌면 닉네임 미러링과 본인계정 줄의 "↳ 닉네임 · 티어" 를 맞춘다
+  function sync() {
+    const nick0 = $('[name=nick]', list), m = main()
+    nick0.disabled = same.checked
+    if (same.checked) nick0.value = discord.value
+    for (const s of list.querySelectorAll('.rc-same')) s.textContent = `↳ ${m.nick || '대표 닉네임'} · ${m.tier || '티어 미선택'}`
+  }
+
+  function rowEl(r, i) {
+    const p = r.char && P(r.char)
+    const li = h('li', { className: `rc-entry is-${r.kind}` })
+    const slotBtn = h('button', { type: 'button', className: 'rc-slot', 'aria-haspopup': 'dialog', 'aria-label': p ? `캐릭터 변경 (${p.name})` : '캐릭터 선택' },
+      p ? h('img', { src: faceOf(p), alt: '' }) : h('span', { className: 'rc-hole' }),
+      p ? h('span', {}, h('b', {}, p.name), h('small', {}, `${POS[p.pos] || ''} ${POS_KO[p.pos] || ''}`)) : h('span', {}, '캐릭터 선택'))
+    slotBtn.onclick = async () => {
+      const id = await pickChar(taken(i), r.char)
+      if (!id) return slotBtn.focus()
+      r.char = id
+      render()
+      $('.rc-slot', list.children[i]).focus()
+    }
+    li.append(slotBtn)
+
+    if (r.kind === 'same') li.append(h('p', { className: 'rc-same' }))
+    else {
+      const nick = h('input', { type: 'text', name: 'nick', autocomplete: 'off', value: r.nick,
+        placeholder: i ? '부계정 닉네임' : '게임 닉네임', 'aria-label': i ? '부계정 게임 닉네임' : '대표 게임 닉네임' })
+      nick.oninput = () => { r.nick = nick.value; sync() }
+      const tier = h('select', { name: 'tier', 'aria-label': '티어' },
+        h('option', { value: '', disabled: true }, '티어 선택'), cfg.tiers.map(t => h('option', { value: t }, t)))
+      tier.value = r.tier
+      tier.onchange = () => { r.tier = tier.value; sync() }
+      li.append(nick, tier)
+    }
+
+    li.append(i
+      ? h('button', { type: 'button', className: 'rc-x', 'aria-label': '이 줄 삭제', onclick: () => { rows.splice(i, 1); render() } }, '✕')
+      : h('span', { className: 'rc-main', title: '대표 계정 · 대표 캐릭터' }, '대표'),
+    h('small', { className: 'rc-err', hidden: true }))
+    return li
+  }
+
+  function render() {
+    list.replaceChildren(...rows.map(rowEl))
+    for (const b of el.querySelectorAll('[data-add]')) b.disabled = rows.length >= cfg.maxEntries
+    sync()
+  }
+
+  discord.oninput = sync
+  same.onchange = () => {
+    if (!same.checked) rows[0].nick = discord.value   // 체크를 풀어도 보이던 닉네임은 그대로 둔다
+    sync()
+  }
+  for (const b of el.querySelectorAll('[data-add]')) b.onclick = () => {
+    if (rows.length >= cfg.maxEntries) return
+    rows.push({ kind: b.dataset.add, nick: '', tier: '', char: '' })
+    render()
+    const li = list.lastElementChild
+    if (b.dataset.add === 'same') $('.rc-slot', li).click()   // 본인계정은 캐릭터만 고르면 끝이라 바로 모달을 연다
+    else $('[name=nick]', li).focus()
+  }
+  const saved = cleanPerson(load(ME_KEY, null))
+  saved ? fill(saved) : render()
+
+  /** 검증을 통과하면 { discord, same, entries }, 아니면 칸마다 메시지를 띄우고 null. */
+  function read() {
+    unflag(el)
+    const bad = [], flag = (...a) => flagErr(bad, ...a)
+
+    const d = discord.value.trim()
+    const dErr = nameErr(d, 32, '디스코드 닉네임을 입력하세요')
+    if (dErr) flag(discord, $('.rc-err', discord.closest('.rc-fld')), dErr)
+
+    const seen = new Set()
+    rows.forEach((r, i) => {
+      const li = list.children[i], box = $('.rc-err', li), a = acct(r)
+      if (!r.char) flag($('.rc-slot', li), box, '캐릭터를 선택하세요')
+      if (r.kind !== 'same') {
+        const mirrored = !i && same.checked
+        const m = nameErr(a.nick, 20, '게임 닉네임을 입력하세요')
+        if (m && !(mirrored && dErr)) flag(mirrored ? discord : $('[name=nick]', li), box, mirrored ? `게임 닉네임: ${m}` : m)
+        if (!a.tier) flag($('[name=tier]', li), box, '티어를 선택하세요')
+      }
+      const key = `${a.nick}\n${r.char}`
+      if (r.char && seen.has(key)) flag($('.rc-slot', li), box, '같은 계정에 같은 캐릭터가 이미 있어요')
+      seen.add(key)
+    })
+    if (bad.length) { bad[0].focus(); return null }
+    return {
+      discord: d, same: same.checked,
+      entries: rows.map(r => ({ ...acct(r), char: r.char })),
+    }
+  }
+
+  // 프리셋 — 칩을 누르면 그 구성으로 채우고, ✕ 로 지운다. 저장은 검증을 통과한 구성만 (불러오면 바로 낼 수 있게)
+  const chips = $('.rc-chips', el), saveBtn = $('.rc-preset-save', el)
+  function presets() {
+    const all = loadPresets()
+    // 꽉 차서 저장 버튼이 잠긴 이유 — title 은 터치 화면에서 안 보인다
+    $('.rc-presets-head small', el).textContent = all.length >= cfg.maxPresets ? `${all.length}/${cfg.maxPresets} · 하나를 지워야 저장돼요` : `${all.length}/${cfg.maxPresets}`
+    chips.replaceChildren(...all.map((pr, k) => {
+      const p = pr.entries[0].char && P(pr.entries[0].char)
+      return h('li', { className: 'rc-chip' },
+        h('button', { type: 'button', className: 'rc-chip-use', title: '이 구성으로 채우기', onclick: () => fill(pr) },
+          p ? h('img', { src: faceOf(p), alt: '' }) : h('span', { className: 'rc-hole' }), h('span', {}, pr.name)),
+        h('button', { type: 'button', className: 'rc-chip-x', 'aria-label': `프리셋 삭제: ${pr.name}`, onclick: () => {
+          all.splice(k, 1)
+          saveJson(PRESETS_KEY, all)
+          presets()
+          saveBtn.focus()   // 누른 칩이 사라져도 포커스가 body 로 떨어지지 않게
+        } }, '✕'))
+    }))
+    saveBtn.disabled = all.length >= cfg.maxPresets
+    saveBtn.title = saveBtn.disabled ? `프리셋은 ${cfg.maxPresets}개까지예요 — 하나를 지우고 저장하세요` : ''
+  }
+  saveBtn.onclick = () => {
+    const me = read()
+    if (!me) return
+    const n = me.entries.length - 1, def = `${P(me.entries[0].char).name}${n ? ` 외 ${n}` : ''}`
+    const name = prompt('프리셋 이름', def)
+    if (name == null) return
+    const nm = [...(name.trim() || def)].slice(0, 20).join('')
+    const all = loadPresets().filter(p => p.name !== nm)   // 같은 이름이면 덮어쓴다
+    if (all.length >= cfg.maxPresets) return
+    saveJson(PRESETS_KEY, [...all, { name: nm, ...me }])
+    presets()
+  }
+  presets()
+
+  return { read }
+}
+
+const personBody = ({ discord, entries }) => ({ discord, entries })
+
+// ---------------------------------------------------------------- 모집 목록 + 팀 만들기
+
+// 순서는 서버가 정한다 (모집 중 먼저, 각각 오래된 방부터) — 여기서 다시 정렬하지 않는다
+function teamCard(t) {
+  const lead = t.members[0]?.entries[0]
+  const holes = Math.max(0, t.size - t.members.length)
+  return h('a', { className: `rc-tcard is-${t.status}`, href: `?t=${t.id}` },
+    h('div', { className: 'rc-tcard-head' },
+      h('b', {}, titleOf(t)),
+      h('span', { className: `rc-status is-${t.status}` }, `${STATUS[t.status]} ${t.members.length}/${t.size}`)),
+    h('p', { className: 'rc-badges' }, roomBadges(t.room),
+      t.room.title && h('span', { className: 'rc-tactic' }, `전술 · ${t.tactic.name || '자유'}`)),   // 제목이 없으면 제목이 곧 전술이다
+    h('div', { className: 'rc-faces' },
+      t.members.map(m => { const p = P(m.entries[0].char); return h('img', { src: faceOf(p), alt: p.name, title: `${m.entries[0].nick} · ${p.name}`, loading: 'lazy' }) }),
+      Array.from({ length: holes }, () => h('span', { className: 'rc-hole', title: '빈 자리' }))),
+    lead && h('p', {}, '팀장 ', h('b', {}, lead.nick), ` · ${lead.tier}`),
+    h('p', {}, t.voice && h('span', { className: 'rc-vc', title: '음성채널' }, t.voice.name), t.voice && ' · ', remain(t.expiresAt)))
+}
+
+function showList() {
+  $('#list-view').hidden = false
+  const box = $('#team-list')
+  const refresh = async () => {
+    try {
+      const { teams } = await api('/teams')
+      box.replaceChildren(...(teams.length ? teams.map(teamCard)
+        : [h('p', { className: 'rc-note' }, '지금 모집 중인 팀이 없어요. 첫 팀을 만들어 보세요.')]))
+    } catch (e) {
+      box.replaceChildren(h('p', { className: 'rc-note rc-bad' }, e.message))
+    }
+  }
+  refresh()
+  setInterval(() => document.hidden || refresh(), 20000)
+  document.addEventListener('visibilitychange', () => document.hidden || refresh())
+
+  let ready = false
+  const sec = $('#create'), open = $('#new-team')
+  open.onclick = () => {
+    if (!ready) { createForm(); ready = true }
+    sec.hidden = false
+    open.hidden = true
+    sec.scrollIntoView({ block: 'start' })
+    $('[name=title]', sec).focus({ preventScroll: true })   // 방 설정이 폼 맨 위
+  }
+  $('#create-cancel').onclick = () => { sec.hidden = true; open.hidden = false; open.focus() }
+}
+
+// 전술판은 포인터가 조금만 움직여도 점을 찍어 긴 동선 하나가 서버 한도(80점)를 넘는다. 32점이면 6명 × 8동선이 꽉 차도
+// 본문 한도(32KB) 안에 든다. 고르게 솎아서 처음·끝 점(화살표·스크린 방향)은 남긴다.
+const PTS = 32
+const thin = pts => pts?.length > PTS ? Array.from({ length: PTS }, (_, i) => pts[Math.round(i * (pts.length - 1) / (PTS - 1))]) : pts
+const thinRoutes = t => Array.isArray(t?.routes) ? { ...t, routes: t.routes.map(r => ({ ...r, pts: thin(r?.pts) })) } : t
+
+/** 방 설정 — 제목·마이크·즐겜/빡겜·메모·비밀번호. read() → { room, bad } */
+function roomForm() {
+  const box = $('#room'), L = cfg.limits, f = n => $(`[name=${n}]`, box)
+  $('[data-modes]', box).append(...Object.entries(cfg.modes).map(([k, v]) =>
+    h('label', {}, h('input', { type: 'radio', name: 'mode', value: k, required: true }), h('span', {}, v))))
+  const memo = f('memo'), count = $('.rc-count', box)
+  memo.oninput = () => {
+    const n = [...memo.value].length
+    count.textContent = `${n}/${L.memo}`
+    count.classList.toggle('rc-bad', n > L.memo)
+  }
+  memo.oninput()
+  // 고치면 그 칸의 오류는 바로 걷는다(라디오도 input 이 온다). 방 설정은 칸마다 컨트롤이 하나라 칸 단위로 지워도 된다
+  box.addEventListener('input', e => {
+    const w = e.target.closest('.rc-fld, .rc-seg'), er = w && $('.rc-err', w)
+    if (!er || er.hidden) return
+    er.hidden = true
+    er.textContent = ''
+    for (const c of w.querySelectorAll('[aria-invalid]')) { c.removeAttribute('aria-invalid'); c.removeAttribute('aria-describedby') }
+  })
+
+  return () => {
+    unflag(box)
+    const bad = [], err = ctl => $('.rc-err', ctl.closest('.rc-fld, .rc-seg'))
+    const title = f('title').value.trim(), note = memo.value.trim(), pw = f('password').value
+    const mic = $('[name=mic]:checked', box), mode = $('[name=mode]:checked', box)
+    const tErr = nameErr(title, L.title, '', '방 제목')
+    if (tErr) flagErr(bad, f('title'), err(f('title')), tErr)
+    if (!mic) flagErr(bad, f('mic'), err(f('mic')), '마이크 사용 여부를 고르세요')
+    if (!mode) flagErr(bad, f('mode'), err(f('mode')), '즐겜·빡겜 중 하나를 고르세요')
+    // 메모만 줄바꿈을 허용한다 (탭 등 다른 제어문자는 서버가 거절)
+    const mErr = /[\u0000-\u0009\u000b-\u001f\u007f]/.test(note) ? '메모에 쓸 수 없는 문자가 있어요' : nameErr(note, L.memo, '', '메모')
+    if (mErr) flagErr(bad, memo, err(memo), mErr)
+    const n = [...pw].length
+    if (!pw.trim() || n < L.passwordMin || n > L.passwordMax) flagErr(bad, f('password'), err(f('password')), `비밀번호를 ${L.passwordMin}~${L.passwordMax}자로 입력하세요`)
+    return { bad, room: { title, mic: mic?.value === '1', mode: mode?.value, memo: note, password: pw } }
+  }
+}
+
+function createForm() {
+  const form = $('#create-form'), sel = $('#tactic'), nameIn = $('#board-name')
+  const readRoom = roomForm(), person = personForm($('[data-person]', form))
+
+  const board = load('dc.tactics', null)
+  const hasBoard = Array.isArray(board?.tokens) && board.tokens.length > 0
+  sel.append(h('option', { value: '' }, '전술 선택 안 함'), ...['공격', '수비'].map(tag => h('optgroup', { label: `${tag} 전술` },
+    tactics.presets.filter(p => p.tag === tag).map(p => h('option', { value: p.id }, p.name)))))
+  if (hasBoard) {
+    sel.append(h('optgroup', { label: '내 전술판' }, h('option', { value: 'board' }, '전술판에 저장된 보드 불러오기')))
+    nameIn.value = presetOf(board.presetId)?.name || '커스텀 전술'
+  }
+
+  const preview = $('#tactic-preview'), court = viewer($('svg', preview))
+  $('.rc-play', preview).onclick = () => court.play()
+  sel.onchange = () => {
+    const v = sel.value, isBoard = v === 'board'
+    $('#board-name-fld').hidden = !isBoard
+    preview.hidden = !v
+    $('#tactic-desc').textContent = v ? tacticDesc(isBoard ? board.presetId : v, isBoard) : '전술 없이 모여도 괜찮아요. 팀 화면에는 「전술 자유」로 표시됩니다.'
+    if (v) court.show(isBoard ? structuredClone(board.tokens) : presetTokens(presetOf(v)))
+  }
+  sel.onchange()
+
+  form.onsubmit = async e => {
+    e.preventDefault()
+    const nameBox = $('.rc-err', $('#board-name-fld'))
+    nameBox.hidden = true
+    nameIn.removeAttribute('aria-invalid')
+    const { room, bad } = readRoom()
+    const me = person.read()
+    const isBoard = sel.value === 'board'
+    const nErr = isBoard && nameIn.value.trim() && nameErr(nameIn.value.trim(), 30, '')
+    if (nErr) {
+      nameBox.textContent = nErr
+      nameBox.hidden = false
+      nameIn.setAttribute('aria-invalid', 'true')
+    }
+    // 화면 위에서부터 첫 오류로 — 방 설정 → 전술 이름 → 팀장 정보(person.read 가 이미 옮겨 둠)
+    if (bad.length) bad[0].focus()
+    else if (nErr && me) nameIn.focus()
+    if (bad.length || !me || nErr) return
+
+    const tactic = isBoard
+      ? { preset: presetOf(board.presetId) ? board.presetId : null, board: { tokens: board.tokens.map(thinRoutes) }, name: nameIn.value.trim() }
+      : { preset: sel.value || null, board: null }
+    const res = await submit(form, () => api('/teams', { method: 'POST', body: { room, tactic, member: personBody(me) } }))
+    if (!res) return
+    remember(res, me, true)
+    location.assign(`?t=${encodeURIComponent(res.team.id)}`)
+  }
+}
+
+// ---------------------------------------------------------------- 팀 화면
+
+/** 프리셋 공격 슬롯에 팀원 대표 캐릭터를 선호 포지션 순으로 배정하고, 남은 슬롯은 남은 팀원으로 채운다. */
+function teamTokens(t) {
+  if (t.tactic.board) return t.tactic.board.tokens.map(k => ({ ...k, routes: k.routes || [] }))
+  const pr = presetOf(t.tactic.preset)
+  if (!pr) return null
+  const pool = t.members.map(m => m.entries[0].char)
+  const ids = pr.offense.map(s => {
+    const i = pool.findIndex(c => s.pos.includes(P(c).pos))
+    return i < 0 ? null : pool.splice(i, 1)[0]
+  })
+  return presetTokens(pr, ids.map(c => c || pool.shift() || null), [])
+}
+
+const teamUrl = t => `${location.origin}/recruit/?t=${t.id}`
+
+/** 카카오 리스트 템플릿. 항목은 2~3개여야 하므로 빈 자리로 teamSize 를 채운다. */
+function kakaoPayload(t) {
+  const url = teamUrl(t), link = { mobileWebUrl: url, webUrl: url }
+  const img = id => `${location.origin}/assets/share/${id}.jpg`
+  const items = t.members.map(m => {
+    const e = m.entries[0], n = m.entries.length - 1
+    return { title: e.nick, description: `${charLine(e)}${n ? ` 외 ${n}개` : ''}`, imageUrl: img(e.char), link }
+  })
+  while (items.length < cfg.teamSize) items.push({ title: '빈 자리', description: '팀 가입을 눌러 합류하세요', imageUrl: img('empty'), link })
+  return {
+    objectType: 'list',
+    headerTitle: t.tactic.name || t.room.title || '팀원 모집',   // 제목은 선호 전술 (사용자 요구), 없으면 방 제목
+    headerLink: link,
+    contents: items.slice(0, cfg.teamSize),
+    buttons: [{ title: t.status === 'open' ? '팀 가입' : '팀 보기', link }],
+  }
+}
+
+async function copyLink(btn, url) {
+  try {
+    await navigator.clipboard.writeText(url)
+    const label = btn.textContent
+    btn.textContent = '복사했어요'
+    setTimeout(() => { btn.textContent = label }, 1600)
+  } catch {
+    prompt('팀 링크', url)
+  }
+}
+
+/** 팀이 없어졌을 때(해제·만료) — 팀 화면을 걷고 목록으로 가는 길만 남긴다 */
+function showGone(id, msg) {
+  const all = load(TOKENS_KEY, {})
+  if (all[id]) { delete all[id]; saveJson(TOKENS_KEY, all) }
+  $('#team-body').hidden = true
+  $('#team-error').hidden = true
+  const box = $('#team-gone')
+  $('p', box).textContent = msg
+  box.hidden = false
+  box.focus()   // 누른 버튼(해제 · 방출)이 #team-body 와 같이 사라진다 — 포커스가 body 로 떨어지지 않게
+  document.title = '팀원모집 · NBA 덩크 시티 한국 서버'
+}
+
+async function showTeam(id) {
+  $('#team-view').hidden = false
+  let team, dead = false
+  try {
+    if (!/^[A-Za-z0-9_-]{8}$/.test(id)) throw Object.assign(new Error(), { status: 404 })
+    team = await api(`/teams/${id}`)
+  } catch (e) {
+    if (e.status === 404) return showGone(id, goneMsg())
+    $('#team-error').textContent = e.message
+    $('#team-error').hidden = false
+    // 서버나 그 DB 가 잠깐 내려간 거면(재시작 · 503) 링크로 들어온 사람이 새로고침하지 않아도 다시 붙는다. 없는 팀은 다시 안 묻는다
+    if (!e.status || e.status >= 500) setTimeout(() => showTeam(id), 15000)
+    return
+  }
+  $('#team-error').hidden = true
+  $('#team-body').hidden = false
+  const end = msg => { dead = true; showGone(id, msg) }
+
+  const courtBox = $('#team-court'), court = viewer($('svg', courtBox))
+  let courtKey = ''
+  $('.rc-play', courtBox).onclick = () => court.play()
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    setTimeout(() => court.play(), 600)
+    setInterval(() => document.hidden || dead || court.play(), 4500)
+  }
+
+  // 이 브라우저가 이 팀의 팀원인지 — 방출됐으면 들고 있던 토큰은 버린다
+  const mine = () => {
+    const all = load(TOKENS_KEY, {}), m = all[team.id]
+    if (m && team.members.some(x => x.id === m.memberId)) return m
+    if (m) { delete all[team.id]; saveJson(TOKENS_KEY, all) }
+    return null
+  }
+
+  // 팀원 본인의 나가기 (토큰)
+  const leave = async (btn, m, token) => {
+    if (!confirm('이 팀에서 나갈까요?')) return
+    const msg = $('#team-msg')
+    msg.hidden = true
+    btn.disabled = true
+    try {
+      const res = await api(`/teams/${team.id}/members/${m.id}`, { method: 'DELETE', token })
+      if (!res.team) return end(goneMsg())
+      team = res.team
+      render()
+    } catch (e) {
+      if (e.status === 404) return end(goneMsg())
+      msg.textContent = e.message
+      msg.hidden = false
+      btn.disabled = false
+    }
+  }
+
+  function roster(me) {
+    const items = team.members.map(m => {
+      const self = me?.memberId === m.id
+      const head = h('div', { className: 'rc-mhead' },
+        m.leader && h('span', { className: 'rc-badge' }, '팀장'),
+        self && h('span', { className: 'rc-badge me' }, '나'),
+        h('b', { title: '디스코드 닉네임' }, m.discord))
+      if (self && !m.leader) head.append(h('button', { type: 'button', className: 'danger', onclick: e => leave(e.currentTarget, m, me.token) }, '나가기'))
+      return h('li', { className: `rc-member${self ? ' is-me' : ''}` }, head,
+        h('ul', { className: 'rc-accts' }, m.entries.map((e, i) => {
+          const p = P(e.char)
+          return h('li', { className: 'rc-acct' },
+            h('img', { src: faceOf(p), alt: '' }),
+            h('div', {},
+              h('div', { className: 'rc-acct-name' }, h('b', {}, e.nick), h('span', { className: 'rc-tier', 'data-tier': e.tier }, e.tier),
+                !i && m.entries.length > 1 && h('span', { className: 'rc-main' }, '대표')),
+              h('small', {}, h('span', { className: `rc-pos pos-${p.pos}` }, POS[p.pos] || '?'), p.name)))
+        })))
+    })
+    for (let i = team.members.length; i < team.size; i++) items.push(h('li', { className: 'rc-member rc-empty' }, h('span', { className: 'rc-hole' }), '빈 자리'))
+    $('#team-roster').replaceChildren(...items)
+  }
+
+  // ---- 팀장 관리: 팀장 토큰이 있으면 바로, 없으면 방 비밀번호로 (연장 · 팀 해제 · 방출)
+  const box = $('#manage'), pwIn = $('#manage-pw input'), pwErr = $('#manage-err')
+  $('[data-ttl]', box).textContent = cfg.ttlHours
+
+  function manage(me) {
+    const lead = !!me?.leader
+    if (lead && !box.classList.contains('is-lead')) box.open = true
+    box.classList.toggle('is-lead', lead)
+    $('summary', box).textContent = lead ? '팀장 관리' : '팀장 관리 (비밀번호)'
+    $('#manage-pw').hidden = lead
+    const ok = lead || [...pwIn.value].length >= cfg.limits.passwordMin
+    $('#extend').disabled = $('#disband').disabled = !ok
+    $('#kicks').replaceChildren(...team.members.filter(m => !m.leader).map(m => {
+      const p = P(m.entries[0].char)
+      return h('li', {}, h('img', { src: faceOf(p), alt: '' }), h('b', {}, m.discord),
+        h('button', { type: 'button', className: 'danger', disabled: !ok, 'aria-label': `${m.discord} 방출`, onclick: e => kick(e.currentTarget, m) }, '방출'))
+    }))
+  }
+
+  /** 팀장 권한 요청 — 오류(비밀번호 403·429 포함)는 비밀번호 칸 바로 아래에 띄운다. 성공하면 응답, 아니면 null */
+  async function asLeader(btn, ask, path, method) {
+    if (ask && !confirm(ask)) return null
+    const me = mine(), token = me?.leader ? me.token : null
+    pwErr.hidden = true
+    $('#manage-ok').hidden = true
+    btn.disabled = true
+    try {
+      return await api(path, { method, token, body: token ? undefined : { password: pwIn.value } })
+    } catch (e) {
+      // 404 는 팀이 없거나(해제 · 만료) 방출할 팀원이 이미 나갔거나다 — 팀을 다시 읽어 없을 때만 끝낸다
+      if (e.status === 404) { await refresh(); if (dead) return null }
+      pwErr.textContent = e.message
+      pwErr.hidden = false
+      if (!token) pwIn.select()
+      return null
+    } finally {
+      btn.disabled = false
+    }
+  }
+  async function kick(btn, m) {
+    const res = await asLeader(btn, `${m.discord} 님을 방출할까요?`, `/teams/${team.id}/members/${m.id}`, 'DELETE')
+    if (!res) return
+    if (!res.team) return end('팀을 해제했어요.')
+    team = res.team
+    render()
+  }
+  $('#extend').onclick = async e => {
+    const res = await asLeader(e.currentTarget, null, `/teams/${team.id}/extend`, 'POST')
+    if (!res) return
+    team = res.team
+    render()
+    // 남은 시간은 화면 맨 위라 여기서 안 보인다. '3시간 남음'을 박아 두면 시간이 흘러 틀려지니 삭제 시각으로 적는다
+    $('#manage-ok').textContent = `연장했어요 · ${new Date(team.expiresAt).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' })}에 삭제돼요`
+    $('#manage-ok').hidden = false
+  }
+  $('#disband').onclick = async e => {
+    if (await asLeader(e.currentTarget, '팀을 해제할까요? 팀이 바로 삭제되고 되돌릴 수 없어요.', `/teams/${team.id}`, 'DELETE')) end('팀을 해제했어요.')
+  }
+  pwIn.oninput = () => { pwErr.hidden = true; manage(mine()) }
+
+  const tick = () => {
+    const ms = team.expiresAt - Date.now()
+    $('#team-left').textContent = remain(team.expiresAt)
+    $('#team-left').classList.toggle('is-soon', ms < 30 * 60000)   // 30분 안 남으면 연장하라고 눈에 띄게
+  }
+
+  function render() {
+    const me = mine(), name = titleOf(team)
+    document.title = `${name} · 팀원모집 · NBA 덩크 시티 한국 서버`
+    $('#team-title').textContent = name
+    $('#team-status').textContent = `${STATUS[team.status]} ${team.members.length}/${team.size}`
+    $('#team-status').className = `rc-status is-${team.status}`
+    $('#team-meta').textContent = `${ago(team.createdAt)} 시작`
+    tick()
+    $('#team-badges').replaceChildren(...roomBadges(team.room))
+    $('#team-memo').textContent = team.room.memo
+    $('#team-memo').hidden = !team.room.memo
+
+    $('#team-tactic').textContent = team.tactic.name || '전술 자유'
+    $('#team-desc').textContent = tacticDesc(team.tactic.preset, !!team.tactic.board) || '정해진 전술 없이 자유롭게 합을 맞추는 팀이에요.'
+    const tokens = teamTokens(team)
+    courtBox.hidden = !tokens
+    const key = JSON.stringify(tokens?.map(t => t.playerId))
+    if (tokens && key !== courtKey) { courtKey = key; court.show(tokens) }   // 팀원이 바뀔 때만 다시 그려 재생을 끊지 않는다
+
+    roster(me)
+    manage(me)
+
+    const v = team.voice
+    $('#team-voice').replaceChildren(v
+      ? h('div', { className: 'rc-voice-row' }, h('b', { className: 'rc-vc' }, v.name),
+        /^https:\/\/discord\.com\//.test(v.url) && h('a', { className: 'rc-discord', href: v.url, target: '_blank', rel: 'noopener' }, '디스코드에서 열기'))
+      : h('p', { className: 'rc-muted' }, '배정된 음성채널이 없어요 — 디스코드에서 자유롭게 모여주세요.'))
+
+    const cta = team.status === 'open' && !!me?.leader
+    $('#lead-cta').hidden = !cta
+    $('#share-bar').hidden = cta
+
+    $('#join').hidden = !(team.status === 'open' && !me)
+    $('#join-closed').hidden = !(!me && team.status === 'full')
+    $('#join-closed').textContent = '팀이 다 찼어요. 누가 나가면 다시 모집해요 — 모집 목록에서 다른 팀도 찾아보세요.'
+  }
+
+  const refresh = async () => {
+    if (dead) return
+    try { team = await api(`/teams/${team.id}`); render() }
+    catch (e) { if (e.status === 404) end(goneMsg()) }   // 그새 해제·만료됐다. 다른 실패는 다음 주기에 다시
+  }
+
+  for (const b of document.querySelectorAll('[data-share=kakao]')) {
+    b.textContent ||= KAKAO_JS_KEY ? '카카오톡 공유' : '공유하기'
+    // sendDefault 는 클릭 핸들러 안에서 동기로 불러야 PC 팝업이 차단되지 않는다 — 앞에 await 를 두지 말 것
+    b.onclick = () => {
+      if (window.Kakao?.isInitialized?.()) {
+        try { return Kakao.Share.sendDefault(kakaoPayload(team)) } catch (e) { console.warn(e) }
+      }
+      if (navigator.share) return navigator.share({ title: `${titleOf(team)} · 팀원모집`, url: teamUrl(team) }).catch(() => {})
+      copyLink(b, teamUrl(team))
+    }
+  }
+  for (const b of document.querySelectorAll('[data-share=copy]')) b.onclick = () => copyLink(b, teamUrl(team))
+
+  const joinForm = $('#join-form'), person = personForm($('[data-person]', joinForm))
+  joinForm.onsubmit = async e => {
+    e.preventDefault()
+    const me = person.read()
+    if (!me) return
+    const res = await submit(joinForm, () => api(`/teams/${team.id}/members`, { method: 'POST', body: personBody(me) }))
+    if (!res) return refresh()   // 그새 팀이 찼거나 사라졌을 수 있다 — 찼으면 가입 폼이 내려간다
+    remember(res, me, false)
+    team = res.team
+    render()
+    $('#team-roster').scrollIntoView({ block: 'center' })
+    $('#team-roster').focus({ preventScroll: true })   // 가입 폼이 사라져도 포커스가 body 로 떨어지지 않게
+  }
+
+  // 다 찬 팀도 계속 본다 — 누가 나가거나 방출되면 다시 모집 중이 되는데, 알림이 없어 이 화면이 유일한 신호다
+  render()
+  setInterval(() => document.hidden || refresh(), 15000)
+  setInterval(() => { if (dead) return; tick(); if (team.expiresAt <= Date.now()) refresh() }, 20000)   // 남은 시간은 분 단위라 20초면 충분
+  document.addEventListener('visibilitychange', () => document.hidden || refresh())
+}
+
+// ---------------------------------------------------------------- 초기화
+
+const boot = async () => {
+  const [players, recruit, presets] = await Promise.all([loadPlayers(), getJson('/data/recruit.json'), getJson('/data/tactics.json')])
+  data = players
+  cfg = recruit
+  tactics = presets
+  mountTop('/recruit/', data.updatedAt)
+  kr = data.players.filter(p => p.server === 'kr')
+
+  // SDK 는 클릭 전에 미리 받아 둔다 (클릭 때 받으면 sendDefault 가 동기 호출이 못 된다)
+  if (KAKAO_JS_KEY) document.head.append(h('script', {
+    src: 'https://t1.kakaocdn.net/kakao_js_sdk/2.8.3/kakao.min.js',
+    integrity: 'sha384-oroumrnFVE0xtgqyDZJARgERibXg2C28380uaUZz2kHDS5CR7tu20eGiOU6GkTpy',
+    crossOrigin: 'anonymous',
+    onload: () => { if (!Kakao.isInitialized()) Kakao.init(KAKAO_JS_KEY) },
+  }))
+
+  buildPicker()
+  const id = new URLSearchParams(location.search).get('t')
+  if (id) showTeam(id)
+  else showList()
+}
+
+boot()

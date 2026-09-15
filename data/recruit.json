@@ -1,0 +1,18 @@
+{
+  "note": "팀원모집 설정 — 서버(server/index.mjs)와 화면(assets/recruit.js)이 같이 읽는다.",
+  "teamSize": 3,
+  "maxEntries": 3,
+  "ttlHours": 3,
+  "tiers": ["브론즈", "실버", "골드", "플래티넘", "다이아", "레전드", "전성기"],
+  "modes": {
+    "fun": "즐겜",
+    "serious": "빡겜"
+  },
+  "limits": {
+    "title": 30,
+    "memo": 100,
+    "passwordMin": 4,
+    "passwordMax": 20
+  },
+  "maxPresets": 5
+}

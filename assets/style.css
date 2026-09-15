@@ -232,8 +232,8 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
   color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums;
 }
 
-/* 두 도구 중 하나를 고르는 게 홈의 유일한 목적이라 크게 둔다 */
-.picker { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* 도구 중 하나를 고르는 게 홈의 유일한 목적이라 크게 둔다 */
+.picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .pick {
   --pick: var(--accent-2);
   display: flex; flex-direction: column; gap: 14px;
@@ -242,6 +242,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
   transition: transform .15s, border-color .15s, background .15s;
 }
 .pick-tiers { --pick: var(--accent); }
+.pick-recruit { --pick: #35c6a7; }
 .pick:hover, .pick:focus-visible {
   transform: translateY(-3px);
   border-color: var(--pick);
@@ -292,4 +293,300 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .sel-info .bio {
   margin: 6px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--muted);
   max-height: 8.5em; overflow-y: auto;
+}
+
+/* ---------- 팀원모집 ---------- */
+.recruit { max-width: 1120px; margin: 0 auto; padding: 24px 16px 64px; }
+.recruit [hidden] { display: none !important; }   /* display 를 준 요소도 hidden 속성으로 숨긴다 */
+.recruit h1 { margin: 0; font-size: clamp(22px, 3.4vw, 30px); line-height: 1.25; letter-spacing: -.03em; overflow-wrap: anywhere; }
+.recruit h2 { margin: 0 0 14px; font-size: 17px; letter-spacing: -.02em; }
+.recruit fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.recruit legend { padding: 0; margin-bottom: 10px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.recruit legend small { font-weight: 500; opacity: .8; margin-left: 4px; }
+.recruit input[type="text"], .recruit select { padding: 9px 11px; min-width: 0; }
+.recruit input[type="password"], .recruit textarea {
+  font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 11px; min-width: 0; width: 100%;
+}
+.recruit textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+.recruit .card :is(input[type="checkbox"], input[type="radio"]) { width: auto; margin: 0; }
+.recruit [aria-invalid="true"] { border-color: var(--def); }
+:is(.recruit, .rc-dialog) button:disabled { opacity: .45; cursor: not-allowed; }   /* 캐릭터 모달은 main 밖에 있다 */
+.rc-big { padding: 10px 18px; font-size: 15px; border-radius: 10px; }
+.rc-muted { margin: 0; color: var(--muted); font-size: 13px; }
+.rc-note { margin: 0; color: var(--muted); font-size: 13.5px; }
+.rc-bad { color: var(--def); }
+
+/* 목록 */
+.rc-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.rc-lead { margin: 6px 0 0; color: var(--muted); max-width: 54ch; }
+.rc-list-head { display: flex; align-items: baseline; gap: 10px; margin: 28px 0 12px; }
+.rc-list-head h2 { margin: 0; font-size: 16px; }
+.rc-list-head small { color: var(--muted); font-size: 12px; }
+.rc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.rc-list > .rc-note { grid-column: 1 / -1; padding: 28px 16px; text-align: center; border: 1px dashed var(--line); border-radius: 14px; }
+.rc-tcard {
+  display: flex; flex-direction: column; gap: 10px; padding: 14px;
+  color: inherit; text-decoration: none;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  transition: transform .15s, border-color .15s, background .15s;
+}
+.rc-tcard:hover, .rc-tcard:focus-visible { transform: translateY(-2px); border-color: var(--accent-2); background: var(--panel-2); outline: none; }
+.rc-tcard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.rc-tcard-head b { font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
+.rc-tcard p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.rc-tcard p b { color: var(--text); }
+.rc-faces { display: flex; gap: 6px; }
+.rc-tcard .rc-faces { margin-top: auto; }   /* 제목이 두 줄로 접혀도 같은 줄 카드끼리 얼굴 줄을 맞춘다 */
+.rc-faces img, .rc-faces .rc-hole { width: 46px; height: 46px; }
+.rc-hole { display: block; flex: none; border-radius: 50%; border: 2px dashed #3b4657; }
+.rc-faces img { border-radius: 50%; background: #0b0f16; flex: none; }
+
+.rc-status {
+  flex: none; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+  font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums;
+  color: #35c6a7; background: #35c6a722;
+}
+.rc-status.is-full { color: var(--accent); background: #f5a62322; }
+/* 다 찬 방은 목록 끝으로 가고(서버 정렬) 흐리게 — 누가 나가면 다시 모집 중으로 올라온다 */
+/* 다 찬 팀 — 글자는 그대로 두고(명암비) 틀 · 얼굴만 흐리게 */
+.rc-tcard.is-full { background: transparent; border-style: dashed; }
+.rc-tcard.is-full .rc-faces { opacity: .5; filter: grayscale(.6); }
+
+/* 방 정보 뱃지 — 마이크 O/X · 즐겜/빡겜 */
+.rc-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; }
+.rc-tag { padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; border: 1px solid var(--line); color: var(--muted); }
+.rc-tag.is-mic { color: #35c6a7; border-color: #35c6a755; }
+.rc-tag.is-fun { color: var(--accent-2); border-color: #4d9eff55; }
+.rc-tag.is-serious { color: var(--def); border-color: #ff5d5d66; }
+.rc-tactic { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.rc-left { font-variant-numeric: tabular-nums; }
+.rc-left.is-soon { color: var(--def); font-weight: 700; }
+
+/* 팀 만들기 / 가입 폼 */
+.rc-create { padding: 18px; margin-bottom: 4px; scroll-margin-top: 72px; }
+.recruit .rc-room { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+.rc-room-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 22px; align-items: start; }
+.rc-fld > span small { font-weight: 500; opacity: .8; margin-left: 2px; }
+.rc-hint { color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+.rc-count { align-self: flex-end; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.rc-count.rc-bad { color: var(--def); }
+.rc-segs { display: flex; gap: 12px 18px; flex-wrap: wrap; }
+.recruit .rc-seg { gap: 5px; }
+.recruit .rc-seg legend { margin-bottom: 5px; font-weight: 600; }
+/* 세그먼트 = 네이티브 라디오 (키보드 화살표·필수 선택이 그대로 동작) */
+.rc-seg-opts { display: inline-flex; padding: 3px; gap: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+.rc-seg-opts label { position: relative; cursor: pointer; }
+.rc-seg-opts input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.rc-seg-opts span { display: block; padding: 6px 14px; border-radius: 7px; font-weight: 700; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.rc-seg-opts label:hover span { color: var(--text); }
+.rc-seg-opts input:checked + span { background: var(--accent-2); color: #06121f; }
+.rc-seg-opts input:focus-visible + span { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.rc-seg:has([aria-invalid]) .rc-seg-opts { border-color: var(--def); }
+.rc-form-grid { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 22px; align-items: start; }
+.rc-fld { display: flex; flex-direction: column; gap: 5px; }
+.rc-fld > span { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.rc-err { color: var(--def); font-size: 12px; }
+.rc-form-err { margin: 12px 0 0; padding: 8px 11px; border-radius: 8px; color: var(--def); background: #ff5d5d14; border: 1px solid #ff5d5d55; font-size: 13px; }
+.rc-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.rc-preview { max-width: 320px; }
+.rc-create .preset-desc { margin: 0; }
+
+.rc-person { display: flex; flex-direction: column; gap: 10px; }
+.rc-same-check { font-size: 13px; color: var(--muted); align-self: flex-start; }
+.rc-entries-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.rc-entries-head small { font-weight: 500; font-size: 11.5px; }
+.rc-entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rc-entry {
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(96px, .62fr) 38px;
+  gap: 8px; align-items: center; padding: 8px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px;
+}
+.rc-entry.is-main { border-color: #f5a62366; box-shadow: inset 3px 0 0 var(--accent); }
+.rc-entry .rc-same { grid-column: 2 / 4; margin: 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.rc-entry .rc-err { grid-column: 1 / -1; }
+.rc-entry select, .rc-entry input { background: var(--bg); }
+.rc-entry input:disabled { color: var(--muted); }
+.rc-slot {
+  display: flex; align-items: center; gap: 10px; min-width: 0; padding: 3px 8px 3px 3px;
+  text-align: left; background: transparent; border-color: transparent; border-radius: 999px;
+}
+.rc-slot:hover { background: #ffffff0a; border-color: var(--line); }
+.rc-slot img, .rc-slot .rc-hole { width: 44px; height: 44px; }
+.rc-slot img { border-radius: 50%; background: #0b0f16; flex: none; }
+.rc-slot > span:last-child { min-width: 0; }
+.rc-slot b { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-slot small { display: block; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.rc-slot:has(.rc-hole) { color: var(--muted); font-weight: 600; }
+.rc-slot:has(.rc-hole):hover { color: var(--text); }
+.rc-slot:has(.rc-hole):hover .rc-hole { border-color: var(--accent); }
+.rc-slot[aria-invalid="true"] .rc-hole { border-color: var(--def); }
+.rc-main { justify-self: center; padding: 1px 6px; border-radius: 6px; font-size: 11px; font-weight: 800; color: #1a1200; background: var(--accent); white-space: nowrap; }
+.rc-x { justify-self: center; width: 32px; height: 32px; padding: 0; color: var(--muted); }
+.rc-x:hover { color: var(--def); border-color: var(--def); }
+.rc-add { display: flex; gap: 6px; flex-wrap: wrap; }
+.rc-add button { border-style: dashed; color: var(--muted); font-weight: 600; }
+.rc-add button:not(:disabled):hover { color: var(--text); border-color: var(--accent-2); }
+
+/* 캐릭터 선택 모달 — 좁은 화면에서는 아래에서 올라오는 시트 */
+.rc-dialog {
+  width: min(760px, calc(100vw - 32px)); height: min(86vh, 900px); max-height: min(86vh, 900px); padding: 0;   /* 높이 고정 — 필터로 줄어들면 뱃지 줄이 손 밑에서 빠져 다음 탭이 backdrop 을 눌러 닫힌다 */
+  color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: 0 24px 64px #000c;
+}
+.rc-dialog::backdrop { background: #05080ccc; }
+.rc-dialog header {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+/* 포지션 필터 뱃지 — 누르면 그 포지션 칸만 남긴다 */
+.rc-filter { --pc: var(--text); flex: 1 0 100%; display: flex; gap: 6px; flex-wrap: wrap; }
+.rc-dialog .rc-filter button {
+  width: auto; height: auto; padding: 4px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 800;
+  color: var(--pc); background: transparent; border-color: color-mix(in srgb, var(--pc) 45%, transparent);
+}
+.rc-filter [data-pos="1"] { --pc: #4d9eff; }
+.rc-filter [data-pos="2"] { --pc: #35c6a7; }
+.rc-filter [data-pos="3"] { --pc: #f5a623; }
+.rc-filter [data-pos="4"] { --pc: #d980ff; }
+.rc-filter [data-pos="5"] { --pc: #ff7a59; }
+.rc-dialog .rc-filter [aria-pressed="true"] { color: #06121f; background: var(--pc); border-color: var(--pc); }
+.rc-dialog h2 { margin: 0; font-size: 16px; }
+.rc-dialog header button { width: 34px; height: 34px; padding: 0; }
+.rc-chars { padding: 4px 16px 18px; }
+.rc-chars h3 { display: flex; align-items: center; gap: 8px; margin: 14px 0 8px; font-size: 13px; color: var(--muted); }
+.rc-char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.rc-char {
+  display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 9px 4px 7px;
+  border-radius: 12px; font-size: 12.5px; font-weight: 600; line-height: 1.25; text-align: center;
+}
+.rc-char img { width: 58px; height: 58px; border-radius: 50%; background: #0b0f16; }
+.rc-char:not(:disabled):hover { border-color: var(--accent-2); background: #4d9eff14; }
+.rc-char.cur { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.rc-pos { display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 10px; font-weight: 800; line-height: 1.4; color: #06121f; background: var(--muted); }
+
+/* 팀 화면 */
+.rc-back { display: inline-block; margin-bottom: 12px; color: var(--muted); text-decoration: none; font-size: 13px; }
+.rc-back:hover { color: var(--text); }
+.rc-team-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.rc-kicker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 6px; color: var(--muted); font-size: 12.5px; }
+.rc-kicker .rc-left::before { content: "·"; margin-right: 8px; color: var(--muted); font-weight: 400; }
+.rc-team-head .rc-badges { margin-top: 8px; }
+.rc-memo { margin: 0 0 12px; padding: 12px 14px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; border-left: 3px solid var(--accent-2); }
+.rc-gone:focus { outline: none; }
+.rc-gone { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 22px; }
+.rc-gone p { margin: 0; font-size: 15px; font-weight: 600; }
+.rc-gone a { text-decoration: none; font-weight: 700; color: #1a1200; background: var(--accent); }
+.rc-tactic-name { margin: -2px 0 10px; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+.rc-share-bar { display: flex; gap: 6px; flex-wrap: wrap; }
+.rc-cta {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap;
+  margin-bottom: 12px; padding: 16px 18px; border-color: #f5a62388;
+  background: linear-gradient(120deg, #f5a6231f, transparent 55%), var(--panel);
+}
+.rc-cta b { font-size: 16px; }
+.rc-cta p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+.rc-team { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 12px; align-items: start; }
+.rc-tactic-card { position: sticky; top: 72px; }
+.rc-court { position: relative; }
+.rc-court svg { display: block; width: 100%; height: auto; border-radius: 10px; background: var(--court); }
+.rc-court .token { cursor: default; }
+.rc-play { position: absolute; right: 8px; bottom: 8px; padding: 5px 11px; font-size: 12.5px; font-weight: 700; background: #0d1117d9; }
+.rc-tactic-card .preset-desc { margin: 10px 0 0; font-size: 13px; line-height: 1.65; }
+.rc-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.rc-join h2 { font-size: 16px; }
+
+.rc-roster { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rc-member { padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; }
+.rc-member.is-me { border-color: #4d9eff88; }
+.rc-member.rc-empty { display: flex; align-items: center; gap: 12px; background: transparent; border-style: dashed; color: var(--muted); }
+.rc-member.rc-empty .rc-hole { width: 40px; height: 40px; }
+.rc-mhead { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; min-width: 0; }
+.rc-mhead b { font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-mhead button { margin-left: auto; padding: 3px 10px; font-size: 12px; flex: none; }
+.rc-badge { flex: none; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 800; color: #1a1200; background: var(--accent); }
+.rc-badge.me { color: #06121f; background: var(--accent-2); }
+.rc-accts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rc-acct { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rc-acct > div { min-width: 0; }
+.rc-acct img { width: 36px; height: 36px; border-radius: 50%; background: #0b0f16; flex: none; }
+.rc-acct:first-child img { width: 48px; height: 48px; box-shadow: 0 0 0 2px var(--accent); }
+.rc-acct-name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rc-acct-name b { overflow-wrap: anywhere; }
+.rc-acct small { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.rc-tier { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.rc-tier[data-tier="브론즈"] { color: #d08b5b; }
+.rc-tier[data-tier="실버"] { color: #c3ccd6; }
+.rc-tier[data-tier="골드"] { color: #f5c542; }
+.rc-tier[data-tier="플래티넘"] { color: #5fd3c6; }
+.rc-tier[data-tier="다이아"] { color: #7cb8ff; }
+.rc-tier[data-tier="레전드"] { color: #d980ff; }
+.rc-tier[data-tier="전성기"] { color: #ff7a59; }
+
+/* 프리셋 — 자주 쓰는 캐릭터 구성 */
+.rc-presets { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 8px; border: 1px dashed var(--line); border-radius: 12px; }
+.rc-presets-head { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-right: 2px; }
+.rc-presets-head small { font-weight: 500; font-size: 11px; margin-left: 3px; font-variant-numeric: tabular-nums; }
+.rc-chips { display: contents; list-style: none; }
+.rc-chip { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-2); }
+.rc-chip:hover { border-color: var(--accent-2); }
+.rc-chip button { border: 0; background: transparent; }
+.rc-chip-use { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 4px 3px 3px; font-size: 12.5px; font-weight: 600; border-radius: 999px 0 0 999px; }
+.rc-chip-use span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-chip-use img, .rc-chip-use .rc-hole { width: 26px; height: 26px; border-radius: 50%; background: #0b0f16; flex: none; }
+.rc-chip-x { align-self: stretch; min-width: 30px; padding: 3px 9px 3px 4px; color: var(--muted); font-size: 11px; border-radius: 0 999px 999px 0; }   /* 누르기 쉽게 24px 넘게 */
+.rc-chip-x:hover { color: var(--def); }
+.rc-preset-save { margin-left: auto; padding: 5px 10px; font-size: 12.5px; font-weight: 600; border-style: dashed; color: var(--muted); }
+.rc-preset-save:not(:disabled):hover { color: var(--text); border-color: var(--accent-2); }
+
+/* 팀장 관리 */
+.recruit button.danger:not(:hover) { color: var(--def); border-color: #ff5d5d55; }   /* 해제 · 방출 · 나가기 — 터치 화면엔 hover 가 없다 */
+.rc-manage summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); }
+.rc-manage summary:hover { color: var(--text); }
+.rc-manage[open] summary { margin-bottom: 10px; }
+.rc-manage > :not(summary) + :not(summary) { margin-top: 10px; }
+.rc-manage > p { margin-bottom: 0; }
+.rc-manage-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.rc-manage-row button { flex: 1 1 120px; padding: 8px 12px; font-weight: 700; }
+.rc-kicks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rc-kicks:empty { display: none; }
+.rc-kicks li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 5px 6px; border-radius: 10px; background: var(--panel-2); }
+.rc-kicks img { width: 30px; height: 30px; border-radius: 50%; background: #0b0f16; flex: none; }
+.rc-kicks b { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-kicks button { padding: 3px 10px; font-size: 12px; flex: none; }
+
+.rc-voice-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rc-voice-row b { font-size: 15px; }
+/* 디스코드 음성채널 표시 — 스피커 아이콘 */
+.rc-vc::before {
+  content: ""; display: inline-block; width: 1.05em; height: 1.05em; margin-right: 4px; vertical-align: -.17em;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.rc-discord { padding: 7px 13px; border-radius: 8px; font-weight: 700; color: #fff; background: #5865f2; text-decoration: none; }
+.rc-discord:hover { background: #4752c4; }
+
+@media (max-width: 860px) {
+  .rc-team, .rc-form-grid, .rc-room-grid { grid-template-columns: minmax(0, 1fr); }
+  .rc-tactic-card { position: static; }
+  .rc-tactic-card .rc-court { max-width: 420px; margin-inline: auto; }   /* 한 줄이 되면 코트가 첫 화면을 다 먹어 가입 폼이 한참 밀린다 */
+  .rc-preview { max-width: none; }
+}
+@media (max-width: 560px) {
+  .recruit { padding: 18px 12px 48px; }
+  .rc-create { scroll-margin-top: 120px; }   /* 좁은 화면에서는 상단 헤더가 두세 줄로 접힌다 */
+  .rc-hero .rc-big, .rc-cta .rc-share-bar, .rc-cta .rc-big { flex: 1 1 auto; }
+  .rc-entry { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; }
+  .rc-slot { grid-column: 1 / 3; grid-row: 1; }
+  .rc-main, .rc-x { grid-column: 3; grid-row: 1; }
+  .rc-entry [name="nick"] { grid-column: 1; }
+  .rc-entry [name="tier"] { grid-column: 2 / 4; }
+  .rc-entry .rc-same { grid-column: 1 / -1; }
+  .rc-dialog {
+    width: 100%; max-width: 100%; height: 86dvh; max-height: 86dvh; margin: auto 0 0;
+    border-radius: 16px 16px 0 0; border-bottom: 0;
+  }
+  .rc-char-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .rc-char { font-size: 11.5px; padding: 7px 2px 6px; }
+  .rc-char img { width: 48px; height: 48px; }
 }
