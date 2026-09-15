@@ -7,7 +7,7 @@ import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=081a7b
 // API = Supabase Edge Function 'recruit'. GitHub Pages 는 API 를 돌릴 수 없어 운영에서는 함수 주소로 부르고,
 // 그 밖(로컬 docker compose 의 nginx 가 /api/ 를 같은 함수로 넘긴다)에서는 같은 도메인의 /api
 const API_ORIGIN = location.hostname === 'nba-kor.github.io' ? 'https://lgchgqxjjlapszmxarun.supabase.co/functions/v1/recruit' : ''
-const KAKAO_JS_KEY = ''    // Kakao Developers > 앱 > 플랫폼 키 > JavaScript 키. 비우면 공유 버튼이 링크 복사로 대체된다.
+const KAKAO_JS_KEY = '8f89f3ef476f72827c9a875ad0c23a72'    // Kakao Developers > 앱 > 플랫폼 키 > JavaScript 키. 비우면 공유 버튼이 링크 복사로 대체된다.
 
 const ME_KEY = 'dc.recruit.me'           // 마지막으로 낸 내 정보 { discord, same, entries } — 다음 폼을 미리 채운다
 const TOKENS_KEY = 'dc.recruit.tokens'   // { [teamId]: { token, memberId, leader } }
