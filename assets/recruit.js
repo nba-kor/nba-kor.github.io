@@ -8,6 +8,9 @@ import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=081a7b
 // 그 밖(로컬 docker compose 의 nginx 가 /api/ 를 같은 함수로 넘긴다)에서는 같은 도메인의 /api
 const API_ORIGIN = location.hostname === 'nba-kor.github.io' ? 'https://lgchgqxjjlapszmxarun.supabase.co/functions/v1/recruit' : ''
 const KAKAO_JS_KEY = '8f89f3ef476f72827c9a875ad0c23a72'    // Kakao Developers > 앱 > 플랫폼 키 > JavaScript 키. 비우면 공유 버튼이 링크 복사로 대체된다.
+// 카카오 카드의 '디스코드' 버튼이 여는 #매칭-현황 채널. TNAB 봇이 현황판을 올리는 채널과 같아야 한다(봇 .env 의 DISCORD_GUILD_ID · MATCH_DASHBOARD_CHANNEL_ID).
+// 이 주소도 카카오 '제품 링크 관리 > 웹 도메인' 에 https://discord.com 이 등록돼 있어야 열린다 — 없으면 카카오가 앱 기본 도메인으로 바꿔 버린다
+const DISCORD_URL = 'https://discord.com/channels/1548921970974920764/1549349444045246586'
 // 디스코드 로그인 = Supabase Auth. publishable key 는 브라우저에 두라고 만든 공개 키다(표는 RLS 로 막혀 있어 이 키로는 아무것도 못 읽는다)
 const SUPABASE_URL = 'https://lgchgqxjjlapszmxarun.supabase.co'
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_NlTRTkRjbTv0iCHhNB8pZA_2Ov5In9Z'
@@ -693,21 +696,30 @@ function teamTokens(t) {
 
 const teamUrl = t => `${location.origin}/recruit/?t=${t.id}`
 
-/** 카카오 리스트 템플릿. 항목은 2~3개여야 하므로 빈 자리로 teamSize 를 채운다. */
+/** 카카오 리스트 템플릿. 항목은 2~3개여야 하므로 빈 자리로 teamSize 를 채운다.
+ *  TNAB 봇이 카톡방에 자동으로 보내는 카드와 **같은 모양이어야 한다** — 한쪽만 고치면 같은 팀이 두 가지로 보인다.
+ *  봇 쪽 원본: tnab/kakao_share.py 의 build_party_share_options (제목 · 항목 · 빈 자리 문구 · 버튼 두 개) */
 function kakaoPayload(t) {
   const url = teamUrl(t), link = { mobileWebUrl: url, webUrl: url }
   const img = id => `${location.origin}/assets/share/${id}.jpg`
+  const lead = t.members.find(m => m.leader)
+  const name = t.room.title || (lead ? `${lead.entries[0].nick} 파티` : '이름 없는 파티')
   const items = t.members.map(m => {
     const e = m.entries[0], n = m.entries.length - 1
-    return { title: e.nick, description: `${charLine(e)}${n ? ` 외 ${n}개` : ''}`, imageUrl: img(e.char), link }
+    return {
+      // 캐릭터 이름은 넣지 않는다 — 오른쪽 얼굴이 대신하고, 설명 줄은 한 줄에서 잘린다
+      title: `${m.leader ? '👑 ' : ''}${e.nick}${n ? ` +${n}` : ''}`,
+      description: `${POS[P(e.char).pos] || '?'} · ${e.tier} · 마이크 ${m.mic ? 'O' : 'X'}`,
+      imageUrl: img(e.char), link,
+    }
   })
-  while (items.length < cfg.teamSize) items.push({ title: '빈 자리', description: '팀 가입을 눌러 합류하세요', imageUrl: img('empty'), link })
+  while (items.length < cfg.teamSize) items.push({ title: '빈 자리', description: '눌러서 합류하기', imageUrl: img('empty'), link })
   return {
     objectType: 'list',
-    headerTitle: t.tactic.name || t.room.title || '팀원 모집',   // 제목은 선호 전술 (사용자 요구), 없으면 방 제목
+    headerTitle: t.status === 'full' ? `✅ ${name} · 매칭 완료` : `🟢 ${name} · ${t.members.length}/${t.size} 모집 중`,
     headerLink: link,
     contents: items.slice(0, cfg.teamSize),
-    buttons: [{ title: t.status === 'open' ? '팀 가입' : '팀 보기', link }],
+    buttons: [{ title: '웹사이트', link }, { title: '디스코드', link: { mobileWebUrl: DISCORD_URL, webUrl: DISCORD_URL } }],
   }
 }
 
