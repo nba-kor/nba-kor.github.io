@@ -696,6 +696,17 @@ function teamTokens(t) {
 
 const teamUrl = t => `${location.origin}/recruit/?t=${t.id}`
 
+/** 디스코드 링크는 앱으로 먼저 보낸다 — 앱 로그인과 브라우저 로그인은 별개라, 웹으로 곧장 가면 대개 로그인 화면이 뜬다.
+ *  앱이 없으면 아무 일도 일어나지 않으므로 잠시 뒤 웹으로 보낸다. 앱이 떴거나 브라우저가 "앱을 여시겠습니까?" 를 묻는
+ *  동안에는 이 창이 포커스를 잃으므로, 그때는 웹으로 넘기지 않는다(확인창을 빼앗지 않게). */
+function openDiscord(event, url) {
+  event.preventDefault()
+  // 카카오톡 인앱 브라우저는 다른 앱을 못 띄운다 — 평소 쓰는 브라우저로 넘긴다(로그인과 같은 방법)
+  if (IN_KAKAO) return void (location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(url)}`)
+  location.href = url.replace('https://discord.com', 'discord://-')
+  setTimeout(() => { if (!document.hidden && document.hasFocus()) location.href = url }, 1800)
+}
+
 /** 카카오 리스트 템플릿. 항목은 2~3개여야 하므로 빈 자리로 teamSize 를 채운다.
  *  TNAB 봇이 카톡방에 자동으로 보내는 카드와 **같은 모양이어야 한다** — 한쪽만 고치면 같은 팀이 두 가지로 보인다.
  *  봇 쪽 원본: tnab/kakao_share.py 의 build_party_share_options (제목 · 항목 · 빈 자리 문구 · 버튼 두 개) */
@@ -903,7 +914,10 @@ async function showTeam(id) {
     const v = team.voice
     $('#team-voice').replaceChildren(v
       ? h('div', { className: 'rc-voice-row' }, h('b', { className: 'rc-vc' }, v.name),
-        /^https:\/\/discord\.com\//.test(v.url) && h('a', { className: 'rc-discord', href: v.url, target: '_blank', rel: 'noopener' }, '디스코드에서 열기'))
+        /^https:\/\/discord\.com\//.test(v.url) && h('a', {
+          className: 'rc-discord', href: v.url, target: '_blank', rel: 'noopener',   // JS 가 막힌 경우 · 가운데 클릭은 그대로 웹으로
+          onclick: e => openDiscord(e, v.url),
+        }, '디스코드에서 열기'))
       : h('p', { className: 'rc-muted' }, '배정된 음성채널이 없어요 — 디스코드에서 자유롭게 모여주세요.'))
 
     const cta = team.status === 'open' && !!mm?.leader
