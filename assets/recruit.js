@@ -725,12 +725,13 @@ function kakaoPayload(t) {
     }
   })
   while (items.length < cfg.teamSize) items.push({ title: '빈 자리', description: '눌러서 합류하기', imageUrl: img('empty'), link })
+  const dc = `${DISCORD_URL}?t=${t.id}`   // 앱이 떠도 그 탭은 남는다 — 팀 화면으로 돌아갈 수 있게 팀 번호를 달고 간다
   return {
     objectType: 'list',
     headerTitle: t.status === 'full' ? `✅ ${name} · 매칭 완료` : `🟢 ${name} · ${t.members.length}/${t.size} 모집 중`,
     headerLink: link,
     contents: items.slice(0, cfg.teamSize),
-    buttons: [{ title: '웹사이트', link }, { title: '디스코드', link: { mobileWebUrl: DISCORD_URL, webUrl: DISCORD_URL } }],
+    buttons: [{ title: '웹사이트', link }, { title: '디스코드', link: { mobileWebUrl: dc, webUrl: dc } }],
   }
 }
 

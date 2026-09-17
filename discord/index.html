@@ -22,10 +22,11 @@
 <main style="max-width:32rem;margin:3rem auto;padding:0 16px;text-align:center">
   <h1 style="font-size:1.25rem">디스코드로 가는 중…</h1>
   <p id="msg">창이 안 뜨면 아래에서 고르세요.</p>
-  <p style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+  <p style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
     <a id="app" href="#">디스코드 앱으로 열기</a>
     <a id="web" href="#">브라우저로 열기</a>
   </p>
+  <p style="margin-top:2rem"><a id="back" href="/recruit/">← 팀원모집으로 돌아가기</a></p>
 </main>
 
 <script>
@@ -36,8 +37,20 @@
 
 // 카톡 안에서는 다른 앱을 못 띄운다 — 평소 쓰는 브라우저로 이 페이지를 다시 연다(팀원모집 로그인과 같은 방법).
 // 서버 번호가 필요 없는 단계라 설정을 읽기 전에 먼저 한다
-var toApp = !(/KAKAOTALK/i.test(navigator.userAgent) && !location.search)
-if (!toApp) location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href + '?ext=1')
+var q = new URLSearchParams(location.search)
+var toApp = !(/KAKAOTALK/i.test(navigator.userAgent) && !q.has('ext'))
+if (!toApp) {
+  q.set('ext', '1')
+  location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.origin + location.pathname + '?' + q)
+}
+
+// 앱이 떠도 이 탭은 남는다 — 어디서 왔는지(?t=팀번호) 알면 그 팀 화면으로 돌아갈 길을 준다
+var team = q.get('t')
+if (team && /^[A-Za-z0-9_-]{8}$/.test(team)) {
+  var back = document.getElementById('back')
+  back.href = '/recruit/?t=' + team
+  back.textContent = '← 팀 화면으로 돌아가기'
+}
 
 // 서버 · 채널은 data/recruit.json 의 discord 에 있다 — 서버를 옮길 때 이 파일은 안 고쳐도 된다.
 // 카톡에서 바깥 브라우저가 안 열리는 구버전도 있어 버튼은 어느 경우에나 채운다
@@ -51,7 +64,7 @@ fetch('/data/recruit.json').then(function (r) { return r.json() }).then(function
   // 웹으로 자동으로 넘기지는 않는다: '디스코드 앱을 여시겠습니까?' 확인창이 떠 있는 동안 화면을 빼앗는다
   if (toApp) location.href = 'discord://-' + path
 }).catch(function () {
-  document.getElementById('msg').textContent = '디스코드 주소를 읽지 못했어요. 팀원모집에서 다시 눌러 주세요.'
+  document.getElementById('msg').textContent = '디스코드 주소를 읽지 못했어요. 아래에서 팀 화면으로 돌아가 주세요.'
 })
 
 </script>
