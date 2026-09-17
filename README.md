@@ -12,6 +12,27 @@
 | `/recruit/` | `recruit/index.html` | **팀원모집** — 디스코드 로그인 · 방 만들기·가입(TNAB 봇과 같은 목록), 디스코드 알림 + 빈 음성채널 배정, 카카오톡 공유, 3시간 뒤 자동 삭제 |
 | `/discord/` | `discord/index.html` | 카카오 카드의 **디스코드** 버튼이 거쳐 가는 곳. `discord://` 앱 주소로 넘긴다 — `discord.com` 으로 곧장 보내면 브라우저에 세션이 없어 매번 로그인해야 한다. 서버 · 채널은 `data/recruit.json` 의 `discord` 에서 읽는다 |
 
+### 검색 · 공유 (SEO · 미리보기)
+
+사이트 이름은 **NBA덩크시티-TNAB** 다(TNAB = 덩크시티 아레나 이름). 제목 · 설명 · Open Graph 태그가
+페이지마다 들어 있고, 카카오톡 · 디스코드 · 트위터가 모두 이 태그로 미리보기를 만든다.
+
+```
+robots.txt              색인 허용 + /discord/ 제외 + sitemap 위치
+sitemap.xml             네 페이지. 새 페이지를 만들면 여기에도 넣는다
+assets/og.jpg           1200x630 미리보기 이미지 (tools/og-image.py 가 생성)
+assets/icon.png         512x512 파비콘 · 홈 화면 아이콘 (같은 스크립트)
+index.html 의 ld+json   검색 결과의 사이트 이름 (WebSite 구조화 데이터)
+```
+
+```sh
+tools/cn-faces/.venv/bin/python tools/og-image.py   # 이미지를 다시 굽는다(색은 style.css 의 :root 를 따른다)
+```
+
+이미지를 바꿨으면 각 페이지의 `og:image` · `rel=icon` 뒤 `?v=` 를 올린다. **카카오는 이미지를 URL 기준으로 캐시하므로**
+같은 주소로 내용만 바꾸면 한동안 옛 그림이 나간다. 이미 퍼진 링크의 미리보기를 지금 갱신하려면
+[카카오 디버거](https://developers.kakao.com/tool/clear/og) 에 주소를 넣어 캐시를 지운다.
+
 주소에 `.html` 이 드러나지 않도록 디렉터리 + `index.html` 구조를 쓴다.
 그래서 페이지가 루트가 아닌 깊이에 있어도 되도록 정적 자원은 전부 **루트 절대경로**(`/assets/...`,
 `/data/...`)로 참조한다. `data/*.json` 의 `img` 값도 같은 이유로 `/assets/players/...` 형태다.

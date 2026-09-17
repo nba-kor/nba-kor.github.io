@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+# 디스코드로 넘겨 주기만 하는 중간 페이지 — 색인할 내용이 없다
+Disallow: /discord/
+
+Sitemap: https://nba-kor.github.io/sitemap.xml
