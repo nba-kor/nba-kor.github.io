@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>디스코드 열기 · NBA 덩크 시티 한국 서버</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/assets/style.css?v=572a195b">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">NBA 덩크 시티 <span>한국 서버</span></div>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/tactics/">전술판</a>
+    <a href="/tiers/">티어표</a>
+    <a href="/recruit/">팀원모집</a>
+  </nav>
+</header>
+
+<main style="max-width:32rem;margin:3rem auto;padding:0 16px;text-align:center">
+  <h1 style="font-size:1.25rem">디스코드로 가는 중…</h1>
+  <p>창이 안 뜨면 아래에서 고르세요.</p>
+  <p style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+    <a id="app" href="#">디스코드 앱으로 열기</a>
+    <a id="web" href="#">브라우저로 열기</a>
+  </p>
+</main>
+
+<script>
+// 카카오 카드 · 사이트의 '디스코드' 버튼이 거쳐 가는 곳.
+// 곧장 discord.com 으로 보내면 매번 로그인을 다시 해야 한다 — 데스크톱 · 모바일 앱 로그인과 브라우저 로그인은 별개이고,
+// 카카오톡 인앱 브라우저에는 아예 세션이 없다. 그래서 앱 전용 주소(discord://)를 먼저 시도한다.
+// 카카오 '제품 링크 관리 > 웹 도메인' 도 이 페이지(사이트 도메인) 하나면 되므로 discord.com 을 따로 등록할 필요가 없다.
+var GUILD = '1548921970974920764', CHANNEL = '1549349444045246586'   // 덩크시티#TNAB > #매칭-현황. 봇의 DISCORD_GUILD_ID · MATCH_DASHBOARD_CHANNEL_ID 와 같아야 한다
+var WEB = 'https://discord.com/channels/' + GUILD + '/' + CHANNEL
+var APP = 'discord://-/channels/' + GUILD + '/' + CHANNEL
+document.getElementById('app').href = APP
+document.getElementById('web').href = WEB
+
+// 인앱 브라우저는 다른 앱을 못 띄운다 — 평소 쓰는 브라우저로 이 페이지를 다시 연다(팀원모집 로그인과 같은 방법)
+if (/KAKAOTALK/i.test(navigator.userAgent) && !location.search) {
+  location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href + '?ext=1')
+} else {
+  // 앱이 없으면 아무 일도 안 일어난다 — 그때는 위 버튼으로 고른다.
+  // 웹으로 자동으로 넘기지는 않는다: 브라우저의 '디스코드 앱을 여시겠습니까?' 확인창이 떠 있는 동안 화면을 빼앗는다
+  location.href = APP
+}
+</script>
+
+</body>
+</html>

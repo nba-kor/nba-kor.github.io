@@ -8,9 +8,9 @@ import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=081a7b
 // 그 밖(로컬 docker compose 의 nginx 가 /api/ 를 같은 함수로 넘긴다)에서는 같은 도메인의 /api
 const API_ORIGIN = location.hostname === 'nba-kor.github.io' ? 'https://lgchgqxjjlapszmxarun.supabase.co/functions/v1/recruit' : ''
 const KAKAO_JS_KEY = '8f89f3ef476f72827c9a875ad0c23a72'    // Kakao Developers > 앱 > 플랫폼 키 > JavaScript 키. 비우면 공유 버튼이 링크 복사로 대체된다.
-// 카카오 카드의 '디스코드' 버튼이 여는 #매칭-현황 채널. TNAB 봇이 현황판을 올리는 채널과 같아야 한다(봇 .env 의 DISCORD_GUILD_ID · MATCH_DASHBOARD_CHANNEL_ID).
-// 이 주소도 카카오 '제품 링크 관리 > 웹 도메인' 에 https://discord.com 이 등록돼 있어야 열린다 — 없으면 카카오가 앱 기본 도메인으로 바꿔 버린다
-const DISCORD_URL = 'https://discord.com/channels/1548921970974920764/1549349444045246586'
+// 카카오 카드의 '디스코드' 버튼. discord.com 으로 곧장 보내면 브라우저에 세션이 없어 매번 로그인해야 하므로,
+// 디스코드 앱(discord://)으로 넘겨 주는 /discord/ 를 거친다. 채널 번호도 그 페이지 한 곳에만 둔다
+const DISCORD_URL = `${location.origin}/discord/`
 // 디스코드 로그인 = Supabase Auth. publishable key 는 브라우저에 두라고 만든 공개 키다(표는 RLS 로 막혀 있어 이 키로는 아무것도 못 읽는다)
 const SUPABASE_URL = 'https://lgchgqxjjlapszmxarun.supabase.co'
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_NlTRTkRjbTv0iCHhNB8pZA_2Ov5In9Z'
