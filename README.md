@@ -10,7 +10,7 @@
 | `/tactics/` | `tactics/index.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종, 재생 |
 | `/tiers/` | `tiers/index.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유 |
 | `/recruit/` | `recruit/index.html` | **팀원모집** — 디스코드 로그인 · 방 만들기·가입(TNAB 봇과 같은 목록), 디스코드 알림 + 빈 음성채널 배정, 카카오톡 공유, 3시간 뒤 자동 삭제 |
-| `/discord/` | `discord/index.html` | 카카오 카드의 **디스코드** 버튼이 거쳐 가는 곳. `discord://` 앱 주소로 넘긴다 — `discord.com` 으로 곧장 보내면 브라우저에 세션이 없어 매번 로그인해야 한다 |
+| `/discord/` | `discord/index.html` | 카카오 카드의 **디스코드** 버튼이 거쳐 가는 곳. `discord://` 앱 주소로 넘긴다 — `discord.com` 으로 곧장 보내면 브라우저에 세션이 없어 매번 로그인해야 한다. 서버 · 채널은 `data/recruit.json` 의 `discord` 에서 읽는다 |
 
 주소에 `.html` 이 드러나지 않도록 디렉터리 + `index.html` 구조를 쓴다.
 그래서 페이지가 루트가 아닌 깊이에 있어도 되도록 정적 자원은 전부 **루트 절대경로**(`/assets/...`,
@@ -153,7 +153,7 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
 **화면 편의** — 자주 쓰는 계정 구성을 **프리셋**으로 이 브라우저에 5개까지 저장해 한 번에 채운다(`dc.recruit.presets`).
 캐릭터 고르기 창 위의 **포지션 뱃지**(전체 · PG · SG · SF · PF · C)로 목록을 거른다.
 
-인원 · 계정 수 · 만료 시간(3시간) · 티어 · 즐겜/빡겜 · 방 마이크 이름 · 글자 수 제한 · 프리셋 수는 `data/recruit.json` 하나에 있고 API · 화면 · 봇이 같이 읽는다
+인원 · 계정 수 · 만료 시간(3시간) · 티어 · 즐겜/빡겜 · 방 마이크 이름 · 글자 수 제한 · 프리셋 수 · 디스코드 서버(`discord`)는 `data/recruit.json` 하나에 있고 API · 화면 · 봇이 같이 읽는다
 (봇은 `https://nba-kor.github.io/data/recruit.json` 을 받는다. 고치면 함수도 다시 배포한다 — [운영 배포](#운영-배포) 4번).
 캐릭터는 한국 출시 선수(`data/players.json`)만 고를 수 있다.
 

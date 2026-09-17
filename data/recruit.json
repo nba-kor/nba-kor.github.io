@@ -17,5 +17,10 @@
     "title": 30,
     "memo": 100
   },
-  "maxPresets": 5
+  "maxPresets": 5,
+  "discord": {
+    "note": "카카오 카드 · 사이트의 '디스코드' 버튼이 여는 곳. /discord/ 가 이 값으로 discord:// 앱 주소를 만든다. 서버를 옮기면 여기와 봇 .env 를 같이 고친다",
+    "guildId": "1548921970974920764",
+    "dashboardChannelId": "1549349444045246586"
+  }
 }

@@ -21,7 +21,7 @@
 
 <main style="max-width:32rem;margin:3rem auto;padding:0 16px;text-align:center">
   <h1 style="font-size:1.25rem">디스코드로 가는 중…</h1>
-  <p>창이 안 뜨면 아래에서 고르세요.</p>
+  <p id="msg">창이 안 뜨면 아래에서 고르세요.</p>
   <p style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
     <a id="app" href="#">디스코드 앱으로 열기</a>
     <a id="web" href="#">브라우저로 열기</a>
@@ -33,20 +33,27 @@
 // 곧장 discord.com 으로 보내면 매번 로그인을 다시 해야 한다 — 데스크톱 · 모바일 앱 로그인과 브라우저 로그인은 별개이고,
 // 카카오톡 인앱 브라우저에는 아예 세션이 없다. 그래서 앱 전용 주소(discord://)를 먼저 시도한다.
 // 카카오 '제품 링크 관리 > 웹 도메인' 도 이 페이지(사이트 도메인) 하나면 되므로 discord.com 을 따로 등록할 필요가 없다.
-var GUILD = '1548921970974920764', CHANNEL = '1549349444045246586'   // 덩크시티#TNAB > #매칭-현황. 봇의 DISCORD_GUILD_ID · MATCH_DASHBOARD_CHANNEL_ID 와 같아야 한다
-var WEB = 'https://discord.com/channels/' + GUILD + '/' + CHANNEL
-var APP = 'discord://-/channels/' + GUILD + '/' + CHANNEL
-document.getElementById('app').href = APP
-document.getElementById('web').href = WEB
 
-// 인앱 브라우저는 다른 앱을 못 띄운다 — 평소 쓰는 브라우저로 이 페이지를 다시 연다(팀원모집 로그인과 같은 방법)
-if (/KAKAOTALK/i.test(navigator.userAgent) && !location.search) {
-  location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href + '?ext=1')
-} else {
-  // 앱이 없으면 아무 일도 안 일어난다 — 그때는 위 버튼으로 고른다.
-  // 웹으로 자동으로 넘기지는 않는다: 브라우저의 '디스코드 앱을 여시겠습니까?' 확인창이 떠 있는 동안 화면을 빼앗는다
-  location.href = APP
-}
+// 카톡 안에서는 다른 앱을 못 띄운다 — 평소 쓰는 브라우저로 이 페이지를 다시 연다(팀원모집 로그인과 같은 방법).
+// 서버 번호가 필요 없는 단계라 설정을 읽기 전에 먼저 한다
+var toApp = !(/KAKAOTALK/i.test(navigator.userAgent) && !location.search)
+if (!toApp) location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href + '?ext=1')
+
+// 서버 · 채널은 data/recruit.json 의 discord 에 있다 — 서버를 옮길 때 이 파일은 안 고쳐도 된다.
+// 카톡에서 바깥 브라우저가 안 열리는 구버전도 있어 버튼은 어느 경우에나 채운다
+fetch('/data/recruit.json').then(function (r) { return r.json() }).then(function (cfg) {
+  var d = cfg.discord || {}
+  if (!d.guildId || !d.dashboardChannelId) throw new Error('discord 설정 없음')
+  var path = '/channels/' + d.guildId + '/' + d.dashboardChannelId
+  document.getElementById('app').href = 'discord://-' + path
+  document.getElementById('web').href = 'https://discord.com' + path
+  // 앱이 없거나 브라우저가 사용자 동작 없는 실행을 막으면 아무 일도 안 일어난다 — 그때는 위 버튼으로 고른다.
+  // 웹으로 자동으로 넘기지는 않는다: '디스코드 앱을 여시겠습니까?' 확인창이 떠 있는 동안 화면을 빼앗는다
+  if (toApp) location.href = 'discord://-' + path
+}).catch(function () {
+  document.getElementById('msg').textContent = '디스코드 주소를 읽지 못했어요. 팀원모집에서 다시 눌러 주세요.'
+})
+
 </script>
 
 </body>
