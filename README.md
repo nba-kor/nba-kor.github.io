@@ -491,7 +491,15 @@ docker compose up -d            # http://localhost:8000/tactics/ · http://local
 `docker compose exec db psql -U postgres -h localhost -d postgres -f /migrations/<파일>`.
 
 화면 파일은 고치고 새로고침하면 바로 반영된다(캐시 끔). 함수 워커는 재사용되므로 `server/*.mjs` · `data/*.json` 을 고쳤으면 `docker compose restart api`.
-`.env` 를 고쳤으면 `docker compose up -d` 를 다시 돌린다. `compose.yaml` 의 nginx 설정을 고쳤으면
+`.env` 를 고쳤으면 `docker compose up -d` 를 다시 돌린다 — **떠 있는 컨테이너는 `.env` 를 다시 읽지 않는다.**
+`restart` 로도 안 바뀐다. 디스코드 값이 빈 채로 오래 떠 있으면 알림 · 음성채널 배정이 조용히 빠지므로, 의심되면 확인하고 강제로 다시 만든다:
+
+```sh
+docker compose exec api sh -c 'echo "$DISCORD_GUILD_ID"'   # 비어 있거나 옛 값이면
+docker compose up -d --force-recreate api
+curl -s localhost:8000/api/health                          # voice 가 true 여야 봇 토큰 · 서버 ID 가 들어간 것
+```
+ `compose.yaml` 의 nginx 설정을 고쳤으면
 `docker compose up -d --force-recreate web` (`up -d` · `restart` 로는 반영되지 않는다). 모집한 방은 3시간이 지나면 사라지고, 당장 비우려면 `docker compose down -v`.
 요청 수 제한(한 사람 당 쓰기 10분에 30번)은 DB 에 남으므로 스크립트로 몰아서 시험하다 막히면
 `docker compose exec db psql -U postgres -h localhost -d postgres -c 'delete from recruit_hits'`.
