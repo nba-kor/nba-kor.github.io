@@ -646,41 +646,50 @@ test('검증: 방 설정(제목 · 마이크 필수/듣코가능/필요없음 ·
 
 // ---------------------------------------------------------------- 프로필 (DB)
 
-dbTest('프로필: 저장 · 다시 저장 · /me · 이름은 신원에서(본문 무시 · 바뀌면 갱신) · auth_user_id 는 저장만(응답엔 없음) · 봇 저장은 연결을 안 지운다', async () => {
+dbTest('프로필: 저장 · 다시 저장 · /me · 표시 이름은 본인이 고른다(안 보내면 유지 · 디스코드 이름이 바뀌어도 유지) · auth_user_id 는 저장만(응답엔 없음) · 봇 저장은 연결을 안 지운다', async () => {
   let clock = futureBase()
   const { api, net } = start({ now: () => clock })
   const id = uid(), as = web(id)
   assert.deepEqual((await api('GET', '/api/me', undefined, { as })).body, { user: { id, name: `웹${id.slice(-4)}` }, profile: null, teamId: null })
 
   const saved = await api('PUT', '/api/me/profile', {
-    mic: false, entries: [{ ...entry({ nick: '  보노 ' }), extra: 1 }, entry({ nick: '😀'.repeat(20), tier: '실버', char: 'klfd' })], name: '위조', userId: '1', evil: 1,
+    mic: false, entries: [{ ...entry({ nick: '  보노 ' }), extra: 1 }, entry({ nick: '😀'.repeat(20), tier: '실버', char: 'klfd' })], name: '  보노보노 ', userId: '1', evil: 1,
   }, { as })
   assert.equal(saved.status, 200)
   assert.deepEqual(Object.keys(saved.body), ['profile'])
   assert.deepEqual(Object.keys(saved.body.profile), PROFILE_KEYS)
-  const want = { userId: id, name: `웹${id.slice(-4)}`, mic: false, entries: [entry(), entry({ nick: '😀'.repeat(20), tier: '실버', char: 'klfd' })], updatedAt: clock }
-  assert.deepEqual(saved.body.profile, want, '닉네임 앞뒤 공백 자르기 · 모르는 필드 버리기 · 이름은 본문이 아니라 신원')
+  const want = { userId: id, name: '보노보노', mic: false, entries: [entry(), entry({ nick: '😀'.repeat(20), tier: '실버', char: 'klfd' })], updatedAt: clock }
+  assert.deepEqual(saved.body.profile, want, '닉네임 · 표시 이름 앞뒤 공백 자르기 · 모르는 필드 버리기')
   const got = await api('GET', '/api/me', undefined, { as })
-  assert.deepEqual(got.body, { user: { id, name: want.name }, profile: want, teamId: null })
+  assert.deepEqual(got.body, { user: { id, name: `웹${id.slice(-4)}` }, profile: want, teamId: null }, 'user.name 은 신원, profile.name 은 본인이 고른 이름')
   let [row] = await rows(`/recruit_profiles?select=*&discord_user_id=eq.${id}`)
   assert.deepEqual([row.auth_user_id, row.discord_name, row.created_at, row.updated_at], [fakeUuid(id), want.name, clock, clock])
 
   clock += MIN
   const again = await api('PUT', '/api/me/profile', { mic: true, entries: [entry({ char: 'sga' })] }, { as })
-  assert.deepEqual(again.body.profile, { ...want, mic: true, entries: [entry({ char: 'sga' })], updatedAt: clock }, '덮어쓴다')
+  assert.deepEqual(again.body.profile, { ...want, mic: true, entries: [entry({ char: 'sga' })], updatedAt: clock }, '덮어쓴다 — 이름을 안 보내면 저장된 이름 그대로')
 
-  // 디스코드에서 이름을 바꾸면 다음 요청(/me)에서 저장된 이름도 바뀐다
+  // 디스코드에서 이름을 바꿔도 표시 이름은 그대로다. 서버 별명이 계정 이름과 다를 수 있어 본인이 고른 이름을 지킨다
   const renamed = await api('GET', '/api/me', undefined, { as: web(id, '새 이름') })
-  assert.deepEqual([renamed.body.user.name, renamed.body.profile.name], ['새 이름', '새 이름'])
+  assert.deepEqual([renamed.body.user.name, renamed.body.profile.name], ['새 이름', '보노보노'])
   ;[row] = await rows(`/recruit_profiles?select=*&discord_user_id=eq.${id}`)
-  assert.deepEqual([row.discord_name, row.created_at], ['새 이름', clock - MIN])
+  assert.deepEqual([row.discord_name, row.created_at], ['보노보노', clock - MIN])
 
-  // 같은 사람이 봇으로 저장 — 이름은 봇이 준 이름, 웹 계정 연결(auth_user_id)은 그대로
+  // 봇이 저장해도(이름을 안 보낸다) 표시 이름은 그대로, 웹 계정 연결(auth_user_id)도 그대로
   const viaBot = await api('PUT', '/api/me/profile', { mic: false, entries: [entry()] }, { as: bot(id, '봇 이름') })
-  assert.equal(viaBot.body.profile.name, '봇 이름')
+  assert.equal(viaBot.body.profile.name, '보노보노')
   ;[row] = await rows(`/recruit_profiles?select=*&discord_user_id=eq.${id}`)
-  assert.deepEqual([row.auth_user_id, row.discord_name, row.mic], [fakeUuid(id), '봇 이름', false])
+  assert.deepEqual([row.auth_user_id, row.discord_name, row.mic], [fakeUuid(id), '보노보노', false])
+
   assert.equal((await api('GET', '/api/me', undefined, { as: bot(id, '봇 이름') })).body.profile.mic, false, '웹 · 봇이 같은 프로필')
+
+  // 이름 바꾸기 · 형식
+  clock += MIN
+  assert.equal((await api('PUT', '/api/me/profile', { name: '길드별명', mic: true, entries: [entry()] }, { as })).body.profile.name, '길드별명')
+  assert.equal((await api('GET', '/api/me', undefined, { as: bot(id, '봇 이름') })).body.profile.name, '길드별명', '봇도 같은 이름을 본다')
+  for (const [name, why] of [[' ', '빈 이름'], ['x'.repeat(33), '33자'], ['http://a.b', '링크'], ['한\n줄', '줄바꿈']]) {
+    assert.equal((await api('PUT', '/api/me/profile', { name, mic: true, entries: [entry()] }, { as })).status, 400, why)
+  }
 
   // 같은 웹 계정(auth uuid)이 다른 디스코드 ID 로 옮겨 붙으면 옛 프로필의 연결만 끊는다(unique 충돌 500 대신)
   const other = uid()
@@ -1336,13 +1345,13 @@ test('Data API 오류 → HTTP: PT404 · PT409(full · already) · PT428 은 사
   assert.equal(call.headers.authorization, undefined, 'secret key 는 Authorization 에 싣지 않는다')
   assert.deepEqual([call.headers['content-type'], call.headers.accept], ['application/json', 'application/json'])
   assert.ok(seen.every(s => s.path.startsWith('/rest/v1/recruit_') || s.path.startsWith('/rest/v1/rpc/')), seen.map(s => s.path).join('\n'))
-  assert.ok(!seen.some(s => s.method === 'PATCH'), '이름이 같으면 프로필을 고치지 않는다')
+  assert.ok(!seen.some(s => s.method === 'PATCH'), '읽기만으로 프로필을 고치지 않는다')
   assert.ok(seen.every(s => !s.path.includes('auth_user_id')), 'auth_user_id 는 읽지 않는다')
 
-  // 이름이 바뀌었으면 PATCH 로 고친다
+  // 디스코드 이름이 달라도 프로필은 그대로다 — 표시 이름은 본인이 화면에서만 바꾼다
   seen.length = 0
   await api('POST', '/api/teams/AAAAAAAA/members', undefined, { as: bot(id, '새 이름') })
-  assert.deepEqual(seen.filter(s => s.method === 'PATCH').map(s => [s.path, s.body]), [[`/rest/v1/recruit_profiles?discord_user_id=eq.${id}`, { discord_name: '새 이름' }]])
+  assert.deepEqual(seen.filter(s => s.method === 'PATCH'), [], '신원 이름으로 덮어쓰지 않는다')
 
   // 팀 만들기 · 프로필 저장 RPC 모양
   seen.length = 0

@@ -493,14 +493,16 @@ function profileForm() {
   form.onsubmit = async e => {
     e.preventDefault()
     const box = $('.rc-seg', form), mic = $('[name=mic]:checked', form), bad = []
-    unflag(box)
+    const nameBox = $('#profile-name').closest('.rc-fld'), name = $('#profile-name').value.trim()
+    unflag(box); unflag(nameBox)
+    if (!name) flagErr(bad, $('#profile-name'), $('.rc-err', nameBox), '표시 이름을 입력하세요')
     if (!mic) flagErr(bad, $('[name=mic]', form), $('.rc-err', box), '마이크 사용 여부를 고르세요')
     const v = person.read(!bad.length)
     if (bad.length) bad[0].focus()
     if (bad.length || !v) return
     const res = await submit(form, async () => {
       if (auth !== 'in') throw new Error('디스코드로 로그인해 주세요')
-      return api('/me/profile', { method: 'PUT', withToken: true, body: { mic: mic.value === '1', entries: v.entries } })
+      return api('/me/profile', { method: 'PUT', withToken: true, body: { name, mic: mic.value === '1', entries: v.entries } })
     })
     if (!res) return
     sec.hidden = true
@@ -516,7 +518,8 @@ function openProfile(after = null, why = '') {
   if (auth !== 'in') return
   const form = $('#profile-form'), sec = $('#profile')
   profileAfter = after
-  $('#profile-name').textContent = me.user.name
+  // 저장된 이름이 있으면 그것을, 처음이면 디스코드 계정 이름을 채워 둔다
+  $('#profile-name').value = me.profile?.name || me.user.name
   $('#profile-why').textContent = why
   $('#profile-why').hidden = !why
   $('.rc-form-err', form).hidden = true

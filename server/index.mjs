@@ -80,7 +80,8 @@ function room(v) {
   return { title: text(v.title ?? '', L.title, '방 제목', 0), mic: v.mic, mode: v.mode, memo: text(v.memo ?? '', L.memo, '메모', 0, true) }
 }
 
-/** 프로필: 개인 마이크 O/X + 게임 계정 1~3줄(첫 줄 대표). 표시 이름은 본문이 아니라 신원(디스코드)에서 온다 */
+/** 프로필: 표시 이름 + 개인 마이크 O/X + 게임 계정 1~3줄(첫 줄 대표).
+ *  이름을 안 보내면(봇 · 옛 화면) 저장돼 있던 이름을 그대로 둔다 — 디스코드 서버 별명과 계정 이름이 다를 수 있어 본인이 고른다 */
 function profile(v) {
   if (!isObj(v)) fail(400, '프로필 정보가 없어요')
   if (typeof v.mic !== 'boolean') fail(400, '마이크 사용 여부를 골라 주세요')
@@ -96,7 +97,7 @@ function profile(v) {
     seen.add(key)
     return { nick, tier: e.tier, char: e.char }
   })
-  return { mic: v.mic, entries }
+  return { name: v.name == null ? null : text(v.name, 32, '표시 이름'), mic: v.mic, entries }
 }
 
 // 전술판은 토큰을 옮기면 동선도 같이 밀려 코트 밖(0~1 바깥) 좌표가 저장될 수 있다 — 거절하지 않고 잘라 넣는다.
@@ -290,13 +291,10 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   // 고정 창 카운터(recruit_hit RPC) — 한 문장 upsert 라 워커 여러 개가 동시에 세도 틀리지 않는다. 늘어난 횟수를 돌려준다
   const hit = (key, windowMs) => db('/rpc/recruit_hit', { method: 'POST', body: { p_key: key, p_now: now(), p_window: windowMs, p_add: 1 } })
 
-  /** 내 프로필 + 지금 든 팀 id. 표시 이름이 신원과 다르면 여기서 고친다 — 파티 목록 · 알림이 늘 지금 디스코드 이름을 쓴다 */
+  /** 내 프로필 + 지금 든 팀 id. 표시 이름은 프로필에 저장된 것을 쓴다 —
+   *  처음 만들 때 디스코드 이름으로 채워지고, 그 뒤로는 본인이 화면에서 고칠 때만 바뀐다(서버 별명이 다른 경우) */
   async function mine(user) {
     const [p] = await db(`/recruit_profiles?select=discord_name,mic,entries,updated_at,member:recruit_members(team_id,team:recruit_teams(expires_at))&discord_user_id=eq.${user.id}`)
-    if (p && p.discord_name !== user.name) {
-      await db(`/recruit_profiles?discord_user_id=eq.${user.id}`, { method: 'PATCH', body: { discord_name: user.name } })
-      p.discord_name = user.name
-    }
     return p || null
   }
   const profileView = (user, p) => ({ userId: user.id, name: p.discord_name, mic: p.mic, entries: p.entries, updatedAt: p.updated_at })
@@ -380,10 +378,12 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
 
       case 'PUT me profile': {
         const p = profile(body)
+        // 이름을 안 보냈으면 저장돼 있던 이름을, 프로필이 아직 없으면 디스코드 이름을 쓴다
+        const name = p.name ?? (await mine(user))?.discord_name ?? user.name
         await db('/rpc/recruit_upsert_profile', {
-          method: 'POST', body: { p_user: user.id, p_auth: user.authUserId, p_name: user.name, p_mic: p.mic, p_entries: p.entries, p_now: t },
+          method: 'POST', body: { p_user: user.id, p_auth: user.authUserId, p_name: name, p_mic: p.mic, p_entries: p.entries, p_now: t },
         })
-        return [200, { profile: { userId: user.id, name: user.name, mic: p.mic, entries: p.entries, updatedAt: t } }]
+        return [200, { profile: { userId: user.id, name, mic: p.mic, entries: p.entries, updatedAt: t } }]
       }
 
       case 'POST': {

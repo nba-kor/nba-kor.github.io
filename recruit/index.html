@@ -47,9 +47,10 @@
       <p class="rc-note rc-why" id="profile-why" hidden></p>
       <div class="rc-profile-top">
         <div class="rc-fld">
-          <span>디스코드 이름</span>
-          <b class="rc-pname" id="profile-name"></b>
-          <small class="rc-hint">로그인한 디스코드 계정 이름이 로스터에 보여요</small>
+          <label for="profile-name">표시 이름</label>
+          <input type="text" id="profile-name" name="name" maxlength="32" autocomplete="off" spellcheck="false" required>
+          <small class="rc-hint">로스터 · 알림 · 카톡 카드에 이 이름이 보여요. 디스코드 서버 별명이 다르면 여기서 맞추세요</small>
+          <small class="rc-err" hidden></small>
         </div>
         <fieldset class="rc-seg">
           <legend>마이크</legend>
@@ -263,6 +264,6 @@
   </form>
 </dialog>
 
-<script type="module" src="/assets/recruit.js?v=af1e35f5"></script>
+<script type="module" src="/assets/recruit.js?v=f15a0e00"></script>
 </body>
 </html>
