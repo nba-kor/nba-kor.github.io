@@ -120,6 +120,40 @@ let memo = null
  * 누가 들어가 있는지는 REST 로 알 수 없다 — "빈 방" 은 만료 전 팀이 안 잡은 방이고, 그 판단은 recruit_create_team 이 한다.
  * 봇이 없거나 실패하면 [] (팀은 음성채널 없이 만든다). 봇이 볼 수 없는 채널은 디스코드가 목록에서 뺀다(2026-11-16~).
  */
+const NICK_MS = 10 * 60_000
+let nickMemo = new Map()   // `길드 사용자` → { nick, at }
+
+/**
+ * 디스코드 **서버 별명**(없으면 서버에서 보이는 이름, 그것도 없으면 null).
+ * 웹 로그인(Supabase Auth)은 계정 이름만 알려 주는데, 같은 서버 사람들은 별명으로 서로를 안다 —
+ * 그래서 로스터 · 알림에 쓸 이름은 별명을 먼저 본다. 봇은 interaction 에서 이미 별명을 보내므로 이 길을 안 탄다.
+ * 워커마다 10분 기억한다(별명은 자주 안 바뀌고, 매 요청 디스코드를 부르면 금방 막힌다).
+ */
+export async function guildNick({ botToken, guildId, userId, fetch = globalThis.fetch, now = Date.now, log = console.log }) {
+  if (!botToken || !guildId || !/^\d{1,20}$/.test(String(userId ?? ''))) return null
+  const key = `${guildId} ${userId}`, memo = nickMemo.get(key)
+  if (memo && now() - memo.at < NICK_MS) return memo.nick
+  let nick = null
+  try {
+    const res = await fetch(`https://discord.com/api/v10/guilds/${encodeURIComponent(guildId)}/members/${encodeURIComponent(userId)}`, {
+      headers: { authorization: `Bot ${botToken}`, 'user-agent': UA },
+      signal: AbortSignal.timeout(3000),
+    })
+    const m = res.ok ? await res.json() : null
+    // 서버를 나간 사람(404) · 권한 부족(403)도 기억한다 — 바로 다시 불러도 같다
+    if (!res.ok) log(`디스코드 서버 별명 실패 ${res.status}`)
+    const raw = [m?.nick, m?.user?.global_name]
+      .map(v => typeof v === 'string' ? v.replace(/[\x00-\x1f\x7f]/g, '').trim() : '').find(Boolean)
+    nick = raw ? [...raw].slice(0, 32).join('') : null
+  } catch (e) {
+    log(`디스코드 서버 별명 오류: ${errText(e)}`)
+    return null   // 시간 초과 · 연결 실패는 기억하지 않는다(다음 요청에 다시)
+  }
+  if (nickMemo.size >= 500) nickMemo = new Map()
+  nickMemo.set(key, { nick, at: now() })
+  return nick
+}
+
 export async function voiceRooms({ botToken, guildId, categoryId = '', fetch = globalThis.fetch, now = Date.now, log = console.log }) {
   if (!botToken || !guildId) return []
   const key = `${guildId} ${categoryId}`

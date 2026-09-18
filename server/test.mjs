@@ -488,6 +488,41 @@ test('웹 신원: Auth(/auth/v1/user)로 토큰 확인 · 디스코드 ID 는 id
   assert.equal(net.auth.length, calls)
 })
 
+test('웹 신원: 서버 별명이 있으면 그것을 이름으로(없거나 서버 밖이면 계정 이름) · 10분 기억 · 봇은 안 부른다', async () => {
+  let clock = 1_000_000
+  const id = uid(), seen = []
+  const member = (u) => {
+    seen.push(u.pathname)
+    return u.pathname.endsWith(`/members/${id}`)
+      ? json(200, { nick: '  길드별명 ', user: { global_name: '계정이름' } })
+      : json(404, { message: 'Unknown Member' })
+  }
+  const { api } = start({ db: FAKE_DB, now: () => clock, env: { DISCORD_BOT_TOKEN: 'tok' }, channels: member })
+  const name = async (as, app = api) => (await app('GET', '/api/me', undefined, { as })).body.user.name
+
+  assert.equal(await name(web(id)), '길드별명', '앞뒤 공백은 자른다')
+  assert.deepEqual(seen, [`/api/v10/guilds/${GUILD}/members/${id}`])
+
+  // 같은 워커에서 10분은 다시 안 부른다(토큰 기억 60초와 별개 — 토큰을 바꿔서 확인한다)
+  clock += 5 * 60_000
+  assert.equal(await name(web(id, '계정이름')), '길드별명')
+  assert.equal(seen.length, 1, '10분 안에는 디스코드를 다시 안 부른다')
+  clock += 6 * 60_000
+  assert.equal(await name(web(id, '계정이름')), '길드별명')
+  assert.equal(seen.length, 2, '10분이 지나면 다시 본다')
+
+  // 서버에 없는 사람(404) · 봇 토큰이 없는 서버는 계정 이름 그대로
+  const outsider = uid()
+  assert.equal(await name(web(outsider, '바깥사람')), '바깥사람')
+  const noBot = start({ db: FAKE_DB, now: () => clock, channels: member })
+  assert.equal(await name(web(uid(), '토큰없음'), noBot.api), '토큰없음')
+
+  // 봇 신원은 헤더 이름(=봇이 보낸 서버 별명)을 그대로 쓴다 — 디스코드를 부르지 않는다
+  const before = seen.length
+  assert.equal(await name(bot(id, '봇이 준 별명')), '봇이 준 별명')
+  assert.equal(seen.length, before, '봇 요청은 디스코드를 안 부른다')
+})
+
 test('웹 신원: 기억은 500개까지(넘치면 비움) · publishable key 고르기 · 키가 없으면 Auth 를 안 부르고 503 · health 의 login', async () => {
   const app = start({ db: FAKE_DB, now: () => 0 })
   const first = web(uid())

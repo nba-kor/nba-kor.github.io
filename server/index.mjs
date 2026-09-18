@@ -12,7 +12,7 @@ import { Buffer } from 'node:buffer'
 import CFG from '../data/recruit.json' with { type: 'json' }
 import playersData from '../data/players.json' with { type: 'json' }
 import tacticsData from '../data/tactics.json' with { type: 'json' }
-import { channelUrl, createNotifier, errText, voiceRooms } from './discord.mjs'
+import { channelUrl, createNotifier, errText, guildNick, voiceRooms } from './discord.mjs'
 
 const PLAYERS = new Map(playersData.players.filter(p => p.server === 'kr').map(p => [p.id, p]))   // 한국 출시만
 const PRESETS = new Map(tacticsData.presets.map(p => [p.id, p.name]))
@@ -232,7 +232,9 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const d = isObj(identity.identity_data) ? identity.identity_data : {}
     const name = [d.custom_claims?.global_name, d.full_name, d.name]
       .map(s => typeof s === 'string' ? s.replace(/[\x00-\x1f\x7f]/g, '').trim() : '').find(Boolean) || 'Discord 사용자'
-    const user = { id: identity.id, name: [...name].slice(0, 80).join(''), authUserId: matches(UUID, body.id) ? body.id : null, admin: false }
+    // 같은 서버 사람들은 별명으로 서로를 안다 — 별명이 있으면 그것을 이름으로 쓴다(봇은 이미 별명을 보낸다)
+    const nick = await guildNick({ botToken: env.DISCORD_BOT_TOKEN, guildId: env.DISCORD_GUILD_ID, userId: identity.id, fetch, now, log })
+    const user = { id: identity.id, name: nick || [...name].slice(0, 80).join(''), authUserId: matches(UUID, body.id) ? body.id : null, admin: false }
     if (authMemo.size >= AUTH_MEMO.max) authMemo.clear()   // 오래된 것부터 고르는 대신 통째로 — 다음 요청이 Auth 를 한 번 더 부를 뿐
     authMemo.set(key, { user, until: now() + AUTH_MEMO.ms })
     return user

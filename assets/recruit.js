@@ -195,7 +195,7 @@ function renderAuth() {
     down: [h('span', { className: 'rc-muted', title: '로그인 모듈을 불러오지 못했어요. 새로고침해 보세요' }, '로그인 불가')],
     out: [btn('디스코드 로그인', login, { className: 'rc-login' })],
     error: [h('span', { className: 'rc-muted rc-bad' }, '로그인 확인 실패'), btn('다시 시도', loadMe)],
-    in: me && [h('b', { className: 'rc-uname', title: '디스코드 계정' }, me.user.name), btn('내 프로필', () => openProfile()), btn('로그아웃', logout)],
+    in: me && [h('b', { className: 'rc-uname', title: '프로필 표시 이름' }, myName()), btn('내 프로필', () => openProfile()), btn('로그아웃', logout)],
   }[auth])
   const need = $('#need')
   need.textContent = auth === 'down' ? '로그인을 불러오지 못해 지금은 팀을 만들거나 가입할 수 없어요. 새로고침해 보세요.'
@@ -234,7 +234,7 @@ function meCard() {
     const e = me.profile.entries[0], p = P(e.char), n = me.profile.entries.length - 1
     box.append(h('img', { src: faceOf(p), alt: '' }),
       h('div', {},
-        h('div', { className: 'rc-acct-name' }, h('b', {}, me.user.name), micTag(me.profile.mic)),
+        h('div', { className: 'rc-acct-name' }, h('b', {}, myName()), micTag(me.profile.mic)),
         h('small', {}, `${e.nick} · ${e.tier} · ${charLine(e)}${n ? ` 외 ${n}개` : ''}`)),
       act('프로필 수정', () => openProfile()))
   }
@@ -696,6 +696,9 @@ function teamTokens(t) {
   })
   return presetTokens(pr, ids.map(c => c || pool.shift() || null), [])
 }
+
+/** 화면에 보이는 내 이름 — 프로필에 저장된 표시 이름이 먼저다(디스코드 서버 별명 · 본인이 고친 이름) */
+const myName = () => me?.profile?.name || me?.user?.name || ''
 
 const teamUrl = t => `${location.origin}/recruit/?t=${t.id}`
 
