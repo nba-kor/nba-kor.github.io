@@ -202,8 +202,8 @@
     },
     {
       "id": "kl",
-      "name": "클레이 톰슨",
-      "short": "톰슨",
+      "name": "클레이 탐슨",
+      "short": "탐슨",
       "en": "Klay Thompson",
       "pos": 2,
       "height": 198,
@@ -286,7 +286,7 @@
     },
     {
       "id": "kjm",
-      "name": "카메룬 존슨",
+      "name": "카메론 존슨",
       "short": "존슨",
       "en": "Cameron Johnson",
       "pos": 3,
@@ -482,8 +482,8 @@
     },
     {
       "id": "dqq",
-      "name": "스티븐 애덤스",
-      "short": "애덤스",
+      "name": "스티븐 아담스",
+      "short": "아담스",
       "en": "Steven Adams",
       "pos": 5,
       "height": 211,
@@ -496,8 +496,8 @@
     },
     {
       "id": "nejq",
-      "name": "유수프 누르키치",
-      "short": "누르키치",
+      "name": "유서프 너키치",
+      "short": "너키치",
       "en": "Jusuf Nurkic",
       "pos": 5,
       "height": 213,

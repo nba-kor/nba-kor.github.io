@@ -39,10 +39,18 @@ const EN = {
   zc: 'Zhou Chang', hla: 'Julio', dlt: 'Jamal Murray',
 }
 
-// 확률 공지 표기 ↔ 라인업 표기가 다른 선수
+// 라인업 페이지와 **인게임 표기가 다른 선수**. 화면에는 인게임 이름을 쓴다 —
+// 확률 공지(인게임 로스터)가 쓰는 표기가 기준이다. 라인업 페이지가 고쳐지면 이 줄을 지운다.
+const NAME_FIX = {
+  kl: { name: '클레이 탐슨', short: '탐슨' },
+  nejq: { name: '유서프 너키치', short: '너키치' },
+  dqq: { name: '스티븐 아담스', short: '아담스' },
+  kjm: { name: '카메론 존슨' },
+}
+
+// 확률 공지 표기 ↔ 우리 표기(NAME_FIX 적용 뒤)가 다른 선수. 공지가 성만 쓰거나 줄임말을 쓰는 경우다
 const ALIAS = {
-  탐슨: '톰슨', 아담스: '애덤스', '유서프 너키치': '누르키치',
-  SGA: '알렉산더', '카메론 존슨': '존슨',
+  SGA: '알렉산더', '유서프 너키치': '너키치', '카메론 존슨': '존슨',
 }
 
 // 확률 공지에만 있고 라인업 페이지에는 없는 선수. 공식 프로필·이미지가 없어 최소 정보만 채운다.
@@ -104,6 +112,14 @@ for (const m of js.matchAll(ROSTER)) {
   })
 }
 if (!players.length) throw new Error('선수 데이터를 찾지 못했습니다. 사이트 구조가 바뀐 듯합니다.')
+
+// 인게임 표기로 고친다(위 NAME_FIX). 라인업 페이지가 바뀌어 이미 같아졌으면 알려 준다
+for (const p of players) {
+  const fix = NAME_FIX[p.id]
+  if (!fix) continue
+  if (Object.entries(fix).every(([k, v]) => p[k] === v)) console.log(`  · NAME_FIX 불필요: ${p.id} (${p.name}) — 라인업 페이지가 인게임 표기로 바뀌었습니다`)
+  Object.assign(p, fix)
+}
 
 // ---------------------------------------------------------------- 2) 확률 공지로 교차 검증
 
