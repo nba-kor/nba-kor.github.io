@@ -378,7 +378,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
 
   // ------------------------------------------------ 잠재력추천 — 읽기는 공개, 쓰기 · 추천 · 댓글은 로그인
 
-  const BUILD_LIST = 'id,author_name,title,chars,likes,comments,created_at,updated_at'
+  const BUILD_LIST = 'id,author_name,title,chars,slots,likes,comments,created_at,updated_at'   // 목록 카드도 작은 판을 그린다(칸마다 id 뿐이라 작다)
   const buildView = b => ({
     id: b.id, authorId: b.author_id, author: b.author_name, title: b.title, chars: b.chars, body: b.body, slots: b.slots,
     likes: b.likes, comments: b.comments, createdAt: b.created_at, updatedAt: b.updated_at,

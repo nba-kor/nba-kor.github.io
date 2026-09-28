@@ -92,15 +92,58 @@ function charGrid({ isOn, pick, onPos }) {
 
 // ---------------------------------------------------------------- 30칸 보기
 
-/** 게임 화면처럼 색마다 10칸. 칸마다 잠재력 이름 + 옵션(최대 레벨 기준) */
-function slotsView(slots) {
-  return h('div', { className: 'pt-slots' }, cat.colors.map(c => h('section', { className: `pt-color is-${c.id}` },
-    h('h3', {}, c.name),
-    h('ol', {}, slots[c.id].map(id => {
-      if (!id) return h('li', { className: 'is-empty' }, '빈 칸')
-      const p = pot.get(id)
-      return h('li', {}, h('b', {}, p?.name || id), p && h('small', {}, statLine(p)))
-    })))))
+// 인게임 잠재력 판. 칸 좌표는 게임 캡처(1155×660)에서 그대로 땄다 — 색마다 바깥 줄 6칸 + 안쪽 줄 4칸
+const NODES = {
+  red: [[140, 194], [200, 140], [276, 116], [353, 116], [425, 140], [487, 194], [206, 230], [272, 189], [353, 189], [419, 230]],
+  green: [[91, 275], [79, 352], [93, 429], [132, 498], [192, 547], [266, 573], [156, 313], [157, 389], [195, 459], [264, 499]],
+  blue: [[536, 276], [548, 353], [531, 431], [495, 500], [433, 548], [360, 574], [470, 315], [470, 390], [432, 459], [362, 499]],
+}
+const CHAINS = [[0, 1, 2, 3, 4, 5], [6, 7, 8, 9]]
+const iconOf = id => `/assets/potentials/${id}.png`
+const svg = (tag, attrs = {}, ...kids) => {
+  const n = document.createElementNS('http://www.w3.org/2000/svg', tag)
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v)
+  n.append(...kids.flat().filter(Boolean))
+  return n
+}
+
+/** 판 하나. sel = { color, i } 고른 칸(글쓰기), onNode(color, i) = 칸을 눌렀을 때 */
+function boardView(slots, { sel, onNode } = {}) {
+  const C = [312, 345]
+  return svg('svg', { viewBox: '12 44 600 600', class: 'pt-board', role: 'img', 'aria-label': '잠재력 판' },
+    svg('circle', { cx: C[0], cy: C[1], r: 298, class: 'pt-b-blob' }),
+    [[40, 210], [585, 210], [312, 645]].map(([x, y]) => svg('line', { x1: C[0], y1: C[1], x2: x, y2: y, class: 'pt-b-div' })),
+    svg('circle', { cx: C[0], cy: C[1] - 5, r: 50, class: 'pt-b-logo' }),
+    svg('path', { d: `M${C[0] - 14},${C[1] - 18} v22 M${C[0] + 14},${C[1] - 18} v22`, class: 'pt-b-logo' }),
+    cat.colors.map(({ id: color, name }) => svg('g', { class: `pt-b-${color}` },
+      CHAINS.map(ch => svg('polyline', { points: ch.map(i => NODES[color][i].join(',')).join(' '), class: 'pt-b-line' })),
+      NODES[color].map(([x, y], i) => {
+        const p = pot.get(slots[color][i]), on = sel?.color === color && sel.i === i
+        const g = svg('g', { class: `pt-b-node${p ? ' is-full' : ''}${on ? ' is-sel' : ''}` },
+          svg('title', {}, `${name} ${i + 1}번 · ${p ? `${p.name} (${statLine(p)})` : '빈 칸'}`),
+          svg('circle', { cx: x, cy: y, r: 27, class: 'pt-b-dot' }),
+          p && svg('image', { href: iconOf(p.id), x: x - 27, y: y - 27, width: 54, height: 54 }),
+          svg('circle', { cx: x, cy: y, r: on ? 32 : 27, class: 'pt-b-ring' }))
+        if (onNode) {
+          Object.assign(g.dataset, { color, i })
+          g.setAttribute('tabindex', '0')
+          g.setAttribute('role', 'button')
+          g.onclick = () => onNode(color, i)
+          g.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNode(color, i) } }
+        }
+        return g
+      }))))
+}
+
+const potIcon = p => h('img', { src: iconOf(p.id), alt: '', className: 'pt-icon', loading: 'lazy' })
+/** 쓴 잠재력을 종류별로: 아이콘 · 이름 ×칸 수 · 옵션 */
+function usedView(slots) {
+  const n = new Map()
+  for (const id of Object.values(slots).flat()) if (pot.has(id)) n.set(id, (n.get(id) || 0) + 1)
+  return h('ul', { className: 'pt-used' }, [...n].map(([id, k]) => {
+    const p = pot.get(id)
+    return h('li', { className: `is-${p.color}` }, potIcon(p), h('div', {}, h('b', {}, p.name, h('span', {}, ` ×${k}`)), h('small', {}, statLine(p))))
+  }))
 }
 
 const faces = ids => h('div', { className: 'rc-faces' }, ids.map(id => h('img', { src: faceOf(P(id)), alt: P(id).name, title: P(id).name })))
@@ -136,6 +179,7 @@ async function loadList() {
   box.replaceChildren(...builds.length ? builds.map(b => h('a', { className: 'rc-tcard pt-card', href: `?b=${b.id}` },
     h('div', { className: 'rc-tcard-head' }, h('b', {}, b.title)),
     h('p', {}, h('b', {}, b.author), ` · ${ago(b.createdAt)}`),
+    b.slots && boardView(b.slots),
     faces(b.chars),
     h('p', { className: 'pt-counts' }, `👍 ${b.likes} · 💬 ${b.comments}`)))
     : [h('p', { className: 'rc-note' }, `아직 ${who}빌드가 없어요. 첫 빌드를 올려 보세요!`)])
@@ -209,7 +253,8 @@ async function showBuild() {
       h('h3', {}, '추천 캐릭터'),
       h('div', { className: 'pt-charnames' }, b.chars.map(id => h('span', {}, h('img', { src: faceOf(P(id)), alt: '' }), P(id).name))),
       b.body && h('p', { className: 'pt-body' }, b.body)),
-    h('section', { className: 'card' }, h('h3', {}, '잠재력 ', h('small', { className: 'rc-muted' }, `전부 ${cat.statsLevel}레벨(MAX) 기준`)), totalsView(b.slots), slotsView(b.slots)),
+    h('section', { className: 'card' }, h('h3', {}, '잠재력 ', h('small', { className: 'rc-muted' }, `전부 ${cat.statsLevel}레벨(MAX) 기준`)),
+      h('div', { className: 'pt-build' }, boardView(b.slots), h('div', {}, totalsView(b.slots), usedView(b.slots)))),
     h('section', { className: 'card' },
       h('h3', {}, `댓글 ${comments.length}`),
       h('ul', { className: 'pt-comments' }, comments.map(c => h('li', {},
@@ -236,24 +281,47 @@ function openForm(b = null) {
   })
   $('#form-chars').replaceChildren(grid)
   form.chars = chars
-  // 칸마다 잠재력 고르기. 보통 한 색을 한 잠재력으로 다 채우므로 색마다 「일괄 선택」이 10칸을 한 번에 바꾼다
-  const total = h('div')
-  const retotal = () => total.replaceChildren(totalsView(readForm(form).slots))
-  const options = (color, cur) => [h('option', { value: '' }, '— 빈 칸 —'),
-    ...cat.potentials.filter(p => p.color === color).map(p => h('option', { value: p.id, selected: cur === p.id }, `${p.name} — ${statLine(p)}`))]
-  $('#form-slots').replaceChildren(total, ...cat.colors.map(c => {
-    const sels = Array.from({ length: cat.slots }, (_, i) =>
-      h('select', { 'aria-label': `${c.name} ${i + 1}번 잠재력`, onchange: retotal }, options(c.id, b?.slots[c.id][i])))
-    const all = h('select', { className: 'pt-all', 'aria-label': `${c.name} 10칸 일괄 선택`, onchange: () => {
-      for (const s of sels) s.value = all.value
-      all.selectedIndex = 0
-      retotal()
-    } }, h('option', { value: '', disabled: true, selected: true }, '일괄 선택 ▾'), options(c.id).slice(1), h('option', { value: '' }, '모두 비우기'))
-    return h('section', { className: `pt-color is-${c.id}` },
-      h('h3', {}, c.name, all),
-      h('ol', {}, sels.map(s => h('li', { 'data-color': c.id }, s))))
-  }))
-  retotal()
+  // 판에서 칸을 누르고 → 오른쪽에서 옵션 필터(여러 개 = 하나라도 있으면)로 좁혀 잠재력을 누른다.
+  // 보통 한 색을 한 잠재력으로 다 채우므로 잠재력마다 「10칸 모두」가 있다
+  const slots = form.slots = Object.fromEntries(cat.colors.map(c => [c.id, [...(b?.slots[c.id] || Array(cat.slots).fill(null))]]))
+  let sel = { color: cat.colors[0].id, i: 0 }
+  const stats = new Set()
+  const box = $('#form-slots')
+  const nextEmpty = (color, from) => {
+    for (let k = 1; k <= cat.slots; k++) { const i = (from + k) % cat.slots; if (!slots[color][i]) return i }
+    return from
+  }
+  const put = (id, all) => {
+    if (all) slots[sel.color].fill(id)
+    else { slots[sel.color][sel.i] = id; if (id) sel = { ...sel, i: nextEmpty(sel.color, sel.i) } }
+    render()
+  }
+  const colorName = id => cat.colors.find(c => c.id === id).name
+  function render() {
+    const hit = p => !stats.size || p.stats.some(([k]) => stats.has(k))
+    const best = p => Math.max(0, ...p.stats.filter(([k]) => stats.has(k)).map(([, v]) => v))
+    const list = cat.potentials.filter(p => p.color === sel.color && hit(p)).sort((a, b) => best(b) - best(a))
+    const cur = pot.get(slots[sel.color][sel.i])
+    box.replaceChildren(totalsView(slots), h('div', { className: 'pt-builder' },
+      h('div', { className: 'pt-board-wrap' }, boardView(slots, { sel, onNode: (color, i) => { sel = { color, i }; render() } })),
+      h('div', { className: `pt-picker is-${sel.color}` },
+        h('div', { className: 'pt-tabs', role: 'group', 'aria-label': '색깔' }, cat.colors.map(c => h('button', {
+          type: 'button', className: `is-${c.id}`, 'aria-pressed': c.id === sel.color,
+          onclick: () => { sel = { color: c.id, i: slots[c.id][0] ? nextEmpty(c.id, 0) : 0 }; render() },
+        }, `${c.name} ${slots[c.id].filter(Boolean).length}/${cat.slots}`))),
+        h('p', { className: 'pt-cur' }, h('b', {}, `${colorName(sel.color)} ${sel.i + 1}번 칸`), cur ? ` · ${cur.name}` : ' · 비어 있음',
+          cur && h('button', { type: 'button', onclick: () => put(null) }, '이 칸 비우기'),
+          slots[sel.color].some(Boolean) && h('button', { type: 'button', onclick: () => put(null, true) }, `${colorName(sel.color)} 모두 비우기`)),
+        h('div', { className: 'pt-stats', role: 'group', 'aria-label': '옵션 필터' }, cat.statOrder.map(k => h('button', {
+          type: 'button', 'aria-pressed': stats.has(k), onclick: () => { stats.has(k) ? stats.delete(k) : stats.add(k); render() },
+        }, k)), stats.size > 0 && h('button', { type: 'button', className: 'pt-stats-clear', onclick: () => { stats.clear(); render() } }, '필터 해제')),
+        h('ul', { className: 'pt-pots' }, list.length ? list.map(p => h('li', { className: p.id === cur?.id ? 'is-cur' : '' },
+          h('button', { type: 'button', className: 'pt-pot', onclick: () => put(p.id) },
+            potIcon(p), h('span', {}, h('b', {}, p.name), h('small', {}, p.stats.map(([k, v]) => h('i', { className: stats.has(k) ? 'is-hit' : '' }, `${k} ${plus(v)}`))))),
+          h('button', { type: 'button', className: 'pt-all', onclick: () => put(p.id, true) }, '10칸 모두')))
+          : h('li', { className: 'rc-muted' }, `${colorName(sel.color)}에는 이 옵션이 붙은 잠재력이 없어요`)))))
+  }
+  render()
   $('#list-view').hidden = true
   $('#build-view').hidden = true
   $('#form-view').hidden = false
@@ -266,11 +334,7 @@ function closeForm() {
 }
 
 function readForm(form) {
-  const slots = Object.fromEntries(cat.colors.map(c => [c.id, []]))
-  for (const li of form.querySelectorAll('#form-slots li')) {
-    slots[li.dataset.color].push($('select', li).value || null)
-  }
-  return { title: form.elements.title.value, chars: [...form.chars], body: form.elements.body.value, slots }
+  return { title: form.elements.title.value, chars: [...form.chars], body: form.elements.body.value, slots: form.slots }
 }
 
 function bindForm() {

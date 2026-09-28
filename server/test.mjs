@@ -1488,11 +1488,11 @@ dbTest('잠재력추천: 글 · 검증 · 필터 · 추천 · 댓글 · 권한',
   assert.equal(c.body.build.body, '스크린 받고\n들어갈 때')
   assert.equal(c.body.build.evil, undefined)
 
-  // 목록: 공개 · 필터 · 정렬. slots 는 목록에 없다
+  // 목록: 공개 · 필터 · 정렬
   const list = async qs => (await api('GET', `/api/builds${qs}`)).body.builds
   const [first] = await list('')
   assert.equal(first.id, id)
-  assert.equal(first.slots, undefined)
+  assert.deepEqual(first.slots, BUILD.slots)
   assert.ok((await list('?char=bl')).some(x => x.id === id))
   assert.ok(!(await list(`?char=${[...PLAYERS.keys()].find(k => k !== 'bl')}`)).some(x => x.id === id))
   assert.ok((await list(`?pos=${pos}`)).some(x => x.id === id))

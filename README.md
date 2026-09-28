@@ -494,7 +494,7 @@ supabase/migrations/20260928000000_potentials.sql  potential_builds · potential
 
 | 요청 | 누가 | 설명 |
 | --- | --- | --- |
-| `GET /api/builds?sort=likes\|new&pos=1~5&char=<id>` | 누구나 | 목록 100개 (30칸은 빼고) |
+| `GET /api/builds?sort=likes\|new&pos=1~5&char=<id>` | 누구나 | 목록 100개 (카드에 작은 판을 그리려고 30칸도 준다) |
 | `GET /api/builds/<id>` | 누구나 | 글 + 댓글. 로그인 토큰을 붙이면 내가 추천했는지(`liked`)도 |
 | `POST /api/builds` · `PUT /api/builds/<id>` · `DELETE /api/builds/<id>` | 로그인 · 고치기/지우기는 쓴 사람 | 제목 · 추천 캐릭터 1~5명 · 설명 · 30칸 |
 | `POST /api/builds/<id>/like` | 로그인 | 추천 켜기/끄기 → `{ liked, likes }` |
