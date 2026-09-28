@@ -237,7 +237,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 }
 
 /* 도구 중 하나를 고르는 게 홈의 유일한 목적이라 크게 둔다 */
-.picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .pick {
   --pick: var(--accent-2);
   display: flex; flex-direction: column; gap: 14px;
@@ -247,6 +247,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 }
 .pick-tiers { --pick: var(--accent); }
 .pick-recruit { --pick: #35c6a7; }
+.pick-potentials { --pick: #ef4b2c; }
 .pick:hover, .pick:focus-visible {
   transform: translateY(-3px);
   border-color: var(--pick);
