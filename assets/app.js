@@ -148,6 +148,13 @@ export function mountTop(current, updatedAt) {
   document.querySelectorAll('.top nav a').forEach(a => {
     if (a.getAttribute('href') === current) a.setAttribute('aria-current', 'page')
   })
+  // 좁은 화면에서는 메뉴를 햄버거 버튼 뒤로 접는다(보이고 말고는 CSS 가 정한다).
+  const top = document.querySelector('.top')
+  const btn = Object.assign(document.createElement('button'), { className: 'menu-btn', textContent: '☰' })
+  btn.setAttribute('aria-label', '메뉴')
+  btn.setAttribute('aria-expanded', 'false')
+  btn.onclick = () => btn.setAttribute('aria-expanded', top.classList.toggle('open'))
+  top.append(btn)
 }
 
 /** URL 해시로 상태 공유. 한글이 들어가므로 UTF-8 → base64url. */

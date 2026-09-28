@@ -1,6 +1,6 @@
 // 팀원모집 — 디스코드 로그인 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
-import { loadPlayers, faceOf, mountTop, POS, POS_KO } from './app.js?v=6bf8da50'
-import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=081a7b3e'
+import { loadPlayers, faceOf, mountTop, POS, POS_KO } from './app.js?v=1af68f91'
+import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=bb0dd88c'
 
 // ---------------------------------------------------------------- 설정
 
