@@ -412,6 +412,8 @@ export SUPABASE_ACCESS_TOKEN=sbp_...
    npx supabase functions deploy recruit --project-ref lgchgqxjjlapszmxarun
    ```
 
+   `sh tools/deploy-api.sh` 가 같은 일을 한다(`.env` 의 토큰을 읽고, 끝나면 `/api/health` 를 찍는다).
+
 5. 확인:
 
    ```sh
