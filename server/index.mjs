@@ -13,6 +13,7 @@ import CFG from '../data/recruit.json' with { type: 'json' }
 import playersData from '../data/players.json' with { type: 'json' }
 import upcomingData from '../data/upcoming.json' with { type: 'json' }
 import tacticsData from '../data/tactics.json' with { type: 'json' }
+import potentialsData from '../data/potentials.json' with { type: 'json' }
 import { channelUrl, createNotifier, errText, guildNick, voiceRooms } from './discord.mjs'
 
 // 한국 출시만. 공식 홈페이지보다 먼저 인게임에 나온 선수는 upcoming.json 에서 server 를 kr 로 바꿔 올린다
@@ -28,6 +29,9 @@ const AUTH_MEMO = { ms: 60_000, max: 500 }         // 로그인 토큰 확인 �
 const ROUTE_KINDS = ['move', 'pass', 'screen']
 const LINK = /:\/\/|www\.|discord\.gg/i
 const TEAM_ID = /^[A-Za-z0-9_-]{8}$/
+// 잠재력추천: /api/builds[/<id>[/like | /comments[/<댓글 id>]]]
+const BUILDS = /^\/api\/builds(?:\/(\d{1,15})(?:\/(like|comments)(?:\/(\d{1,15}))?)?)?$/
+const BUILD_CHARS = 5
 const SNOWFLAKE = /^\d{17,20}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const CONTROL = /[\x00-\x1f\x7f]/
@@ -139,6 +143,35 @@ function tactic(v) {
   return { preset, name: b ? name || presetName || '커스텀 전술' : presetName, board: b }
 }
 
+/** 잠재력 빌드 글. cat = data/potentials.json. 칸은 비워 둘 수 있지만 한 칸은 채워야 한다 */
+function build(v, cat) {
+  if (!isObj(v)) fail(400, '요청 형식이 잘못됐어요')
+  if (!listOf(v.chars, BUILD_CHARS, 1) || new Set(v.chars).size !== v.chars.length || !v.chars.every(c => typeof c === 'string' && PLAYERS.has(c))) {
+    fail(400, `추천 캐릭터를 1~${BUILD_CHARS}명 골라 주세요`)
+  }
+  if (!isObj(v.slots)) fail(400, '잠재력을 넣어 주세요')
+  const byId = new Map(cat.potentials.map(p => [p.id, p]))
+  const slots = {}
+  for (const { id: color, name } of cat.colors) {
+    const row = v.slots[color]
+    if (!listOf(row, cat.slots, cat.slots)) fail(400, `${name} 잠재력 칸이 잘못됐어요`)
+    slots[color] = row.map(x => {
+      if (x == null) return null
+      if (!isObj(x) || byId.get(x.p)?.color !== color) fail(400, `${name} 칸에 없는 잠재력이 있어요`)
+      if (!Number.isInteger(x.lv) || x.lv < 1 || x.lv > cat.maxLevel) fail(400, `잠재력 레벨은 1~${cat.maxLevel}로 골라 주세요`)
+      return { p: x.p, lv: x.lv }
+    })
+  }
+  if (!Object.values(slots).flat().some(Boolean)) fail(400, '잠재력을 한 칸 이상 넣어 주세요')
+  return {
+    title: text(v.title, 40, '제목'),
+    chars: v.chars,
+    positions: [...new Set(v.chars.map(c => PLAYERS.get(c).pos))].sort(),
+    body: text(v.body ?? '', 1000, '설명', 0, true),
+    slots,
+  }
+}
+
 // ---------------------------------------------------------------- Supabase Data API (PostgREST)
 
 /**
@@ -149,12 +182,12 @@ function tactic(v) {
 function supabase({ url = '', key = '', fetch, log }) {
   const base = `${url.replace(/\/+$/, '')}/rest/v1`
   const headers = { apikey: key, 'content-type': 'application/json', accept: 'application/json' }
-  return async (path, { method = 'GET', body } = {}) => {
+  return async (path, { method = 'GET', body, prefer } = {}) => {
     const where = `${method} ${path.split('?')[0]}`
     let res, raw, json, tries = 0
     for (;;) {
       try {
-        res = await fetch(base + path, { method, headers, body: body && JSON.stringify(body), signal: AbortSignal.timeout(8000) })
+        res = await fetch(base + path, { method, headers: prefer ? { ...headers, prefer } : headers, body: body && JSON.stringify(body), signal: AbortSignal.timeout(8000) })
         raw = await res.text()
       } catch (e) {
         log(`DB 연결 실패 ${where}: ${errText(e)}`)
@@ -194,7 +227,7 @@ const MEMBERS = 'members:recruit_members(discord_user_id,leader,joined_at,profil
  * now 는 테스트가 시간을 돌리려고, fetch 는 가짜 Data API · Auth · 디스코드를 끼우려고 받는다. waitUntil = 응답 뒤에도 끝내야 할 일(디스코드 알림).
  * 워커 메모리에는 로그인 확인 결과(60초)만 둔다 — 제한 횟수 · 방 배정 · 1인 1파티는 DB 가 센다.
  */
-export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fetch, waitUntil = p => p, log = console.log } = {}) {
+export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fetch, waitUntil = p => p, log = console.log, potentials = potentialsData } = {}) {
   const db = supabase({ url: env.SUPABASE_URL, key: keyOf(env, 'SUPABASE_SECRET_KEY'), fetch, log })
   const publishable = keyOf(env, 'SUPABASE_PUBLISHABLE_KEY')
   const botKey = Buffer.from(env.TNAB_BOT_KEY || '')
@@ -343,9 +376,93 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     catch { fail(400, '요청 형식이 잘못됐어요') }
   }
 
+  // ------------------------------------------------ 잠재력추천 — 읽기는 공개, 쓰기 · 추천 · 댓글은 로그인
+
+  const BUILD_LIST = 'id,author_name,title,chars,likes,comments,created_at,updated_at'
+  const buildView = b => ({
+    id: b.id, authorId: b.author_id, author: b.author_name, title: b.title, chars: b.chars, body: b.body, slots: b.slots,
+    likes: b.likes, comments: b.comments, createdAt: b.created_at, updatedAt: b.updated_at,
+  })
+  const buildOf = async id => (await db(`/potential_builds?select=*&id=eq.${id}`))[0] || fail(404, '글을 찾을 수 없어요')
+  const nameOf = async user => (await mine(user))?.discord_name ?? user.name
+
+  async function builds(request, [, id, sub, cid], t) {
+    const { searchParams: q } = new URL(request.url), method = request.method
+    const action = [method, id && 'build', sub, cid && 'comment'].filter(Boolean).join(' ')
+    const known = ['GET', 'POST', 'GET build', 'PUT build', 'DELETE build', 'POST build like', 'POST build comments', 'DELETE build comments comment']
+    if (!known.includes(action)) fail(404, '없는 주소예요')
+
+    if (action === 'GET') {   // ?char=<id> · ?pos=1~5 · ?sort=new(기본)|likes
+      const char = q.get('char'), pos = q.get('pos')
+      const order = q.get('sort') === 'likes' ? 'likes.desc,id.desc' : 'id.desc'
+      const rows = await db(`/potential_builds?select=${BUILD_LIST}`
+        + (char && PLAYERS.has(char) ? `&chars=cs.${enc(`{${char}}`)}` : '')
+        + (/^[1-5]$/.test(pos || '') ? `&positions=cs.${enc(`{${pos}}`)}` : '')
+        + `&order=${order}&limit=${MAX_LIST}`)
+      return [200, { builds: rows.map(buildView) }]
+    }
+    if (action === 'GET build') {
+      const [b, comments] = await Promise.all([
+        buildOf(id), db(`/potential_comments?select=id,author_id,author_name,body,created_at&build_id=eq.${id}&order=id.asc`),
+      ])
+      // 로그인 토큰을 붙여 부르면 내가 추천했는지도 준다. 토큰이 틀려도 글은 보여 준다
+      let liked = false
+      if (request.headers.has('authorization')) {
+        const user = await identity(request).catch(() => null)
+        liked = !!user && (await db(`/potential_likes?select=user_id&build_id=eq.${id}&user_id=eq.${user.id}`)).length > 0
+      }
+      return [200, {
+        build: buildView(b), liked,
+        comments: comments.map(c => ({ id: c.id, authorId: c.author_id, author: c.author_name, body: c.body, createdAt: c.created_at })),
+      }]
+    }
+
+    const user = await identity(request)
+    if (await hit(`w ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
+    const mineOrAdmin = (authorId, what) => { if (authorId !== user.id && !user.admin) fail(403, `내가 쓴 ${what}만 고치거나 지울 수 있어요`) }
+
+    switch (action) {
+      case 'POST': {
+        const v = build(await readJson(request), potentials)
+        const [b] = await db('/potential_builds', {
+          method: 'POST', prefer: 'return=representation', body: { ...v, author_id: user.id, author_name: await nameOf(user), created_at: t, updated_at: t },
+        })
+        return [201, { build: buildView(b) }]
+      }
+      case 'PUT build': {
+        const v = build(await readJson(request), potentials)
+        mineOrAdmin((await buildOf(id)).author_id, '글')
+        await db(`/potential_builds?id=eq.${id}`, { method: 'PATCH', body: { ...v, author_name: await nameOf(user), updated_at: t } })
+        return [200, { build: buildView(await buildOf(id)) }]
+      }
+      case 'DELETE build':
+        mineOrAdmin((await buildOf(id)).author_id, '글')
+        await db(`/potential_builds?id=eq.${id}`, { method: 'DELETE' })   // 추천 · 댓글은 cascade
+        return [200, { ok: true }]
+      case 'POST build like':
+        await buildOf(id)   // 없는 글이면 여기서 404(RPC 의 PT404 는 팀 문구라 동시 삭제 때만 난다)
+        return [200, await db('/rpc/potential_toggle_like', { method: 'POST', body: { p_build: +id, p_user: user.id } })]
+      case 'POST build comments': {
+        const v = await readJson(request)
+        const body = text(isObj(v) ? v.body : null, 500, '댓글', 1, true)
+        await buildOf(id)
+        await db('/potential_comments', { method: 'POST', body: { build_id: +id, author_id: user.id, author_name: await nameOf(user), body, created_at: t } })
+        return [201, { ok: true }]
+      }
+      case 'DELETE build comments comment': {
+        const [c] = await db(`/potential_comments?select=author_id&id=eq.${cid}&build_id=eq.${id}`)
+        mineOrAdmin((c || fail(404, '댓글을 찾을 수 없어요')).author_id, '댓글')
+        await db(`/potential_comments?id=eq.${cid}`, { method: 'DELETE' })
+        return [200, { ok: true }]
+      }
+    }
+  }
+
   async function route(request) {
     const { pathname } = new URL(request.url)
     const method = request.method
+    const b = pathname.match(BUILDS)
+    if (b) return builds(request, b, now())
     if (pathname === '/api/health' && method === 'GET') {
       return [200, { ok: true, voice: !!(env.DISCORD_BOT_TOKEN && env.DISCORD_GUILD_ID), login: !!publishable }]
     }

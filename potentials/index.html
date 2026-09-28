@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>잠재력추천 · NBA덩크시티-TNAB</title>
+<meta name="description" content="NBA 덩크 시티 잠재력 빌드 추천. 빨강 · 초록 · 파랑 30칸 잠재력 구성을 캐릭터 · 포지션별로 찾아보고 추천 · 댓글을 남기세요.">
+<link rel="canonical" href="https://nba-kor.github.io/potentials/">
+<link rel="icon" href="/assets/icon.png?v=1" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icon.png?v=1">
+<meta name="theme-color" content="#0d1117">
+<!-- 카카오톡 · 디스코드 · 트위터 미리보기. 이미지를 바꾸면 ?v= 도 올린다(카카오는 URL 로 캐시한다) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="NBA덩크시티-TNAB">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:url" content="https://nba-kor.github.io/potentials/">
+<meta property="og:title" content="잠재력추천 · NBA덩크시티-TNAB">
+<meta property="og:description" content="NBA 덩크 시티 잠재력 빌드 추천. 빨강 · 초록 · 파랑 30칸 잠재력 구성을 캐릭터 · 포지션별로 찾아보고 추천 · 댓글을 남기세요.">
+<meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="NBA덩크시티-TNAB — 3:3 전술판 · 티어표 · 팀원모집">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/assets/style.css?v=d473ae6e">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">NBA 덩크 시티 <span>TNAB</span></div>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/tactics/">전술판</a>
+    <a href="/tiers/">티어표</a>
+    <a href="/potentials/">잠재력추천</a>
+    <a href="/recruit/">팀원모집</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="rc-auth" id="auth" aria-live="polite"></div>
+</header>
+
+<main class="recruit pt">
+
+  <!-- 글 쓰기 · 고치기 — 로그인한 사람만 -->
+  <section id="form-view" class="card rc-create" hidden>
+    <form id="build-form" novalidate>
+      <h2 id="form-title">빌드 작성</h2>
+      <label class="rc-fld">
+        <span>제목</span>
+        <input type="text" name="title" maxlength="40" autocomplete="off" placeholder="예) 커리 3점 특화 빌드" required>
+      </label>
+      <fieldset>
+        <legend>추천 캐릭터 <small>1~5명</small></legend>
+        <div id="form-chars"></div>
+      </fieldset>
+      <label class="rc-fld">
+        <span>어떤 상황에서 쓰면 좋은지</span>
+        <textarea name="body" rows="4" maxlength="1000" placeholder="예) 외곽 슈터로 스페이싱할 때. 수비는 스위치가 많은 조합에서…"></textarea>
+      </label>
+      <fieldset>
+        <legend>잠재력 <small>색깔마다 10칸 · 레벨 1~10 · 빈 칸은 비워 두세요</small></legend>
+        <div class="pt-slots" id="form-slots"></div>
+      </fieldset>
+      <p class="rc-form-err" role="alert" hidden></p>
+      <div class="rc-actions">
+        <button type="button" id="form-cancel">취소</button>
+        <button type="submit" class="primary rc-big">저장</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ?b 없음: 목록 -->
+  <section id="list-view" hidden>
+    <div class="rc-hero">
+      <div>
+        <h1>잠재력추천</h1>
+        <p class="rc-lead">빨강 · 초록 · 파랑 30칸 잠재력 빌드를 캐릭터별로 모았어요. 좋은 빌드엔 추천을, 궁금한 건 댓글로 물어보세요.</p>
+        <p class="rc-muted rc-need" id="need" hidden></p>
+      </div>
+      <button id="new-build" class="primary rc-big" type="button">+ 빌드 작성</button>
+    </div>
+    <div class="card pt-filter">
+      <div class="pt-sort" role="group" aria-label="정렬">
+        <button type="button" data-sort="likes">추천순</button>
+        <button type="button" data-sort="new">최신순</button>
+      </div>
+      <div id="filter-chars"></div>
+    </div>
+    <div id="build-list" class="rc-list pt-list"></div>
+  </section>
+
+  <!-- ?b=<id>: 글 -->
+  <section id="build-view" hidden>
+    <a class="rc-back" href="/potentials/">← 목록</a>
+    <p class="rc-form-err" id="build-error" hidden></p>
+    <div id="build-body"></div>
+  </section>
+
+</main>
+
+<script type="module" src="/assets/potentials.js?v=2bfbb84a"></script>
+</body>
+</html>

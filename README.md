@@ -9,6 +9,7 @@
 | `/` | `index.html` | 소개 / 선수 현황 |
 | `/tactics/` | `tactics/index.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종, 재생 |
 | `/tiers/` | `tiers/index.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유 |
+| `/potentials/` | `potentials/index.html` | **잠재력추천** — 빨강 · 초록 · 파랑 30칸 잠재력 빌드 게시판. 추천 캐릭터 · 포지션 필터, 추천 · 댓글(디스코드 로그인). API 는 팀원모집 함수를 같이 쓴다([잠재력추천](#잠재력추천)) |
 | `/recruit/` | `recruit/index.html` | **팀원모집** — 디스코드 로그인 · 방 만들기·가입(TNAB 봇과 같은 목록), 디스코드 알림 + 빈 음성채널 배정, 카카오톡 공유, 3시간 뒤 자동 삭제 |
 | `/discord/` | `discord/index.html` | 카카오 카드의 **디스코드** 버튼이 거쳐 가는 곳. `discord://` 앱 주소로 넘긴다 — `discord.com` 으로 곧장 보내면 브라우저에 세션이 없어 매번 로그인해야 한다. 서버 · 채널은 `data/recruit.json` 의 `discord` 에서 읽는다 |
 
@@ -19,7 +20,7 @@
 
 ```
 robots.txt              색인 허용 + /discord/ 제외 + sitemap 위치
-sitemap.xml             네 페이지. 새 페이지를 만들면 여기에도 넣는다
+sitemap.xml             다섯 페이지. 새 페이지를 만들면 여기에도 넣는다
 assets/og.jpg           1200x630 미리보기 이미지 (tools/og-image.py 가 생성)
 assets/icon.png         512x512 파비콘 · 홈 화면 아이콘 (같은 스크립트)
 index.html 의 ld+json   검색 결과의 사이트 이름 (WebSite 구조화 데이터)
@@ -310,7 +311,8 @@ publishable key 나 로그인 토큰으로는 표를 읽거나 쓸 수 없다. �
 4. **디스코드 로그인** — [Discord Developer Portal](https://discord.com/developers/applications) 의 애플리케이션 **OAuth2 > Redirects** 에
    `https://lgchgqxjjlapszmxarun.supabase.co/auth/v1/callback` 을 넣고 Client ID · Client Secret 을 복사한다.
    Supabase **Authentication > Sign In / Providers > Discord** 를 켜고 둘을 넣는다(이메일 없는 디스코드 계정도 되게 이메일 필수는 끈다).
-   **Authentication > URL Configuration** 의 Site URL 은 `https://nba-kor.github.io/recruit/`, Redirect URLs 에 `https://nba-kor.github.io/recruit/` · `http://localhost:8000/recruit/`.
+   **Authentication > URL Configuration** 의 Site URL 은 `https://nba-kor.github.io/recruit/`, Redirect URLs 에 `https://nba-kor.github.io/recruit/` · `https://nba-kor.github.io/potentials/` · `http://localhost:8000/recruit/` · `http://localhost:8000/potentials/`
+   (로그인은 누른 페이지로 돌아온다 — `assets/auth.js`. 목록에 없는 페이지는 Site URL 로 떨어진다).
    Client Secret 은 함수 비밀값이 아니다 — `.env` 에 두고 `secrets set` 으로 올리지 않는다.
 
 secret key 는 RLS 를 건너뛰는 관리자 키다. `assets/recruit.js` 같은 브라우저 코드나 저장소에 넣지 않는다.
@@ -478,6 +480,32 @@ K=local-dev-tnab-bot-key-0916-not-a-secret-xxxxxxxx
 curl -s -H "Authorization: Bot $K" -H 'X-Discord-User: 100000000000000001' -H 'X-Discord-Name: %EB%B3%B4%EB%85%B8' http://localhost:8000/api/me
 ```
 
+## 잠재력추천
+
+잠재력 빌드 게시판. 따로 서버를 두지 않고 팀원모집 함수(`server/index.mjs`)의 `/api/builds` 로 같이 돈다 — 로그인 · 요청 수 제한 · DB 원칙이 같다.
+
+```
+potentials/index.html                           화면 (정적)
+assets/potentials.js                            목록 · 글 · 쓰기/고치기
+assets/auth.js                                  디스코드 로그인 + api() — 팀원모집과 같이 쓴다
+data/potentials.json                            잠재력 목록 (색 · 이름 · 5레벨 기준 능력치). 칸 수 · 최대 레벨도 여기
+supabase/migrations/20260928000000_potentials.sql  potential_builds · potential_likes · potential_comments + 추천 RPC
+```
+
+| 요청 | 누가 | 설명 |
+| --- | --- | --- |
+| `GET /api/builds?sort=likes\|new&pos=1~5&char=<id>` | 누구나 | 목록 100개 (30칸은 빼고) |
+| `GET /api/builds/<id>` | 누구나 | 글 + 댓글. 로그인 토큰을 붙이면 내가 추천했는지(`liked`)도 |
+| `POST /api/builds` · `PUT /api/builds/<id>` · `DELETE /api/builds/<id>` | 로그인 · 고치기/지우기는 쓴 사람 | 제목 · 추천 캐릭터 1~5명 · 설명 · 30칸 |
+| `POST /api/builds/<id>/like` | 로그인 | 추천 켜기/끄기 → `{ liked, likes }` |
+| `POST /api/builds/<id>/comments` · `DELETE /api/builds/<id>/comments/<댓글 id>` | 로그인 · 지우기는 쓴 사람 | 댓글 |
+
+작성자 이름은 팀원모집 프로필 이름(없으면 디스코드 이름)을 쓸 때 저장한다. 잠재력이 게임에 새로 나오면
+`data/potentials.json` 의 `potentials` 에 한 줄 넣는다(`id` 는 한 번 정하면 바꾸지 않는다 — 저장된 글이 이 id 를 가리킨다).
+함수에 묶여 있으므로 **함수도 다시 배포**한다([운영 배포](#운영-배포) 4번).
+
+처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → 위 Redirect URLs 에 `/potentials/` 추가 → 함수 배포 → main 푸시.
+
 ## 배포 전: 캐시 무효화
 
 ```sh
@@ -497,8 +525,8 @@ GitHub Pages 는 모든 파일에 `Cache-Control: max-age=600` 만 준다. 그�
 
 | 대상 | 파일 |
 | --- | --- |
-| 페이지 | `index.html`, `tactics/index.html`, `tiers/index.html`, `recruit/index.html` |
-| 자원 | `assets/style.css`, `app.js`, `court.js`, `tactics.js`, `tiers.js`, `recruit.js` |
+| 페이지 | `index.html`, `tactics/index.html`, `tiers/index.html`, `recruit/index.html`, `potentials/index.html` |
+| 자원 | `assets/style.css`, `app.js`, `auth.js`, `court.js`, `tactics.js`, `tiers.js`, `recruit.js`, `potentials.js` |
 
 다른 스크립트가 import 하는 모듈은 import 구문에도 버전이 박히고, 그걸 박은 결과로 다시 해시를 낸다.
 `app.js` → `court.js` → `tactics.js` · `recruit.js` (그리고 `app.js` → `tiers.js`) 순으로 번지므로

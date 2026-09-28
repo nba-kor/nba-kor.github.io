@@ -1,25 +1,18 @@
 // 팀원모집 — 디스코드 로그인 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
 import { loadPlayers, faceOf, mountTop, POS, POS_KO } from './app.js?v=1af68f91'
 import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=bb0dd88c'
+import { api, initAuth as startAuth, login, logout, session, IN_KAKAO, IS_MOBILE } from './auth.js?v=5d44380b'
 
 // ---------------------------------------------------------------- 설정
 
-// API = Supabase Edge Function 'recruit'. GitHub Pages 는 API 를 돌릴 수 없어 운영에서는 함수 주소로 부르고,
-// 그 밖(로컬 docker compose 의 nginx 가 /api/ 를 같은 함수로 넘긴다)에서는 같은 도메인의 /api
-const API_ORIGIN = location.hostname === 'nba-kor.github.io' ? 'https://lgchgqxjjlapszmxarun.supabase.co/functions/v1/recruit' : ''
 const KAKAO_JS_KEY = '8f89f3ef476f72827c9a875ad0c23a72'    // Kakao Developers > 앱 > 플랫폼 키 > JavaScript 키. 비우면 공유 버튼이 링크 복사로 대체된다.
 // 카카오 카드의 '디스코드' 버튼. discord.com 으로 곧장 보내면 브라우저에 세션이 없어 매번 로그인해야 하므로,
 // 디스코드 앱(discord://)으로 넘겨 주는 /discord/ 를 거친다. 채널 번호도 그 페이지 한 곳에만 둔다
 const DISCORD_URL = `${location.origin}/discord/`
-// 디스코드 로그인 = Supabase Auth. publishable key 는 브라우저에 두라고 만든 공개 키다(표는 RLS 로 막혀 있어 이 키로는 아무것도 못 읽는다)
-const SUPABASE_URL = 'https://lgchgqxjjlapszmxarun.supabase.co'
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_NlTRTkRjbTv0iCHhNB8pZA_2Ov5In9Z'
-const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/+esm'   // 버전 고정. 동적 import 라 CDN 이 죽어도 목록·팀 화면은 뜬다
 
 const PRESETS_KEY = 'dc.recruit.presets' // [{ name, entries }] — 자주 쓰는 캐릭터 구성, 최대 cfg.maxPresets 개
 const LEFT_KEY = 'dc.recruit.left'       // 팀을 만들고 팀 화면으로 넘어갈 때 "기존 파티에서 빠졌어요" 를 들고 간다 (sessionStorage)
 const MOVE_ASK = '기존 파티에서 빠지고 이동할까요? (팀장이면 기존 파티는 해제돼요)'
-const NO_SERVER = '모집 서버에 연결할 수 없어요'
 const STATUS = { open: '모집 중', full: '모집 완료' }
 const LINK_RE = /:\/\/|www\.|discord\.gg/i   // 서버와 같은 규칙 — 이름에 링크 금지
 
@@ -58,24 +51,6 @@ const roomBadges = room => [
   h('span', { className: `rc-tag is-${room.mode}` }, cfg.modes[room.mode] || room.mode),
 ]
 
-/** withToken = 로그인 토큰을 붙인다. 공개 GET 에는 붙이지 않는다 — Authorization 헤더가 붙으면 preflight 로 함수 호출이 두 배가 된다 */
-async function api(path, { method = 'GET', body, withToken } = {}) {
-  let r
-  const token = withToken && (await sb?.auth.getSession())?.data.session?.access_token   // getSession 이 만료된 토큰을 갱신해 준다
-  try {
-    r = await fetch(`${API_ORIGIN}/api${path}`, {
-      method, cache: 'no-store',
-      headers: { ...(body && { 'content-type': 'application/json' }), ...(token && { authorization: `Bearer ${token}` }) },
-      body: body && JSON.stringify(body),
-    })
-  } catch { throw new Error(NO_SERVER) }
-  const j = await r.json().catch(() => null)
-  // 정적 호스팅이 대신 답한 404·502 HTML 등은 서버가 없는 것으로 본다
-  if (!j) throw new Error(NO_SERVER)
-  if (!r.ok) throw Object.assign(new Error(j.error || NO_SERVER), { status: r.status })   // 404 = 해제·만료로 사라진 팀
-  return j
-}
-
 /** 제출 중에는 버튼을 잠그고, 실패하면 폼은 그대로 둔 채 메시지만 띄운다. */
 async function submit(form, call) {
   const btn = $('[type=submit]', form), err = $('.rc-form-err', form), label = btn.textContent
@@ -92,10 +67,9 @@ const leftMsg = left => left && (left.disbanded ? '기존 파티를 해제하고
 
 // ---------------------------------------------------------------- 로그인 (Supabase Auth · Discord)
 
-let sb = null         // supabase 클라이언트 — 못 불러오면 null 로 남고 로그인만 안 된다
 let auth = 'loading'  // loading · down(SDK 못 불러옴) · out · in · error(로그인은 됐는데 /api/me 실패)
 let me = null         // auth === 'in' 이면 GET /api/me — { user: { id, name }, profile, teamId }
-let meSeq = 0, uid
+let meSeq = 0
 const meSubs = []     // me 가 바뀌면 부를 화면 갱신
 let meReady
 const meFirst = new Promise(r => { meReady = r })
@@ -110,9 +84,9 @@ function setAuth(state, v = null) {
 
 async function loadMe() {
   const seq = ++meSeq
-  const session = sb && (await sb.auth.getSession()).data.session
+  const s = await session()
   if (seq !== meSeq) return
-  if (!session) return setAuth(sb ? 'out' : 'down')
+  if (!s) return setAuth('out')
   try {
     const v = await api('/me', { withToken: true })
     if (seq === meSeq) setAuth('in', v)
@@ -122,71 +96,8 @@ async function loadMe() {
 }
 
 async function initAuth() {
-  try {
-    const { createClient } = await import(SUPABASE_JS)
-    sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { flowType: 'pkce' } })
-  } catch (e) {
-    console.warn('로그인 모듈을 불러오지 못했어요', e)
-    return setAuth('down')
-  }
-  // 로그인을 취소하면 ?error=... 가 남는다 — 다음 로그인의 redirectTo 에 딸려 가지 않게 걷는다 (?code 는 SDK 가 걷는다)
-  const url = new URL(location.href)
-  const failed = url.searchParams.has('error'), wantLogin = url.searchParams.has('login')
-  if (failed || wantLogin) {
-    for (const k of ['error', 'error_code', 'error_description', 'login']) url.searchParams.delete(k)
-    history.replaceState(history.state, '', url)
-  }
-  // 승인 화면을 건너뛰려다(prompt=none) 실패했으면 — 디스코드 쪽 승인이 풀렸거나 로그인이 끊긴 것 — 한 번만 승인 화면으로 다시 간다
-  const quietFailed = failed && store.get(QUIET_TRY)
-  store.del(QUIET_TRY)
-  if (quietFailed) { store.del(AUTHORIZED); return login() }
-  sb.auth.onAuthStateChange((event, session) => {
-    if (session) store.set(AUTHORIZED, '1')   // 세션이 있다 = 이 브라우저에서 디스코드 승인을 끝냈다
-    const id = session?.user?.id
-    if (event !== 'INITIAL_SESSION' && id === uid) return   // 토큰 갱신 · 탭 복귀 때마다 /api/me 를 다시 읽지 않는다
-    uid = id
-    setTimeout(loadMe)   // 콜백 안에서 SDK 를 다시 부르면 잠금에 걸린다 — 한 박자 미룬다
-  })
-  // 카카오톡에서 "로그인"을 눌러 바깥 브라우저로 넘어온 경우(?login=1) — 로그인이 안 돼 있으면 바로 이어서 로그인한다
-  if (wantLogin && !(await sb.auth.getSession()).data.session) login()
+  if (!await startAuth(loadMe)) setAuth('down')
 }
-
-// 이 브라우저에서 디스코드 승인을 끝낸 적이 있으면 다음부터 승인 화면을 건너뛴다(디스코드 prompt=none — Supabase 가 그대로 넘긴다)
-const AUTHORIZED = 'dc.recruit.discordAuthorized', QUIET_TRY = 'dc.recruit.quietLogin'
-const store = {
-  get: k => { try { return localStorage.getItem(k) } catch { return null } },
-  set: (k, v) => { try { localStorage.setItem(k, v) } catch {} },
-  del: k => { try { localStorage.removeItem(k) } catch {} },
-}
-const UA = navigator.userAgent
-const IN_KAKAO = /KAKAOTALK/i.test(UA)
-const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(UA)
-
-function login() {
-  if (!sb) return
-  // 카카오톡 인앱 브라우저에는 디스코드 로그인이 안 돼 있어 아이디 · 비밀번호를 매번 쳐야 한다 — 평소 쓰는 브라우저로 넘겨 거기서 로그인한다
-  if (IN_KAKAO) {
-    const next = new URL(location.href)
-    next.searchParams.set('login', '1')
-    location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(next)}`
-    // 카톡 버전에 따라 바깥 브라우저가 안 열리면 화면이 그대로 보인다 — 그때는 여기서 로그인한다
-    setTimeout(() => { if (document.visibilityState === 'visible') oauth() }, 1500)
-    return
-  }
-  return oauth()
-}
-
-function oauth() {
-  const quiet = store.get(AUTHORIZED) === '1'
-  if (quiet) store.set(QUIET_TRY, '1')
-  return sb.auth.signInWithOAuth({
-    provider: 'discord',
-    options: { redirectTo: `${location.origin}/recruit/${location.search}`, ...(quiet && { queryParams: { prompt: 'none' } }) },
-  })
-}
-
-// 로그아웃하면 다음 로그인은 승인 화면부터 — 다른 디스코드 계정으로 바꾸려는 경우일 수 있다
-const logout = () => { store.del(AUTHORIZED); return sb.auth.signOut() }
 
 function renderAuth() {
   const btn = (label, onclick, props = {}) => h('button', { type: 'button', onclick, ...props }, label)

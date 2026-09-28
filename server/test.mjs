@@ -145,7 +145,7 @@ const FAKE_DB = u => u.pathname === '/rest/v1/rpc/recruit_hit' ? [200, '1'] : u.
 
 let appNo = 0
 /** 앱 하나 = 시계 하나 · 웹훅 경로 하나 */
-function start({ env = {}, now = futureClock(), log: logTo = log, channels, db } = {}) {
+function start({ env = {}, now = futureClock(), log: logTo = log, channels, db, potentials } = {}) {
   const n = ++appNo, pending = []
   const net = fakeNet({ channels, db })
   const handler = createHandler({
@@ -153,7 +153,7 @@ function start({ env = {}, now = futureClock(), log: logTo = log, channels, db }
       SUPABASE_URL: db ? 'http://db.test' : SUPA, SUPABASE_SECRET_KEY: db ? 'sb_secret_test' : KEY, SUPABASE_PUBLISHABLE_KEY: PUB, TNAB_BOT_KEY: BOT_KEY,
       SITE_URL: SITE + '/', DISCORD_GUILD_ID: GUILD, DISCORD_WEBHOOK_URL: `https://hook.test/${n}`, ...env,
     },
-    now, fetch: net.fetch, log: logTo,
+    now, fetch: net.fetch, log: logTo, potentials,
     waitUntil: p => pending.push(p),
   })
   const api = async (method, path, body, { as, headers } = {}) => {
@@ -1448,4 +1448,91 @@ test('응답 어디에도 토큰 · 봇 키 · auth_user_id · 옛 비밀번호 
 
 test('서버 오류(500)는 한 번도 나지 않았다', () => {
   assert.deepEqual(logs.filter(l => l.startsWith('API 오류')), [])
+})
+
+// ---------------------------------------------------------------- 잠재력추천
+
+const CAT = {
+  slots: 10, maxLevel: 10,
+  colors: [{ id: 'red', name: '빨강' }, { id: 'green', name: '초록' }, { id: 'blue', name: '파랑' }],
+  potentials: [{ id: 'r1', color: 'red', name: '빨강1' }, { id: 'g1', color: 'green', name: '초록1' }, { id: 'b1', color: 'blue', name: '파랑1' }],
+}
+const row = (...xs) => [...xs, ...Array(10 - xs.length).fill(null)]
+const BUILD = { title: '픽앤롤 빌드', chars: ['bl'], body: '스크린 받고\n들어갈 때', slots: { red: row({ p: 'r1', lv: 10 }), green: row(), blue: row({ p: 'b1', lv: 3 }) } }
+
+dbTest('잠재력추천: 글 · 검증 · 필터 · 추천 · 댓글 · 권한', async () => {
+  const { api } = start({ potentials: CAT })
+  const a = { id: uid() }, b = { id: uid() }
+  a.as = web(a.id, '작성자'); b.as = web(b.id, '구경꾼')
+  const pos = PLAYERS.get('bl').pos
+
+  assert.deepEqual((await api('POST', '/api/builds', BUILD)).body, LOGIN)
+  const bad = async (patch, msg) => {
+    const r = await api('POST', '/api/builds', { ...BUILD, ...patch }, { as: a.as })
+    assert.equal(r.status, 400, r.text)
+    assert.match(r.body.error, msg)
+  }
+  await bad({ title: '' }, /제목/)
+  await bad({ chars: [] }, /추천 캐릭터/)
+  await bad({ chars: ['bl', 'bl'] }, /추천 캐릭터/)
+  await bad({ chars: ['없는캐릭'] }, /추천 캐릭터/)
+  await bad({ slots: { ...BUILD.slots, red: row({ p: 'g1', lv: 1 }) } }, /빨강 칸에 없는/)   // 색이 다른 잠재력
+  await bad({ slots: { ...BUILD.slots, red: row({ p: 'r1', lv: 11 }) } }, /레벨/)
+  await bad({ slots: { ...BUILD.slots, red: row().slice(1) } }, /빨강 잠재력 칸/)
+  await bad({ slots: { red: row(), green: row(), blue: row() } }, /한 칸 이상/)
+
+  const c = await api('POST', '/api/builds', { ...BUILD, evil: 1 }, { as: a.as })
+  assert.equal(c.status, 201, c.text)
+  const id = c.body.build.id
+  assert.equal(c.body.build.author, '작성자')
+  assert.equal(c.body.build.body, '스크린 받고\n들어갈 때')
+  assert.equal(c.body.build.evil, undefined)
+
+  // 목록: 공개 · 필터 · 정렬. slots 는 목록에 없다
+  const list = async qs => (await api('GET', `/api/builds${qs}`)).body.builds
+  const [first] = await list('')
+  assert.equal(first.id, id)
+  assert.equal(first.slots, undefined)
+  assert.ok((await list('?char=bl')).some(x => x.id === id))
+  assert.ok(!(await list(`?char=${[...PLAYERS.keys()].find(k => k !== 'bl')}`)).some(x => x.id === id))
+  assert.ok((await list(`?pos=${pos}`)).some(x => x.id === id))
+  assert.ok(!(await list(`?pos=${pos % 5 + 1}`)).some(x => x.id === id))
+
+  // 추천 켜기 · 끄기, 내가 추천했는지는 토큰을 붙였을 때만
+  const like = who => api('POST', `/api/builds/${id}/like`, undefined, { as: who.as })
+  assert.deepEqual((await like(b)).body, { liked: true, likes: 1 })
+  assert.deepEqual((await like(a)).body, { liked: true, likes: 2 })
+  assert.deepEqual((await like(b)).body, { liked: false, likes: 1 })
+  assert.equal((await api('GET', `/api/builds/${id}`, undefined, { as: a.as })).body.liked, true)
+  assert.equal((await api('GET', `/api/builds/${id}`)).body.liked, false)
+  assert.equal((await api('GET', `/api/builds/${id}`, undefined, { as: { authorization: 'Bearer nope' } })).body.liked, false)
+  assert.equal((await api('POST', '/api/builds/999999999999/like', undefined, { as: b.as })).status, 404)
+
+  // 댓글: 로그인해야 쓰고, 지우기는 쓴 사람만
+  assert.deepEqual((await api('POST', `/api/builds/${id}/comments`, { body: '좋아요' })).body, LOGIN)
+  assert.equal((await api('POST', `/api/builds/${id}/comments`, { body: ' ' }, { as: b.as })).status, 400)
+  assert.equal((await api('POST', `/api/builds/${id}/comments`, { body: '좋아요' }, { as: b.as })).status, 201)
+  let d = (await api('GET', `/api/builds/${id}`)).body
+  assert.equal(d.build.comments, 1)
+  assert.deepEqual(d.comments.map(x => [x.author, x.body]), [['구경꾼', '좋아요']])
+  const cid = d.comments[0].id
+  assert.equal((await api('DELETE', `/api/builds/${id}/comments/${cid}`, undefined, { as: a.as })).status, 403)
+  assert.equal((await api('DELETE', `/api/builds/${id}/comments/${cid}`, undefined, { as: b.as })).status, 200)
+  assert.equal((await api('GET', `/api/builds/${id}`)).body.build.comments, 0)
+
+  // 추천순: 추천 1 인 이 글이 방금 쓴 추천 0 글보다 앞
+  const c2 = await api('POST', '/api/builds', BUILD, { as: b.as })
+  const byLikes = await list('?sort=likes')
+  assert.ok(byLikes.findIndex(x => x.id === id) < byLikes.findIndex(x => x.id === c2.body.build.id))
+
+  // 고치기 · 지우기는 쓴 사람만. 지우면 추천 · 댓글도 같이 없어진다
+  assert.equal((await api('PUT', `/api/builds/${id}`, { ...BUILD, title: '남의 글' }, { as: b.as })).status, 403)
+  const e = await api('PUT', `/api/builds/${id}`, { ...BUILD, title: '고친 제목' }, { as: a.as })
+  assert.equal(e.body.build.title, '고친 제목')
+  assert.equal(e.body.build.likes, 1)
+  assert.equal((await api('DELETE', `/api/builds/${id}`, undefined, { as: b.as })).status, 403)
+  assert.equal((await api('DELETE', `/api/builds/${id}`, undefined, { as: a.as })).status, 200)
+  assert.equal((await api('GET', `/api/builds/${id}`)).status, 404)
+  assert.deepEqual(await rows(`/potential_likes?build_id=eq.${id}`), [])
+  await api('DELETE', `/api/builds/${c2.body.build.id}`, undefined, { as: b.as })
 })
