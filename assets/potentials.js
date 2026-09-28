@@ -25,10 +25,13 @@ const P = id => data.byId.get(id) || { id, name: id, short: id, pos: 0 }
 const plus = v => `+${+v.toFixed(2)}`   // 0.15 × 10 같은 합에 붙는 부동소수점 꼬리를 뗀다
 const statLine = p => p.stats.map(([k, v]) => `${k} ${plus(v)}`).join(' · ')
 /** 30칸 능력치 합계, 큰 것부터 — [[이름, 값]] */
+// 칸 순서 = 빨강 1→10, 초록 1→10, 파랑 1→10. DB(jsonb)는 키 순서를 바꾸므로 늘 cat.colors 순서로 돈다
+const ordered = slots => cat.colors.flatMap(c => slots[c.id] || [])
+/** 30칸 능력치 합계, 큰 것부터 — [[이름, 값]]. 같으면 판에서 먼저 나온 능력치가 앞(정렬은 안정적이고 Map 은 넣은 순서) */
 function totals(slots) {
   const sum = new Map()
-  for (const id of Object.values(slots).flat()) for (const [k, v] of pot.get(id)?.stats || []) sum.set(k, (sum.get(k) || 0) + v)
-  return [...sum].sort((a, b) => b[1] - a[1])
+  for (const id of ordered(slots)) for (const [k, v] of pot.get(id)?.stats || []) sum.set(k, (sum.get(k) || 0) + v)
+  return [...sum].sort((a, b) => Math.round(b[1] * 100) - Math.round(a[1] * 100))   // 0.1+0.2 같은 꼬리로 같은 값이 갈리지 않게
 }
 const totalsView = slots => {
   const t = totals(slots)
@@ -135,11 +138,28 @@ function boardView(slots, { sel, onNode } = {}) {
       }))))
 }
 
+/** 목록 카드 요약: 색마다 가장 많이 쓴 잠재력 아이콘 하나씩 + 능력치 합계 상위 4 뱃지(나머지는 +N).
+ *  같은 색에서 칸 수가 같으면 앞 칸에 먼저 넣은 것, 색끼리 칸 수가 같으면 빨강 → 초록 → 파랑 */
+const TOP_STATS = 4
+function summaryView(slots) {
+  const icons = cat.colors.map(c => {
+    const n = new Map()
+    for (const id of slots[c.id] || []) if (pot.has(id)) n.set(id, (n.get(id) || 0) + 1)
+    const [id, k] = [...n].sort((a, b) => b[1] - a[1])[0] || []
+    return id && { p: pot.get(id), k }
+  }).filter(Boolean).sort((a, b) => b.k - a.k)
+  const t = totals(slots), rest = t.slice(TOP_STATS)
+  return h('div', { className: 'pt-sum' },
+    h('div', { className: 'pt-sum-icons' }, icons.map(({ p, k }) => h('span', { title: `${p.name} ×${k} — ${statLine(p)}` }, potIcon(p), h('small', {}, `×${k}`)))),
+    h('div', { className: 'pt-sum-stats' }, t.slice(0, TOP_STATS).map(([k, v]) => h('span', {}, k, h('em', {}, plus(v)))),
+      rest.length > 0 && h('span', { className: 'pt-more', title: rest.map(([k, v]) => `${k} ${plus(v)}`).join(' · ') }, `+${rest.length}`)))
+}
+
 const potIcon = p => h('img', { src: iconOf(p.id), alt: '', className: 'pt-icon', loading: 'lazy' })
 /** 쓴 잠재력을 종류별로: 아이콘 · 이름 ×칸 수 · 옵션 */
 function usedView(slots) {
   const n = new Map()
-  for (const id of Object.values(slots).flat()) if (pot.has(id)) n.set(id, (n.get(id) || 0) + 1)
+  for (const id of ordered(slots)) if (pot.has(id)) n.set(id, (n.get(id) || 0) + 1)
   return h('ul', { className: 'pt-used' }, [...n].map(([id, k]) => {
     const p = pot.get(id)
     return h('li', { className: `is-${p.color}` }, potIcon(p), h('div', {}, h('b', {}, p.name, h('span', {}, ` ×${k}`)), h('small', {}, statLine(p))))
@@ -179,7 +199,7 @@ async function loadList() {
   box.replaceChildren(...builds.length ? builds.map(b => h('a', { className: 'rc-tcard pt-card', href: `?b=${b.id}` },
     h('div', { className: 'rc-tcard-head' }, h('b', {}, b.title)),
     h('p', {}, h('b', {}, b.author), ` · ${ago(b.createdAt)}`),
-    b.slots && boardView(b.slots),
+    b.slots && summaryView(b.slots),
     faces(b.chars),
     h('p', { className: 'pt-counts' }, `👍 ${b.likes} · 💬 ${b.comments}`)))
     : [h('p', { className: 'rc-note' }, `아직 ${who}빌드가 없어요. 첫 빌드를 올려 보세요!`)])
@@ -192,7 +212,7 @@ const buildUrl = b => `${location.origin}/potentials/?b=${b.id}`
 function kakaoPayload(b) {
   const url = buildUrl(b), link = { mobileWebUrl: url, webUrl: url }
   const n = new Map()
-  for (const id of Object.values(b.slots).flat()) if (pot.has(id)) n.set(id, (n.get(id) || 0) + 1)
+  for (const id of ordered(b.slots)) if (pot.has(id)) n.set(id, (n.get(id) || 0) + 1)
   const top = totals(b.slots).slice(0, 3).map(([k, v]) => `${k} ${plus(v)}`).join(' · ')
   return {
     objectType: 'list',
