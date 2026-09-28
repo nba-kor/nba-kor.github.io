@@ -419,7 +419,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-entries-head small { font-weight: 500; font-size: 11.5px; }
 .rc-entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .rc-entry {
-  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(96px, .62fr) 38px;
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(96px, .62fr) auto;
   gap: 8px; align-items: center; padding: 8px;
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px;
 }
@@ -443,8 +443,11 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-slot:has(.rc-hole):hover .rc-hole { border-color: var(--accent); }
 .rc-slot[aria-invalid="true"] .rc-hole { border-color: var(--def); }
 .rc-main { justify-self: center; padding: 1px 6px; border-radius: 6px; font-size: 11px; font-weight: 800; color: #1a1200; background: var(--accent); white-space: nowrap; }
-.rc-x { justify-self: center; width: 32px; height: 32px; padding: 0; color: var(--muted); }
+.rc-rowbtns { justify-self: center; display: flex; gap: 4px; }
+.rc-x, .rc-star { width: 32px; height: 32px; padding: 0; color: var(--muted); }
+.rc-x { justify-self: center; }
 .rc-x:hover { color: var(--def); border-color: var(--def); }
+.rc-star:hover { color: var(--accent); border-color: var(--accent); }
 .rc-add { display: flex; gap: 6px; flex-wrap: wrap; }
 .rc-add button { border-style: dashed; color: var(--muted); font-weight: 600; }
 .rc-add button:not(:disabled):hover { color: var(--text); border-color: var(--accent-2); }
@@ -598,7 +601,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
   .rc-hero .rc-big, .rc-cta .rc-share-bar, .rc-cta .rc-big { flex: 1 1 auto; }
   .rc-entry { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; }
   .rc-slot { grid-column: 1 / 3; grid-row: 1; }
-  .rc-main, .rc-x { grid-column: 3; grid-row: 1; }
+  .rc-main, .rc-rowbtns { grid-column: 3; grid-row: 1; }
   .rc-entry [name="nick"] { grid-column: 1; }
   .rc-entry [name="tier"] { grid-column: 2 / 4; }
   .rc-entry .rc-same { grid-column: 1 / -1; }

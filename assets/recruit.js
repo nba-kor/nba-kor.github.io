@@ -342,7 +342,7 @@ const loadPresets = () => {
 
 function personForm(el) {
   const list = $('.rc-entries', el)
-  $('.rc-entries-head small', el).textContent = `최대 ${cfg.maxEntries}개 · 첫 줄이 대표`
+  $('.rc-entries-head small', el).textContent = `최대 ${cfg.maxEntries}개 · 첫 줄이 대표(★ 로 바꿔요)`
 
   // row: { kind: 'main'|'same'|'sub', nick, tier, char } — 'same' 줄은 대표 계정의 닉네임·티어를 따른다
   let rows = [{ kind: 'main', nick: '', tier: '', char: '' }]
@@ -355,6 +355,22 @@ function personForm(el) {
   const main = () => ({ nick: rows[0].nick.trim(), tier: rows[0].tier })
   const acct = r => r.kind === 'sub' ? { nick: r.nick.trim(), tier: r.tier } : main()
   const taken = i => new Set(rows.filter((r, j) => j !== i && r.char && acct(r).nick === acct(rows[i]).nick).map(r => r.char))
+
+  /** i 번째 줄을 대표로 올린다 — 대표는 언제나 첫 줄이라 순서를 바꾼다.
+   *  '본인계정' 줄은 대표의 닉네임 · 티어를 따라가던 줄이라, 옮기기 전에 옛 대표 값을 제 것으로 굳힌다.
+   *  새 대표와 계정이 같은 줄은 다시 '본인계정' 줄로 접는다(대개 한 계정으로 캐릭터만 여럿이라 모양이 그대로 남는다). */
+  function makeMain(i) {
+    if (!i) return
+    const old = main()
+    // 일단 전부 제 계정 값을 가진 줄로 만든다 — 옛 대표도, 대표를 따라가던 줄도(옛 대표 값으로 굳힌다)
+    const next = rows.map(r => r.kind === 'same' ? { ...r, ...old, kind: 'sub' } : { ...r, kind: 'sub' })
+    const [pick] = next.splice(i, 1)
+    next.unshift({ ...pick, kind: 'main' })
+    const same = r => r.nick.trim() === pick.nick.trim() && r.tier === pick.tier
+    rows = next.map((r, j) => j && r.kind === 'sub' && same(r) ? { ...r, kind: 'same' } : r)
+    render()
+    $('.rc-slot', list.children[0]).focus()
+  }
 
   // 대표 계정이 바뀌면 본인계정 줄의 "↳ 닉네임 · 티어" 를 맞춘다
   function sync() {
@@ -390,7 +406,9 @@ function personForm(el) {
     }
 
     li.append(i
-      ? h('button', { type: 'button', className: 'rc-x', 'aria-label': '이 줄 삭제', onclick: () => { rows.splice(i, 1); render() } }, '✕')
+      ? h('div', { className: 'rc-rowbtns' },
+        h('button', { type: 'button', className: 'rc-star', title: '이 줄을 대표로', 'aria-label': `${p ? p.name + ' 줄을' : '이 줄을'} 대표로`, onclick: () => makeMain(i) }, '★'),
+        h('button', { type: 'button', className: 'rc-x', 'aria-label': '이 줄 삭제', onclick: () => { rows.splice(i, 1); render() } }, '✕'))
       : h('span', { className: 'rc-main', title: '대표 계정 · 대표 캐릭터' }, '대표'),
     h('small', { className: 'rc-err', hidden: true }))
     return li
