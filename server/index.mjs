@@ -143,7 +143,7 @@ function tactic(v) {
   return { preset, name: b ? name || presetName || '커스텀 전술' : presetName, board: b }
 }
 
-/** 잠재력 빌드 글. cat = data/potentials.json. 칸은 비워 둘 수 있지만 한 칸은 채워야 한다 */
+/** 잠재력 빌드 글. cat = data/potentials.json(능력치는 최대 레벨 기준). 칸은 비워 둘 수 있지만 한 칸은 채워야 한다 */
 function build(v, cat) {
   if (!isObj(v)) fail(400, '요청 형식이 잘못됐어요')
   if (!listOf(v.chars, BUILD_CHARS, 1) || new Set(v.chars).size !== v.chars.length || !v.chars.every(c => typeof c === 'string' && PLAYERS.has(c))) {
@@ -155,11 +155,11 @@ function build(v, cat) {
   for (const { id: color, name } of cat.colors) {
     const row = v.slots[color]
     if (!listOf(row, cat.slots, cat.slots)) fail(400, `${name} 잠재력 칸이 잘못됐어요`)
+    // 잠재력은 늘 최대 레벨(5)로 끼운다고 보고 레벨은 받지 않는다 — 칸마다 잠재력 id 또는 null
     slots[color] = row.map(x => {
       if (x == null) return null
-      if (!isObj(x) || byId.get(x.p)?.color !== color) fail(400, `${name} 칸에 없는 잠재력이 있어요`)
-      if (!Number.isInteger(x.lv) || x.lv < 1 || x.lv > cat.maxLevel) fail(400, `잠재력 레벨은 1~${cat.maxLevel}로 골라 주세요`)
-      return { p: x.p, lv: x.lv }
+      if (typeof x !== 'string' || byId.get(x)?.color !== color) fail(400, `${name} 칸에 없는 잠재력이 있어요`)
+      return x
     })
   }
   if (!Object.values(slots).flat().some(Boolean)) fail(400, '잠재력을 한 칸 이상 넣어 주세요')

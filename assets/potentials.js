@@ -22,7 +22,19 @@ const ago = ms => {
 let data, cat, kr, pot
 let auth = 'loading', me = null   // me = { id, name } — 로그인했을 때
 const P = id => data.byId.get(id) || { id, name: id, short: id, pos: 0 }
-const statLine = p => p.stats.map(([k, v]) => `${k} +${v}`).join(' · ')
+const plus = v => `+${+v.toFixed(2)}`   // 0.15 × 10 같은 합에 붙는 부동소수점 꼬리를 뗀다
+const statLine = p => p.stats.map(([k, v]) => `${k} ${plus(v)}`).join(' · ')
+/** 30칸 능력치 합계, 큰 것부터 — [[이름, 값]] */
+function totals(slots) {
+  const sum = new Map()
+  for (const id of Object.values(slots).flat()) for (const [k, v] of pot.get(id)?.stats || []) sum.set(k, (sum.get(k) || 0) + v)
+  return [...sum].sort((a, b) => b[1] - a[1])
+}
+const totalsView = slots => {
+  const t = totals(slots)
+  return h('div', { className: 'pt-total' }, h('b', {}, '능력치 합계'),
+    t.length ? t.map(([k, v]) => h('span', {}, k, h('em', {}, plus(v)))) : h('span', { className: 'rc-muted' }, '잠재력을 넣으면 여기에 합계가 나와요'))
+}
 
 // ---------------------------------------------------------------- 로그인
 
@@ -80,16 +92,14 @@ function charGrid({ isOn, pick, onPos }) {
 
 // ---------------------------------------------------------------- 30칸 보기
 
-/** 게임 화면처럼 색마다 10칸. 칸마다 잠재력 이름 + 레벨, 능력치는 5레벨 기준 */
+/** 게임 화면처럼 색마다 10칸. 칸마다 잠재력 이름 + 옵션(최대 레벨 기준) */
 function slotsView(slots) {
   return h('div', { className: 'pt-slots' }, cat.colors.map(c => h('section', { className: `pt-color is-${c.id}` },
     h('h3', {}, c.name),
-    h('ol', {}, slots[c.id].map(x => {
-      if (!x) return h('li', { className: 'is-empty' }, '빈 칸')
-      const p = pot.get(x.p)
-      return h('li', { title: p ? `${cat.statsLevel}레벨 기준 · ${statLine(p)}` : '' },
-        h('b', {}, p?.name || x.p), h('span', { className: 'pt-lv' }, `Lv.${x.lv}`),
-        p && h('small', {}, statLine(p)))
+    h('ol', {}, slots[c.id].map(id => {
+      if (!id) return h('li', { className: 'is-empty' }, '빈 칸')
+      const p = pot.get(id)
+      return h('li', {}, h('b', {}, p?.name || id), p && h('small', {}, statLine(p)))
     })))))
 }
 
@@ -199,7 +209,7 @@ async function showBuild() {
       h('h3', {}, '추천 캐릭터'),
       h('div', { className: 'pt-charnames' }, b.chars.map(id => h('span', {}, h('img', { src: faceOf(P(id)), alt: '' }), P(id).name))),
       b.body && h('p', { className: 'pt-body' }, b.body)),
-    h('section', { className: 'card' }, h('h3', {}, '잠재력 ', h('small', { className: 'rc-muted' }, `능력치는 ${cat.statsLevel}레벨 기준`)), slotsView(b.slots)),
+    h('section', { className: 'card' }, h('h3', {}, '잠재력 ', h('small', { className: 'rc-muted' }, `전부 ${cat.statsLevel}레벨(MAX) 기준`)), totalsView(b.slots), slotsView(b.slots)),
     h('section', { className: 'card' },
       h('h3', {}, `댓글 ${comments.length}`),
       h('ul', { className: 'pt-comments' }, comments.map(c => h('li', {},
@@ -226,17 +236,24 @@ function openForm(b = null) {
   })
   $('#form-chars').replaceChildren(grid)
   form.chars = chars
-  $('#form-slots').replaceChildren(...cat.colors.map(c => h('section', { className: `pt-color is-${c.id}` },
-    h('h3', {}, c.name),
-    h('ol', {}, Array.from({ length: cat.slots }, (_, i) => {
-      const cur = b?.slots[c.id][i]
-      const lv = h('select', { 'aria-label': `${c.name} ${i + 1}번 레벨`, disabled: !cur },
-        Array.from({ length: cat.maxLevel }, (_, k) => h('option', { value: k + 1, selected: (cur?.lv ?? cat.maxLevel) === k + 1 }, `Lv.${k + 1}`)))
-      const sel = h('select', { 'aria-label': `${c.name} ${i + 1}번 잠재력`, onchange: () => { lv.disabled = !sel.value } },
-        h('option', { value: '' }, '— 빈 칸 —'),
-        cat.potentials.filter(p => p.color === c.id).map(p => h('option', { value: p.id, title: statLine(p), selected: cur?.p === p.id }, `${p.name} (${p.stats[0][0]})`)))
-      return h('li', { 'data-color': c.id }, sel, lv)
-    })))))
+  // 칸마다 잠재력 고르기. 보통 한 색을 한 잠재력으로 다 채우므로 색마다 「일괄 선택」이 10칸을 한 번에 바꾼다
+  const total = h('div')
+  const retotal = () => total.replaceChildren(totalsView(readForm(form).slots))
+  const options = (color, cur) => [h('option', { value: '' }, '— 빈 칸 —'),
+    ...cat.potentials.filter(p => p.color === color).map(p => h('option', { value: p.id, selected: cur === p.id }, `${p.name} — ${statLine(p)}`))]
+  $('#form-slots').replaceChildren(total, ...cat.colors.map(c => {
+    const sels = Array.from({ length: cat.slots }, (_, i) =>
+      h('select', { 'aria-label': `${c.name} ${i + 1}번 잠재력`, onchange: retotal }, options(c.id, b?.slots[c.id][i])))
+    const all = h('select', { className: 'pt-all', 'aria-label': `${c.name} 10칸 일괄 선택`, onchange: () => {
+      for (const s of sels) s.value = all.value
+      all.selectedIndex = 0
+      retotal()
+    } }, h('option', { value: '', disabled: true, selected: true }, '일괄 선택 ▾'), options(c.id).slice(1), h('option', { value: '' }, '모두 비우기'))
+    return h('section', { className: `pt-color is-${c.id}` },
+      h('h3', {}, c.name, all),
+      h('ol', {}, sels.map(s => h('li', { 'data-color': c.id }, s))))
+  }))
+  retotal()
   $('#list-view').hidden = true
   $('#build-view').hidden = true
   $('#form-view').hidden = false
@@ -251,8 +268,7 @@ function closeForm() {
 function readForm(form) {
   const slots = Object.fromEntries(cat.colors.map(c => [c.id, []]))
   for (const li of form.querySelectorAll('#form-slots li')) {
-    const [sel, lv] = li.querySelectorAll('select')
-    slots[li.dataset.color].push(sel.value ? { p: sel.value, lv: +lv.value } : null)
+    slots[li.dataset.color].push($('select', li).value || null)
   }
   return { title: form.elements.title.value, chars: [...form.chars], body: form.elements.body.value, slots }
 }

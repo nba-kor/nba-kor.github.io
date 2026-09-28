@@ -652,11 +652,18 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .pt-color li::before { content: counter(slot); width: 18px; height: 18px; border-radius: 50%; background: var(--c); color: #06121f; font-size: 10.5px; font-weight: 800; display: grid; place-items: center; }
 .pt-color li.is-empty { color: var(--muted); background: transparent; border: 1px dashed var(--line); }
 .pt-color li.is-empty::before { background: var(--line); }
+.pt-color li { grid-template-columns: auto minmax(0, 1fr); }
 .pt-color li b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.pt-color li small { grid-column: 2 / -1; color: var(--muted); font-size: 11px; }
-.pt-lv { font-weight: 800; font-size: 12px; color: var(--c); font-variant-numeric: tabular-nums; }
-#form-slots li { grid-template-columns: auto minmax(0, 1fr) 76px; }
-#form-slots select { padding: 5px 6px; font-size: 12.5px; }
+.pt-color li small { grid-column: 2; color: var(--muted); font-size: 11.5px; }
+.pt-color h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#form-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#form-slots > div { grid-column: 1 / -1; }
+#form-slots select { padding: 5px 6px; font-size: 12.5px; width: 100%; min-width: 0; }
+#form-slots .pt-all { width: auto; max-width: 60%; font-weight: 700; color: var(--c); border-color: color-mix(in srgb, var(--c) 50%, transparent); }
+.pt-total { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
+.pt-total > b { font-size: 12.5px; color: var(--muted); margin-right: 4px; }
+.pt-total span { padding: 3px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12.5px; }
+.pt-total em { font-style: normal; font-weight: 800; color: var(--accent); margin-left: 5px; font-variant-numeric: tabular-nums; }
 
 .pt-comments { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .pt-comments li { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
@@ -664,5 +671,5 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .pt-cdel { margin-left: 8px; padding: 1px 8px; font-size: 11.5px; }
 
 @media (max-width: 860px) {
-  .pt-slots { grid-template-columns: 1fr; }
+  .pt-slots, #form-slots { grid-template-columns: 1fr; }
 }

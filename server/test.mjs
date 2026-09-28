@@ -1453,12 +1453,12 @@ test('서버 오류(500)는 한 번도 나지 않았다', () => {
 // ---------------------------------------------------------------- 잠재력추천
 
 const CAT = {
-  slots: 10, maxLevel: 10,
+  slots: 10,
   colors: [{ id: 'red', name: '빨강' }, { id: 'green', name: '초록' }, { id: 'blue', name: '파랑' }],
   potentials: [{ id: 'r1', color: 'red', name: '빨강1' }, { id: 'g1', color: 'green', name: '초록1' }, { id: 'b1', color: 'blue', name: '파랑1' }],
 }
 const row = (...xs) => [...xs, ...Array(10 - xs.length).fill(null)]
-const BUILD = { title: '픽앤롤 빌드', chars: ['bl'], body: '스크린 받고\n들어갈 때', slots: { red: row({ p: 'r1', lv: 10 }), green: row(), blue: row({ p: 'b1', lv: 3 }) } }
+const BUILD = { title: '픽앤롤 빌드', chars: ['bl'], body: '스크린 받고\n들어갈 때', slots: { red: row('r1', 'r1'), green: row(), blue: row('b1') } }
 
 dbTest('잠재력추천: 글 · 검증 · 필터 · 추천 · 댓글 · 권한', async () => {
   const { api } = start({ potentials: CAT })
@@ -1476,8 +1476,8 @@ dbTest('잠재력추천: 글 · 검증 · 필터 · 추천 · 댓글 · 권한',
   await bad({ chars: [] }, /추천 캐릭터/)
   await bad({ chars: ['bl', 'bl'] }, /추천 캐릭터/)
   await bad({ chars: ['없는캐릭'] }, /추천 캐릭터/)
-  await bad({ slots: { ...BUILD.slots, red: row({ p: 'g1', lv: 1 }) } }, /빨강 칸에 없는/)   // 색이 다른 잠재력
-  await bad({ slots: { ...BUILD.slots, red: row({ p: 'r1', lv: 11 }) } }, /레벨/)
+  await bad({ slots: { ...BUILD.slots, red: row('g1') } }, /빨강 칸에 없는/)   // 색이 다른 잠재력
+  await bad({ slots: { ...BUILD.slots, red: row({ p: 'r1', lv: 5 }) } }, /빨강 칸에 없는/)   // 옛 { p, lv } 모양
   await bad({ slots: { ...BUILD.slots, red: row().slice(1) } }, /빨강 잠재력 칸/)
   await bad({ slots: { red: row(), green: row(), blue: row() } }, /한 칸 이상/)
 

@@ -1,5 +1,5 @@
 -- 잠재력추천 게시판. 팀원모집과 같은 원칙 — 브라우저는 DB 에 붙지 않고 API 함수만 secret key(service_role)로 부른다.
---   potential_builds    : 빌드 글 하나 = 제목 · 추천 캐릭터 · 상황 설명 · 30칸(빨강 · 초록 · 파랑 각 10칸, 칸마다 잠재력 + 레벨)
+--   potential_builds    : 빌드 글 하나 = 제목 · 추천 캐릭터 · 상황 설명 · 30칸(빨강 · 초록 · 파랑 각 10칸, 칸마다 잠재력)
 --   potential_likes     : 사람당 글마다 추천 한 번
 --   potential_comments  : 댓글
 -- 추천 · 댓글 수는 글 행에 세어 둔다(트리거) — 추천순 정렬과 목록의 숫자가 조인 없이 나온다.
@@ -14,7 +14,7 @@ create table public.potential_builds (
   chars text[] not null,             -- 추천 캐릭터 id 1~5명
   positions smallint[] not null,     -- chars 의 포지션(1~5) — 포지션 필터용. 서버가 선수 데이터로 채운다
   body text not null,                -- 어떤 상황에서 쓰면 좋은지
-  slots jsonb not null,              -- { red: [{ p, lv } | null ×10], green: [...], blue: [...] }
+  slots jsonb not null,              -- { red: [잠재력 id | null ×10], green: [...], blue: [...] } — 레벨은 늘 최대(5)
   likes int not null default 0,
   comments int not null default 0,
   created_at bigint not null,        -- epoch ms, 서버 시계 기준

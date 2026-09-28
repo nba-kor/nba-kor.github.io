@@ -1,6 +1,5 @@
 {
   "slots": 10,
-  "maxLevel": 10,
   "colors": [
     { "id": "red", "name": "빨강" },
     { "id": "green", "name": "초록" },
