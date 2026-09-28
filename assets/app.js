@@ -177,3 +177,41 @@ export async function share(state) {
     prompt('공유 링크', url)
   }
 }
+
+// ---------------------------------------------------------------- 공유 (팀원모집 · 잠재력추천)
+
+// Kakao Developers > 앱 > 플랫폼 키 > JavaScript 키. 비우면 공유 버튼이 기기 공유 · 링크 복사로 대체된다.
+export const KAKAO_JS_KEY = '8f89f3ef476f72827c9a875ad0c23a72'
+
+/** SDK 는 클릭 전에 미리 받아 둔다 (클릭 때 받으면 sendDefault 가 동기 호출이 못 된다) */
+export function loadKakao() {
+  if (!KAKAO_JS_KEY) return
+  const s = Object.assign(document.createElement('script'), {
+    src: 'https://t1.kakaocdn.net/kakao_js_sdk/2.8.3/kakao.min.js',
+    integrity: 'sha384-oroumrnFVE0xtgqyDZJARgERibXg2C28380uaUZz2kHDS5CR7tu20eGiOU6GkTpy',
+    crossOrigin: 'anonymous',
+    onload: () => { if (!Kakao.isInitialized()) Kakao.init(KAKAO_JS_KEY) },
+  })
+  document.head.append(s)
+}
+
+/** 카카오톡 공유. SDK 가 없으면 기기 공유창, 그것도 없으면 링크 복사.
+ *  클릭 핸들러 안에서 동기로 불러야 PC 팝업이 차단되지 않는다 — 앞에 await 를 두지 말 것 */
+export function shareKakao(btn, payload, { title, url }) {
+  if (window.Kakao?.isInitialized?.()) {
+    try { return Kakao.Share.sendDefault(payload()) } catch (e) { console.warn(e) }
+  }
+  if (navigator.share) return navigator.share({ title, url }).catch(() => {})
+  copyLink(btn, url)
+}
+
+export async function copyLink(btn, url) {
+  try {
+    await navigator.clipboard.writeText(url)
+    const label = btn.textContent
+    btn.textContent = '복사했어요'
+    setTimeout(() => { btn.textContent = label }, 1600)
+  } catch {
+    prompt('링크', url)
+  }
+}

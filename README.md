@@ -488,6 +488,7 @@ curl -s -H "Authorization: Bot $K" -H 'X-Discord-User: 100000000000000001' -H 'X
 potentials/index.html                           화면 (정적)
 assets/potentials.js                            목록 · 글 · 쓰기/고치기
 assets/auth.js                                  디스코드 로그인 + api() — 팀원모집과 같이 쓴다
+assets/potentials/<id>.png · share/<id>.jpg   잠재력 아이콘(게임 캡처에서 잘라냄) · 카카오 공유용 200x200 JPG
 data/potentials.json                            잠재력 목록 (색 · 이름 · 옵션). 늘 5레벨(MAX)로 끼운다고 보고 레벨은 저장하지 않는다
 supabase/migrations/20260928000000_potentials.sql  potential_builds · potential_likes · potential_comments + 추천 RPC
 ```

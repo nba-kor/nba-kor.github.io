@@ -1,6 +1,6 @@
 // 전술판 — 하프코트 3:3 배치 / 동선 / 프리셋 / 재생
-import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, mountTop, decodeState, share, POS_KO } from './app.js?v=1af68f91'
-import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=bb0dd88c'
+import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, mountTop, decodeState, share, POS_KO } from './app.js?v=bef36734'
+import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=5feabedb'
 
 const STORE = 'dc.tactics'
 

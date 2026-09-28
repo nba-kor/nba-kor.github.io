@@ -1,5 +1,5 @@
 // 티어표 — 드래그로 선수를 티어에 올리고 링크로 공유
-import { loadPlayers, mountFilters, chipEl, startDrag, mountTop, decodeState, share } from './app.js?v=1af68f91'
+import { loadPlayers, mountFilters, chipEl, startDrag, mountTop, decodeState, share } from './app.js?v=bef36734'
 
 const STORE = 'dc.tiers'
 const DEFAULT = () => ({

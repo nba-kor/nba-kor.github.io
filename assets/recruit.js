@@ -1,11 +1,10 @@
 // 팀원모집 — 디스코드 로그인 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
-import { loadPlayers, faceOf, mountTop, POS, POS_KO } from './app.js?v=1af68f91'
-import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=bb0dd88c'
+import { loadPlayers, faceOf, mountTop, POS, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, copyLink } from './app.js?v=bef36734'
+import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=5feabedb'
 import { api, initAuth as startAuth, login, logout, session, IN_KAKAO, IS_MOBILE } from './auth.js?v=5d44380b'
 
 // ---------------------------------------------------------------- 설정
 
-const KAKAO_JS_KEY = '8f89f3ef476f72827c9a875ad0c23a72'    // Kakao Developers > 앱 > 플랫폼 키 > JavaScript 키. 비우면 공유 버튼이 링크 복사로 대체된다.
 // 카카오 카드의 '디스코드' 버튼. discord.com 으로 곧장 보내면 브라우저에 세션이 없어 매번 로그인해야 하므로,
 // 디스코드 앱(discord://)으로 넘겨 주는 /discord/ 를 거친다. 채널 번호도 그 페이지 한 곳에만 둔다
 const DISCORD_URL = `${location.origin}/discord/`
@@ -670,17 +669,6 @@ function kakaoPayload(t) {
   }
 }
 
-async function copyLink(btn, url) {
-  try {
-    await navigator.clipboard.writeText(url)
-    const label = btn.textContent
-    btn.textContent = '복사했어요'
-    setTimeout(() => { btn.textContent = label }, 1600)
-  } catch {
-    prompt('팀 링크', url)
-  }
-}
-
 /** 팀이 없어졌을 때(해제·만료) — 팀 화면을 걷고 목록으로 가는 길만 남긴다 */
 function showGone(msg) {
   $('#team-body').hidden = true
@@ -874,14 +862,7 @@ async function showTeam(id) {
 
   for (const b of document.querySelectorAll('[data-share=kakao]')) {
     b.textContent ||= KAKAO_JS_KEY ? '카카오톡 공유' : '공유하기'
-    // sendDefault 는 클릭 핸들러 안에서 동기로 불러야 PC 팝업이 차단되지 않는다 — 앞에 await 를 두지 말 것
-    b.onclick = () => {
-      if (window.Kakao?.isInitialized?.()) {
-        try { return Kakao.Share.sendDefault(kakaoPayload(team)) } catch (e) { console.warn(e) }
-      }
-      if (navigator.share) return navigator.share({ title: `${titleOf(team)} · 팀원모집`, url: teamUrl(team) }).catch(() => {})
-      copyLink(b, teamUrl(team))
-    }
+    b.onclick = () => shareKakao(b, () => kakaoPayload(team), { title: `${titleOf(team)} · 팀원모집`, url: teamUrl(team) })
   }
   for (const b of document.querySelectorAll('[data-share=copy]')) b.onclick = () => copyLink(b, teamUrl(team))
 
@@ -936,13 +917,7 @@ const boot = async () => {
   mountTop('/recruit/', data.updatedAt)
   kr = data.players.filter(p => p.server === 'kr')
 
-  // SDK 는 클릭 전에 미리 받아 둔다 (클릭 때 받으면 sendDefault 가 동기 호출이 못 된다)
-  if (KAKAO_JS_KEY) document.head.append(h('script', {
-    src: 'https://t1.kakaocdn.net/kakao_js_sdk/2.8.3/kakao.min.js',
-    integrity: 'sha384-oroumrnFVE0xtgqyDZJARgERibXg2C28380uaUZz2kHDS5CR7tu20eGiOU6GkTpy',
-    crossOrigin: 'anonymous',
-    onload: () => { if (!Kakao.isInitialized()) Kakao.init(KAKAO_JS_KEY) },
-  }))
+  loadKakao()
 
   buildPicker()
   profileForm()

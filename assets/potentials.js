@@ -1,5 +1,5 @@
 // 잠재력추천 — 빌드 목록(추천순 · 최신순 · 포지션 · 캐릭터 필터) · 글(30칸 · 추천 · 댓글) · 쓰기 · 고치기
-import { loadPlayers, faceOf, mountTop, POS } from './app.js?v=1af68f91'
+import { loadPlayers, faceOf, mountTop, POS, KAKAO_JS_KEY, loadKakao, shareKakao, copyLink } from './app.js?v=bef36734'
 import { api, initAuth, login, logout, session, IN_KAKAO } from './auth.js?v=5d44380b'
 
 const $ = (s, root = document) => root.querySelector(s)
@@ -185,6 +185,30 @@ async function loadList() {
     : [h('p', { className: 'rc-note' }, `아직 ${who}빌드가 없어요. 첫 빌드를 올려 보세요!`)])
 }
 
+// ---------------------------------------------------------------- 카카오톡 공유
+
+const buildUrl = b => `${location.origin}/potentials/?b=${b.id}`
+/** 리스트 카드: 첫 줄 = 추천 캐릭터 + 능력치 합계 상위 3, 그다음 = 많이 쓴 잠재력 2종(아이콘). 줄은 2~3개여야 한다 */
+function kakaoPayload(b) {
+  const url = buildUrl(b), link = { mobileWebUrl: url, webUrl: url }
+  const n = new Map()
+  for (const id of Object.values(b.slots).flat()) if (pot.has(id)) n.set(id, (n.get(id) || 0) + 1)
+  const top = totals(b.slots).slice(0, 3).map(([k, v]) => `${k} ${plus(v)}`).join(' · ')
+  return {
+    objectType: 'list',
+    headerTitle: `💡 ${b.title} · 잠재력추천`,
+    headerLink: link,
+    contents: [
+      { title: `추천: ${b.chars.map(id => P(id).name).join(' · ')}`, description: top, imageUrl: `${location.origin}/assets/share/${b.chars[0]}.jpg`, link },
+      ...[...n].sort((x, y) => y[1] - x[1]).slice(0, 2).map(([id, k]) => {
+        const p = pot.get(id)
+        return { title: `${p.name} ×${k}`, description: statLine(p), imageUrl: `${location.origin}/assets/potentials/share/${id}.jpg`, link }
+      }),
+    ],
+    buttons: [{ title: '빌드 보기', link }],
+  }
+}
+
 // ---------------------------------------------------------------- 글
 
 let view = 'list', buildId, buildSeq = 0
@@ -247,6 +271,8 @@ async function showBuild() {
         h('p', { className: 'rc-kicker' }, h('b', {}, b.author), ` · ${ago(b.createdAt)}${b.updatedAt > b.createdAt + 60000 ? ' (수정됨)' : ''}`),
         h('h1', {}, b.title)),
       h('div', { className: 'rc-share-bar' }, likeBtn,
+        h('button', { type: 'button', onclick: e => shareKakao(e.currentTarget, () => kakaoPayload(b), { title: `${b.title} · 잠재력추천`, url: buildUrl(b) }) }, KAKAO_JS_KEY ? '카카오톡 공유' : '공유하기'),
+        h('button', { type: 'button', onclick: e => copyLink(e.currentTarget, buildUrl(b)) }, '링크 복사'),
         mine && h('button', { type: 'button', onclick: () => openForm(b) }, '수정'),
         mine && h('button', { type: 'button', className: 'danger', onclick: async () => { if (await del(`/builds/${b.id}`, '이 빌드를 지울까요? 추천 · 댓글도 같이 지워져요')) location.href = '/potentials/' } }, '삭제'))),
     h('section', { className: 'card' },
@@ -366,6 +392,7 @@ const boot = async () => {
   pot = new Map(cat.potentials.map(p => [p.id, p]))
   kr = data.players.filter(p => p.server === 'kr').sort((a, b) => a.pos - b.pos)
   mountTop('/potentials/')
+  loadKakao()
   bindForm()
   setAuth('loading')
   initAuth(loadMe).then(ok => ok || setAuth('down'))
