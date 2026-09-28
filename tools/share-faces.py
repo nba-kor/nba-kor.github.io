@@ -46,7 +46,13 @@ def empty():
 
 
 OUT.mkdir(parents=True, exist_ok=True)
-kr = {p["id"] for p in json.loads((ROOT / "data/players.json").read_text(encoding="utf-8"))["players"] if p.get("server") == "kr"}
+# 한국 출시 = players.json + upcoming.json 에서 server 를 kr 로 바꾼 선수(홈페이지보다 먼저 인게임에 나온 경우)
+kr = {
+    p["id"]
+    for f in ("data/players.json", "data/upcoming.json")
+    for p in json.loads((ROOT / f).read_text(encoding="utf-8"))["players"]
+    if p.get("server") == "kr"
+}
 pngs = sorted(p for p in SRC.glob("*.png") if p.stem in kr)
 for p in pngs:
     face(p).save(OUT / f"{p.stem}.jpg", **SAVE)

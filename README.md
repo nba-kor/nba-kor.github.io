@@ -49,6 +49,19 @@ assets/players/*.png  얼굴 이미지 (id.png, 181x180 원형)
 assets/share/*.jpg    카카오톡 공유용 얼굴 (300x300, 위 PNG 로 생성 — 얼굴을 바꾸면 다시 만든다)
 ```
 
+**인게임에 먼저 나온 선수** — 공식 홈페이지 갱신이 늦어 `update-players` 로는 아직 못 받는 선수는,
+`data/upcoming.json` 에서 그 선수의 **`"server": "cn"` 을 `"kr"` 로 바꾸면** 한국 서버 명단에 올라간다.
+화면(전술판 · 티어표 · 모집 캐릭터 선택) · 모집 API · TNAB 봇이 모두 이 값을 본다.
+
+```sh
+# 1) data/upcoming.json 에서 해당 선수의 server 를 kr 로
+tools/cn-faces/.venv/bin/python tools/share-faces.py     # 2) 카카오 공유 얼굴 굽기
+npx supabase functions deploy recruit --project-ref lgchgqxjjlapszmxarun   # 3) 함수가 선수 목록을 번들로 들고 있다
+# 4) 봇은 재시작(사이트 데이터를 프로세스당 한 번만 읽는다)
+```
+
+홈페이지에 오르면 `update-players` 가 `data/players.json` 에 공식 id 로 넣으므로, 그때 `upcoming.json` 에서 그 줄을 지운다(두 곳에 남으면 명단에 두 번 나온다).
+
 **93명 전원 얼굴 이미지가 있다.** 한국 출시 선수는 공식 홈페이지의 카드 이미지를 그대로 쓰고,
 미출시 선수는 중국 서버 공식 사이트의 전신 아트에서 얼굴만 잘라낸 것이다(`tools/cn-faces`).
 이미지가 없는 선수가 생기면 이름 이니셜 아바타가 자동 생성되므로 화면은 깨지지 않는다.

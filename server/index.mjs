@@ -11,10 +11,13 @@ import { Buffer } from 'node:buffer'
 // 데이터는 글자 그대로의 import 로 읽는다 — 배포 CLI 가 이 구문만 보고 JSON 파일을 함수에 같이 묶는다(readFileSync 는 못 찾는다)
 import CFG from '../data/recruit.json' with { type: 'json' }
 import playersData from '../data/players.json' with { type: 'json' }
+import upcomingData from '../data/upcoming.json' with { type: 'json' }
 import tacticsData from '../data/tactics.json' with { type: 'json' }
 import { channelUrl, createNotifier, errText, guildNick, voiceRooms } from './discord.mjs'
 
-const PLAYERS = new Map(playersData.players.filter(p => p.server === 'kr').map(p => [p.id, p]))   // 한국 출시만
+// 한국 출시만. 공식 홈페이지보다 먼저 인게임에 나온 선수는 upcoming.json 에서 server 를 kr 로 바꿔 올린다
+// (화면 · 카카오 얼굴 · 봇이 같은 규칙을 쓴다). 홈페이지에 오르면 update-players 가 players.json 에 넣으니 upcoming 에서 지운다
+const PLAYERS = new Map([...playersData.players, ...upcomingData.players].filter(p => p.server === 'kr').map(p => [p.id, p]))
 const PRESETS = new Map(tacticsData.presets.map(p => [p.id, p.name]))
 const TTL = CFG.ttlHours * 3_600_000
 const L = CFG.limits
