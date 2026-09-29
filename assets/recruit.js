@@ -227,6 +227,14 @@ function viewer(svg) {
   }
 }
 
+// 전술판의 커스텀 전술 — 목록은 만들기 폼이 한 번 읽고, 하나씩은 번호로 읽어 둔다(보드 · 설명 · 작성자)
+const customCache = new Map()
+const customOf = id => {
+  if (!customCache.has(id)) customCache.set(id, api(`/tactics/${id}`).then(r => r.tactic).catch(e => { customCache.delete(id); throw e }))
+  return customCache.get(id)
+}
+const customDesc = t => `${t.body}\n\n작성자 ${t.author} · 👍 ${t.likes}`
+
 const tacticDesc = (preset, board) => {
   const pr = presetOf(preset)
   if (!board) return pr?.desc || ''
@@ -619,13 +627,28 @@ function createForm() {
     sel.append(h('optgroup', { label: '내 전술판' }, h('option', { value: 'board' }, '전술판에 저장된 보드 불러오기')))
     nameIn.value = presetOf(board.presetId)?.name || '커스텀 전술'
   }
+  // 전술판에 등록된 커스텀 전술(좋아요순). 못 읽어도 기본 전술로는 만든다
+  api('/tactics?sort=likes').then(({ tactics: list }) => {
+    if (list.length) sel.append(h('optgroup', { label: '커스텀 전술' }, list.map(t => h('option', { value: `c:${t.id}` }, `${t.title} · 👍${t.likes} · ${t.author}`))))
+  }).catch(() => {})
 
   const preview = $('#tactic-preview'), court = viewer($('svg', preview))
   $('.rc-play', preview).onclick = () => court.play()
-  sel.onchange = () => {
-    const v = sel.value, isBoard = v === 'board'
+  let seq = 0
+  sel.onchange = async () => {
+    const v = sel.value, isBoard = v === 'board', custom = /^c:\d+$/.test(v) && +v.slice(2), my = ++seq
     $('#board-name-fld').hidden = !isBoard
     preview.hidden = !v
+    if (custom) {
+      $('#tactic-desc').textContent = '불러오는 중…'
+      try {
+        const t = await customOf(custom)
+        if (my !== seq) return
+        $('#tactic-desc').textContent = customDesc(t)
+        court.show(structuredClone(t.board.tokens))
+      } catch (e) { if (my === seq) { $('#tactic-desc').textContent = e.message; preview.hidden = true } }
+      return
+    }
     $('#tactic-desc').textContent = v ? tacticDesc(isBoard ? board.presetId : v, isBoard) : '전술 없이 모여도 괜찮아요. 팀 화면에는 「전술 자유」로 표시됩니다.'
     if (v) court.show(isBoard ? structuredClone(board.tokens) : presetTokens(presetOf(v)))
   }
@@ -649,7 +672,13 @@ function createForm() {
     else if (nErr) nameIn.focus()
     if (bad.length || nErr) return
 
-    const tactic = isBoard
+    const custom = /^c:\d+$/.test(sel.value) && +sel.value.slice(2)
+    let tactic
+    if (custom) {
+      let t
+      try { t = await customOf(custom) } catch (e) { return alert(e.message) }
+      tactic = { preset: t.preset, board: { tokens: t.board.tokens.map(thinRoutes) }, name: t.title, custom }
+    } else tactic = isBoard
       ? { preset: presetOf(board.presetId) ? board.presetId : null, board: { tokens: board.tokens.map(thinRoutes) }, name: nameIn.value.trim() }
       : { preset: sel.value || null, board: null }
     const again = () => form.requestSubmit()
@@ -880,6 +909,12 @@ async function showTeam(id) {
 
     $('#team-tactic').textContent = team.tactic.name || '전술 자유'
     $('#team-desc').textContent = tacticDesc(team.tactic.preset, !!team.tactic.board) || '정해진 전술 없이 자유롭게 합을 맞추는 팀이에요.'
+    // 커스텀 전술로 만든 팀 — 그 전술의 설명 · 작성자 + 전술판에서 열기. 전술이 지워졌으면 위 설명 그대로
+    const custom = team.tactic.custom
+    if (custom) customOf(custom).then(t => {
+      if (team.tactic.custom !== custom) return
+      $('#team-desc').replaceChildren(customDesc(t), '\n', h('a', { href: `/tactics/?c=${custom}` }, '전술판에서 열기 →'))
+    }).catch(() => {})
     const tokens = teamTokens(team)
     courtBox.hidden = !tokens
     const key = JSON.stringify(tokens?.map(t => t.playerId))

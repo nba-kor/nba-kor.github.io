@@ -144,7 +144,9 @@ function tactic(v) {
   const b = v.board == null ? null : board(v.board)
   const name = v.name == null ? '' : text(v.name, 30, '전술 이름', 0)
   const presetName = preset ? PRESETS.get(preset) : ''
-  return { preset, name: b ? name || presetName || '커스텀 전술' : presetName, board: b }
+  // custom = 전술판의 커스텀 전술 번호. 팀 화면이 그 전술의 설명 · 작성자를 보여 준다(지워졌으면 보드만). 보드가 있을 때만 의미가 있다
+  if (v.custom != null && !(Number.isInteger(v.custom) && v.custom > 0)) fail(400, '전술 정보가 잘못됐어요')
+  return { preset, name: b ? name || presetName || '커스텀 전술' : presetName, board: b, ...(b && v.custom && { custom: v.custom }) }
 }
 
 const positionsOf = chars => [...new Set(chars.map(c => PLAYERS.get(c).pos))].sort()

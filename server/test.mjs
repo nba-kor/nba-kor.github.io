@@ -827,6 +827,17 @@ dbTest('검증(DB): 코드포인트 길이 · 공백 자르기 · 모르는 필�
   })
 })
 
+dbTest('팀 전술에 커스텀 전술 번호: 보드와 같이 오면 저장 · 보드 없으면 버림 · 숫자가 아니면 400', async () => {
+  const { api } = start()
+  const board = { tokens: [boardToken()] }
+  const make = async tactic => api('POST', '/api/teams', { room: ROOM, tactic }, { as: (await person(api)).as })
+  const a = await make({ preset: 'pnr', board, name: '더블 스크린', custom: 7 })
+  assert.equal(a.status, 201, a.text)
+  assert.deepEqual([a.body.team.tactic.custom, a.body.team.tactic.name], [7, '더블 스크린'])
+  assert.equal((await make({ preset: 'pnr', custom: 7 })).body.team.tactic.custom, undefined)
+  for (const bad of ['7', 0, 1.5]) assert.equal((await make({ preset: 'pnr', board, custom: bad })).status, 400, String(bad))
+})
+
 dbTest('전술 이름 만들기: 보드면 이름 > 프리셋 이름 > 커스텀 전술, 보드 없으면 프리셋 이름만 · 목록에는 보드 없음', async () => {
   const { api } = start()
   const p = await person(api)
