@@ -410,6 +410,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     videos: {
       table: 'videos', likes: 'video_likes', comments: 'video_comments', fk: 'video_id', rpc: ['video_toggle_like', 'p_video'],
       one: 'video', cols: 'youtube,category', validate: video, extra: b => ({ youtube: b.youtube, category: b.category }),
+      neighbors: true,   // 글 화면의 이전 · 다음 영상(올린 순서)
       // ?cat=<분류> — 홈의 "최신 강의"
       filter: q => CATEGORIES.has(q.get('cat')) ? `&category=eq.${q.get('cat')}` : '',
       // 같은 영상은 한 번만(youtube unique). 동시에 두 번 올리면 unique 위반이 500 으로 난다 — ponytail: 드물어서 미리 한 번 보는 것으로 충분
@@ -443,8 +444,10 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       return [200, { [kind]: rows.map(view) }]
     }
     if (action === 'GET item') {
-      const [b, comments] = await Promise.all([
-        itemOf(id), db(`/${B.comments}?select=id,author_id,author_name,body,created_at&${B.fk}=eq.${id}&order=id.asc`),
+      // 이전 = 바로 전에 올라온 글, 다음 = 바로 뒤에 올라온 글 — { id, title } | null
+      const near = (op, dir) => B.neighbors ? db(`/${B.table}?select=id,title&id=${op}.${id}&order=id.${dir}&limit=1`).then(r => r[0] || null) : null
+      const [b, comments, prev, next] = await Promise.all([
+        itemOf(id), db(`/${B.comments}?select=id,author_id,author_name,body,created_at&${B.fk}=eq.${id}&order=id.asc`), near('lt', 'desc'), near('gt', 'asc'),
       ])
       // 로그인 토큰을 붙여 부르면 내가 추천했는지도 준다. 토큰이 틀려도 글은 보여 준다
       let liked = false
@@ -453,7 +456,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         liked = !!user && (await db(`/${B.likes}?select=user_id&${B.fk}=eq.${id}&user_id=eq.${user.id}`)).length > 0
       }
       return [200, {
-        [B.one]: view(b), liked,
+        [B.one]: view(b), liked, ...(B.neighbors && { prev, next }),
         comments: comments.map(c => ({ id: c.id, authorId: c.author_id, author: c.author_name, body: c.body, createdAt: c.created_at })),
       }]
     }

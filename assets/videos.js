@@ -53,7 +53,7 @@ function kakaoPayload(v) {
 
 let view = 'list', videoId
 
-const showVideo = () => showItem(`/videos/${videoId}`, ({ video: v, liked, comments }) => {
+const showVideo = () => showItem(`/videos/${videoId}`, ({ video: v, liked, comments, prev, next }) => {
   document.title = `${v.title} · 영상 · NBA덩크시티-TNAB`
   return itemView({
     path: `/videos/${v.id}`, item: v, liked, comments, listUrl: '/videos/', reload: showVideo, onEdit: () => openForm(v),
@@ -64,6 +64,11 @@ const showVideo = () => showItem(`/videos/${videoId}`, ({ video: v, liked, comme
         allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
         referrerPolicy: 'strict-origin-when-cross-origin',
       })),
+      // 이전 = 바로 전에 올라온 영상, 다음 = 바로 뒤에 올라온 영상
+      h('nav', { className: 'vd-nav', 'aria-label': '이전 · 다음 영상' },
+        [[prev, '← 이전 영상', 'is-prev'], [next, '다음 영상 →', 'is-next']].map(([n, label, cls]) => n
+          ? h('a', { className: cls, href: `?v=${n.id}` }, h('small', {}, label), h('b', {}, n.title))
+          : h('span', { className: `${cls} is-none` }, h('small', {}, label), h('b', {}, n === null ? '없어요' : '')))),
       h('section', { className: 'card' },
         h('p', { className: 'vd-meta' }, catTag(v.category),
           h('a', { href: `https://www.youtube.com/watch?v=${v.youtube}`, target: '_blank', rel: 'noopener' }, '유튜브에서 보기 ↗')),

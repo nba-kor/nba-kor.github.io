@@ -1574,6 +1574,12 @@ dbTest('영상: 유튜브 주소 · 분류 · 중복 · 필터 · 추천 · 댓�
 
   // 목록: 분류 · 캐릭터 필터, limit
   const list = async qs => (await api('GET', `/api/videos${qs}`)).body.videos
+  // 이전 · 다음 = 올린 순서. 방금 올린 글은 다음이 없고, 이전은 바로 앞에 올린 글
+  const nav = (await api('GET', `/api/videos/${id}`)).body
+  assert.equal(nav.next, null)
+  assert.deepEqual(nav.prev, { id: id - 1, title: V.title })   // 앞 반복에서 올린 vid(4)
+  assert.equal((await api('GET', `/api/videos/${id - 1}`)).body.next.id, id)
+  assert.equal((await api('GET', '/api/builds/999999999999')).body.prev, undefined)   // 잠재력추천에는 없다
   const lectures = await list('?cat=lecture&limit=2')
   assert.equal(lectures[0].id, id)
   assert.ok(lectures.length <= 2 && lectures.every(x => x.category === 'lecture'))

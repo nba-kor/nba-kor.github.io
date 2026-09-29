@@ -752,3 +752,12 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .lecture small { color: var(--muted); font-size: 12px; }
 .lecture:hover b { color: var(--accent-2); }
 @media (max-width: 720px) { .lectures-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* 글 화면의 이전 · 다음 영상 */
+.vd-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.vd-nav > * { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); color: inherit; text-decoration: none; }
+.vd-nav .is-next { text-align: right; }
+.vd-nav small { color: var(--muted); font-size: 12px; }
+.vd-nav b { font-size: 13.5px; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.vd-nav a:hover { border-color: var(--accent-2); background: var(--panel-2); }
+.vd-nav .is-none { opacity: .45; }
