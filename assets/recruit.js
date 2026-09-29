@@ -134,16 +134,52 @@ async function ready(again, why) {
 // 이번 파티에 어떤 캐릭터로 들어가는지 — 프로필 entries 의 몇 번째 줄(0 = 대표). 만들기 · 가입이 같이 쓴다
 let playAs = 0
 
-/** 캐릭터가 2줄 이상이면 「참가 캐릭터」 버튼 — 대표 / 서브(같은 계정 다른 캐릭터) / 부계정 */
+const entryKind = (entries, i) => !i ? '대표' : entries[i].nick === entries[0].nick ? '서브' : '부계정'
+
+/** 캐릭터 한 줄 — 얼굴 · 닉네임 · 티어 · (뱃지) · 포지션 · 캐릭터 이름. 로스터 · 캐릭터 모달이 같이 쓴다 */
+const acctBody = (e, tag) => {
+  const p = P(e.char)
+  return [h('img', { src: faceOf(p), alt: '' }),
+    h('div', {},
+      h('div', { className: 'rc-acct-name' }, h('b', {}, e.nick), h('span', { className: 'rc-tier', 'data-tier': e.tier }, e.tier), tag),
+      h('small', {}, h('span', { className: `rc-pos pos-${p.pos}` }, POS[p.pos] || '?'), p.name))]
+}
+
+/**
+ * 캐릭터 목록 모달. pick = 지금 고른 줄 번호를 주면 고르기(누른 줄 번호로 끝난다, 닫으면 null), 안 주면 보기만.
+ * tagOf(i) = 줄마다 붙일 뱃지 글자
+ */
+function acctsDialog(title, entries, { pick, tagOf = () => '' } = {}) {
+  const dlg = $('#accts-dialog')
+  $('#accts-title').textContent = title
+  $('ul', dlg).replaceChildren(...entries.map((e, i) => {
+    const tag = tagOf(i) && h('span', { className: 'rc-main' }, tagOf(i))
+    return pick == null
+      ? h('li', { className: 'rc-acct' }, acctBody(e, tag))
+      : h('li', {}, h('button', { className: 'rc-acct rc-acct-pick', value: String(i), 'aria-pressed': i === pick }, acctBody(e, tag)))
+  }))
+  dlg.returnValue = ''
+  dlg.showModal()
+  if (!dlg.dataset.bound) {   // 바깥(backdrop)을 누르면 닫기 — 한 번만 건다
+    dlg.dataset.bound = '1'
+    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close() })
+  }
+  return new Promise(res => dlg.addEventListener('close', () => res(dlg.returnValue === '' ? null : +dlg.returnValue), { once: true }))
+}
+
+/** 캐릭터가 2줄 이상이면 「참가 캐릭터 · … · 바꾸기」 버튼 하나 — 누르면 모달에서 고른다 */
 function playAsPicker(entries) {
   if (entries.length < 2) return null
-  const kind = (e, i) => !i ? '대표' : e.nick === entries[0].nick ? '서브' : '부계정'
-  return h('div', { className: 'rc-playas', role: 'group', 'aria-label': '참가 캐릭터' },
+  const e = entries[playAs], p = P(e.char)
+  return h('div', { className: 'rc-playas' },
     h('span', {}, '참가 캐릭터'),
-    entries.map((e, i) => h('button', {
-      type: 'button', 'aria-pressed': i === playAs, title: `${e.nick} · ${e.tier} · ${charLine(e)}`,
-      onclick: () => { playAs = i; renderMeCards() },
-    }, h('img', { src: faceOf(P(e.char)), alt: '' }), h('span', {}, h('small', {}, kind(e, i)), P(e.char).short || P(e.char).name))))
+    h('button', {
+      type: 'button', 'aria-haspopup': 'dialog', title: '다른 캐릭터로 참가하려면 눌러서 고르세요',
+      onclick: async () => {
+        const i = await acctsDialog('어떤 캐릭터로 참가할까요?', entries, { pick: playAs, tagOf: i => entryKind(entries, i) })
+        if (i != null) { playAs = i; renderMeCards() }
+      },
+    }, h('img', { src: faceOf(p), alt: '' }), h('span', {}, h('small', {}, entryKind(entries, playAs)), p.short || p.name), h('em', {}, `바꾸기 (${entries.length}개)`)))
 }
 
 /** 팀장 정보 · 가입 폼에 들어가는 "내 프로필" 요약 */
@@ -758,16 +794,14 @@ async function showTeam(id) {
         self && h('span', { className: 'rc-badge me' }, '나'),
         h('b', { title: '디스코드 이름' }, m.name), micTag(m.mic))
       if (self && !m.leader) head.append(h('button', { type: 'button', className: 'danger', onclick: e => leave(e.currentTarget, m) }, '나가기'))
+      // 이 파티에서 쓰는 캐릭터(서버가 맨 앞에 둔다)만 보이고, 나머지는 버튼 → 모달
+      const more = m.entries.length - 1
       return h('li', { className: `rc-member${self ? ' is-me' : ''}` }, head,
-        h('ul', { className: 'rc-accts' }, m.entries.map((e, i) => {
-          const p = P(e.char)
-          return h('li', { className: 'rc-acct' },
-            h('img', { src: faceOf(p), alt: '' }),
-            h('div', {},
-              h('div', { className: 'rc-acct-name' }, h('b', {}, e.nick), h('span', { className: 'rc-tier', 'data-tier': e.tier }, e.tier),
-                !i && m.entries.length > 1 && h('span', { className: 'rc-main', title: '이 파티에서 쓰는 캐릭터' }, '참가')),
-              h('small', {}, h('span', { className: `rc-pos pos-${p.pos}` }, POS[p.pos] || '?'), p.name)))
-        })))
+        h('div', { className: 'rc-acct' }, acctBody(m.entries[0], more > 0 && h('span', { className: 'rc-main', title: '이 파티에서 쓰는 캐릭터' }, '참가'))),
+        more > 0 && h('button', {
+          type: 'button', className: 'rc-more-accts', 'aria-haspopup': 'dialog',
+          onclick: () => acctsDialog(`${m.name} 님의 캐릭터 ${m.entries.length}개`, m.entries, { tagOf: i => i ? '' : '참가' }),
+        }, `캐릭터 ${m.entries.length}개 보기`))
     })
     for (let i = team.members.length; i < team.size; i++) items.push(h('li', { className: 'rc-member rc-empty' }, h('span', { className: 'rc-hole' }), '빈 자리'))
     $('#team-roster').replaceChildren(...items)

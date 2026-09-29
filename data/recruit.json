@@ -1,7 +1,7 @@
 {
   "note": "팀원모집 설정 — 서버(server/index.mjs) · 화면(assets/recruit.js) · TNAB 봇이 같이 읽는다.",
   "teamSize": 3,
-  "maxEntries": 3,
+  "maxEntries": 10,
   "ttlHours": 3,
   "tiers": ["브론즈", "실버", "골드", "플래티넘", "다이아", "레전드", "전성기"],
   "modes": {

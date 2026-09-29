@@ -588,7 +588,7 @@ test('봇 신원: 봇 키(32자 이상 · timingSafeEqual) + X-Discord-User(17~2
 
 // ---------------------------------------------------------------- 검증 (DB 없이 — 요청 수 제한 · 프로필 조회만 가짜 DB 가 답한다)
 
-test('검증: 프로필(마이크 O/X · 계정 1~3줄) 이 잘못되면 400', async () => {
+test('검증: 프로필(마이크 O/X · 계정 1~maxEntries 줄) 이 잘못되면 400', async () => {
   const { api } = start({ db: FAKE_DB })
   const as = bot(uid())
   const bad = async (body, why, error) => {
@@ -605,7 +605,7 @@ test('검증: 프로필(마이크 O/X · 계정 1~3줄) 이 잘못되면 400', a
   await bad({ ...ok, entries: [entry({ tier: '마스터' })] }, '없는 티어')
   await bad({ ...ok, entries: [entry({ char: 'nope' })] }, '없는 캐릭터')
   await bad({ ...ok, entries: [entry({ char: UPCOMING })] }, '미출시 캐릭터')
-  await bad({ ...ok, entries: [entry(), entry({ char: 'klfd' }), entry({ char: 'sga' }), entry({ char: 'lkdqq' })] }, '4개')
+  await bad({ ...ok, entries: Array.from({ length: CFG.maxEntries + 1 }, (_, i) => entry({ nick: `n${i}` })) }, `${CFG.maxEntries + 1}개`)
   await bad({ ...ok, entries: [] }, '0개')
   await bad({ ...ok, entries: [entry(), entry()] }, '같은 닉네임·캐릭터 중복')
   await bad({ ...ok, entries: [entry({ nick: 'discord.gg/abc' })] }, '닉네임에 링크')
