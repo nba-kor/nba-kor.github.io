@@ -21,7 +21,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="NBA덩크시티-TNAB — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="/assets/style.css?v=5ba8f160">
+<link rel="stylesheet" href="/assets/style.css?v=7be7610f">
 </head>
 <body>
 
@@ -36,6 +36,7 @@
     <a href="/recruit/">팀원모집</a>
   </nav>
   <div class="spacer"></div>
+  <div class="rc-auth" id="auth" aria-live="polite"></div>
 </header>
 
 <main class="tactics">
@@ -82,14 +83,26 @@
 
   <aside class="side">
     <div class="card">
-      <h3>기본 전술 프리셋</h3>
+      <h3>전술 프리셋</h3>
       <select id="preset"></select>
       <div class="row" style="margin-top:8px">
         <button id="apply-preset" class="primary" style="flex:1">적용</button>
         <button id="apply-keep" title="코트에 있는 선수는 그대로 두고 위치·동선만 적용">선수 유지</button>
       </div>
       <p class="preset-desc" id="preset-desc"></p>
+      <div class="tc-meta" id="custom-meta" hidden></div>
     </div>
+
+    <!-- 보드를 고치면 나온다 — 이름 · 설명을 붙여 올리면 다른 사람도 프리셋 목록의 "커스텀 전술" 에서 고른다 -->
+    <form class="card tc-register" id="register" hidden novalidate>
+      <h3>커스텀 전술 등록</h3>
+      <p class="rc-muted">전술을 고쳤어요. 이름과 설명을 붙여 등록하면 다른 사람들도 프리셋 목록에서 볼 수 있어요.</p>
+      <p class="rc-muted rc-need" id="need" hidden></p>
+      <input type="text" name="title" maxlength="30" placeholder="전술 이름 (예: 더블 스크린 숏롤)" autocomplete="off" aria-label="전술 이름">
+      <textarea name="body" rows="4" maxlength="500" placeholder="전술 설명 — 언제 쓰는지, 누가 어떻게 움직이는지" aria-label="전술 설명"></textarea>
+      <p class="rc-form-err" role="alert" hidden></p>
+      <button type="submit" class="primary">등록</button>
+    </form>
 
     <div class="card">
       <h3>선택한 선수</h3>
@@ -106,6 +119,7 @@
         <button id="reset" class="danger" style="flex:1">전체 초기화</button>
         <button id="share" style="flex:1">공유 링크</button>
       </div>
+      <button id="kakao" style="width:100%;margin-top:8px">카카오톡 공유</button>
     </div>
 
     <div class="card">
@@ -121,6 +135,6 @@
 
 </main>
 
-<script type="module" src="/assets/tactics.js?v=d6eebdaf"></script>
+<script type="module" src="/assets/tactics.js?v=cc40e1fe"></script>
 </body>
 </html>

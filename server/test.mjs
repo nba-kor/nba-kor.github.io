@@ -1597,3 +1597,44 @@ dbTest('영상: 유튜브 주소 · 분류 · 중복 · 필터 · 추천 · 댓�
   assert.equal((await api('GET', `/api/videos/${id}`)).status, 404)
   assert.deepEqual(await rows(`/video_comments?video_id=eq.${id}`), [])
 })
+
+// ---------------------------------------------------------------- 커스텀 전술
+
+dbTest('커스텀 전술: 보드 검증 · 좋아요순 목록 · 댓글 없음 · 권한', async () => {
+  const { api } = start()
+  const a = { id: uid() }, b = { id: uid() }
+  a.as = web(a.id, '전술가'); b.as = web(b.id, '구경꾼')
+  const T = { title: '내 픽앤롤', body: '스크린 뒤 숏롤\n코너는 45도로', preset: 'pnr', board: { tokens: [boardToken(), boardToken({ key: 'd1', side: 'def', playerId: 'nope', routes: [] })] } }
+
+  assert.deepEqual((await api('POST', '/api/tactics', T)).body, LOGIN)
+  const bad = async (patch, msg) => {
+    const r = await api('POST', '/api/tactics', { ...T, ...patch }, { as: a.as })
+    assert.equal(r.status, 400, r.text)
+    assert.match(r.body.error, msg)
+  }
+  await bad({ title: '' }, /전술 이름/)
+  await bad({ body: '' }, /전술 설명/)
+  await bad({ board: { tokens: [] } }, /한 명 이상/)
+  await bad({ preset: 'nope' }, /없는 전술/)
+
+  const c = await api('POST', '/api/tactics', T, { as: a.as })
+  assert.equal(c.status, 201, c.text)
+  const t = c.body.tactic
+  assert.deepEqual([t.title, t.author, t.preset, t.chars], ['내 픽앤롤', '전술가', 'pnr', ['bl']])   // 없는 선수 id 는 chars 에서 빠진다
+  assert.equal(t.board.tokens[0].evil, undefined)                                                   // 보드는 서버가 다시 만든다
+  assert.deepEqual(t.board.tokens[0].routes[0].pts, [[0.5, 0.66], [0, 1]])                          // 코트 밖 좌표는 잘린다
+
+  // 좋아요순 목록 — 방금 올린 두 개 중 좋아요 1 인 쪽이 앞. 목록에는 보드가 없다
+  const t2 = (await api('POST', '/api/tactics', { ...T, title: '두 번째' }, { as: b.as })).body.tactic
+  assert.deepEqual((await api('POST', `/api/tactics/${t.id}/like`, undefined, { as: b.as })).body, { liked: true, likes: 1 })
+  const list = (await api('GET', '/api/tactics?sort=likes')).body.tactics
+  assert.ok(list.findIndex(x => x.id === t.id) < list.findIndex(x => x.id === t2.id))
+  assert.equal(list[0].board, undefined)
+  const d = (await api('GET', `/api/tactics/${t.id}`, undefined, { as: b.as })).body
+  assert.deepEqual([d.liked, d.comments, d.prev], [true, [], undefined])
+  assert.equal((await api('POST', `/api/tactics/${t.id}/comments`, { body: 'x' }, { as: b.as })).status, 404)   // 댓글은 없다
+
+  assert.equal((await api('DELETE', `/api/tactics/${t.id}`, undefined, { as: b.as })).status, 403)
+  for (const [x, who] of [[t, a], [t2, b]]) assert.equal((await api('DELETE', `/api/tactics/${x.id}`, undefined, { as: who.as })).status, 200)
+  assert.deepEqual(await rows(`/custom_tactic_likes?tactic_id=eq.${t.id}`), [])
+})

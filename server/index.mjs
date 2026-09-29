@@ -30,8 +30,8 @@ const AUTH_MEMO = { ms: 60_000, max: 500 }         // 로그인 토큰 확인 �
 const ROUTE_KINDS = ['move', 'pass', 'screen']
 const LINK = /:\/\/|www\.|discord\.gg/i
 const TEAM_ID = /^[A-Za-z0-9_-]{8}$/
-// 게시판(잠재력추천 builds · 영상 videos): /api/<게시판>[/<id>[/like | /comments[/<댓글 id>]]]
-const BOARD_PATH = /^\/api\/(builds|videos)(?:\/(\d{1,15})(?:\/(like|comments)(?:\/(\d{1,15}))?)?)?$/
+// 게시판(잠재력추천 builds · 영상 videos · 커스텀 전술 tactics): /api/<게시판>[/<id>[/like | /comments[/<댓글 id>]]]
+const BOARD_PATH = /^\/api\/(builds|videos|tactics)(?:\/(\d{1,15})(?:\/(like|comments)(?:\/(\d{1,15}))?)?)?$/
 const BUILD_CHARS = 5
 // 유튜브 주소 → 영상 id(11자). watch?v= · youtu.be · shorts · live · embed, www · m · music 서브도메인
 const YOUTUBE = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/
@@ -165,6 +165,19 @@ function video(v) {
   return {
     youtube, category: v.category, chars, positions: positionsOf(chars),
     title: text(v.title, 60, '제목'), body: text(v.body ?? '', 1000, '설명', 0, true),
+  }
+}
+
+/** 커스텀 전술: 이름 · 설명 · 전술판 보드(선수 1명 이상) · 고치기 시작한 기본 전술 */
+function customTactic(v) {
+  if (!isObj(v)) fail(400, '요청 형식이 잘못됐어요')
+  const b = board(v.board)
+  if (!b.tokens.length) fail(400, '코트에 선수를 한 명 이상 올려 주세요')
+  if (v.preset != null && !(typeof v.preset === 'string' && PRESETS.has(v.preset))) fail(400, '없는 전술이에요')
+  const chars = [...new Set(b.tokens.map(t => t.playerId).filter(id => PLAYERS.has(id)))]
+  return {
+    title: text(v.title, 30, '전술 이름'), body: text(v.body, 500, '전술 설명', 1, true),
+    board: b, preset: v.preset ?? null, chars, positions: positionsOf(chars),
   }
 }
 
@@ -419,6 +432,10 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         if (dup) fail(409, '이미 올라온 영상이에요')
       },
     },
+    tactics: {   // 댓글 없음 — 전술판 프리셋 목록의 "커스텀 전술"
+      table: 'custom_tactics', likes: 'custom_tactic_likes', comments: null, fk: 'tactic_id', rpc: ['custom_tactic_toggle_like', 'p_tactic'],
+      one: 'tactic', cols: 'preset', validate: customTactic, extra: b => ({ preset: b.preset, board: b.board }),
+    },
   }
   const nameOf = async user => (await mine(user))?.discord_name ?? user.name
 
@@ -426,7 +443,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const B = BOARDS[kind], { searchParams: q } = new URL(request.url), method = request.method
     const action = [method, id && 'item', sub, cid && 'comment'].filter(Boolean).join(' ')
     const known = ['GET', 'POST', 'GET item', 'PUT item', 'DELETE item', 'POST item like', 'POST item comments', 'DELETE item comments comment']
-    if (!known.includes(action)) fail(404, '없는 주소예요')
+    if (!known.includes(action) || (sub === 'comments' && !B.comments)) fail(404, '없는 주소예요')
     const view = b => ({
       id: b.id, authorId: b.author_id, author: b.author_name, title: b.title, chars: b.chars, body: b.body,
       likes: b.likes, comments: b.comments, createdAt: b.created_at, updatedAt: b.updated_at, ...B.extra(b),
@@ -447,7 +464,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       // 이전 = 바로 전에 올라온 글, 다음 = 바로 뒤에 올라온 글 — { id, title } | null
       const near = (op, dir) => B.neighbors ? db(`/${B.table}?select=id,title&id=${op}.${id}&order=id.${dir}&limit=1`).then(r => r[0] || null) : null
       const [b, comments, prev, next] = await Promise.all([
-        itemOf(id), db(`/${B.comments}?select=id,author_id,author_name,body,created_at&${B.fk}=eq.${id}&order=id.asc`), near('lt', 'desc'), near('gt', 'asc'),
+        itemOf(id), B.comments ? db(`/${B.comments}?select=id,author_id,author_name,body,created_at&${B.fk}=eq.${id}&order=id.asc`) : [], near('lt', 'desc'), near('gt', 'asc'),
       ])
       // 로그인 토큰을 붙여 부르면 내가 추천했는지도 준다. 토큰이 틀려도 글은 보여 준다
       let liked = false

@@ -7,7 +7,7 @@
 | URL | 파일 | 설명 |
 | --- | --- | --- |
 | `/` | `index.html` | 소개 / 선수 현황 |
-| `/tactics/` | `tactics/index.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종, 재생 |
+| `/tactics/` | `tactics/index.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종 + 커스텀 전술(등록 · 좋아요), 재생, 링크 · 카톡 공유 |
 | `/tiers/` | `tiers/index.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유 |
 | `/potentials/` | `potentials/index.html` | **잠재력추천** — 빨강 · 초록 · 파랑 30칸 잠재력 빌드 게시판. 추천 캐릭터 · 포지션 필터, 추천 · 댓글(디스코드 로그인). API 는 팀원모집 함수를 같이 쓴다([잠재력추천](#잠재력추천)) |
 | `/videos/` | `videos/index.html` | **영상** — 유튜브 링크 게시판. 분류(강의 · 하이라이트 · 공략 · 매드무비 · 기타) · 캐릭터 필터, 추천 · 댓글 · 카톡 공유. 최신 강의는 홈에도 뜬다 |
@@ -312,7 +312,7 @@ publishable key 나 로그인 토큰으로는 표를 읽거나 쓸 수 없다. �
 4. **디스코드 로그인** — [Discord Developer Portal](https://discord.com/developers/applications) 의 애플리케이션 **OAuth2 > Redirects** 에
    `https://lgchgqxjjlapszmxarun.supabase.co/auth/v1/callback` 을 넣고 Client ID · Client Secret 을 복사한다.
    Supabase **Authentication > Sign In / Providers > Discord** 를 켜고 둘을 넣는다(이메일 없는 디스코드 계정도 되게 이메일 필수는 끈다).
-   **Authentication > URL Configuration** 의 Site URL 은 `https://nba-kor.github.io/recruit/`, Redirect URLs 에 `https://nba-kor.github.io/recruit/` · `https://nba-kor.github.io/potentials/` · `https://nba-kor.github.io/videos/` · `http://localhost:8000/recruit/` · `http://localhost:8000/potentials/` · `http://localhost:8000/videos/`
+   **Authentication > URL Configuration** 의 Site URL 은 `https://nba-kor.github.io/recruit/`, Redirect URLs 에 `https://nba-kor.github.io/recruit/` · `https://nba-kor.github.io/potentials/` · `https://nba-kor.github.io/videos/` · `https://nba-kor.github.io/tactics/` · `http://localhost:8000/recruit/` · `http://localhost:8000/potentials/` · `http://localhost:8000/videos/`
    (로그인은 누른 페이지로 돌아온다 — `assets/auth.js`. 목록에 없는 페이지는 Site URL 로 떨어진다).
    Client Secret 은 함수 비밀값이 아니다 — `.env` 에 두고 `secrets set` 으로 올리지 않는다.
 
@@ -527,6 +527,22 @@ supabase/migrations/20260929000000_videos.sql  videos · video_likes · video_co
 - 카톡 공유는 피드 카드(유튜브 썸네일 `i.ytimg.com/vi/<id>/hqdefault.jpg`).
 
 처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → Redirect URLs 에 `/videos/` 추가 → `sh tools/deploy-api.sh` → main 푸시.
+
+## 커스텀 전술
+
+전술판에서 보드를 고치면(선수 위치 · 동선 · 선수 수 — 선수만 바꿔 끼운 건 아니다) 프리셋 상자가 「✏️ 직접 수정한 전술」 로 바뀌고
+등록 칸이 열린다. 이름 · 설명을 붙여 등록(디스코드 로그인)하면 모두의 프리셋 상자에 「커스텀 전술」 묶음(수비 전술 아래, 좋아요순)으로 뜬다.
+고르면 설명 · 작성자 · 좋아요, 내 것이면 삭제. 서버는 잠재력추천 · 영상과 같은 게시판 코드(`BOARDS.tactics`, 댓글 없음)이고 보드는 팀원모집과 같은 `board()` 검증을 쓴다.
+
+```
+supabase/migrations/20260930000000_custom_tactics.sql   custom_tactics · custom_tactic_likes + 좋아요 RPC
+GET /api/tactics?sort=likes      목록(보드 없이) · GET /api/tactics/<id> 보드 · 설명 · liked
+```
+
+- 카톡 공유: 등록된 커스텀(안 고친 것)은 `/tactics/?c=<id>`, 나머지는 보드를 담은 `#...` 주소. 주소가 2000자를 넘으면(동선이 많으면) 등록을 권한다.
+- 카드: 코트의 한국 서버 선수 얼굴 3명(공격 먼저), 2명 미만이면 사이트 대표 이미지.
+
+처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → Redirect URLs 에 `/tactics/` 추가 → `sh tools/deploy-api.sh` → main 푸시.
 
 ## 배포 전: 캐시 무효화
 
