@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>잠재력추천 · NBA덩크시티-TNAB</title>
-<meta name="description" content="NBA 덩크 시티 잠재력 빌드 추천. 빨강 · 초록 · 파랑 30칸 잠재력 구성을 캐릭터 · 포지션별로 찾아보고 추천 · 댓글을 남기세요.">
-<link rel="canonical" href="https://nba-kor.github.io/potentials/">
+<title>영상 · NBA덩크시티-TNAB</title>
+<meta name="description" content="NBA 덩크 시티 영상 모음. 하이라이트 · 공략 · 강의 · 매드무비 유튜브 영상을 캐릭터 · 포지션별로 찾아보고 추천 · 댓글을 남기세요.">
+<link rel="canonical" href="https://nba-kor.github.io/videos/">
 <link rel="icon" href="/assets/icon.png?v=1" type="image/png">
 <link rel="apple-touch-icon" href="/assets/icon.png?v=1">
 <meta name="theme-color" content="#0d1117">
@@ -13,9 +13,9 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="NBA덩크시티-TNAB">
 <meta property="og:locale" content="ko_KR">
-<meta property="og:url" content="https://nba-kor.github.io/potentials/">
-<meta property="og:title" content="잠재력추천 · NBA덩크시티-TNAB">
-<meta property="og:description" content="NBA 덩크 시티 잠재력 빌드 추천. 빨강 · 초록 · 파랑 30칸 잠재력 구성을 캐릭터 · 포지션별로 찾아보고 추천 · 댓글을 남기세요.">
+<meta property="og:url" content="https://nba-kor.github.io/videos/">
+<meta property="og:title" content="영상 · NBA덩크시티-TNAB">
+<meta property="og:description" content="NBA 덩크 시티 영상 모음. 하이라이트 · 공략 · 강의 · 매드무비 유튜브 영상을 캐릭터 · 포지션별로 찾아보고 추천 · 댓글을 남기세요.">
 <meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=1">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -39,28 +39,34 @@
   <div class="rc-auth" id="auth" aria-live="polite"></div>
 </header>
 
-<main class="recruit pt">
+<main class="recruit pt vd">
 
-  <!-- 글 쓰기 · 고치기 — 로그인한 사람만 -->
+  <!-- 올리기 · 고치기 — 로그인한 사람만 -->
   <section id="form-view" class="card rc-create" hidden>
-    <form id="build-form" novalidate>
-      <h2 id="form-title">빌드 작성</h2>
+    <form id="video-form" novalidate>
+      <h2 id="form-title">영상 올리기</h2>
+      <label class="rc-fld">
+        <span>유튜브 주소</span>
+        <input type="text" name="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://youtu.be/…  또는  https://www.youtube.com/watch?v=…" required>
+        <small class="rc-hint">붙여 넣으면 제목이 자동으로 채워져요. 쇼츠 · 라이브 주소도 돼요</small>
+      </label>
+      <div class="vd-preview" id="form-preview" hidden></div>
       <label class="rc-fld">
         <span>제목</span>
-        <input type="text" name="title" maxlength="40" autocomplete="off" placeholder="예) 커리 3점 특화 빌드" required>
+        <input type="text" name="title" maxlength="60" autocomplete="off" required>
       </label>
       <fieldset>
-        <legend>추천 캐릭터 <small>1~5명</small></legend>
+        <legend>분류</legend>
+        <div class="rc-seg-opts" id="form-cats"></div>
+      </fieldset>
+      <fieldset>
+        <legend>나온 캐릭터 <small>선택 · 5명까지</small></legend>
         <div id="form-chars"></div>
       </fieldset>
       <label class="rc-fld">
-        <span>어떤 상황에서 쓰면 좋은지</span>
-        <textarea name="body" rows="4" maxlength="1000" placeholder="예) 외곽 슈터로 스페이싱할 때. 수비는 스위치가 많은 조합에서…"></textarea>
+        <span>설명 <small>선택</small></span>
+        <textarea name="body" rows="3" maxlength="1000" placeholder="예) 픽앤롤에서 스크린 각도 잡는 법"></textarea>
       </label>
-      <fieldset>
-        <legend>잠재력 <small>판에서 칸을 누르고 잠재력을 고르세요 · 전부 5레벨(MAX) · 한 색을 다 채우려면 「10칸 모두」</small></legend>
-        <div id="form-slots"></div>
-      </fieldset>
       <p class="rc-form-err" role="alert" hidden></p>
       <div class="rc-actions">
         <button type="button" id="form-cancel">취소</button>
@@ -69,35 +75,36 @@
     </form>
   </section>
 
-  <!-- ?b 없음: 목록 -->
+  <!-- ?v 없음: 목록 -->
   <section id="list-view" hidden>
     <div class="rc-hero">
       <div>
-        <h1>잠재력추천</h1>
-        <p class="rc-lead">빨강 · 초록 · 파랑 30칸 잠재력 빌드를 캐릭터별로 모았어요. 좋은 빌드엔 추천을, 궁금한 건 댓글로 물어보세요.</p>
+        <h1>영상</h1>
+        <p class="rc-lead">하이라이트 · 공략 · 강의 · 매드무비. 유튜브 링크만 붙여 넣으면 올라가요. 좋은 영상엔 추천을 눌러 주세요.</p>
         <p class="rc-muted rc-need" id="need" hidden></p>
       </div>
-      <button id="new" class="primary rc-big" type="button">+ 빌드 작성</button>
+      <button id="new" class="primary rc-big" type="button">+ 영상 올리기</button>
     </div>
     <div class="card pt-filter">
+      <div class="vd-cats" id="filter-cats" role="group" aria-label="분류"></div>
       <div class="pt-sort" role="group" aria-label="정렬">
         <button type="button" data-sort="likes">추천순</button>
         <button type="button" data-sort="new">최신순</button>
       </div>
       <div id="filter-chars"></div>
     </div>
-    <div id="list" class="rc-list pt-list"></div>
+    <div id="list" class="rc-list pt-list vd-list"></div>
   </section>
 
-  <!-- ?b=<id>: 글 -->
+  <!-- ?v=<id>: 글 -->
   <section id="item-view" hidden>
-    <a class="rc-back" href="/potentials/">← 목록</a>
+    <a class="rc-back" href="/videos/">← 목록</a>
     <p class="rc-form-err" id="item-error" hidden></p>
     <div id="item-body"></div>
   </section>
 
 </main>
 
-<script type="module" src="/assets/potentials.js?v=ce3cd53c"></script>
+<script type="module" src="/assets/videos.js?v=a91bccd3"></script>
 </body>
 </html>

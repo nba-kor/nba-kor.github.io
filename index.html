@@ -21,7 +21,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="NBA덩크시티-TNAB — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="/assets/style.css?v=0a53b21e">
+<link rel="stylesheet" href="/assets/style.css?v=7cae65df">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -47,6 +47,7 @@
     <a href="/tactics/">전술판</a>
     <a href="/tiers/">티어표</a>
     <a href="/potentials/">잠재력추천</a>
+    <a href="/videos/">영상</a>
     <a href="/recruit/">팀원모집</a>
   </nav>
   <div class="spacer"></div>
@@ -163,6 +164,15 @@
     </a>
   </nav>
 
+  <!-- 영상 게시판의 최신 "강의" — 없거나 API 가 안 되면 통째로 숨는다 -->
+  <section class="lectures" id="lectures" hidden>
+    <div class="lectures-head">
+      <h3>최신 강의 영상</h3>
+      <a href="/videos/?cat=lecture">더 보기 →</a>
+    </div>
+    <div class="lectures-grid" id="lectures-grid"></div>
+  </section>
+
   <section class="roster-strip">
     <h3>한국 서버 출시 선수</h3>
     <div class="faces" id="faces"></div>
@@ -172,6 +182,7 @@
 
 <script type="module">
 import { loadPlayers, mountTop } from '/assets/app.js?v=bef36734'
+import { api } from '/assets/auth.js?v=5d44380b'
 const { players, updatedAt } = await loadPlayers()
 mountTop('/', updatedAt)
 const kr = players.filter(p => p.server === 'kr')
@@ -179,6 +190,20 @@ document.getElementById('faces').innerHTML = kr
   .map(p => `<img src="${p.img}" alt="${p.name}" title="${p.name}" loading="lazy">`).join('')
 document.getElementById('count').textContent =
   `한국 서버 ${kr.length}명 · 미출시 ${players.length - kr.length}명 지원`
+
+// 최신 강의 4개. 제목 · 작성자는 사용자 입력이라 textContent 로만 넣는다
+try {
+  const { videos } = await api('/videos?cat=lecture&sort=new&limit=4')
+  const grid = document.getElementById('lectures-grid')
+  for (const v of videos) {
+    const a = Object.assign(document.createElement('a'), { className: 'lecture', href: `/videos/?v=${v.id}` })
+    a.innerHTML = `<div class="vd-thumb"><img src="https://i.ytimg.com/vi/${v.youtube}/mqdefault.jpg" alt="" loading="lazy"></div><b></b><small></small>`
+    a.querySelector('b').textContent = v.title
+    a.querySelector('small').textContent = v.author
+    grid.append(a)
+  }
+  document.getElementById('lectures').hidden = !videos.length
+} catch {}
 </script>
 </body>
 </html>

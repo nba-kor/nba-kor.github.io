@@ -10,6 +10,7 @@
 | `/tactics/` | `tactics/index.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종, 재생 |
 | `/tiers/` | `tiers/index.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유 |
 | `/potentials/` | `potentials/index.html` | **잠재력추천** — 빨강 · 초록 · 파랑 30칸 잠재력 빌드 게시판. 추천 캐릭터 · 포지션 필터, 추천 · 댓글(디스코드 로그인). API 는 팀원모집 함수를 같이 쓴다([잠재력추천](#잠재력추천)) |
+| `/videos/` | `videos/index.html` | **영상** — 유튜브 링크 게시판. 분류(하이라이트 · 공략 · 강의 · 매드무비 · 기타) · 캐릭터 필터, 추천 · 댓글 · 카톡 공유. 최신 강의는 홈에도 뜬다 |
 | `/recruit/` | `recruit/index.html` | **팀원모집** — 디스코드 로그인 · 방 만들기·가입(TNAB 봇과 같은 목록), 디스코드 알림 + 빈 음성채널 배정, 카카오톡 공유, 3시간 뒤 자동 삭제 |
 | `/discord/` | `discord/index.html` | 카카오 카드의 **디스코드** 버튼이 거쳐 가는 곳. `discord://` 앱 주소로 넘긴다 — `discord.com` 으로 곧장 보내면 브라우저에 세션이 없어 매번 로그인해야 한다. 서버 · 채널은 `data/recruit.json` 의 `discord` 에서 읽는다 |
 
@@ -20,7 +21,7 @@
 
 ```
 robots.txt              색인 허용 + /discord/ 제외 + sitemap 위치
-sitemap.xml             다섯 페이지. 새 페이지를 만들면 여기에도 넣는다
+sitemap.xml             여섯 페이지. 새 페이지를 만들면 여기에도 넣는다
 assets/og.jpg           1200x630 미리보기 이미지 (tools/og-image.py 가 생성)
 assets/icon.png         512x512 파비콘 · 홈 화면 아이콘 (같은 스크립트)
 index.html 의 ld+json   검색 결과의 사이트 이름 (WebSite 구조화 데이터)
@@ -311,7 +312,7 @@ publishable key 나 로그인 토큰으로는 표를 읽거나 쓸 수 없다. �
 4. **디스코드 로그인** — [Discord Developer Portal](https://discord.com/developers/applications) 의 애플리케이션 **OAuth2 > Redirects** 에
    `https://lgchgqxjjlapszmxarun.supabase.co/auth/v1/callback` 을 넣고 Client ID · Client Secret 을 복사한다.
    Supabase **Authentication > Sign In / Providers > Discord** 를 켜고 둘을 넣는다(이메일 없는 디스코드 계정도 되게 이메일 필수는 끈다).
-   **Authentication > URL Configuration** 의 Site URL 은 `https://nba-kor.github.io/recruit/`, Redirect URLs 에 `https://nba-kor.github.io/recruit/` · `https://nba-kor.github.io/potentials/` · `http://localhost:8000/recruit/` · `http://localhost:8000/potentials/`
+   **Authentication > URL Configuration** 의 Site URL 은 `https://nba-kor.github.io/recruit/`, Redirect URLs 에 `https://nba-kor.github.io/recruit/` · `https://nba-kor.github.io/potentials/` · `https://nba-kor.github.io/videos/` · `http://localhost:8000/recruit/` · `http://localhost:8000/potentials/` · `http://localhost:8000/videos/`
    (로그인은 누른 페이지로 돌아온다 — `assets/auth.js`. 목록에 없는 페이지는 Site URL 로 떨어진다).
    Client Secret 은 함수 비밀값이 아니다 — `.env` 에 두고 `secrets set` 으로 올리지 않는다.
 
@@ -509,6 +510,24 @@ supabase/migrations/20260928000000_potentials.sql  potential_builds · potential
 
 처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → 위 Redirect URLs 에 `/potentials/` 추가 → 함수 배포 → main 푸시.
 
+## 영상
+
+유튜브 링크 게시판. 잠재력추천과 같은 게시판 코드를 쓴다 — 서버는 `server/index.mjs` 의 `BOARDS`(게시판마다 표 이름 · 글 검증 · 필터),
+화면은 `assets/board.js`(로그인 표시 · 캐릭터 필터 · 목록 카드 · 글 머리 · 추천 · 댓글). 요청 모양도 `/api/builds` 와 같고 `/api/videos` 로 부른다.
+
+```
+videos/index.html · assets/videos.js         화면
+data/videos.json                             분류 목록 · 캐릭터 최대 수. 분류를 바꾸면 함수도 다시 배포한다
+supabase/migrations/20260929000000_videos.sql  videos · video_likes · video_comments + 추천 RPC
+```
+
+- 주소는 서버가 영상 id(11자)로 바꿔 저장한다(watch · youtu.be · shorts · live · embed). 같은 영상은 한 번만 올라간다(409).
+- 제목은 화면이 유튜브 oEmbed(CORS 허용)로 받아 미리 채운다. 서버는 유튜브에 묻지 않는다.
+- `GET /api/videos?cat=<분류>&limit=<n>` — 홈이 `cat=lecture&sort=new&limit=4` 로 "최신 강의" 를 그린다. 실패하거나 0개면 그 칸은 숨는다.
+- 카톡 공유는 피드 카드(유튜브 썸네일 `i.ytimg.com/vi/<id>/hqdefault.jpg`).
+
+처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → Redirect URLs 에 `/videos/` 추가 → `sh tools/deploy-api.sh` → main 푸시.
+
 ## 배포 전: 캐시 무효화
 
 ```sh
@@ -528,8 +547,8 @@ GitHub Pages 는 모든 파일에 `Cache-Control: max-age=600` 만 준다. 그�
 
 | 대상 | 파일 |
 | --- | --- |
-| 페이지 | `index.html`, `tactics/index.html`, `tiers/index.html`, `recruit/index.html`, `potentials/index.html` |
-| 자원 | `assets/style.css`, `app.js`, `auth.js`, `court.js`, `tactics.js`, `tiers.js`, `recruit.js`, `potentials.js` |
+| 페이지 | `index.html`, `tactics/index.html`, `tiers/index.html`, `recruit/index.html`, `potentials/index.html`, `videos/index.html` |
+| 자원 | `assets/style.css`, `app.js`, `auth.js`, `board.js`, `court.js`, `tactics.js`, `tiers.js`, `recruit.js`, `potentials.js`, `videos.js` |
 
 다른 스크립트가 import 하는 모듈은 import 구문에도 버전이 박히고, 그걸 박은 결과로 다시 해시를 낸다.
 `app.js` → `court.js` → `tactics.js` · `recruit.js` (그리고 `app.js` → `tiers.js`) 순으로 번지므로

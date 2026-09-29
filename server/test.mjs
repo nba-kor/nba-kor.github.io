@@ -1536,3 +1536,58 @@ dbTest('잠재력추천: 글 · 검증 · 필터 · 추천 · 댓글 · 권한',
   assert.deepEqual(await rows(`/potential_likes?build_id=eq.${id}`), [])
   await api('DELETE', `/api/builds/${c2.body.build.id}`, undefined, { as: b.as })
 })
+
+// ---------------------------------------------------------------- 영상
+
+dbTest('영상: 유튜브 주소 · 분류 · 중복 · 필터 · 추천 · 댓글 · 권한', async () => {
+  const { api } = start()
+  const a = { id: uid() }, b = { id: uid() }
+  a.as = web(a.id, '올린이'); b.as = web(b.id, '구경꾼')
+  // 실행마다 다른 영상 id — youtube 는 unique 라 지난 실행의 글과 겹치면 409
+  const vid = n => `${RUN.slice(-8)}${String(n).padStart(3, '_')}`
+  const V = { url: `https://youtu.be/${vid(1)}?t=30`, title: '픽앤롤 강의', category: 'lecture', chars: ['bl'], body: '' }
+
+  assert.deepEqual((await api('POST', '/api/videos', V)).body, LOGIN)
+  const bad = async (patch, msg) => {
+    const r = await api('POST', '/api/videos', { ...V, ...patch }, { as: a.as })
+    assert.equal(r.status, 400, r.text)
+    assert.match(r.body.error, msg)
+  }
+  await bad({ url: 'https://vimeo.com/123' }, /유튜브/)
+  await bad({ url: `https://youtube.com/watch?v=${vid(1)}x` }, /유튜브/)   // 12자
+  await bad({ category: 'nope' }, /분류/)
+  await bad({ chars: ['bl', 'bl'] }, /캐릭터/)
+  await bad({ title: '' }, /제목/)
+
+  // 주소 모양은 여러 가지 — 전부 같은 id 로
+  for (const [n, url] of [[2, `https://www.youtube.com/watch?feature=share&v=${vid(2)}`], [3, `m.youtube.com/shorts/${vid(3)}`], [4, `https://www.youtube.com/live/${vid(4)}?si=x`]]) {
+    const r = await api('POST', '/api/videos', { ...V, url, chars: [], category: 'highlight' }, { as: a.as })
+    assert.equal(r.status, 201, r.text)
+    assert.equal(r.body.video.youtube, vid(n))
+    assert.deepEqual(r.body.video.chars, [])
+  }
+  const c = await api('POST', '/api/videos', V, { as: a.as })
+  assert.equal(c.status, 201, c.text)
+  const id = c.body.video.id
+  assert.deepEqual([c.body.video.youtube, c.body.video.category, c.body.video.author], [vid(1), 'lecture', '올린이'])
+  assert.equal((await api('POST', '/api/videos', { ...V, url: `https://www.youtube.com/watch?v=${vid(1)}` }, { as: b.as })).status, 409)
+
+  // 목록: 분류 · 캐릭터 필터, limit
+  const list = async qs => (await api('GET', `/api/videos${qs}`)).body.videos
+  const lectures = await list('?cat=lecture&limit=2')
+  assert.equal(lectures[0].id, id)
+  assert.ok(lectures.length <= 2 && lectures.every(x => x.category === 'lecture'))
+  assert.ok((await list('?char=bl')).some(x => x.id === id))
+  assert.ok(!(await list('?cat=highlight')).some(x => x.id === id))
+
+  // 추천 · 댓글 · 권한은 잠재력추천과 같은 코드 — 한 번씩만
+  assert.deepEqual((await api('POST', `/api/videos/${id}/like`, undefined, { as: b.as })).body, { liked: true, likes: 1 })
+  assert.equal((await api('POST', `/api/videos/${id}/comments`, { body: '잘 봤어요' }, { as: b.as })).status, 201)
+  const d = (await api('GET', `/api/videos/${id}`, undefined, { as: b.as })).body
+  assert.deepEqual([d.liked, d.video.comments, d.comments[0].body], [true, 1, '잘 봤어요'])
+  assert.equal((await api('PUT', `/api/videos/${id}`, { ...V, title: '남의 글' }, { as: b.as })).status, 403)
+  assert.equal((await api('PUT', `/api/videos/${id}`, { ...V, title: '고친 제목' }, { as: a.as })).body.video.title, '고친 제목')   // 자기 영상 id 는 중복 아님
+  for (const x of await list('')) if (x.authorId === a.id) assert.equal((await api('DELETE', `/api/videos/${x.id}`, undefined, { as: a.as })).status, 200)
+  assert.equal((await api('GET', `/api/videos/${id}`)).status, 404)
+  assert.deepEqual(await rows(`/video_comments?video_id=eq.${id}`), [])
+})

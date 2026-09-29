@@ -18,10 +18,10 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const PAGES = ['index.html', 'tactics/index.html', 'tiers/index.html', 'recruit/index.html', 'potentials/index.html']
+const PAGES = ['index.html', 'tactics/index.html', 'tiers/index.html', 'recruit/index.html', 'potentials/index.html', 'videos/index.html']
 // import 되는 쪽이 먼저 와야 한다 — 그 해시를 import 구문에 심은 뒤에 import 하는 쪽의 해시를 낸다.
-//   app.js → court.js → tactics.js · recruit.js,   app.js → tiers.js · potentials.js,   auth.js → recruit.js · potentials.js
-const ASSETS = ['app.js', 'auth.js', 'court.js', 'style.css', 'tactics.js', 'tiers.js', 'recruit.js', 'potentials.js']
+//   app.js → court.js → tactics.js · recruit.js,   app.js → tiers.js,   app.js · auth.js → board.js → potentials.js · videos.js
+const ASSETS = ['app.js', 'auth.js', 'board.js', 'court.js', 'style.css', 'tactics.js', 'tiers.js', 'recruit.js', 'potentials.js', 'videos.js']
 
 const hash = s => createHash('sha256').update(s).digest('hex').slice(0, 8)
 /** 이미 붙어 있는 ?v= 를 떼어 스크립트를 몇 번 돌려도 같은 결과가 나오게 한다. */

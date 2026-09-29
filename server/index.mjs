@@ -14,6 +14,7 @@ import playersData from '../data/players.json' with { type: 'json' }
 import upcomingData from '../data/upcoming.json' with { type: 'json' }
 import tacticsData from '../data/tactics.json' with { type: 'json' }
 import potentialsData from '../data/potentials.json' with { type: 'json' }
+import videosData from '../data/videos.json' with { type: 'json' }
 import { channelUrl, createNotifier, errText, guildNick, voiceRooms } from './discord.mjs'
 
 // 한국 출시만. 공식 홈페이지보다 먼저 인게임에 나온 선수는 upcoming.json 에서 server 를 kr 로 바꿔 올린다
@@ -29,9 +30,12 @@ const AUTH_MEMO = { ms: 60_000, max: 500 }         // 로그인 토큰 확인 �
 const ROUTE_KINDS = ['move', 'pass', 'screen']
 const LINK = /:\/\/|www\.|discord\.gg/i
 const TEAM_ID = /^[A-Za-z0-9_-]{8}$/
-// 잠재력추천: /api/builds[/<id>[/like | /comments[/<댓글 id>]]]
-const BUILDS = /^\/api\/builds(?:\/(\d{1,15})(?:\/(like|comments)(?:\/(\d{1,15}))?)?)?$/
+// 게시판(잠재력추천 builds · 영상 videos): /api/<게시판>[/<id>[/like | /comments[/<댓글 id>]]]
+const BOARD_PATH = /^\/api\/(builds|videos)(?:\/(\d{1,15})(?:\/(like|comments)(?:\/(\d{1,15}))?)?)?$/
 const BUILD_CHARS = 5
+// 유튜브 주소 → 영상 id(11자). watch?v= · youtu.be · shorts · live · embed, www · m · music 서브도메인
+const YOUTUBE = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/
+const CATEGORIES = new Set(videosData.categories.map(c => c.id))
 const SNOWFLAKE = /^\d{17,20}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const CONTROL = /[\x00-\x1f\x7f]/
@@ -143,12 +147,31 @@ function tactic(v) {
   return { preset, name: b ? name || presetName || '커스텀 전술' : presetName, board: b }
 }
 
+const positionsOf = chars => [...new Set(chars.map(c => PLAYERS.get(c).pos))].sort()
+function charsOf(v, min, max, what) {
+  if (!listOf(v, max, min) || new Set(v).size !== v.length || !v.every(c => typeof c === 'string' && PLAYERS.has(c))) {
+    fail(400, min ? `${what}를 ${min}~${max}명 골라 주세요` : `${what}는 ${max}명까지 고를 수 있어요`)
+  }
+  return v
+}
+
+/** 영상 글: 유튜브 주소 · 제목 · 분류 · 나온 캐릭터 0~5명 · 설명 */
+function video(v) {
+  if (!isObj(v)) fail(400, '요청 형식이 잘못됐어요')
+  const youtube = typeof v.url === 'string' && YOUTUBE.exec(v.url.trim())?.[1]
+  if (!youtube) fail(400, '유튜브 영상 주소를 넣어 주세요')
+  if (!CATEGORIES.has(v.category)) fail(400, '분류를 골라 주세요')
+  const chars = charsOf(v.chars ?? [], 0, videosData.maxChars, '캐릭터')
+  return {
+    youtube, category: v.category, chars, positions: positionsOf(chars),
+    title: text(v.title, 60, '제목'), body: text(v.body ?? '', 1000, '설명', 0, true),
+  }
+}
+
 /** 잠재력 빌드 글. cat = data/potentials.json(능력치는 최대 레벨 기준). 칸은 비워 둘 수 있지만 한 칸은 채워야 한다 */
 function build(v, cat) {
   if (!isObj(v)) fail(400, '요청 형식이 잘못됐어요')
-  if (!listOf(v.chars, BUILD_CHARS, 1) || new Set(v.chars).size !== v.chars.length || !v.chars.every(c => typeof c === 'string' && PLAYERS.has(c))) {
-    fail(400, `추천 캐릭터를 1~${BUILD_CHARS}명 골라 주세요`)
-  }
+  charsOf(v.chars, 1, BUILD_CHARS, '추천 캐릭터')
   if (!isObj(v.slots)) fail(400, '잠재력을 넣어 주세요')
   const byId = new Map(cat.potentials.map(p => [p.id, p]))
   const slots = {}
@@ -166,7 +189,7 @@ function build(v, cat) {
   return {
     title: text(v.title, 40, '제목'),
     chars: v.chars,
-    positions: [...new Set(v.chars.map(c => PLAYERS.get(c).pos))].sort(),
+    positions: positionsOf(v.chars),
     body: text(v.body ?? '', 1000, '설명', 0, true),
     slots,
   }
@@ -376,43 +399,61 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     catch { fail(400, '요청 형식이 잘못됐어요') }
   }
 
-  // ------------------------------------------------ 잠재력추천 — 읽기는 공개, 쓰기 · 추천 · 댓글은 로그인
+  // ------------------------------------------------ 게시판(잠재력추천 · 영상) — 읽기는 공개, 쓰기 · 추천 · 댓글은 로그인
+  // 글 · 추천 · 댓글 표가 게시판마다 한 벌씩 있고 모양이 같다. 다른 것은 표 이름 · 글 검증 · 게시판만의 칸 · 목록 필터
 
-  const BUILD_LIST = 'id,author_name,title,chars,slots,likes,comments,created_at,updated_at'   // 목록 카드도 작은 판을 그린다(칸마다 id 뿐이라 작다)
-  const buildView = b => ({
-    id: b.id, authorId: b.author_id, author: b.author_name, title: b.title, chars: b.chars, body: b.body, slots: b.slots,
-    likes: b.likes, comments: b.comments, createdAt: b.created_at, updatedAt: b.updated_at,
-  })
-  const buildOf = async id => (await db(`/potential_builds?select=*&id=eq.${id}`))[0] || fail(404, '글을 찾을 수 없어요')
+  const BOARDS = {
+    builds: {
+      table: 'potential_builds', likes: 'potential_likes', comments: 'potential_comments', fk: 'build_id', rpc: ['potential_toggle_like', 'p_build'],
+      one: 'build', cols: 'slots', validate: v => build(v, potentials), extra: b => ({ slots: b.slots }),
+    },
+    videos: {
+      table: 'videos', likes: 'video_likes', comments: 'video_comments', fk: 'video_id', rpc: ['video_toggle_like', 'p_video'],
+      one: 'video', cols: 'youtube,category', validate: video, extra: b => ({ youtube: b.youtube, category: b.category }),
+      // ?cat=<분류> — 홈의 "최신 강의"
+      filter: q => CATEGORIES.has(q.get('cat')) ? `&category=eq.${q.get('cat')}` : '',
+      // 같은 영상은 한 번만(youtube unique). 동시에 두 번 올리면 unique 위반이 500 으로 난다 — ponytail: 드물어서 미리 한 번 보는 것으로 충분
+      async unique(v, id) {
+        const [dup] = await db(`/videos?select=id&youtube=eq.${v.youtube}${id ? `&id=neq.${id}` : ''}`)
+        if (dup) fail(409, '이미 올라온 영상이에요')
+      },
+    },
+  }
   const nameOf = async user => (await mine(user))?.discord_name ?? user.name
 
-  async function builds(request, [, id, sub, cid], t) {
-    const { searchParams: q } = new URL(request.url), method = request.method
-    const action = [method, id && 'build', sub, cid && 'comment'].filter(Boolean).join(' ')
-    const known = ['GET', 'POST', 'GET build', 'PUT build', 'DELETE build', 'POST build like', 'POST build comments', 'DELETE build comments comment']
+  async function board(request, [, kind, id, sub, cid], t) {
+    const B = BOARDS[kind], { searchParams: q } = new URL(request.url), method = request.method
+    const action = [method, id && 'item', sub, cid && 'comment'].filter(Boolean).join(' ')
+    const known = ['GET', 'POST', 'GET item', 'PUT item', 'DELETE item', 'POST item like', 'POST item comments', 'DELETE item comments comment']
     if (!known.includes(action)) fail(404, '없는 주소예요')
+    const view = b => ({
+      id: b.id, authorId: b.author_id, author: b.author_name, title: b.title, chars: b.chars, body: b.body,
+      likes: b.likes, comments: b.comments, createdAt: b.created_at, updatedAt: b.updated_at, ...B.extra(b),
+    })
+    const itemOf = async id => (await db(`/${B.table}?select=*&id=eq.${id}`))[0] || fail(404, '글을 찾을 수 없어요')
 
-    if (action === 'GET') {   // ?char=<id> · ?pos=1~5 · ?sort=new(기본)|likes
-      const char = q.get('char'), pos = q.get('pos')
+    if (action === 'GET') {   // ?char=<id> · ?pos=1~5 · ?sort=new(기본)|likes · ?limit=1~100 (+ 게시판별 필터)
+      const char = q.get('char'), pos = q.get('pos'), limit = Math.min(MAX_LIST, Math.max(1, +q.get('limit') || MAX_LIST))
       const order = q.get('sort') === 'likes' ? 'likes.desc,id.desc' : 'id.desc'
-      const rows = await db(`/potential_builds?select=${BUILD_LIST}`
+      const rows = await db(`/${B.table}?select=id,author_id,author_name,title,chars,likes,comments,created_at,updated_at,${B.cols}`
         + (char && PLAYERS.has(char) ? `&chars=cs.${enc(`{${char}}`)}` : '')
         + (/^[1-5]$/.test(pos || '') ? `&positions=cs.${enc(`{${pos}}`)}` : '')
-        + `&order=${order}&limit=${MAX_LIST}`)
-      return [200, { builds: rows.map(buildView) }]
+        + (B.filter?.(q) || '')
+        + `&order=${order}&limit=${limit}`)
+      return [200, { [kind]: rows.map(view) }]
     }
-    if (action === 'GET build') {
+    if (action === 'GET item') {
       const [b, comments] = await Promise.all([
-        buildOf(id), db(`/potential_comments?select=id,author_id,author_name,body,created_at&build_id=eq.${id}&order=id.asc`),
+        itemOf(id), db(`/${B.comments}?select=id,author_id,author_name,body,created_at&${B.fk}=eq.${id}&order=id.asc`),
       ])
       // 로그인 토큰을 붙여 부르면 내가 추천했는지도 준다. 토큰이 틀려도 글은 보여 준다
       let liked = false
       if (request.headers.has('authorization')) {
         const user = await identity(request).catch(() => null)
-        liked = !!user && (await db(`/potential_likes?select=user_id&build_id=eq.${id}&user_id=eq.${user.id}`)).length > 0
+        liked = !!user && (await db(`/${B.likes}?select=user_id&${B.fk}=eq.${id}&user_id=eq.${user.id}`)).length > 0
       }
       return [200, {
-        build: buildView(b), liked,
+        [B.one]: view(b), liked,
         comments: comments.map(c => ({ id: c.id, authorId: c.author_id, author: c.author_name, body: c.body, createdAt: c.created_at })),
       }]
     }
@@ -423,36 +464,38 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
 
     switch (action) {
       case 'POST': {
-        const v = build(await readJson(request), potentials)
-        const [b] = await db('/potential_builds', {
+        const v = B.validate(await readJson(request))
+        await B.unique?.(v)
+        const [b] = await db(`/${B.table}`, {
           method: 'POST', prefer: 'return=representation', body: { ...v, author_id: user.id, author_name: await nameOf(user), created_at: t, updated_at: t },
         })
-        return [201, { build: buildView(b) }]
+        return [201, { [B.one]: view(b) }]
       }
-      case 'PUT build': {
-        const v = build(await readJson(request), potentials)
-        mineOrAdmin((await buildOf(id)).author_id, '글')
-        await db(`/potential_builds?id=eq.${id}`, { method: 'PATCH', body: { ...v, author_name: await nameOf(user), updated_at: t } })
-        return [200, { build: buildView(await buildOf(id)) }]
+      case 'PUT item': {
+        const v = B.validate(await readJson(request))
+        mineOrAdmin((await itemOf(id)).author_id, '글')
+        await B.unique?.(v, id)
+        await db(`/${B.table}?id=eq.${id}`, { method: 'PATCH', body: { ...v, author_name: await nameOf(user), updated_at: t } })
+        return [200, { [B.one]: view(await itemOf(id)) }]
       }
-      case 'DELETE build':
-        mineOrAdmin((await buildOf(id)).author_id, '글')
-        await db(`/potential_builds?id=eq.${id}`, { method: 'DELETE' })   // 추천 · 댓글은 cascade
+      case 'DELETE item':
+        mineOrAdmin((await itemOf(id)).author_id, '글')
+        await db(`/${B.table}?id=eq.${id}`, { method: 'DELETE' })   // 추천 · 댓글은 cascade
         return [200, { ok: true }]
-      case 'POST build like':
-        await buildOf(id)   // 없는 글이면 여기서 404(RPC 의 PT404 는 팀 문구라 동시 삭제 때만 난다)
-        return [200, await db('/rpc/potential_toggle_like', { method: 'POST', body: { p_build: +id, p_user: user.id } })]
-      case 'POST build comments': {
+      case 'POST item like':
+        await itemOf(id)   // 없는 글이면 여기서 404(RPC 의 PT404 는 팀 문구라 동시 삭제 때만 난다)
+        return [200, await db(`/rpc/${B.rpc[0]}`, { method: 'POST', body: { [B.rpc[1]]: +id, p_user: user.id } })]
+      case 'POST item comments': {
         const v = await readJson(request)
         const body = text(isObj(v) ? v.body : null, 500, '댓글', 1, true)
-        await buildOf(id)
-        await db('/potential_comments', { method: 'POST', body: { build_id: +id, author_id: user.id, author_name: await nameOf(user), body, created_at: t } })
+        await itemOf(id)
+        await db(`/${B.comments}`, { method: 'POST', body: { [B.fk]: +id, author_id: user.id, author_name: await nameOf(user), body, created_at: t } })
         return [201, { ok: true }]
       }
-      case 'DELETE build comments comment': {
-        const [c] = await db(`/potential_comments?select=author_id&id=eq.${cid}&build_id=eq.${id}`)
+      case 'DELETE item comments comment': {
+        const [c] = await db(`/${B.comments}?select=author_id&id=eq.${cid}&${B.fk}=eq.${id}`)
         mineOrAdmin((c || fail(404, '댓글을 찾을 수 없어요')).author_id, '댓글')
-        await db(`/potential_comments?id=eq.${cid}`, { method: 'DELETE' })
+        await db(`/${B.comments}?id=eq.${cid}`, { method: 'DELETE' })
         return [200, { ok: true }]
       }
     }
@@ -461,8 +504,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   async function route(request) {
     const { pathname } = new URL(request.url)
     const method = request.method
-    const b = pathname.match(BUILDS)
-    if (b) return builds(request, b, now())
+    const b = pathname.match(BOARD_PATH)
+    if (b) return board(request, b, now())
     if (pathname === '/api/health' && method === 'GET') {
       return [200, { ok: true, voice: !!(env.DISCORD_BOT_TOKEN && env.DISCORD_GUILD_ID), login: !!publishable }]
     }

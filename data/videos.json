@@ -1,0 +1,10 @@
+{
+  "maxChars": 5,
+  "categories": [
+    { "id": "highlight", "name": "하이라이트" },
+    { "id": "guide", "name": "공략" },
+    { "id": "lecture", "name": "강의" },
+    { "id": "mad", "name": "매드무비" },
+    { "id": "etc", "name": "기타" }
+  ]
+}
