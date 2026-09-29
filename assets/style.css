@@ -776,3 +776,12 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .tc-meta b { color: var(--text); }
 .tc-like[aria-pressed="true"] { background: var(--accent); color: #1a1200; border-color: transparent; font-weight: 700; }
 .top .rc-auth .rc-uname { max-width: 10ch; }
+
+/* 팀원모집: 참가 캐릭터 고르기 (내 프로필 카드 아래 줄) */
+.rc-mecard > .rc-playas { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.rc-playas > span { font-size: 12px; font-weight: 700; color: var(--muted); margin-right: 2px; }
+.rc-mecard .rc-playas button { margin: 0; display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; font-weight: 700; }
+.rc-mecard .rc-playas img { width: 26px; height: 26px; box-shadow: none; }
+.rc-mecard .rc-playas small { display: inline; margin-right: 4px; font-size: 11px; }
+.rc-mecard .rc-playas button[aria-pressed="true"] { background: var(--accent); color: #1a1200; border-color: transparent; }
+.rc-mecard .rc-playas button[aria-pressed="true"] small { color: #1a1200; opacity: .7; }

@@ -131,6 +131,21 @@ async function ready(again, why) {
   return me
 }
 
+// 이번 파티에 어떤 캐릭터로 들어가는지 — 프로필 entries 의 몇 번째 줄(0 = 대표). 만들기 · 가입이 같이 쓴다
+let playAs = 0
+
+/** 캐릭터가 2줄 이상이면 「참가 캐릭터」 버튼 — 대표 / 서브(같은 계정 다른 캐릭터) / 부계정 */
+function playAsPicker(entries) {
+  if (entries.length < 2) return null
+  const kind = (e, i) => !i ? '대표' : e.nick === entries[0].nick ? '서브' : '부계정'
+  return h('div', { className: 'rc-playas', role: 'group', 'aria-label': '참가 캐릭터' },
+    h('span', {}, '참가 캐릭터'),
+    entries.map((e, i) => h('button', {
+      type: 'button', 'aria-pressed': i === playAs, title: `${e.nick} · ${e.tier} · ${charLine(e)}`,
+      onclick: () => { playAs = i; renderMeCards() },
+    }, h('img', { src: faceOf(P(e.char)), alt: '' }), h('span', {}, h('small', {}, kind(e, i)), P(e.char).short || P(e.char).name))))
+}
+
 /** 팀장 정보 · 가입 폼에 들어가는 "내 프로필" 요약 */
 function meCard() {
   const box = h('div', { className: 'rc-mecard' })
@@ -141,17 +156,21 @@ function meCard() {
   else if (auth === 'error') box.append(h('p', { className: 'rc-muted rc-bad' }, '로그인 정보를 확인하지 못했어요.'), act('다시 시도', loadMe))
   else if (!me.profile) box.append(h('p', { className: 'rc-muted' }, h('b', {}, me.user.name), ' 님, 게임 계정과 마이크를 적은 프로필을 먼저 등록해 주세요.'), act('프로필 등록', () => openProfile()))
   else {
-    const e = me.profile.entries[0], p = P(e.char), n = me.profile.entries.length - 1
+    const e = me.profile.entries[playAs], p = P(e.char), n = me.profile.entries.length - 1
     box.append(h('img', { src: faceOf(p), alt: '' }),
       h('div', {},
         h('div', { className: 'rc-acct-name' }, h('b', {}, myName()), micTag(me.profile.mic)),
         h('small', {}, `${e.nick} · ${e.tier} · ${charLine(e)}${n ? ` 외 ${n}개` : ''}`)),
-      act('프로필 수정', () => openProfile()))
+      act('프로필 수정', () => openProfile()),
+      playAsPicker(me.profile.entries))
   }
   return box
 }
 const micTag = on => h('span', { className: `rc-tag ${on ? 'mic-on' : 'mic-no'}` }, on ? '마이크 O' : '마이크 X')
-const renderMeCards = () => { for (const s of document.querySelectorAll('[data-mecard]')) s.replaceChildren(meCard()) }
+const renderMeCards = () => {
+  if (playAs >= (me?.profile?.entries.length || 0)) playAs = 0   // 프로필을 고쳐 줄이 줄었으면 대표로
+  for (const s of document.querySelectorAll('[data-mecard]')) s.replaceChildren(meCard())
+}
 
 // ---------------------------------------------------------------- 코트 (보기 전용)
 
@@ -601,7 +620,7 @@ function createForm() {
     const res = await submit(form, async () => {
       const cur = await ready(again, '팀을 만들기 전에 프로필을 먼저 등록해 주세요')
       if (!cur || (cur.teamId && !confirm(MOVE_ASK))) return null
-      try { return await api('/teams', { method: 'POST', withToken: true, body: { room, tactic } }) }
+      try { return await api('/teams', { method: 'POST', withToken: true, body: { room, tactic, entry: playAs } }) }
       catch (e) { if (e.status === 428) { openProfile(again, e.message); return null } throw e }
     })
     if (!res) return
@@ -746,7 +765,7 @@ async function showTeam(id) {
             h('img', { src: faceOf(p), alt: '' }),
             h('div', {},
               h('div', { className: 'rc-acct-name' }, h('b', {}, e.nick), h('span', { className: 'rc-tier', 'data-tier': e.tier }, e.tier),
-                !i && m.entries.length > 1 && h('span', { className: 'rc-main' }, '대표')),
+                !i && m.entries.length > 1 && h('span', { className: 'rc-main', title: '이 파티에서 쓰는 캐릭터' }, '참가')),
               h('small', {}, h('span', { className: `rc-pos pos-${p.pos}` }, POS[p.pos] || '?'), p.name)))
         })))
     })
@@ -883,7 +902,7 @@ async function showTeam(id) {
       const cur = await ready(again, '팀에 가입하기 전에 프로필을 먼저 등록해 주세요')
       if (!cur || mine()) return null
       if (cur.teamId && cur.teamId !== team.id && !confirm(MOVE_ASK)) return null
-      try { return await api(`/teams/${team.id}/members`, { method: 'POST', withToken: true }) }
+      try { return await api(`/teams/${team.id}/members`, { method: 'POST', withToken: true, body: { entry: playAs } }) }
       catch (e) {
         if (e.status === 428) { openProfile(again, e.message); return null }
         failed = true

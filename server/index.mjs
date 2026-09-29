@@ -208,6 +208,9 @@ function build(v, cat) {
   }
 }
 
+/** 이 파티에서 쓰는 줄(entry)을 맨 앞으로. 프로필을 고쳐 그 줄이 없어졌으면 대표 그대로 */
+const playing = (entries, i) => i > 0 && i < entries.length ? [entries[i], ...entries.filter((_, k) => k !== i)] : entries
+
 // ---------------------------------------------------------------- Supabase Data API (PostgREST)
 
 /**
@@ -253,7 +256,7 @@ function supabase({ url = '', key = '', fetch, log }) {
 }
 
 // 팀원은 팀장 먼저, 들어온 순. 이름 · 마이크 · 계정은 프로필을 조인한다 — 프로필을 고치면 파티에도 바로 보인다. auth_user_id 는 고르지 않는다
-const MEMBERS = 'members:recruit_members(discord_user_id,leader,joined_at,profile:recruit_profiles(discord_name,mic,entries))'
+const MEMBERS = 'members:recruit_members(discord_user_id,leader,joined_at,entry,profile:recruit_profiles(discord_name,mic,entries))'
   + '&members.order=leader.desc,joined_at.asc,discord_user_id.asc'
 
 // ---------------------------------------------------------------- API
@@ -339,7 +342,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   // 목록 행은 tactic 대신 preset · name 만 온다.
   function view(t) {
     const members = t.members.map(m => ({
-      userId: m.discord_user_id, name: m.profile.discord_name, mic: m.profile.mic, entries: m.profile.entries, leader: m.leader, joinedAt: m.joined_at,
+      userId: m.discord_user_id, name: m.profile.discord_name, mic: m.profile.mic, entries: playing(m.profile.entries, m.entry), leader: m.leader, joinedAt: m.joined_at,
     }))
     return {
       id: t.id,
@@ -376,8 +379,17 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   /** 만들기 · 가입 전: 프로필 확인(없으면 428 — RPC 도 잠금 안에서 다시 확인한다)과, 1인 1파티로 빠질 기존 팀의 스냅샷(알림용) */
   async function current(user, t) {
     const p = await mine(user) || fail(428, NO_PROFILE)
-    return p.member ? findTeam(p.member.team_id, t) : null
+    return { old: p.member ? await findTeam(p.member.team_id, t) : null, entries: p.entries.length }
   }
+
+  /** 어떤 캐릭터(프로필 몇 번째 줄)로 들어가는지. 안 보내면 대표(0) — 봇 · 옛 화면 */
+  const entryOf = (body, entries) => {
+    const e = isObj(body) && body.entry != null ? body.entry : 0
+    if (!Number.isInteger(e) || e < 0 || e >= entries) fail(400, '참가할 캐릭터를 다시 골라 주세요')
+    return e
+  }
+  // 만들기 · 가입 RPC 뒤에, 알림용 팀 모양을 읽기 전에 적는다. 대표면 기본값(0) 그대로라 부르지 않는다
+  const setEntry = (teamId, user, entry) => entry && db(`/recruit_members?team_id=eq.${enc(teamId)}&discord_user_id=eq.${user.id}`, { method: 'PATCH', body: { entry } })
 
   // 1인 1파티로 빠진 기존 팀 알림. 스냅샷은 RPC 전에 읽은 것 — 그 사이 다른 팀으로 바뀌었으면(드묾) 알림만 건너뛴다
   function leftNotice(left, old, userId) {
@@ -387,10 +399,11 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     else if (me) notifier.memberLeft({ ...before, members: before.members.filter(m => m !== me) }, me, 'move')
   }
 
-  async function join(id, user, old, t) {
+  async function join(id, user, old, t, entry = 0) {
     // 만료 · 이미 이 팀 · 정원 확인, 기존 팀에서 빠지기, INSERT 를 RPC 가 전역 잠금 안에서 한 트랜잭션으로 한다 —
     // 여러 요청이 동시에 와도 정원을 넘지 않고, 같은 사람이 두 팀에 남지 않는다
     const { left, count } = await db('/rpc/recruit_join_team', { method: 'POST', body: { p_team: id, p_actor: user.id, p_now: t, p_size: CFG.teamSize } })
+    await setEntry(id, user, entry)
     const team = view(await teamOf(id, t))
     leftNotice(left, old, user.id)
     notifier.memberJoined(team, user.id, count)
@@ -552,7 +565,9 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const user = await identity(request)
     // 쓰기는 신원을 확인한 뒤 사람 단위로 센다 — 로그인 · 봇 키 없이 온 요청은 여기까지 못 와서 남의 한도를 태우지 못한다
     if (method !== 'GET' && await hit(`w ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
-    const body = action === 'POST' || action === 'PUT me profile' ? await readJson(request) : null   // 나머지는 본문을 읽지 않는다
+    // 가입은 본문이 없어도 된다(봇 · 옛 화면) — JSON 으로 { entry } 를 보낼 때만 읽는다. 나머지는 본문을 읽지 않는다
+    const joinBody = action === 'POST team members' && JSON_TYPE.test(request.headers.get('content-type') || '')
+    const body = action === 'POST' || action === 'PUT me profile' || joinBody ? await readJson(request) : null
 
     switch (action) {
       case 'GET me': {
@@ -574,7 +589,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       case 'POST': {
         if (!isObj(body)) fail(400, '요청 형식이 잘못됐어요')
         const r = room(body.room), tac = tactic(body.tactic)
-        const [old, candidates] = await Promise.all([current(user, t), rooms()])
+        const [{ old, entries }, candidates] = await Promise.all([current(user, t), rooms()])
+        const entry = entryOf(body, entries)
         const teamId = randomBytes(6).toString('base64url'), at = now()
         // 방 고르기(끝 방부터, 만료 전 팀이 안 잡은 첫 방) · 만료된 팀 청소 · 기존 팀에서 빠지기 · 팀 + 팀장 저장을 RPC 가 전역 잠금 안에서
         // 한 트랜잭션으로 한다 — 워커가 여럿이어도 두 팀이 같은 방을 받지 않고, 한 사람이 두 팀에 남지 않는다
@@ -582,17 +598,20 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
           method: 'POST',
           body: { p_id: teamId, p_actor: user.id, p_room: r, p_tactic: tac, p_rooms: candidates, p_now: at, p_expires_at: at + TTL },
         })
+        await setEntry(teamId, user, entry)
         const team = view(await teamOf(teamId, at))
         leftNotice(left, old, user.id)
         notifier.teamCreated(team)
         return [201, { team, left }]
       }
 
-      case 'POST team members':
-        return [201, await join(id, user, await current(user, t), t)]
+      case 'POST team members': {
+        const { old, entries } = await current(user, t)
+        return [201, await join(id, user, old, t, entryOf(body, entries))]
+      }
 
       case 'POST quick': {   // 봇의 "빠른 참가": 가장 오래된 모집 중 팀(내 팀 제외). 고르는 사이 차거나 없어진 팀은 건너뛴다
-        const old = await current(user, t)
+        const { old } = await current(user, t)
         const open = await db(`/recruit_teams?select=id&${live(t)}&recruit_member_count=lt.${CFG.teamSize}`
           + `${old ? `&id=neq.${enc(old.id)}` : ''}&order=created_at.asc,id.asc&limit=5`)
         for (const row of open) {

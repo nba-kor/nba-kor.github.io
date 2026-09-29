@@ -483,6 +483,13 @@ K=local-dev-tnab-bot-key-0916-not-a-secret-xxxxxxxx
 curl -s -H "Authorization: Bot $K" -H 'X-Discord-User: 100000000000000001' -H 'X-Discord-Name: %EB%B3%B4%EB%85%B8' http://localhost:8000/api/me
 ```
 
+### 서브 캐릭터로 참가
+
+프로필에 캐릭터가 2줄 이상이면 팀 만들기 · 가입 카드에 「참가 캐릭터」 버튼(대표 / 서브 / 부계정)이 나온다. 고른 줄 번호가
+`POST /api/teams` · `POST /api/teams/<id>/members` 의 `{ entry }` 로 가고 `recruit_members.entry` 에 저장된다(안 보내면 0 = 대표 — 봇 · 옛 화면).
+API 가 팀을 보여 줄 때 그 줄을 `entries` 맨 앞으로 옮기므로 웹 · 디스코드 알림 · 카톡 카드 · TNAB 봇은 고칠 곳 없이 고른 캐릭터를 보여 준다.
+프로필에서 그 줄을 지우면 대표로 보인다. 마이그레이션 `20261001000000_recruit_entry.sql` 을 **함수 배포보다 먼저** 넣는다(팀 조회가 entry 칸을 읽는다).
+
 ## 잠재력추천
 
 잠재력 빌드 게시판. 따로 서버를 두지 않고 팀원모집 함수(`server/index.mjs`)의 `/api/builds` 로 같이 돈다 — 로그인 · 요청 수 제한 · DB 원칙이 같다.

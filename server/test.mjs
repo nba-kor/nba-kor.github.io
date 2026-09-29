@@ -914,6 +914,36 @@ dbTest('빠른 참가: 가장 오래된 모집 중 팀(내 팀 · 다 찬 팀 ·
   assert.equal((await quick(api, c)).body.team.members[0].userId, l4.id)
 })
 
+dbTest('서브 캐릭터로 만들기 · 가입: 그 줄이 팀에서 맨 앞(entries[0]) · 없는 줄은 400 · 안 보내면 대표 · 프로필에서 그 줄이 빠지면 대표로', async () => {
+  const { api, idle, hooks } = start()
+  const two = n => [entry({ nick: `본${n}`, char: 'bl' }), entry({ nick: `부${n}`, char: 'bk', tier: '다이아' })]
+  const lead = await person(api, { entries: two('a') }), mate = await person(api, { entries: two('b') }), plain = await person(api)
+
+  const c = await api('POST', '/api/teams', { room: ROOM, tactic: { preset: 'pnr' }, entry: 1 }, { as: lead.as })
+  assert.equal(c.status, 201, c.text)
+  assert.deepEqual(c.body.team.members[0].entries.map(e => e.char), ['bk', 'bl'])
+  const T = teamApi(api, c.body.team.id)
+
+  for (const bad of [2, -1, 1.5, '1']) {
+    const r = await api('POST', `/api/teams/${c.body.team.id}/members`, { entry: bad }, { as: mate.as })
+    assert.deepEqual([r.status, r.body.error], [400, '참가할 캐릭터를 다시 골라 주세요'], String(bad))
+  }
+  assert.equal((await api('POST', `/api/teams/${c.body.team.id}/members`, { entry: 1 }, { as: plain.as })).status, 400)   // 한 줄짜리 프로필
+  const j = await api('POST', `/api/teams/${c.body.team.id}/members`, { entry: 1 }, { as: mate.as })
+  assert.equal(j.status, 201, j.text)
+  assert.equal((await T.join(plain)).status, 201)   // 본문 없이 = 대표
+  const team = (await T.get()).body
+  assert.deepEqual(team.members.map(m => m.entries[0].nick), ['부a', '부b', `n${plain.id.slice(-5)}`])
+  await idle()
+  const [started, joined] = hooks().map(x => x.embeds[0].description)
+  assert.match(started, /\(다이아\) · SG 데빈 부커/)   // 알림도 고른 캐릭터로 — 모집 시작(팀장) · 합류(팀원)
+  assert.match(joined, /\(다이아\) · SG 데빈 부커/)
+
+  // 프로필에서 부계정 줄을 지우면 그 파티에서는 대표로 보인다
+  assert.equal((await api('PUT', '/api/me/profile', { mic: true, entries: two('b').slice(0, 1) }, { as: mate.as })).status, 200)
+  assert.equal((await T.get()).body.members[1].entries[0].nick, '본b')
+})
+
 dbTest('1인 1파티: 팀원이 다른 팀에 가입하거나 팀을 만들면 기존 팀에서만 빠진다(left · 이탈 알림)', async () => {
   const { api, idle, hooks } = start()
   const l1 = await person(api), l2 = await person(api, { kind: 'bot' }), a = await person(api), b = await person(api, { kind: 'bot' })
