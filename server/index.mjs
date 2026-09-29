@@ -43,6 +43,7 @@ const JSON_TYPE = /^application\/json\b/i
 // 받는 요청 — 메서드 + 경로 조각. 예: 'POST team members' = 가입, 'DELETE team members member' = 방출 · 나가기
 const ACTIONS = new Set([
   'GET me', 'PUT me profile', 'GET', 'POST', 'POST quick', 'GET team', 'DELETE team', 'POST team members', 'DELETE team members member', 'POST team extend',
+  'PUT team', 'PUT team members member',   // 팀 정보 수정(팀장) · 참가 캐릭터 바꾸기(본인)
 ])
 // 브라우저는 authorization · content-type 만 보낸다(커스텀 x- 헤더는 운영 게이트웨이 preflight 에서 잘릴 수 있다). 봇의 x-discord-* 는 서버끼리라 preflight 가 없다
 const PREFLIGHT = { 'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '600' }
@@ -569,7 +570,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (method !== 'GET' && await hit(`w ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
     // 가입은 본문이 없어도 된다(봇 · 옛 화면) — JSON 으로 { entry } 를 보낼 때만 읽는다. 나머지는 본문을 읽지 않는다
     const joinBody = action === 'POST team members' && JSON_TYPE.test(request.headers.get('content-type') || '')
-    const body = action === 'POST' || action === 'PUT me profile' || joinBody ? await readJson(request) : null
+    const body = ['POST', 'PUT me profile', 'PUT team', 'PUT team members member'].includes(action) || joinBody ? await readJson(request) : null
 
     switch (action) {
       case 'GET me': {
@@ -635,6 +636,23 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         if (!isLeader(view(await teamOf(id, t)), user)) fail(403, '팀장만 연장할 수 있어요')
         // 남은 시간을 더하지 않고 지금부터 다시 TTL — 연장해도 최대 3시간
         await db(`/recruit_teams?id=eq.${enc(id)}&expires_at=gt.${t}`, { method: 'PATCH', body: { expires_at: t + TTL } })
+        return [200, { team: view(await teamOf(id, t)) }]
+      }
+
+      case 'PUT team': {   // 팀 정보 수정 — 방 설정은 통째로, 전술은 보냈을 때만 바꾼다(안 보내면 그대로). 음성채널 · 팀원 · 남은 시간은 그대로
+        if (!isObj(body)) fail(400, '요청 형식이 잘못됐어요')
+        if (!isLeader(view(await teamOf(id, t)), user)) fail(403, '팀장만 팀 정보를 고칠 수 있어요')
+        const patch = { room: room(body.room), ...(body.tactic !== undefined && { tactic: tactic(body.tactic) }) }
+        await db(`/recruit_teams?id=eq.${enc(id)}&expires_at=gt.${t}`, { method: 'PATCH', body: patch })
+        return [200, { team: view(await teamOf(id, t)) }]
+      }
+
+      case 'PUT team members member': {   // 참가 캐릭터 바꾸기 — 본인만. { entry } = 프로필 몇 번째 줄
+        if (userId !== user.id) fail(403, '내 캐릭터만 바꿀 수 있어요')
+        const before = view(await teamOf(id, t))
+        if (!before.members.some(m => m.userId === user.id)) fail(404, '팀원을 찾을 수 없어요')
+        const entry = entryOf(body, (await mine(user))?.entries.length || 0)
+        await db(`/recruit_members?team_id=eq.${enc(id)}&discord_user_id=eq.${user.id}`, { method: 'PATCH', body: { entry } })
         return [200, { team: view(await teamOf(id, t)) }]
       }
 

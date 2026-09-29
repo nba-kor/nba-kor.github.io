@@ -827,6 +827,37 @@ dbTest('검증(DB): 코드포인트 길이 · 공백 자르기 · 모르는 필�
   })
 })
 
+dbTest('팀 정보 수정(팀장만 · 방 설정 통째로 · 전술은 보냈을 때만) · 참가 캐릭터 바꾸기(본인만)', async () => {
+  const { api } = start()
+  const two = n => [entry({ nick: `본${n}`, char: 'bl' }), entry({ nick: `부${n}`, char: 'bk' })]
+  const lead = await person(api, { entries: two('a') }), mate = await person(api, { entries: two('b') })
+  const c = await create(api, lead)
+  const id = c.body.team.id, T = teamApi(api, id)
+  assert.equal((await T.join(mate)).status, 201)
+  const put = (who, body, path = '') => api('PUT', `/api/teams/${id}${path}`, body, { as: who.as })
+
+  const room = { title: '바뀐 제목', mic: 'off', mode: 'serious', memo: '둘째 줄\n메모' }
+  assert.equal((await put(mate, { room })).status, 403)
+  assert.equal((await put(lead, { room: { ...room, mic: 'x' } })).status, 400)
+  const e = await put(lead, { room })
+  assert.equal(e.status, 200, e.text)
+  assert.deepEqual(e.body.team.room, room)
+  assert.equal(e.body.team.tactic.preset, 'pnr')                            // 전술을 안 보내면 그대로
+  assert.equal(e.body.team.members.length, 2)                               // 팀원 · 음성채널 · 남은 시간은 그대로
+  assert.equal(e.body.team.expiresAt, c.body.team.expiresAt)
+  assert.equal((await put(lead, { room, tactic: { preset: 'iso' } })).body.team.tactic.name, '아이솔레이션')
+  assert.equal((await put(lead, { room, tactic: null })).body.team.tactic.name, '')   // 전술 자유로
+
+  // 캐릭터: 본인만, 프로필에 있는 줄만. 0 으로 되돌릴 수도 있다
+  const me = `/members/${mate.id}`
+  assert.equal((await put(lead, { entry: 1 }, me)).status, 403)
+  assert.equal((await put(mate, { entry: 2 }, me)).status, 400)
+  assert.equal((await put(mate, { entry: 1 }, me)).body.team.members[1].entries[0].nick, '부b')
+  assert.equal((await put(mate, { entry: 0 }, me)).body.team.members[1].entries[0].nick, '본b')
+  assert.equal((await put(lead, { entry: 1 }, `/members/${lead.id}`)).body.team.members[0].entries[0].nick, '부a')
+  assert.equal((await put(mate, { entry: 1 }, '/members/1')).status, 403)   // 남의 줄
+})
+
 dbTest('팀 전술에 커스텀 전술 번호: 보드와 같이 오면 저장 · 보드 없으면 버림 · 숫자가 아니면 400', async () => {
   const { api } = start()
   const board = { tokens: [boardToken()] }

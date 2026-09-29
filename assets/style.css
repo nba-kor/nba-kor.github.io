@@ -796,3 +796,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-acct-pick { width: 100%; text-align: left; padding: 8px 10px; border-radius: 12px; }
 .rc-acct-pick[aria-pressed="true"] { border-color: var(--accent); background: #f5a6231a; }
 @media (max-width: 560px) { .rc-accts-dialog { width: 100%; height: fit-content; max-height: 86dvh; } }
+
+/* 로스터: 「캐릭터 N개 보기」 · 「캐릭터 변경」 */
+.rc-acct-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.rc-acct-btns .rc-more-accts { margin-top: 8px; }

@@ -562,12 +562,11 @@ function showList() {
   setInterval(() => document.hidden || refresh(), 60000)
   document.addEventListener('visibilitychange', () => document.hidden || refresh())
 
-  let built = false
   const sec = $('#create'), open = $('#new-team')
   meSubs.push(renderMeCards)
   open.onclick = async () => {
     if (!await ready(open.onclick, '팀을 만들기 전에 프로필을 먼저 등록해 주세요').catch(e => alert(e.message))) return
-    if (!built) { createForm(); built = true }
+    ensureCreateForm()
     renderMeCards()
     sec.hidden = false
     open.hidden = true
@@ -615,6 +614,43 @@ function roomForm() {
   }
 }
 
+// 팀 만들기 폼은 팀 정보 수정에도 쓴다(팀 화면으로 옮겨 붙인다) — 핸들러는 한 번만 건다
+let createBuilt = false
+const ensureCreateForm = () => { if (!createBuilt) { createForm(); createBuilt = true } }
+let editing = null   // 팀 정보 수정 중이면 { team, done(team) }
+
+/** 팀 정보 수정: 만들기 폼을 팀 화면 맨 위로 옮기고 지금 값으로 채운다. 전술은 「현재 전술 유지」 가 기본 */
+function openEdit(team, done) {
+  ensureCreateForm()
+  const sec = $('#create'), form = $('#create-form'), sel = $('#tactic'), room = $('#room')
+  editing = { team, done }
+  $('#team-view').insertBefore(sec, $('#team-body'))
+  $('h2', form).textContent = '팀 정보 수정'
+  $('[type=submit]', form).textContent = '수정 저장'
+  $('[data-mecard]', form).closest('fieldset').hidden = true   // 캐릭터는 로스터의 「캐릭터 변경」 에서
+  $('[name=title]', room).value = team.room.title || ''
+  $('[name=memo]', room).value = team.room.memo || ''
+  $('[name=memo]', room).oninput()
+  for (const r of room.querySelectorAll('[name=mic], [name=mode]')) r.checked = r.value === team.room[r.name]
+  $('option[value=keep]', sel)?.remove()
+  sel.prepend(h('option', { value: 'keep' }, `현재 전술 유지 — ${team.tactic.name || '전술 자유'}`))
+  sel.value = 'keep'
+  sel.onchange()
+  $('#create-cancel').onclick = closeEdit
+  sec.hidden = false
+  sec.scrollIntoView({ block: 'start' })
+}
+
+function closeEdit() {
+  const sec = $('#create'), form = $('#create-form')
+  editing = null
+  sec.hidden = true
+  $('h2', form).textContent = '팀 만들기'
+  $('[type=submit]', form).textContent = '팀 만들고 모집 시작'
+  $('[data-mecard]', form).closest('fieldset').hidden = false
+  $('#tactic option[value=keep]')?.remove()
+}
+
 function createForm() {
   const form = $('#create-form'), sel = $('#tactic'), nameIn = $('#board-name')
   const readRoom = roomForm()
@@ -639,6 +675,13 @@ function createForm() {
     const v = sel.value, isBoard = v === 'board', custom = /^c:\d+$/.test(v) && +v.slice(2), my = ++seq
     $('#board-name-fld').hidden = !isBoard
     preview.hidden = !v
+    if (v === 'keep') {   // 팀 정보 수정 — 지금 팀 전술 그대로
+      const tokens = teamTokens(editing.team)
+      preview.hidden = !tokens
+      if (tokens) court.show(tokens)
+      $('#tactic-desc').textContent = '전술은 바꾸지 않아요. 다른 전술을 고르면 그걸로 바뀌어요.'
+      return
+    }
     if (custom) {
       $('#tactic-desc').textContent = '불러오는 중…'
       try {
@@ -672,6 +715,24 @@ function createForm() {
     else if (nErr) nameIn.focus()
     if (bad.length || nErr) return
 
+    if (editing) {   // 팀 정보 수정 — 방 설정 + (바꿨으면) 전술
+      const keep = sel.value === 'keep'
+      let tactic
+      if (!keep) {
+        const c = /^c:\d+$/.test(sel.value) && +sel.value.slice(2)
+        if (c) {
+          let t
+          try { t = await customOf(c) } catch (e) { return alert(e.message) }
+          tactic = { preset: t.preset, board: { tokens: t.board.tokens.map(thinRoutes) }, name: t.title, custom: c }
+        } else tactic = sel.value === 'board'
+          ? { preset: presetOf(board.presetId) ? board.presetId : null, board: { tokens: board.tokens.map(thinRoutes) }, name: nameIn.value.trim() }
+          : { preset: sel.value || null, board: null }
+      }
+      const { team: t, done } = editing
+      const res = await submit(form, () => api(`/teams/${t.id}`, { method: 'PUT', withToken: true, body: { room, ...(!keep && { tactic }) } }))
+      if (res) { closeEdit(); done(res.team) }
+      return
+    }
     const custom = /^c:\d+$/.test(sel.value) && +sel.value.slice(2)
     let tactic
     if (custom) {
@@ -823,14 +884,30 @@ async function showTeam(id) {
         self && h('span', { className: 'rc-badge me' }, '나'),
         h('b', { title: '디스코드 이름' }, m.name), micTag(m.mic))
       if (self && !m.leader) head.append(h('button', { type: 'button', className: 'danger', onclick: e => leave(e.currentTarget, m) }, '나가기'))
+      const mine = self && me?.profile?.entries
+      const change = mine?.length > 1 && h('button', {
+        type: 'button', className: 'rc-more-accts', 'aria-haspopup': 'dialog',
+        onclick: async e => {
+          // 프로필 순서에서 지금 쓰는 줄(서버가 맨 앞에 둔 것)의 번호
+          const now = Math.max(0, mine.findIndex(x => x.nick === m.entries[0].nick && x.char === m.entries[0].char))
+          const i = await acctsDialog('어떤 캐릭터로 바꿀까요?', mine, { pick: now, tagOf: i => entryKind(mine, i) })
+          if (i == null || i === now) return
+          const btn = e.target.closest('button')
+          btn.disabled = true
+          try { team = (await api(`/teams/${team.id}/members/${m.userId}`, { method: 'PUT', withToken: true, body: { entry: i } })).team; render() }
+          catch (err) { alert(err.message); btn.disabled = false }
+        },
+      }, '캐릭터 변경')
       // 이 파티에서 쓰는 캐릭터(서버가 맨 앞에 둔다)만 보이고, 나머지는 버튼 → 모달
       const more = m.entries.length - 1
       return h('li', { className: `rc-member${self ? ' is-me' : ''}` }, head,
         h('div', { className: 'rc-acct' }, acctBody(m.entries[0], more > 0 && h('span', { className: 'rc-main', title: '이 파티에서 쓰는 캐릭터' }, '참가'))),
-        more > 0 && h('button', {
-          type: 'button', className: 'rc-more-accts', 'aria-haspopup': 'dialog',
-          onclick: () => acctsDialog(`${m.name} 님의 캐릭터 ${m.entries.length}개`, m.entries, { tagOf: i => i ? '' : '참가' }),
-        }, `캐릭터 ${m.entries.length}개 보기`))
+        (more > 0 || change) && h('div', { className: 'rc-acct-btns' },
+          more > 0 && h('button', {
+            type: 'button', className: 'rc-more-accts', 'aria-haspopup': 'dialog',
+            onclick: () => acctsDialog(`${m.name} 님의 캐릭터 ${m.entries.length}개`, m.entries, { tagOf: i => i ? '' : '참가' }),
+          }, `캐릭터 ${m.entries.length}개 보기`),
+          change))
     })
     for (let i = team.members.length; i < team.size; i++) items.push(h('li', { className: 'rc-member rc-empty' }, h('span', { className: 'rc-hole' }), '빈 자리'))
     $('#team-roster').replaceChildren(...items)
@@ -843,6 +920,7 @@ async function showTeam(id) {
   function manage(mm) {
     box.hidden = !mm?.leader
     if (box.hidden) return
+    $('#edit-team').onclick = () => openEdit(team, t => { team = t; render(); flash('팀 정보를 고쳤어요') })
     $('#kicks').replaceChildren(...team.members.filter(m => !m.leader).map(m => {
       const p = P(m.entries[0].char)
       return h('li', {}, h('img', { src: faceOf(p), alt: '' }), h('b', {}, m.name),

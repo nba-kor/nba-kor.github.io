@@ -222,6 +222,8 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
 | `DELETE /api/teams/:id/members/:userId` | 본인 = 나가기, 팀장 = 방출 | `{ ok: true, team }`. 팀장이 대상이면 해제되고 `team: null` |
 | `DELETE /api/teams/:id` | 팀장, 봇 + `X-Discord-Admin: 1` | 팀 해제(삭제) → `{ ok: true }` |
 | `POST /api/teams/:id/extend` | 팀장 | 만료 = 지금 + 3시간 → `{ team }` |
+| `PUT /api/teams/:id` | 팀장 | `{ room, tactic? }` 팀 정보 수정 — 방 설정은 통째로, 전술은 보냈을 때만(`null` = 전술 자유). 팀원 · 음성채널 · 남은 시간은 그대로 → `{ team }` |
+| `PUT /api/teams/:id/members/:userId` | 본인 | `{ entry }` 참가 캐릭터 바꾸기(프로필 몇 번째 줄) → `{ team }` |
 
 **신원**은 두 가지다. 없거나 틀리면 401 「디스코드로 로그인해 주세요」.
 
