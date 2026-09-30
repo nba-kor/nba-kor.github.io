@@ -173,6 +173,12 @@ for (const p of up.players) {                            // 남은 선수는 아
   p.img = `/assets/players/${p.id}.png`
   done.add(p.id); fromArt++
 }
+for (const p of up.players) {                            // 프로필 카드에서 잘라 둔 얼굴(tools/portraits)이 있으면 그게 우선
+  const src = `${ROOT}/tools/portraits/${p.id}.png`
+  if (!existsSync(src)) continue
+  await copyFile(src, `${ROOT}/assets/players/${p.id}.png`)
+  p.img = `/assets/players/${p.id}.png`
+}
 
 // ---------------------------------------------------------------- 4) 신체 데이터
 

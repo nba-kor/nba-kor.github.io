@@ -13,7 +13,8 @@
 //
 // 미출시(중국·글로벌 서버) 선수는 data/upcoming.json 에서 따로 관리한다.
 
-import { writeFile, mkdir } from 'node:fs/promises'
+import { writeFile, mkdir, copyFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -181,6 +182,15 @@ for (const p of players) {
   p.img = `/assets/players/${p.id}.png`
   downloaded++
 }
+// 중국 서버 프로필 카드에서 잘라 둔 얼굴(tools/portraits)이 있으면 그걸 쓴다 — 공식 카드 이미지보다 얼굴이 크고 깔끔하다
+let portraits = 0
+for (const p of players) {
+  const src = `${ROOT}/tools/portraits/${p.id}.png`
+  if (!existsSync(src)) continue
+  await copyFile(src, `${ROOT}/assets/players/${p.id}.png`)
+  p.img = `/assets/players/${p.id}.png`
+  portraits++
+}
 
 await writeFile(`${ROOT}/data/players.json`, JSON.stringify({
   updatedAt: new Date().toISOString().slice(0, 10),
@@ -190,7 +200,7 @@ await writeFile(`${ROOT}/data/players.json`, JSON.stringify({
   players,
 }, null, 2) + '\n')
 
-console.log(`선수 ${players.length}명, 이미지 ${downloaded}장 갱신 완료`)
+console.log(`선수 ${players.length}명, 이미지 ${downloaded}장 갱신 완료 (그중 ${portraits}장은 tools/portraits 얼굴)`)
 const noEn = players.filter(p => !p.en).map(p => `${p.id}(${p.name})`)
 if (noEn.length) console.log(`영문명 미매핑 → EN 에 추가: ${noEn.join(', ')}`)
 for (const w of warnings) console.warn(`  ! ${w}`)
