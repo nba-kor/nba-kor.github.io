@@ -198,7 +198,7 @@ export function loadKakao() {
 // 카카오 디벨로퍼스 > 메시지 템플릿 빌더의 사용자 정의 리스트(4줄 · 5줄). 기본 리스트 템플릿은 3줄이 최대라 따로 만들었다.
 // 변수: HEADER · HEADER_PATH · TITLEn · DESCn · IMGn · PATHn · BTN1 · BTN1_PATH · BTN2 · BTN2_PATH (링크는 사이트 도메인 뒤 경로만)
 // 템플릿을 고치거나 지우면 여기 번호도 같이 — 비우면 그 줄 수는 기본 3줄 카드로 보낸다
-// 머리(HEADER)에 이모지를 넣으면 PC 카톡에서 깨진다(「(」 로 보임). 버튼 두 개는 나란히라 5자를 넘으면 두 줄로 접힌다
+// 버튼 두 개는 나란히라 이름이 5자를 넘으면 두 줄로 접힌다
 export const KAKAO_LIST_TEMPLATES = { 4: 137568, 5: 137513 }
 
 /**

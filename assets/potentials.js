@@ -1,7 +1,7 @@
 // 잠재력추천 — 빌드 목록(추천순 · 최신순 · 포지션 · 캐릭터 필터) · 글(30칸 판 · 추천 · 댓글) · 쓰기 · 고치기. 게시판 공용 부분은 board.js
-import { mountTop, loadKakao, faceOf, kakaoList, POS_KO } from './app.js?v=bc0f3e71'
+import { mountTop, loadKakao, faceOf, kakaoList, POS_KO } from './app.js?v=722e4f3b'
 import { api } from './auth.js?v=5d44380b'
-import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=55ac9956'
+import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=27243310'
 
 let cat, pot
 const plus = v => `+${+v.toFixed(2)}`   // 0.15 × 10 같은 합에 붙는 부동소수점 꼬리를 뗀다
@@ -126,8 +126,8 @@ function kakaoPayload(b) {
     ...b.chars.slice(1).map(id => ({ title: `추천 캐릭터 · ${P(id).name}`, desc: POS_KO[P(id).pos] || '', img: `${location.origin}/assets/share/${id}.jpg` })),
   ]
   return kakaoList({
-    // 머리는 한 줄이고 사용자 정의 템플릿에서는 이모지가 깨진다 — 제목만. 버튼은 둘이 나란히라 5자 이내
-    header: b.title, url, rows,
+    // 버튼은 둘이 나란히라 5자 이내(넘으면 두 줄로 접힌다)
+    header: `💡 ${b.title} · 잠재력추천`, url, rows,
     buttons: [{ title: '빌드 보기', url }, { title: '빌드 목록', url: `${location.origin}/potentials/` }],
   })
 }

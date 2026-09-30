@@ -1,8 +1,8 @@
 // 전술판 — 하프코트 3:3 배치 / 동선 / 프리셋(기본 + 커스텀) / 재생 / 공유(링크 · 카카오톡)
-import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, mountTop, decodeState, encodeState, share, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, kakaoList } from './app.js?v=bc0f3e71'
-import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=adc41668'
+import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, mountTop, decodeState, encodeState, share, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, kakaoList } from './app.js?v=722e4f3b'
+import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=d269750e'
 import { api } from './auth.js?v=5d44380b'
-import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=55ac9956'
+import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=27243310'
 
 const STORE = 'dc.tactics'
 
@@ -361,7 +361,7 @@ const boardTitle = () => {
 /** 리스트 카드: 코트의 선수(공격 먼저) 한 줄씩 — 4~5명이면 사용자 정의 4 · 5줄, 6명이면 5번째 줄에 남은 선수를 묶는다.
  *  등록 안 한 보드(# 주소)는 kakaoList 가 기본 3줄로 내린다. 선수가 2명 미만이면 사이트 대표 이미지 한 장짜리 피드 카드 */
 function kakaoPayload() {
-  const url = boardUrl(), title = `${boardTitle()} · 전술판`   // 사용자 정의 템플릿 머리에서는 이모지가 깨진다
+  const url = boardUrl(), title = `🏀 ${boardTitle()} · 전술판`
   const who = state.tokens.filter(t => data.byId.get(t.playerId)?.server === 'kr').sort((a, b) => (a.side === 'def') - (b.side === 'def'))
   if (who.length < 2) {
     const link = { mobileWebUrl: url, webUrl: url }
