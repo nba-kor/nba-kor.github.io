@@ -1,5 +1,5 @@
 // 하프코트 렌더 · 재생 공통 모듈 — 전술판과 팀원모집이 같은 그림과 애니메이션을 쓴다.
-import { faceOf } from './app.js?v=7f07a439'
+import { faceOf } from './app.js?v=bc0f3e71'
 
 const NS = 'http://www.w3.org/2000/svg'
 export const W = 500, H = 470     // 1 unit = 0.1ft, 하프코트 50ft x 47ft
