@@ -1,8 +1,8 @@
 // 전술판 — 하프코트 3:3 배치 / 동선 / 프리셋(기본 + 커스텀) / 재생 / 공유(링크 · 카카오톡)
-import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, mountTop, decodeState, encodeState, share, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, kakaoList } from './app.js?v=722e4f3b'
-import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=d269750e'
+import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, mountTop, decodeState, encodeState, share, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, kakaoList, shareFace } from './app.js?v=0dc0778c'
+import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=e8d35d53'
 import { api } from './auth.js?v=5d44380b'
-import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=27243310'
+import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=7790234c'
 
 const STORE = 'dc.tactics'
 
@@ -370,7 +370,7 @@ function kakaoPayload() {
   // 공격이 모자라면(수비만 올린 보드 등) 수비로 채운다
   const lineup = [...who.filter(t => t.side === 'off'), ...who.filter(t => t.side === 'def')].slice(0, 3)
   const rows = lineup.map(t => ({
-    title: `${data.byId.get(t.playerId).name} · ${t.label}`, desc: t.side === 'off' ? '공격' : '수비', img: `${location.origin}/assets/share/${t.playerId}.jpg`,
+    title: `${data.byId.get(t.playerId).name} · ${t.label}`, desc: t.side === 'off' ? '공격' : '수비', img: shareFace(t.playerId),
   }))
   const c = customId(state.presetId)
   const desc = c ? detail.get(c)?.tactic.body : tactics.presets.find(p => p.id === state.presetId)?.desc

@@ -183,6 +183,11 @@ export async function share(state) {
 // Kakao Developers > 앱 > 플랫폼 키 > JavaScript 키. 비우면 공유 버튼이 기기 공유 · 링크 복사로 대체된다.
 export const KAKAO_JS_KEY = '8f89f3ef476f72827c9a875ad0c23a72'
 
+// 카카오는 카드 이미지를 주소로 캐시한다 — assets/share 얼굴을 다시 구웠으면 이 숫자를 올려 새 주소로 보이게 한다.
+// TNAB 봇(tnab/kakao_share.py 의 SHARE_FACES_VERSION)도 같은 숫자로 맞춘다
+export const SHARE_FACES_VERSION = 2
+export const shareFace = id => `${location.origin}/assets/share/${id}.jpg?v=${SHARE_FACES_VERSION}`
+
 /** SDK 는 클릭 전에 미리 받아 둔다 (클릭 때 받으면 sendDefault 가 동기 호출이 못 된다) */
 export function loadKakao() {
   if (!KAKAO_JS_KEY) return

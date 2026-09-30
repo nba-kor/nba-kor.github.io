@@ -106,7 +106,7 @@ node tools/update-players.mjs
 
 중국 서버 게임의 선수 프로필 카드(노란 배경 얼굴) 캡처에서 잘라 만든 180x180 원형 얼굴 93장이 `tools/portraits/<id>.png` 에 있다.
 `update-players.mjs` · `cn-faces/fetch.mjs` 는 이미지를 받은 뒤 **portraits 에 같은 id 가 있으면 그걸로 덮는다** — 다시 돌려도 이 얼굴이 유지된다.
-틀은 옛 한국 공식 얼굴과 같다(흰 테두리 10px + 오른쪽 아래 반투명 파란 그림자). 얼굴을 바꿨으면 카톡 공유 얼굴도 다시 굽는다(`tools/share-faces.py`).
+틀은 옛 한국 공식 얼굴과 같다(흰 테두리 10px + 오른쪽 아래 반투명 파란 그림자). 얼굴을 바꿨으면 카톡 공유 얼굴도 다시 굽고(`tools/share-faces.py`), **카카오가 옛 이미지를 주소로 캐시하므로** `assets/app.js` 의 `SHARE_FACES_VERSION` 과 봇 `tnab/kakao_share.py` 의 같은 이름 숫자를 하나 올린다(`?v=` 가 바뀌어 새 이미지로 받는다).
 캡처에는 같은 선수의 스킨 카드(克城之子·詹姆斯 · 风城玫瑰·罗斯)도 있었는데 쓰지 않았다.
 
 ### 얼굴 이미지 · 신체 데이터

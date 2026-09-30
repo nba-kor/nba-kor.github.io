@@ -1,7 +1,7 @@
 // 잠재력추천 — 빌드 목록(추천순 · 최신순 · 포지션 · 캐릭터 필터) · 글(30칸 판 · 추천 · 댓글) · 쓰기 · 고치기. 게시판 공용 부분은 board.js
-import { mountTop, loadKakao, faceOf, kakaoList } from './app.js?v=722e4f3b'
+import { mountTop, loadKakao, faceOf, kakaoList, shareFace } from './app.js?v=0dc0778c'
 import { api } from './auth.js?v=5d44380b'
-import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=27243310'
+import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=7790234c'
 
 let cat, pot
 const plus = v => `+${+v.toFixed(2)}`   // 0.15 × 10 같은 합에 붙는 부동소수점 꼬리를 뗀다
@@ -121,7 +121,7 @@ function kakaoPayload(b) {
   const tops = cat.colors.map(c => byCount.find(id => pot.get(id).color === c.id)).filter(Boolean)
   const top = totals(b.slots).slice(0, 3).map(([k, v]) => `${k} ${plus(v)}`).join(' · ')
   const rows = [
-    { title: `추천: ${b.chars.map(id => P(id).name).join(' · ')}`, desc: top, img: `${location.origin}/assets/share/${b.chars[0]}.jpg` },
+    { title: `추천: ${b.chars.map(id => P(id).name).join(' · ')}`, desc: top, img: shareFace(b.chars[0]) },
     ...tops.map(row),
     body && { title: '빌드 설명', desc: body, img: `${location.origin}/assets/og.jpg` },
   ].filter(Boolean)

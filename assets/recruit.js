@@ -1,6 +1,6 @@
 // 팀원모집 — 디스코드 로그인 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
-import { loadPlayers, faceOf, mountTop, POS, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, copyLink } from './app.js?v=722e4f3b'
-import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=d269750e'
+import { loadPlayers, faceOf, mountTop, POS, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, copyLink, shareFace } from './app.js?v=0dc0778c'
+import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=e8d35d53'
 import { api, initAuth as startAuth, login, logout, session, IN_KAKAO, IS_MOBILE } from './auth.js?v=5d44380b'
 
 // ---------------------------------------------------------------- 설정
@@ -791,7 +791,7 @@ function openDiscord(event, url) {
  *  봇 쪽 원본: tnab/kakao_share.py 의 build_party_share_options (제목 · 항목 · 빈 자리 문구 · 버튼 두 개) */
 function kakaoPayload(t) {
   const url = teamUrl(t), link = { mobileWebUrl: url, webUrl: url }
-  const img = id => `${location.origin}/assets/share/${id}.jpg`
+  const img = shareFace
   const lead = t.members.find(m => m.leader)
   const name = t.room.title || (lead ? `${lead.entries[0].nick} 파티` : '이름 없는 파티')
   const items = t.members.map(m => {
