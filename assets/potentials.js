@@ -1,5 +1,5 @@
 // 잠재력추천 — 빌드 목록(추천순 · 최신순 · 포지션 · 캐릭터 필터) · 글(30칸 판 · 추천 · 댓글) · 쓰기 · 고치기. 게시판 공용 부분은 board.js
-import { mountTop, loadKakao, faceOf, kakaoList, POS_KO } from './app.js?v=722e4f3b'
+import { mountTop, loadKakao, faceOf, kakaoList } from './app.js?v=722e4f3b'
 import { api } from './auth.js?v=5d44380b'
 import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=27243310'
 
@@ -108,13 +108,14 @@ const showList = () => {
 // ---------------------------------------------------------------- 카카오톡 공유
 
 const buildUrl = b => `${location.origin}/potentials/?b=${b.id}`
-/** 리스트 카드 5줄: 추천 캐릭터 + 능력치 합계 상위 3 → 빨강 · 초록 · 파랑 대표 잠재력 → 남는 줄은 그다음 많이 쓴 잠재력 · 다른 추천 캐릭터.
- *  줄이 모자라면 kakaoList 가 4줄 · 기본 3줄 카드로 내린다 */
+/** 리스트 카드: 추천 캐릭터 + 능력치 합계 상위 3 → 빨강 · 초록 · 파랑 대표 잠재력 → 빌드 설명(있을 때만).
+ *  설명이 있으면 5줄, 없으면 4줄. 쓴 색이 적어 줄이 모자라면 kakaoList 가 한 단계 작은 카드로 내린다 */
 function kakaoPayload(b) {
   const url = buildUrl(b), img = id => `${location.origin}/assets/potentials/share/${id}.jpg`
   const count = new Map()
   for (const id of ordered(b.slots)) if (pot.has(id)) count.set(id, (count.get(id) || 0) + 1)
   const row = id => { const p = pot.get(id); return { title: `${p.name} ×${count.get(id)}`, desc: statLine(p), img: img(id) } }
+  const body = b.body?.replace(/\s+/g, ' ').trim()   // 설명은 한 줄로 잘린다
   // 색마다 가장 많이 쓴 것(같으면 앞 칸 — Map 은 넣은 순서, 정렬은 안정적) → 나머지는 많이 쓴 순
   const byCount = [...count].sort((x, y) => y[1] - x[1]).map(([id]) => id)
   const tops = cat.colors.map(c => byCount.find(id => pot.get(id).color === c.id)).filter(Boolean)
@@ -122,9 +123,8 @@ function kakaoPayload(b) {
   const rows = [
     { title: `추천: ${b.chars.map(id => P(id).name).join(' · ')}`, desc: top, img: `${location.origin}/assets/share/${b.chars[0]}.jpg` },
     ...tops.map(row),
-    ...byCount.filter(id => !tops.includes(id)).map(row),
-    ...b.chars.slice(1).map(id => ({ title: `추천 캐릭터 · ${P(id).name}`, desc: POS_KO[P(id).pos] || '', img: `${location.origin}/assets/share/${id}.jpg` })),
-  ]
+    body && { title: '빌드 설명', desc: body, img: `${location.origin}/assets/og.jpg` },
+  ].filter(Boolean)
   return kakaoList({
     // 버튼은 둘이 나란히라 5자 이내(넘으면 두 줄로 접힌다)
     header: `💡 ${b.title} · 잠재력추천`, url, rows,
