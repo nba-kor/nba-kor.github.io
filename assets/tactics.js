@@ -358,21 +358,23 @@ const boardTitle = () => {
     : tactics.presets.find(p => p.id === state.presetId)?.name || '직접 짠 전술'
 }
 
-/** 리스트 카드: 코트의 선수(공격 먼저) 한 줄씩 — 4~5명이면 사용자 정의 4 · 5줄, 6명이면 5번째 줄에 남은 선수를 묶는다.
- *  등록 안 한 보드(# 주소)는 kakaoList 가 기본 3줄로 내린다. 선수가 2명 미만이면 사이트 대표 이미지 한 장짜리 피드 카드 */
+/** 리스트 카드: 1~3줄 = 공격 선수, 4줄 = 전술 설명(4줄 템플릿). 등록된 커스텀은 그 설명, 기본 전술은 프리셋 설명.
+ *  등록 안 한 보드(# 주소)는 kakaoList 가 기본 3줄로 내린다(설명 줄은 빠진다). 선수가 2명 미만이면 사이트 대표 이미지 한 장짜리 피드 카드 */
 function kakaoPayload() {
   const url = boardUrl(), title = `🏀 ${boardTitle()} · 전술판`
-  const who = state.tokens.filter(t => data.byId.get(t.playerId)?.server === 'kr').sort((a, b) => (a.side === 'def') - (b.side === 'def'))
+  const who = state.tokens.filter(t => data.byId.get(t.playerId)?.server === 'kr')
   if (who.length < 2) {
     const link = { mobileWebUrl: url, webUrl: url }
     return { objectType: 'feed', content: { title, description: '하프코트 3:3 전술 — 눌러서 동선 재생', imageUrl: `${location.origin}/assets/og.jpg`, link }, buttons: [{ title: '전술 보기', link }] }
   }
-  const face = id => `${location.origin}/assets/share/${id}.jpg`, side = t => t.side === 'off' ? '공격' : '수비'
-  const rows = who.map(t => ({ title: `${data.byId.get(t.playerId).name} · ${t.label}`, desc: side(t), img: face(t.playerId) }))
-  if (who.length > 5) {
-    const rest = who.slice(4)
-    rows.splice(4, Infinity, { title: rest.map(t => data.byId.get(t.playerId).name).join(' · '), desc: [...new Set(rest.map(side))].join(' · '), img: face(rest[0].playerId) })
-  }
+  // 공격이 모자라면(수비만 올린 보드 등) 수비로 채운다
+  const lineup = [...who.filter(t => t.side === 'off'), ...who.filter(t => t.side === 'def')].slice(0, 3)
+  const rows = lineup.map(t => ({
+    title: `${data.byId.get(t.playerId).name} · ${t.label}`, desc: t.side === 'off' ? '공격' : '수비', img: `${location.origin}/assets/share/${t.playerId}.jpg`,
+  }))
+  const c = customId(state.presetId)
+  const desc = c ? detail.get(c)?.tactic.body : tactics.presets.find(p => p.id === state.presetId)?.desc
+  if (desc) rows.push({ title: '전술 설명', desc: desc.replace(/\s+/g, ' '), img: `${location.origin}/assets/og.jpg` })   // 설명은 한 줄로 잘린다
   return kakaoList({
     header: title, url, rows,
     buttons: [{ title: '전술 보기', url }, { title: '팀원 모집', url: `${location.origin}/recruit/` }],   // 나란히 두 개라 5자 이내
