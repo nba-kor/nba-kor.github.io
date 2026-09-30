@@ -1,7 +1,7 @@
 // 영상 — 유튜브 링크 게시판: 목록(분류 · 추천순/최신순 · 포지션 · 캐릭터 필터) · 글(영상 · 추천 · 댓글) · 올리기 · 고치기. 게시판 공용 부분은 board.js
-import { mountTop, loadKakao, faceOf } from './app.js?v=bef36734'
+import { mountTop, loadKakao, faceOf } from './app.js?v=7f07a439'
 import { api } from './auth.js?v=5d44380b'
-import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=a783f380'
+import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=37a44377'
 
 let cfg, catName   // data/videos.json · 분류 id → 이름
 // 서버(server/index.mjs 의 YOUTUBE)와 같은 규칙 — 여기서는 미리보기 · 제목 채우기용이고, 최종 확인은 서버가 한다

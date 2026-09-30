@@ -195,11 +195,42 @@ export function loadKakao() {
   document.head.append(s)
 }
 
+// 카카오 디벨로퍼스 > 메시지 템플릿 빌더의 사용자 정의 리스트(4줄 · 5줄). 기본 리스트 템플릿은 3줄이 최대라 따로 만들었다.
+// 변수: HEADER · HEADER_PATH · TITLEn · DESCn · IMGn · PATHn · BTN1 · BTN1_PATH · BTN2 · BTN2_PATH (링크는 사이트 도메인 뒤 경로만)
+// 템플릿을 고치거나 지우면 여기 번호도 같이 — 비우면 그 줄 수는 기본 3줄 카드로 보낸다
+export const KAKAO_LIST_TEMPLATES = { 4: 137568, 5: 137513 }
+
+/**
+ * 리스트 카드. 줄이 4~5개면 사용자 정의 템플릿, 그보다 적거나 주소에 # 가 있으면(템플릿 링크는 경로 · 쿼리만 받는다) 기본 리스트(3줄).
+ * rows: [{ title, desc, img, url }] — 5개 넘으면 앞 5개. buttons: [{ title, url }] 2개(사용자 정의 템플릿은 버튼 2개로 만들었다)
+ */
+export function kakaoList({ header, url, rows, buttons }) {
+  const n = Math.min(rows.length, 5), id = KAKAO_LIST_TEMPLATES[n]
+  const path = u => { const x = new URL(u, location.origin); return (x.pathname + x.search).replace(/^\//, '') }
+  if (id && ![url, ...rows.map(r => r.url), ...buttons.map(b => b.url)].some(u => u?.includes('#'))) {
+    const args = { HEADER: header, HEADER_PATH: path(url) }
+    rows.slice(0, n).forEach((r, i) => Object.assign(args, {
+      [`TITLE${i + 1}`]: r.title, [`DESC${i + 1}`]: r.desc || ' ', [`IMG${i + 1}`]: r.img, [`PATH${i + 1}`]: path(r.url || url),
+    }))
+    buttons.forEach((b, i) => Object.assign(args, { [`BTN${i + 1}`]: b.title, [`BTN${i + 1}_PATH`]: path(b.url) }))
+    return { templateId: id, templateArgs: args }
+  }
+  const link = u => ({ mobileWebUrl: u, webUrl: u })
+  return {
+    objectType: 'list', headerTitle: header, headerLink: link(url),
+    contents: rows.slice(0, 3).map(r => ({ title: r.title, description: r.desc, imageUrl: r.img, link: link(r.url || url) })),
+    buttons: buttons.map(b => ({ title: b.title, link: link(b.url) })),
+  }
+}
+
 /** 카카오톡 공유. SDK 가 없으면 기기 공유창, 그것도 없으면 링크 복사.
  *  클릭 핸들러 안에서 동기로 불러야 PC 팝업이 차단되지 않는다 — 앞에 await 를 두지 말 것 */
 export function shareKakao(btn, payload, { title, url }) {
   if (window.Kakao?.isInitialized?.()) {
-    try { return Kakao.Share.sendDefault(payload()) } catch (e) { console.warn(e) }
+    try {
+      const p = payload()   // 사용자 정의 템플릿이면 { templateId, templateArgs }
+      return p.templateId ? Kakao.Share.sendCustom(p) : Kakao.Share.sendDefault(p)
+    } catch (e) { console.warn(e) }
   }
   if (navigator.share) return navigator.share({ title, url }).catch(() => {})
   copyLink(btn, url)

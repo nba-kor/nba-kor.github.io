@@ -1,7 +1,7 @@
 // 잠재력추천 — 빌드 목록(추천순 · 최신순 · 포지션 · 캐릭터 필터) · 글(30칸 판 · 추천 · 댓글) · 쓰기 · 고치기. 게시판 공용 부분은 board.js
-import { mountTop, loadKakao, faceOf } from './app.js?v=bef36734'
+import { mountTop, loadKakao, faceOf, kakaoList, POS_KO } from './app.js?v=7f07a439'
 import { api } from './auth.js?v=5d44380b'
-import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=a783f380'
+import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=37a44377'
 
 let cat, pot
 const plus = v => `+${+v.toFixed(2)}`   // 0.15 × 10 같은 합에 붙는 부동소수점 꼬리를 뗀다
@@ -108,25 +108,27 @@ const showList = () => {
 // ---------------------------------------------------------------- 카카오톡 공유
 
 const buildUrl = b => `${location.origin}/potentials/?b=${b.id}`
-/** 리스트 카드: 첫 줄 = 추천 캐릭터 + 능력치 합계 상위 3, 그다음 = 많이 쓴 잠재력 2종(아이콘). 줄은 2~3개여야 한다 */
+/** 리스트 카드 5줄: 추천 캐릭터 + 능력치 합계 상위 3 → 빨강 · 초록 · 파랑 대표 잠재력 → 남는 줄은 그다음 많이 쓴 잠재력 · 다른 추천 캐릭터.
+ *  줄이 모자라면 kakaoList 가 4줄 · 기본 3줄 카드로 내린다 */
 function kakaoPayload(b) {
-  const url = buildUrl(b), link = { mobileWebUrl: url, webUrl: url }
-  const n = new Map()
-  for (const id of ordered(b.slots)) if (pot.has(id)) n.set(id, (n.get(id) || 0) + 1)
+  const url = buildUrl(b), img = id => `${location.origin}/assets/potentials/share/${id}.jpg`
+  const count = new Map()
+  for (const id of ordered(b.slots)) if (pot.has(id)) count.set(id, (count.get(id) || 0) + 1)
+  const row = id => { const p = pot.get(id); return { title: `${p.name} ×${count.get(id)}`, desc: statLine(p), img: img(id) } }
+  // 색마다 가장 많이 쓴 것(같으면 앞 칸 — Map 은 넣은 순서, 정렬은 안정적) → 나머지는 많이 쓴 순
+  const byCount = [...count].sort((x, y) => y[1] - x[1]).map(([id]) => id)
+  const tops = cat.colors.map(c => byCount.find(id => pot.get(id).color === c.id)).filter(Boolean)
   const top = totals(b.slots).slice(0, 3).map(([k, v]) => `${k} ${plus(v)}`).join(' · ')
-  return {
-    objectType: 'list',
-    headerTitle: `💡 ${b.title} · 잠재력추천`,
-    headerLink: link,
-    contents: [
-      { title: `추천: ${b.chars.map(id => P(id).name).join(' · ')}`, description: top, imageUrl: `${location.origin}/assets/share/${b.chars[0]}.jpg`, link },
-      ...[...n].sort((x, y) => y[1] - x[1]).slice(0, 2).map(([id, k]) => {
-        const p = pot.get(id)
-        return { title: `${p.name} ×${k}`, description: statLine(p), imageUrl: `${location.origin}/assets/potentials/share/${id}.jpg`, link }
-      }),
-    ],
-    buttons: [{ title: '빌드 보기', link }],
-  }
+  const rows = [
+    { title: `추천: ${b.chars.map(id => P(id).name).join(' · ')}`, desc: top, img: `${location.origin}/assets/share/${b.chars[0]}.jpg` },
+    ...tops.map(row),
+    ...byCount.filter(id => !tops.includes(id)).map(row),
+    ...b.chars.slice(1).map(id => ({ title: `추천 캐릭터 · ${P(id).name}`, desc: POS_KO[P(id).pos] || '', img: `${location.origin}/assets/share/${id}.jpg` })),
+  ]
+  return kakaoList({
+    header: `💡 ${b.title} · 잠재력추천`, url, rows,
+    buttons: [{ title: '빌드 보기', url }, { title: '다른 빌드 보기', url: `${location.origin}/potentials/` }],
+  })
 }
 
 // ---------------------------------------------------------------- 글

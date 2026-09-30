@@ -1,8 +1,8 @@
 // 전술판 — 하프코트 3:3 배치 / 동선 / 프리셋(기본 + 커스텀) / 재생 / 공유(링크 · 카카오톡)
-import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, mountTop, decodeState, encodeState, share, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao } from './app.js?v=bef36734'
-import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=5feabedb'
+import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, mountTop, decodeState, encodeState, share, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, kakaoList } from './app.js?v=7f07a439'
+import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=c2ef8afe'
 import { api } from './auth.js?v=5d44380b'
-import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=a783f380'
+import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=37a44377'
 
 const STORE = 'dc.tactics'
 
@@ -358,21 +358,25 @@ const boardTitle = () => {
     : tactics.presets.find(p => p.id === state.presetId)?.name || '직접 짠 전술'
 }
 
-/** 리스트 카드: 선수 얼굴 줄(공격 먼저, 3명까지). 선수가 2명 미만이면 사이트 대표 이미지 한 장짜리 피드 카드 */
+/** 리스트 카드: 코트의 선수(공격 먼저) 한 줄씩 — 4~5명이면 사용자 정의 4 · 5줄, 6명이면 5번째 줄에 남은 선수를 묶는다.
+ *  등록 안 한 보드(# 주소)는 kakaoList 가 기본 3줄로 내린다. 선수가 2명 미만이면 사이트 대표 이미지 한 장짜리 피드 카드 */
 function kakaoPayload() {
-  const url = boardUrl(), link = { mobileWebUrl: url, webUrl: url }, title = `🏀 ${boardTitle()} · 전술판`
-  const who = state.tokens.filter(t => data.byId.get(t.playerId)?.server === 'kr').sort((a, b) => (a.side === 'def') - (b.side === 'def')).slice(0, 3)
+  const url = boardUrl(), title = `🏀 ${boardTitle()} · 전술판`
+  const who = state.tokens.filter(t => data.byId.get(t.playerId)?.server === 'kr').sort((a, b) => (a.side === 'def') - (b.side === 'def'))
   if (who.length < 2) {
+    const link = { mobileWebUrl: url, webUrl: url }
     return { objectType: 'feed', content: { title, description: '하프코트 3:3 전술 — 눌러서 동선 재생', imageUrl: `${location.origin}/assets/og.jpg`, link }, buttons: [{ title: '전술 보기', link }] }
   }
-  return {
-    objectType: 'list', headerTitle: title, headerLink: link,
-    contents: who.map(t => ({
-      title: `${data.byId.get(t.playerId).name} · ${t.label}`, description: t.side === 'off' ? '공격' : '수비',
-      imageUrl: `${location.origin}/assets/share/${t.playerId}.jpg`, link,
-    })),
-    buttons: [{ title: '전술 보기', link }],
+  const face = id => `${location.origin}/assets/share/${id}.jpg`, side = t => t.side === 'off' ? '공격' : '수비'
+  const rows = who.map(t => ({ title: `${data.byId.get(t.playerId).name} · ${t.label}`, desc: side(t), img: face(t.playerId) }))
+  if (who.length > 5) {
+    const rest = who.slice(4)
+    rows.splice(4, Infinity, { title: rest.map(t => data.byId.get(t.playerId).name).join(' · '), desc: [...new Set(rest.map(side))].join(' · '), img: face(rest[0].playerId) })
   }
+  return kakaoList({
+    header: title, url, rows,
+    buttons: [{ title: '전술 보기', url }, { title: '팀원 모집하기', url: `${location.origin}/recruit/` }],
+  })
 }
 
 // ---------------------------------------------------------------- 초기화
