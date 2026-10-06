@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>조합표 · NBA덩크시티-TNAB</title>
-<meta name="description" content="NBA 덩크 시티 3:3 조합표. 선수 3명 조합과 추천 잠재력 · 추천 티어 · 상대하기 편한/힘든 캐릭터와 조합을 찾아보고 추천 · 댓글을 남기세요.">
+<meta name="description" content="NBA 덩크 시티 3:3 조합표. 선수 3명 조합과 추천 잠재력 · 상대하기 편한/힘든 캐릭터와 조합을 찾아보고 추천 · 댓글을 남기세요.">
 <link rel="canonical" href="https://nba-kor.github.io/combos/">
 <link rel="icon" href="/assets/icon.png?v=1" type="image/png">
 <link rel="apple-touch-icon" href="/assets/icon.png?v=1">
@@ -15,13 +15,13 @@
 <meta property="og:locale" content="ko_KR">
 <meta property="og:url" content="https://nba-kor.github.io/combos/">
 <meta property="og:title" content="조합표 · NBA덩크시티-TNAB">
-<meta property="og:description" content="NBA 덩크 시티 3:3 조합표. 선수 3명 조합과 추천 잠재력 · 추천 티어 · 상대하기 편한/힘든 캐릭터와 조합을 찾아보고 추천 · 댓글을 남기세요.">
+<meta property="og:description" content="NBA 덩크 시티 3:3 조합표. 선수 3명 조합과 추천 잠재력 · 상대하기 편한/힘든 캐릭터와 조합을 찾아보고 추천 · 댓글을 남기세요.">
 <meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=1">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="NBA덩크시티-TNAB — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="/assets/style.css?v=d78c6c90">
+<link rel="stylesheet" href="/assets/style.css?v=c3a45d8c">
 </head>
 <body>
 
@@ -57,20 +57,22 @@
         <div id="form-builds" class="cb-bpicks"></div>
       </fieldset>
       <fieldset>
-        <legend>추천 티어 <small>선택 · 여러 개</small></legend>
-        <div class="rc-seg-opts cb-tier-opts" id="form-tiers"></div>
-      </fieldset>
-      <fieldset>
-        <legend>😀 상대하기 편한 캐릭터 · 조합 <small>선택 · 각각 10개까지</small></legend>
+        <legend>😀 상대하기 편한 캐릭터 · 조합 <small>선택 · 캐릭터 10명 · 조합(3명) 10개까지</small></legend>
+        <div class="pt-sort" id="form-easy-mode" role="group" aria-label="고르는 것">
+          <button type="button" value="chars">캐릭터 고르기</button>
+          <button type="button" value="set">조합 만들기 (3명)</button>
+        </div>
         <div id="form-easy-chars"></div>
-        <small class="rc-hint">다른 조합 (추천순)</small>
-        <div id="form-easy-combos" class="cb-refs"></div>
+        <div id="form-easy-combos" class="cb-sets"></div>
       </fieldset>
       <fieldset>
-        <legend>😣 상대하기 힘든 캐릭터 · 조합 <small>선택 · 각각 10개까지</small></legend>
+        <legend>😣 상대하기 힘든 캐릭터 · 조합 <small>선택 · 캐릭터 10명 · 조합(3명) 10개까지</small></legend>
+        <div class="pt-sort" id="form-hard-mode" role="group" aria-label="고르는 것">
+          <button type="button" value="chars">캐릭터 고르기</button>
+          <button type="button" value="set">조합 만들기 (3명)</button>
+        </div>
         <div id="form-hard-chars"></div>
-        <small class="rc-hint">다른 조합 (추천순)</small>
-        <div id="form-hard-combos" class="cb-refs"></div>
+        <div id="form-hard-combos" class="cb-sets"></div>
       </fieldset>
       <label class="rc-fld">
         <span>조합 설명 <small>선택</small></span>
@@ -89,7 +91,7 @@
     <div class="rc-hero">
       <div>
         <h1>조합표</h1>
-        <p class="rc-lead">3:3 선수 조합을 모았어요. 선수별 추천 잠재력 · 추천 티어 · 상대하기 편한/힘든 캐릭터와 조합을 같이 보고, 좋은 조합엔 추천을 남겨 주세요.</p>
+        <p class="rc-lead">3:3 선수 조합을 모았어요. 선수별 추천 잠재력 · 상대하기 편한/힘든 캐릭터와 조합을 같이 보고, 좋은 조합엔 추천을 남겨 주세요.</p>
         <p class="rc-muted rc-need" id="need" hidden></p>
       </div>
       <button id="new" class="primary rc-big" type="button">+ 조합 등록</button>
@@ -113,6 +115,6 @@
 
 </main>
 
-<script type="module" src="/assets/combos.js?v=1e4bf6be"></script>
+<script type="module" src="/assets/combos.js?v=f480fe0c"></script>
 </body>
 </html>

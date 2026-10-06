@@ -35,7 +35,7 @@ const TEAM_ID = /^[A-Za-z0-9_-]{8}$/
 // 게시판(잠재력추천 builds · 영상 videos · 커스텀 전술 tactics · 티어표 tiers · 조합표 combos): /api/<게시판>[/<id>[/like | /comments[/<댓글 id>]]]
 const BOARD_PATH = /^\/api\/(builds|videos|tactics|tiers|combos)(?:\/(\d{1,15})(?:\/(like|comments)(?:\/(\d{1,15}))?)?)?$/
 const BUILD_CHARS = 5
-const COMBO_VS = 10   // 조합표: 상대하기 편한 · 힘든 쪽마다 캐릭터 · 조합 수
+const COMBO_VS = 10   // 조합표: 상대하기 편한 · 힘든 쪽마다 캐릭터 수 · 조합(3명 세트) 수
 // 유튜브 주소 → 영상 id(11자). watch?v= · youtu.be · shorts · live · embed, www · m · music 서브도메인
 const YOUTUBE = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/
 const CATEGORIES = new Set(videosData.categories.map(c => c.id))
@@ -205,29 +205,29 @@ function tierList(v) {
   return { title: text(v.title, 40, '제목'), body: text(v.body ?? '', 500, '설명', 0, true), tiers, chars, positions: positionsOf(chars) }
 }
 
-/** 조합표 글: 이름 · 선수 3명(+ 선수마다 참고할 잠재력추천 글) · 추천 티어 · 상대하기 편한/힘든 캐릭터 · 조합 글 · 설명.
- *  글 번호는 모양만 본다 — 지워진 글은 화면이 빼고 보여 준다 */
+/** 조합표 글: 이름 · 선수 3명(+ 선수마다 참고할 잠재력추천 글) · 상대하기 편한/힘든 캐릭터 · 조합(3명 세트) · 설명.
+ *  잠재력추천 글 번호는 모양만 본다 — 지워진 글은 화면이 빼고 보여 준다 */
 function combo(v) {
   if (!isObj(v)) fail(400, '요청 형식이 잘못됐어요')
   const chars = charsOf(v.chars, 3, 3, '조합 선수')
-  const postId = x => Number.isInteger(x) && x > 0 && x < 1e15
   const builds = v.builds ?? [null, null, null]
-  if (!listOf(builds, 3, 3) || !builds.every(x => x === null || postId(x))) fail(400, '추천 잠재력 정보가 잘못됐어요')
-  const tiers = v.tiers ?? []
-  if (!listOf(tiers, CFG.tiers.length) || new Set(tiers).size !== tiers.length || !tiers.every(x => CFG.tiers.includes(x))) fail(400, '추천 티어가 잘못됐어요')
+  if (!listOf(builds, 3, 3) || !builds.every(x => x === null || (Number.isInteger(x) && x > 0 && x < 1e15))) fail(400, '추천 잠재력 정보가 잘못됐어요')
+  const setKey = c => [...c].sort().join()   // 같은 세 명이면 순서가 달라도 같은 조합
   const side = (s = {}, what) => {
     if (!isObj(s)) fail(400, '상대 정보가 잘못됐어요')
-    const combos = s.combos ?? []
-    if (!listOf(combos, COMBO_VS) || new Set(combos).size !== combos.length || !combos.every(postId)) fail(400, `${what} 조합은 ${COMBO_VS}개까지 고를 수 있어요`)
+    if (!listOf(s.combos ?? [], COMBO_VS)) fail(400, `${what} 조합은 ${COMBO_VS}개까지 만들 수 있어요`)
+    const combos = (s.combos ?? []).map(c => charsOf(c, 3, 3, `${what} 조합 선수`))
+    if (new Set(combos.map(setKey)).size !== combos.length) fail(400, `${what} 쪽에 같은 조합이 두 번 들어갔어요`)
     return { chars: charsOf(s.chars ?? [], 0, COMBO_VS, `${what} 캐릭터`), combos }
   }
   const vs = v.matchups ?? {}
   if (!isObj(vs)) fail(400, '상대 정보가 잘못됐어요')
   const easy = side(vs.easy, '상대하기 편한'), hard = side(vs.hard, '상대하기 힘든')
-  if (easy.chars.some(c => hard.chars.includes(c)) || easy.combos.some(c => hard.combos.includes(c))) fail(400, '같은 캐릭터 · 조합을 편한 쪽과 힘든 쪽에 같이 넣었어요')
+  const hardSets = new Set(hard.combos.map(setKey))
+  if (easy.chars.some(c => hard.chars.includes(c)) || easy.combos.some(c => hardSets.has(setKey(c)))) fail(400, '같은 캐릭터 · 조합을 편한 쪽과 힘든 쪽에 같이 넣었어요')
   return {
     title: text(v.title, 40, '조합 이름'), body: text(v.body ?? '', 1000, '조합 설명', 0, true),
-    chars, positions: positionsOf(chars), tiers, builds, matchups: { easy, hard },
+    chars, positions: positionsOf(chars), builds, matchups: { easy, hard },
   }
 }
 
@@ -503,9 +503,9 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       table: 'tier_lists', likes: 'tier_list_likes', comments: 'tier_list_comments', fk: 'list_id', rpc: ['tier_list_toggle_like', 'p_list'],
       one: 'tier', cols: 'tiers', validate: tierList, extra: b => ({ tiers: b.tiers }),
     },
-    combos: {   // 목록 카드에 추천 티어 · 상대 캐릭터를 보여 주려고 목록에도 준다
+    combos: {   // 목록 카드에 상대 캐릭터를 보여 주려고 목록에도 준다
       table: 'combos', likes: 'combo_likes', comments: 'combo_comments', fk: 'combo_id', rpc: ['combo_toggle_like', 'p_combo'],
-      one: 'combo', cols: 'tiers,builds,matchups', validate: combo, extra: b => ({ tiers: b.tiers, builds: b.builds, matchups: b.matchups }),
+      one: 'combo', cols: 'builds,matchups', validate: combo, extra: b => ({ builds: b.builds, matchups: b.matchups }),
     },
   }
   const nameOf = async user => (await mine(user))?.discord_name ?? user.name
@@ -521,7 +521,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     })
     const itemOf = async id => (await db(`/${B.table}?select=*&id=eq.${id}`))[0] || fail(404, '글을 찾을 수 없어요')
 
-    // ?char=<id> · ?pos=1~5 · ?sort=new(기본)|likes · ?limit=1~100 · ?ids=1,2,3(30개까지 — 조합표가 고른 글만 한 번에 읽는다) (+ 게시판별 필터)
+    // ?char=<id> · ?pos=1~5 · ?sort=new(기본)|likes · ?limit=1~100 · ?ids=1,2,3(30개까지 — 조합표가 고른 잠재력추천 글만 한 번에 읽는다) (+ 게시판별 필터)
     if (action === 'GET') {
       const char = q.get('char'), pos = q.get('pos'), ids = q.get('ids'), limit = Math.min(MAX_LIST, Math.max(1, +q.get('limit') || MAX_LIST))
       const order = q.get('sort') === 'likes' ? 'likes.desc,id.desc' : 'id.desc'

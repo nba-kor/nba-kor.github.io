@@ -1757,14 +1757,14 @@ dbTest('티어표: 검증 · 미출시 선수 · 최신순/추천순 · 댓글 �
 
 // ---------------------------------------------------------------- 조합표
 
-dbTest('조합표: 검증 · 추천 잠재력 · 상대 조합 · ids 목록 · 댓글 · 권한', async () => {
+dbTest('조합표: 검증 · 추천 잠재력 · 상대 조합(3명 세트) · ids 목록 · 댓글 · 권한', async () => {
   const { api } = start()
   const a = { id: uid() }, b = { id: uid() }
   a.as = web(a.id, '조합장인'); b.as = web(b.id, '구경꾼')
-  const [p1, p2, p3, p4, p5] = [...PLAYERS.keys()]
+  const [p1, p2, p3, p4, p5, p6] = [...PLAYERS.keys()]
   const C = {
-    title: '스페이싱 조합', body: '외곽 셋', chars: [p1, p2, p3], tiers: ['골드', '다이아'], builds: [7, null, null],
-    matchups: { easy: { chars: [p4], combos: [] }, hard: { chars: [p5], combos: [] } },
+    title: '스페이싱 조합', body: '외곽 셋', chars: [p1, p2, p3], builds: [7, null, null],
+    matchups: { easy: { chars: [p4], combos: [[p4, p5, p6]] }, hard: { chars: [p5], combos: [] } },
   }
 
   assert.deepEqual((await api('POST', '/api/combos', C)).body, LOGIN)
@@ -1773,26 +1773,29 @@ dbTest('조합표: 검증 · 추천 잠재력 · 상대 조합 · ids 목록 · 
     assert.equal(r.status, 400, r.text)
     assert.match(r.body.error, msg)
   }
+  const set = [p1, p2, p3]
   await bad({ title: '' }, /조합 이름/)
   await bad({ chars: [p1, p2] }, /3명 골라/)
   await bad({ chars: [p1, p1, p2] }, /3명 골라/)
   await bad({ builds: [1, 2] }, /추천 잠재력/)
   await bad({ builds: ['1', null, null] }, /추천 잠재력/)
-  await bad({ tiers: ['챌린저'] }, /추천 티어/)
   await bad({ matchups: { easy: { chars: [p4] }, hard: { chars: [p4] } } }, /같이 넣었어요/)
-  await bad({ matchups: { easy: { combos: [0] } } }, /편한 조합/)
+  await bad({ matchups: { easy: { combos: [set] }, hard: { combos: [[p3, p1, p2]] } } }, /같이 넣었어요/)   // 순서만 다르면 같은 조합
+  await bad({ matchups: { easy: { combos: [set, [p2, p3, p1]] } } }, /두 번/)
+  await bad({ matchups: { easy: { combos: [[p1, p2]] } } }, /편한 조합 선수를 3명/)
+  await bad({ matchups: { easy: { combos: [3] } } }, /편한 조합 선수를 3명/)
+  await bad({ matchups: { easy: { combos: Array(11).fill(set) } } }, /10개까지/)
   await bad({ matchups: { hard: { chars: ['nope'] } } }, /힘든 캐릭터/)
 
-  const c = await api('POST', '/api/combos', { ...C, evil: 1 }, { as: a.as })
+  const c = await api('POST', '/api/combos', { ...C, tiers: ['골드'], evil: 1 }, { as: a.as })
   assert.equal(c.status, 201, c.text)
   const x = c.body.combo
-  assert.deepEqual([x.author, x.chars, x.tiers, x.builds, x.matchups.easy, x.evil], ['조합장인', C.chars, C.tiers, C.builds, { chars: [p4], combos: [] }, undefined])
+  assert.deepEqual([x.author, x.chars, x.builds, x.matchups.easy, x.tiers, x.evil], ['조합장인', C.chars, C.builds, C.matchups.easy, undefined, undefined])
   // 선택 칸은 비워도 된다
   const min = (await api('POST', '/api/combos', { title: '최소', chars: [p3, p4, p5] }, { as: b.as })).body.combo
-  assert.deepEqual([min.tiers, min.builds, min.matchups, min.body], [[], [null, null, null], { easy: { chars: [], combos: [] }, hard: { chars: [], combos: [] } }, ''])
-  // 다른 조합 글을 상대 조합으로
-  const y = (await api('PUT', `/api/combos/${x.id}`, { ...C, matchups: { ...C.matchups, hard: { chars: [p5], combos: [min.id] } } }, { as: a.as })).body.combo
-  assert.deepEqual(y.matchups.hard.combos, [min.id])
+  assert.deepEqual([min.builds, min.matchups, min.body], [[null, null, null], { easy: { chars: [], combos: [] }, hard: { chars: [], combos: [] } }, ''])
+  const y = (await api('PUT', `/api/combos/${x.id}`, { ...C, matchups: { ...C.matchups, hard: { chars: [p5], combos: [set] } } }, { as: a.as })).body.combo
+  assert.deepEqual(y.matchups.hard.combos, [set])
 
   // ?ids= 로 고른 글만 — 없는 번호는 빠진다. 다른 게시판도 같다
   const ids = (await api('GET', `/api/combos?ids=${min.id},${x.id},999999999999`)).body.combos.map(z => z.id).sort()
