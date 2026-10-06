@@ -9,6 +9,7 @@
 | `/` | `index.html` | 소개 / 선수 현황 |
 | `/tactics/` | `tactics/index.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종 + 커스텀 전술(등록 · 좋아요), 재생, 링크 · 카톡 공유 |
 | `/tiers/` | `tiers/index.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유. 올리면 「모두의 티어표」(`?list`, 최신순 · 추천순) 게시판에 뜨고 추천 · 댓글 · 가져오기([티어표 게시판](#티어표-게시판)) |
+| `/combos/` | `combos/index.html` | **조합표** — 선수 3명 조합 게시판. 선수마다 잠재력추천 빌드를 참고로 붙이고, 추천 티어 · 상대하기 편한/힘든 캐릭터와 조합을 고른다. 추천 · 댓글([조합표](#조합표)) |
 | `/potentials/` | `potentials/index.html` | **잠재력추천** — 빨강 · 초록 · 파랑 30칸 잠재력 빌드 게시판. 추천 캐릭터 · 포지션 필터, 추천 · 댓글(디스코드 로그인). API 는 팀원모집 함수를 같이 쓴다([잠재력추천](#잠재력추천)) |
 | `/videos/` | `videos/index.html` | **영상** — 유튜브 링크 게시판. 분류(강의 · 하이라이트 · 공략 · 매드무비 · 기타) · 캐릭터 필터, 추천 · 댓글 · 카톡 공유. 최신 강의는 홈에도 뜬다 |
 | `/recruit/` | `recruit/index.html` | **팀원모집** — 디스코드 로그인 · 방 만들기·가입(TNAB 봇과 같은 목록), 디스코드 알림 + 빈 음성채널 배정, 카카오톡 공유, 3시간 뒤 자동 삭제 |
@@ -21,7 +22,7 @@
 
 ```
 robots.txt              색인 허용 + /discord/ 제외 + sitemap 위치
-sitemap.xml             여섯 페이지. 새 페이지를 만들면 여기에도 넣는다
+sitemap.xml             일곱 페이지. 새 페이지를 만들면 여기에도 넣는다
 assets/og.jpg           1200x630 미리보기 이미지 (tools/og-image.py 가 생성)
 assets/icon.png         512x512 파비콘 · 홈 화면 아이콘 (같은 스크립트)
 index.html 의 ld+json   검색 결과의 사이트 이름 (WebSite 구조화 데이터)
@@ -578,6 +579,23 @@ supabase/migrations/20261006000000_tier_lists.sql   tier_lists · tier_list_like
 
 처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → Redirect URLs 에 `/tiers/` 추가 → `sh tools/deploy-api.sh` → main 푸시.
 
+## 조합표
+
+선수 3명 조합 게시판. 서버는 같은 게시판 코드(`BOARDS.combos`), 화면은 `assets/combos.js`(`?c=<id>` 글, 없으면 목록).
+
+```
+combos/index.html · assets/combos.js            화면
+supabase/migrations/20261006100000_combos.sql   combos · combo_likes · combo_comments + 추천 RPC
+```
+
+- 선수는 정확히 3명(한국 서버). 고른 순서대로 선수마다 **잠재력추천 글을 하나씩 참고로** 붙일 수 있다(`builds` — 선수 순서와 같은 3칸, 글 번호 | null). 글쓰기 화면은 `GET /api/builds?char=<id>&sort=likes` 로 그 캐릭터를 추천한 빌드를 고르게 한다.
+- 추천 티어는 `data/recruit.json` 의 `tiers` 중 여러 개(선택). 티어를 바꾸면 함수도 다시 배포한다.
+- 상대하기 편한 · 힘든 쪽마다 캐릭터 10명 · 다른 조합 글 10개까지(`matchups.easy|hard.chars|combos`). 한 캐릭터 · 조합은 한쪽에만.
+- 잠재력추천 · 상대 조합은 **글 번호만 저장**하고, 글 화면이 게시판 공용 `?ids=1,2,3`(30개까지) 목록으로 한 번에 읽는다 — 지워진 글은 빠지고 「지워졌어요」 로 보인다.
+- 카톡 공유: 선수 3줄(포지션 · 추천 빌드 제목) + 추천 티어 · 상성 줄 + 설명 줄(있을 때) — 4 · 5줄 사용자 정의 템플릿, 3줄뿐이면 기본 카드.
+
+처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → Redirect URLs 에 `/combos/` 추가 → `sh tools/deploy-api.sh` → main 푸시.
+
 ## 카카오 4 · 5줄 리스트
 
 기본 리스트 템플릿은 3줄이 최대라, 카카오 디벨로퍼스 메시지 템플릿 빌더로 **사용자 정의 리스트 4줄(137568) · 5줄(137513)** 을 만들어 쓴다.
@@ -590,7 +608,7 @@ supabase/migrations/20261006000000_tier_lists.sql   tier_lists · tier_list_like
 | `BTN1` · `BTN1_PATH` · `BTN2` · `BTN2_PATH` | 버튼 두 개 이름 · 링크 |
 
 링크 변수는 사이트 도메인 뒤의 경로 · 쿼리만 넘긴다(`potentials/?b=3`). 버튼 이름은 5자 이내(넘으면 두 줄). 변수가 하나라도 빠지면 카드에 `${…}` 가 그대로 보이므로 늘 전부 채운다.
-쓰는 곳: 티어표(티어 4줄 + 작성자 줄), 잠재력추천(추천 캐릭터 + 합계 → 색깔별 대표 잠재력 → 빌드 설명이 있으면 5줄, 없으면 4줄), 전술판(등록된 커스텀, 4줄: 공격 3 + 설명). 팀원모집 · 영상 · TNAB 봇은 기본 템플릿 그대로.
+쓰는 곳: 티어표(티어 4줄 + 작성자 줄), 조합표(선수 3줄 + 티어 · 상성 + 설명), 잠재력추천(추천 캐릭터 + 합계 → 색깔별 대표 잠재력 → 빌드 설명이 있으면 5줄, 없으면 4줄), 전술판(등록된 커스텀, 4줄: 공격 3 + 설명). 팀원모집 · 영상 · TNAB 봇은 기본 템플릿 그대로.
 
 ## 배포 전: 캐시 무효화
 
@@ -611,8 +629,8 @@ GitHub Pages 는 모든 파일에 `Cache-Control: max-age=600` 만 준다. 그�
 
 | 대상 | 파일 |
 | --- | --- |
-| 페이지 | `index.html`, `tactics/index.html`, `tiers/index.html`, `recruit/index.html`, `potentials/index.html`, `videos/index.html` |
-| 자원 | `assets/style.css`, `app.js`, `auth.js`, `board.js`, `court.js`, `tactics.js`, `tiers.js`, `recruit.js`, `potentials.js`, `videos.js` |
+| 페이지 | `index.html`, `tactics/index.html`, `tiers/index.html`, `recruit/index.html`, `potentials/index.html`, `videos/index.html`, `combos/index.html` |
+| 자원 | `assets/style.css`, `app.js`, `auth.js`, `board.js`, `court.js`, `tactics.js`, `tiers.js`, `recruit.js`, `potentials.js`, `videos.js`, `combos.js` |
 
 다른 스크립트가 import 하는 모듈은 import 구문에도 버전이 박히고, 그걸 박은 결과로 다시 해시를 낸다.
 `app.js` → `court.js` → `tactics.js` · `recruit.js` (그리고 `app.js` → `board.js` → `tiers.js`) 순으로 번지므로

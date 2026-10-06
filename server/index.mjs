@@ -32,9 +32,10 @@ const AUTH_MEMO = { ms: 60_000, max: 500 }         // 로그인 토큰 확인 �
 const ROUTE_KINDS = ['move', 'pass', 'screen']
 const LINK = /:\/\/|www\.|discord\.gg/i
 const TEAM_ID = /^[A-Za-z0-9_-]{8}$/
-// 게시판(잠재력추천 builds · 영상 videos · 커스텀 전술 tactics · 티어표 tiers): /api/<게시판>[/<id>[/like | /comments[/<댓글 id>]]]
-const BOARD_PATH = /^\/api\/(builds|videos|tactics|tiers)(?:\/(\d{1,15})(?:\/(like|comments)(?:\/(\d{1,15}))?)?)?$/
+// 게시판(잠재력추천 builds · 영상 videos · 커스텀 전술 tactics · 티어표 tiers · 조합표 combos): /api/<게시판>[/<id>[/like | /comments[/<댓글 id>]]]
+const BOARD_PATH = /^\/api\/(builds|videos|tactics|tiers|combos)(?:\/(\d{1,15})(?:\/(like|comments)(?:\/(\d{1,15}))?)?)?$/
 const BUILD_CHARS = 5
+const COMBO_VS = 10   // 조합표: 상대하기 편한 · 힘든 쪽마다 캐릭터 · 조합 수
 // 유튜브 주소 → 영상 id(11자). watch?v= · youtu.be · shorts · live · embed, www · m · music 서브도메인
 const YOUTUBE = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/
 const CATEGORIES = new Set(videosData.categories.map(c => c.id))
@@ -155,7 +156,7 @@ function tactic(v) {
 const positionsOf = chars => [...new Set(chars.map(c => PLAYERS.get(c).pos))].sort()
 function charsOf(v, min, max, what) {
   if (!listOf(v, max, min) || new Set(v).size !== v.length || !v.every(c => typeof c === 'string' && PLAYERS.has(c))) {
-    fail(400, min ? `${what}를 ${min}~${max}명 골라 주세요` : `${what}는 ${max}명까지 고를 수 있어요`)
+    fail(400, min ? `${what}를 ${min === max ? max : `${min}~${max}`}명 골라 주세요` : `${what}는 ${max}명까지 고를 수 있어요`)
   }
   return v
 }
@@ -202,6 +203,32 @@ function tierList(v) {
   if (!seen.size) fail(400, '티어에 선수를 한 명 이상 올려 주세요')
   const chars = [...seen].filter(id => PLAYERS.has(id))
   return { title: text(v.title, 40, '제목'), body: text(v.body ?? '', 500, '설명', 0, true), tiers, chars, positions: positionsOf(chars) }
+}
+
+/** 조합표 글: 이름 · 선수 3명(+ 선수마다 참고할 잠재력추천 글) · 추천 티어 · 상대하기 편한/힘든 캐릭터 · 조합 글 · 설명.
+ *  글 번호는 모양만 본다 — 지워진 글은 화면이 빼고 보여 준다 */
+function combo(v) {
+  if (!isObj(v)) fail(400, '요청 형식이 잘못됐어요')
+  const chars = charsOf(v.chars, 3, 3, '조합 선수')
+  const postId = x => Number.isInteger(x) && x > 0 && x < 1e15
+  const builds = v.builds ?? [null, null, null]
+  if (!listOf(builds, 3, 3) || !builds.every(x => x === null || postId(x))) fail(400, '추천 잠재력 정보가 잘못됐어요')
+  const tiers = v.tiers ?? []
+  if (!listOf(tiers, CFG.tiers.length) || new Set(tiers).size !== tiers.length || !tiers.every(x => CFG.tiers.includes(x))) fail(400, '추천 티어가 잘못됐어요')
+  const side = (s = {}, what) => {
+    if (!isObj(s)) fail(400, '상대 정보가 잘못됐어요')
+    const combos = s.combos ?? []
+    if (!listOf(combos, COMBO_VS) || new Set(combos).size !== combos.length || !combos.every(postId)) fail(400, `${what} 조합은 ${COMBO_VS}개까지 고를 수 있어요`)
+    return { chars: charsOf(s.chars ?? [], 0, COMBO_VS, `${what} 캐릭터`), combos }
+  }
+  const vs = v.matchups ?? {}
+  if (!isObj(vs)) fail(400, '상대 정보가 잘못됐어요')
+  const easy = side(vs.easy, '상대하기 편한'), hard = side(vs.hard, '상대하기 힘든')
+  if (easy.chars.some(c => hard.chars.includes(c)) || easy.combos.some(c => hard.combos.includes(c))) fail(400, '같은 캐릭터 · 조합을 편한 쪽과 힘든 쪽에 같이 넣었어요')
+  return {
+    title: text(v.title, 40, '조합 이름'), body: text(v.body ?? '', 1000, '조합 설명', 0, true),
+    chars, positions: positionsOf(chars), tiers, builds, matchups: { easy, hard },
+  }
 }
 
 /** 잠재력 빌드 글. cat = data/potentials.json(능력치는 최대 레벨 기준). 칸은 비워 둘 수 있지만 한 칸은 채워야 한다 */
@@ -448,7 +475,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     catch { fail(400, '요청 형식이 잘못됐어요') }
   }
 
-  // ------------------------------------------------ 게시판(잠재력추천 · 영상 · 커스텀 전술 · 티어표) — 읽기는 공개, 쓰기 · 추천 · 댓글은 로그인
+  // ------------------------------------------------ 게시판(잠재력추천 · 영상 · 커스텀 전술 · 티어표 · 조합표) — 읽기는 공개, 쓰기 · 추천 · 댓글은 로그인
   // 글 · 추천 · 댓글 표가 게시판마다 한 벌씩 있고 모양이 같다. 다른 것은 표 이름 · 글 검증 · 게시판만의 칸 · 목록 필터
 
   const BOARDS = {
@@ -476,6 +503,10 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       table: 'tier_lists', likes: 'tier_list_likes', comments: 'tier_list_comments', fk: 'list_id', rpc: ['tier_list_toggle_like', 'p_list'],
       one: 'tier', cols: 'tiers', validate: tierList, extra: b => ({ tiers: b.tiers }),
     },
+    combos: {   // 목록 카드에 추천 티어 · 상대 캐릭터를 보여 주려고 목록에도 준다
+      table: 'combos', likes: 'combo_likes', comments: 'combo_comments', fk: 'combo_id', rpc: ['combo_toggle_like', 'p_combo'],
+      one: 'combo', cols: 'tiers,builds,matchups', validate: combo, extra: b => ({ tiers: b.tiers, builds: b.builds, matchups: b.matchups }),
+    },
   }
   const nameOf = async user => (await mine(user))?.discord_name ?? user.name
 
@@ -490,12 +521,14 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     })
     const itemOf = async id => (await db(`/${B.table}?select=*&id=eq.${id}`))[0] || fail(404, '글을 찾을 수 없어요')
 
-    if (action === 'GET') {   // ?char=<id> · ?pos=1~5 · ?sort=new(기본)|likes · ?limit=1~100 (+ 게시판별 필터)
-      const char = q.get('char'), pos = q.get('pos'), limit = Math.min(MAX_LIST, Math.max(1, +q.get('limit') || MAX_LIST))
+    // ?char=<id> · ?pos=1~5 · ?sort=new(기본)|likes · ?limit=1~100 · ?ids=1,2,3(30개까지 — 조합표가 고른 글만 한 번에 읽는다) (+ 게시판별 필터)
+    if (action === 'GET') {
+      const char = q.get('char'), pos = q.get('pos'), ids = q.get('ids'), limit = Math.min(MAX_LIST, Math.max(1, +q.get('limit') || MAX_LIST))
       const order = q.get('sort') === 'likes' ? 'likes.desc,id.desc' : 'id.desc'
       const rows = await db(`/${B.table}?select=id,author_id,author_name,title,chars,likes,comments,created_at,updated_at,${B.cols}`
         + (char && PLAYERS.has(char) ? `&chars=cs.${enc(`{${char}}`)}` : '')
         + (/^[1-5]$/.test(pos || '') ? `&positions=cs.${enc(`{${pos}}`)}` : '')
+        + (/^\d{1,15}(?:,\d{1,15}){0,29}$/.test(ids || '') ? `&id=in.(${ids})` : '')
         + (B.filter?.(q) || '')
         + `&order=${order}&limit=${limit}`)
       return [200, { [kind]: rows.map(view) }]

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>조합표 · NBA덩크시티-TNAB</title>
+<meta name="description" content="NBA 덩크 시티 3:3 조합표. 선수 3명 조합과 추천 잠재력 · 추천 티어 · 상대하기 편한/힘든 캐릭터와 조합을 찾아보고 추천 · 댓글을 남기세요.">
+<link rel="canonical" href="https://nba-kor.github.io/combos/">
+<link rel="icon" href="/assets/icon.png?v=1" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icon.png?v=1">
+<meta name="theme-color" content="#0d1117">
+<!-- 카카오톡 · 디스코드 · 트위터 미리보기. 이미지를 바꾸면 ?v= 도 올린다(카카오는 URL 로 캐시한다) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="NBA덩크시티-TNAB">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:url" content="https://nba-kor.github.io/combos/">
+<meta property="og:title" content="조합표 · NBA덩크시티-TNAB">
+<meta property="og:description" content="NBA 덩크 시티 3:3 조합표. 선수 3명 조합과 추천 잠재력 · 추천 티어 · 상대하기 편한/힘든 캐릭터와 조합을 찾아보고 추천 · 댓글을 남기세요.">
+<meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="NBA덩크시티-TNAB — 3:3 전술판 · 티어표 · 팀원모집">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/assets/style.css?v=d78c6c90">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">NBA 덩크 시티 <span>TNAB</span></div>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/tactics/">전술판</a>
+    <a href="/tiers/">티어표</a>
+    <a href="/combos/">조합표</a>
+    <a href="/potentials/">잠재력추천</a>
+    <a href="/videos/">영상</a>
+    <a href="/recruit/">팀원모집</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="rc-auth" id="auth" aria-live="polite"></div>
+</header>
+
+<main class="recruit pt cb">
+
+  <!-- 글 쓰기 · 고치기 — 로그인한 사람만 -->
+  <section id="form-view" class="card rc-create" hidden>
+    <form id="combo-form" novalidate>
+      <h2 id="form-title">조합 등록</h2>
+      <label class="rc-fld">
+        <span>조합 이름</span>
+        <input type="text" name="title" maxlength="40" autocomplete="off" placeholder="예) 커리 · 그린 · 듀란트 스페이싱" required>
+      </label>
+      <fieldset>
+        <legend>선수 3명 <small>누른 순서대로 1 · 2 · 3번</small></legend>
+        <div id="form-chars"></div>
+        <small class="rc-hint">선수마다 잠재력추천에 올라온 빌드를 골라 참고로 붙일 수 있어요(선택)</small>
+        <div id="form-builds" class="cb-bpicks"></div>
+      </fieldset>
+      <fieldset>
+        <legend>추천 티어 <small>선택 · 여러 개</small></legend>
+        <div class="rc-seg-opts cb-tier-opts" id="form-tiers"></div>
+      </fieldset>
+      <fieldset>
+        <legend>😀 상대하기 편한 캐릭터 · 조합 <small>선택 · 각각 10개까지</small></legend>
+        <div id="form-easy-chars"></div>
+        <small class="rc-hint">다른 조합 (추천순)</small>
+        <div id="form-easy-combos" class="cb-refs"></div>
+      </fieldset>
+      <fieldset>
+        <legend>😣 상대하기 힘든 캐릭터 · 조합 <small>선택 · 각각 10개까지</small></legend>
+        <div id="form-hard-chars"></div>
+        <small class="rc-hint">다른 조합 (추천순)</small>
+        <div id="form-hard-combos" class="cb-refs"></div>
+      </fieldset>
+      <label class="rc-fld">
+        <span>조합 설명 <small>선택</small></span>
+        <textarea name="body" rows="4" maxlength="1000" placeholder="예) 커리가 볼을 들고 그린이 스크린, 듀란트는 코너에서 대기. 빅맨이 느린 조합에 강해요"></textarea>
+      </label>
+      <p class="rc-form-err" role="alert" hidden></p>
+      <div class="rc-actions">
+        <button type="button" id="form-cancel">취소</button>
+        <button type="submit" class="primary rc-big">저장</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ?c 없음: 목록 -->
+  <section id="list-view" hidden>
+    <div class="rc-hero">
+      <div>
+        <h1>조합표</h1>
+        <p class="rc-lead">3:3 선수 조합을 모았어요. 선수별 추천 잠재력 · 추천 티어 · 상대하기 편한/힘든 캐릭터와 조합을 같이 보고, 좋은 조합엔 추천을 남겨 주세요.</p>
+        <p class="rc-muted rc-need" id="need" hidden></p>
+      </div>
+      <button id="new" class="primary rc-big" type="button">+ 조합 등록</button>
+    </div>
+    <div class="card pt-filter">
+      <div class="pt-sort" role="group" aria-label="정렬">
+        <button type="button" data-sort="likes">추천순</button>
+        <button type="button" data-sort="new">최신순</button>
+      </div>
+      <div id="filter-chars"></div>
+    </div>
+    <div id="list" class="rc-list pt-list"></div>
+  </section>
+
+  <!-- ?c=<id>: 글 -->
+  <section id="item-view" hidden>
+    <a class="rc-back" href="/combos/">← 목록</a>
+    <p class="rc-form-err" id="item-error" hidden></p>
+    <div id="item-body"></div>
+  </section>
+
+</main>
+
+<script type="module" src="/assets/combos.js?v=1e4bf6be"></script>
+</body>
+</html>
