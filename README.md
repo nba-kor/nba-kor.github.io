@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `/` | `index.html` | 소개 / 선수 현황 |
 | `/tactics/` | `tactics/index.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종 + 커스텀 전술(등록 · 좋아요), 재생, 링크 · 카톡 공유 |
-| `/tiers/` | `tiers/index.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유 |
+| `/tiers/` | `tiers/index.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유. 올리면 「모두의 티어표」(`?list`, 최신순 · 추천순) 게시판에 뜨고 추천 · 댓글 · 가져오기([티어표 게시판](#티어표-게시판)) |
 | `/potentials/` | `potentials/index.html` | **잠재력추천** — 빨강 · 초록 · 파랑 30칸 잠재력 빌드 게시판. 추천 캐릭터 · 포지션 필터, 추천 · 댓글(디스코드 로그인). API 는 팀원모집 함수를 같이 쓴다([잠재력추천](#잠재력추천)) |
 | `/videos/` | `videos/index.html` | **영상** — 유튜브 링크 게시판. 분류(강의 · 하이라이트 · 공략 · 매드무비 · 기타) · 캐릭터 필터, 추천 · 댓글 · 카톡 공유. 최신 강의는 홈에도 뜬다 |
 | `/recruit/` | `recruit/index.html` | **팀원모집** — 디스코드 로그인 · 방 만들기·가입(TNAB 봇과 같은 목록), 디스코드 알림 + 빈 음성채널 배정, 카카오톡 공유, 3시간 뒤 자동 삭제 |
@@ -321,7 +321,7 @@ publishable key 나 로그인 토큰으로는 표를 읽거나 쓸 수 없다. �
 4. **디스코드 로그인** — [Discord Developer Portal](https://discord.com/developers/applications) 의 애플리케이션 **OAuth2 > Redirects** 에
    `https://lgchgqxjjlapszmxarun.supabase.co/auth/v1/callback` 을 넣고 Client ID · Client Secret 을 복사한다.
    Supabase **Authentication > Sign In / Providers > Discord** 를 켜고 둘을 넣는다(이메일 없는 디스코드 계정도 되게 이메일 필수는 끈다).
-   **Authentication > URL Configuration** 의 Site URL 은 `https://nba-kor.github.io/recruit/`, Redirect URLs 에 `https://nba-kor.github.io/recruit/` · `https://nba-kor.github.io/potentials/` · `https://nba-kor.github.io/videos/` · `https://nba-kor.github.io/tactics/` · `http://localhost:8000/recruit/` · `http://localhost:8000/potentials/` · `http://localhost:8000/videos/`
+   **Authentication > URL Configuration** 의 Site URL 은 `https://nba-kor.github.io/recruit/`, Redirect URLs 에 `https://nba-kor.github.io/recruit/` · `https://nba-kor.github.io/potentials/` · `https://nba-kor.github.io/videos/` · `https://nba-kor.github.io/tactics/` · `https://nba-kor.github.io/tiers/` · `http://localhost:8000/recruit/` · `http://localhost:8000/potentials/` · `http://localhost:8000/videos/`
    (로그인은 누른 페이지로 돌아온다 — `assets/auth.js`. 목록에 없는 페이지는 Site URL 로 떨어진다).
    Client Secret 은 함수 비밀값이 아니다 — `.env` 에 두고 `secrets set` 으로 올리지 않는다.
 
@@ -563,6 +563,21 @@ GET /api/tactics?sort=likes      목록(보드 없이) · GET /api/tactics/<id> 
 
 처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → Redirect URLs 에 `/tactics/` 추가 → `sh tools/deploy-api.sh` → main 푸시.
 
+## 티어표 게시판
+
+티어표 편집기의 「티어표 올리기」(디스코드 로그인)로 지금 티어표에 제목 · 설명을 붙여 올린다. 서버는 같은 게시판 코드(`BOARDS.tiers`)이고 화면은 `assets/tiers.js` 한 파일이 주소로 나눈다.
+
+```
+/tiers/             편집기(localStorage 에 저장) · /tiers/?edit=<id> 내 글을 불러와 「수정 저장」
+/tiers/?list        모두의 티어표 — 최신순(기본) · 추천순, 카드에 작은 티어표
+/tiers/?t=<id>      글 — 추천 · 댓글 · 카톡 공유(티어 4줄 + 작성자 줄) · 「내 티어표로 가져와 고치기」
+supabase/migrations/20261006000000_tier_lists.sql   tier_lists · tier_list_likes · tier_list_comments + 추천 RPC
+```
+
+- 티어 1~12줄, 이름 10자 · 색 `#rrggbb` · 선수는 한 줄에만. 미출시 선수도 올릴 수 있다(`chars` 에는 한국 서버 선수만 들어간다).
+
+처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → Redirect URLs 에 `/tiers/` 추가 → `sh tools/deploy-api.sh` → main 푸시.
+
 ## 카카오 4 · 5줄 리스트
 
 기본 리스트 템플릿은 3줄이 최대라, 카카오 디벨로퍼스 메시지 템플릿 빌더로 **사용자 정의 리스트 4줄(137568) · 5줄(137513)** 을 만들어 쓴다.
@@ -575,7 +590,7 @@ GET /api/tactics?sort=likes      목록(보드 없이) · GET /api/tactics/<id> 
 | `BTN1` · `BTN1_PATH` · `BTN2` · `BTN2_PATH` | 버튼 두 개 이름 · 링크 |
 
 링크 변수는 사이트 도메인 뒤의 경로 · 쿼리만 넘긴다(`potentials/?b=3`). 버튼 이름은 5자 이내(넘으면 두 줄). 변수가 하나라도 빠지면 카드에 `${…}` 가 그대로 보이므로 늘 전부 채운다.
-쓰는 곳: 잠재력추천(추천 캐릭터 + 합계 → 색깔별 대표 잠재력 → 빌드 설명이 있으면 5줄, 없으면 4줄), 전술판(등록된 커스텀, 4줄: 공격 3 + 설명). 팀원모집 · 영상 · TNAB 봇은 기본 템플릿 그대로.
+쓰는 곳: 티어표(티어 4줄 + 작성자 줄), 잠재력추천(추천 캐릭터 + 합계 → 색깔별 대표 잠재력 → 빌드 설명이 있으면 5줄, 없으면 4줄), 전술판(등록된 커스텀, 4줄: 공격 3 + 설명). 팀원모집 · 영상 · TNAB 봇은 기본 템플릿 그대로.
 
 ## 배포 전: 캐시 무효화
 
@@ -600,7 +615,7 @@ GitHub Pages 는 모든 파일에 `Cache-Control: max-age=600` 만 준다. 그�
 | 자원 | `assets/style.css`, `app.js`, `auth.js`, `board.js`, `court.js`, `tactics.js`, `tiers.js`, `recruit.js`, `potentials.js`, `videos.js` |
 
 다른 스크립트가 import 하는 모듈은 import 구문에도 버전이 박히고, 그걸 박은 결과로 다시 해시를 낸다.
-`app.js` → `court.js` → `tactics.js` · `recruit.js` (그리고 `app.js` → `tiers.js`) 순으로 번지므로
+`app.js` → `court.js` → `tactics.js` · `recruit.js` (그리고 `app.js` → `board.js` → `tiers.js`) 순으로 번지므로
 `app.js` 만 고쳐도 줄줄이 새 URL 이 된다. JS 파일이나 페이지를 새로 만들면 스크립트의 `ASSETS` · `PAGES` 에
 넣는다 — `ASSETS` 는 import 되는 쪽이 앞이어야 하고, 순서가 틀리면 에러로 알려준다.
 

@@ -1710,3 +1710,47 @@ dbTest('커스텀 전술: 보드 검증 · 좋아요순 목록 · 댓글 없음 
   for (const [x, who] of [[t, a], [t2, b]]) assert.equal((await api('DELETE', `/api/tactics/${x.id}`, undefined, { as: who.as })).status, 200)
   assert.deepEqual(await rows(`/custom_tactic_likes?tactic_id=eq.${t.id}`), [])
 })
+
+// ---------------------------------------------------------------- 티어표
+
+dbTest('티어표: 검증 · 미출시 선수 · 최신순/추천순 · 댓글 · 권한', async () => {
+  const { api } = start()
+  const a = { id: uid() }, b = { id: uid() }
+  a.as = web(a.id, '티어장인'); b.as = web(b.id, '구경꾼')
+  const cn = data('upcoming.json').players.find(p => p.server !== 'kr').id
+  const T = { title: '내 티어', body: '솔랭 기준', tiers: [{ label: 'S', color: '#ff7f7f', ids: ['bl', cn] }, { label: 'A', color: '#ffbf7f', ids: [] }] }
+
+  assert.deepEqual((await api('POST', '/api/tiers', T)).body, LOGIN)
+  const bad = async (patch, msg) => {
+    const r = await api('POST', '/api/tiers', { ...T, ...patch }, { as: a.as })
+    assert.equal(r.status, 400, r.text)
+    assert.match(r.body.error, msg)
+  }
+  await bad({ title: '' }, /제목/)
+  await bad({ tiers: [] }, /1~12줄/)
+  await bad({ tiers: [{ label: 'S', color: 'red', ids: ['bl'] }] }, /티어 정보/)
+  await bad({ tiers: [{ label: 'S', color: '#ffffff', ids: ['nope'] }] }, /없는 선수/)
+  await bad({ tiers: [{ label: 'S', color: '#ffffff', ids: ['bl'] }, { label: 'A', color: '#ffffff', ids: ['bl'] }] }, /두 번/)
+  await bad({ tiers: [{ label: 'S', color: '#ffffff', ids: [] }] }, /한 명 이상/)
+
+  const c = await api('POST', '/api/tiers', T, { as: a.as })
+  assert.equal(c.status, 201, c.text)
+  const t = c.body.tier
+  assert.deepEqual([t.author, t.chars, t.tiers[0].ids], ['티어장인', ['bl'], ['bl', cn]])   // chars 는 한국 서버 선수만
+
+  const t2 = (await api('POST', '/api/tiers', { ...T, title: '두 번째' }, { as: b.as })).body.tier
+  assert.deepEqual((await api('POST', `/api/tiers/${t.id}/like`, undefined, { as: b.as })).body, { liked: true, likes: 1 })
+  const list = async sort => (await api('GET', `/api/tiers?sort=${sort}`)).body.tiers
+  const at = (l, x) => l.findIndex(y => y.id === x.id)
+  const [byNew, byLikes] = [await list('new'), await list('likes')]
+  assert.ok(at(byNew, t2) < at(byNew, t) && at(byLikes, t) < at(byLikes, t2))
+  assert.deepEqual(byNew[at(byNew, t)].tiers, t.tiers)   // 목록 카드도 티어를 그린다
+  assert.equal((await api('POST', `/api/tiers/${t.id}/comments`, { body: '동의' }, { as: b.as })).status, 201)
+  const d = (await api('GET', `/api/tiers/${t.id}`, undefined, { as: b.as })).body
+  assert.deepEqual([d.liked, d.tier.comments, d.comments[0].body], [true, 1, '동의'])
+
+  assert.equal((await api('PUT', `/api/tiers/${t.id}`, T, { as: b.as })).status, 403)
+  assert.equal((await api('PUT', `/api/tiers/${t.id}`, { ...T, title: '고침' }, { as: a.as })).body.tier.title, '고침')
+  for (const [x, who] of [[t, a], [t2, b]]) assert.equal((await api('DELETE', `/api/tiers/${x.id}`, undefined, { as: who.as })).status, 200)
+  assert.deepEqual(await rows(`/tier_list_comments?list_id=eq.${t.id}`), [])
+})

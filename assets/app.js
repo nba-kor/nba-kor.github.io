@@ -3,6 +3,9 @@
 // 우클릭 메뉴를 막는다. 터치에서는 길게 누르기 메뉴도 같이 막혀,
 // 칩을 꾹 눌러 드래그를 시작할 때 OS 메뉴가 끼어들지 않는 이점도 있다.
 addEventListener('contextmenu', e => e.preventDefault())
+// 브라우저 기본 드래그를 막는다 — 선수 얼굴(img)을 끌다 놓치면 브라우저가 그 그림 주소를 새 탭으로 열어 버린다.
+// 드래그는 전부 아래 startDrag(포인터 이벤트)로 한다
+addEventListener('dragstart', e => e.preventDefault())
 
 export const POS = ['', 'PG', 'SG', 'SF', 'PF', 'C']
 export const POS_KO = ['', '포인트가드', '슈팅가드', '스몰포워드', '파워포워드', '센터']
@@ -51,7 +54,7 @@ export function chipEl(p) {
   el.dataset.id = p.id
   el.dataset.server = p.server
   el.title = `${p.name}${p.en ? ` (${p.en})` : ''} · ${POS_KO[p.pos]}${p.height ? ` · ${p.height}cm` : ''}`
-  el.innerHTML = `<img src="${faceOf(p)}" alt="" loading="lazy"><span class="nm"></span><span class="pos pos-${p.pos}"></span>`
+  el.innerHTML = `<img src="${faceOf(p)}" alt="" loading="lazy" draggable="false"><span class="nm"></span><span class="pos pos-${p.pos}"></span>`
   el.querySelector('.nm').textContent = p.short || p.name
   el.querySelector('.pos').textContent = POS[p.pos]
   return el

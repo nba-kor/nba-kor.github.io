@@ -1,5 +1,5 @@
 // 게시판 공용 — 잠재력추천 · 영상이 같이 쓴다: 로그인 표시, 캐릭터 고르기, 목록 카드 틀, 글 머리(추천 · 공유 · 수정 · 삭제), 댓글
-import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=0dc0778c'
+import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=2ce73e96'
 import { api, initAuth, login, logout, session, IN_KAKAO } from './auth.js?v=5d44380b'
 
 export const $ = (s, root = document) => root.querySelector(s)
@@ -98,10 +98,10 @@ export function charGrid({ isOn, pick, onPos }) {
 
 /**
  * 목록 화면: 정렬 버튼([data-sort]) · 포지션/캐릭터 필터(#filter-chars) · 카드(#list). load(qs) 가 [글] 을 돌려주고 card(글) 가 카드를 만든다.
- * extra() = 게시판만의 필터를 쿼리에 더한다. 돌려주는 reload() 로 그 필터가 바뀌었을 때 다시 읽는다
+ * extra() = 게시판만의 필터를 쿼리에 더한다. sort = 처음 정렬(likes | new). 돌려주는 reload() 로 그 필터가 바뀌었을 때 다시 읽는다
  */
-export function listView({ load, card, empty, extra = () => ({}) }) {
-  const filter = { sort: 'likes', pos: 0, char: '' }
+export function listView({ load, card, empty, extra = () => ({}), sort = 'likes' }) {
+  const filter = { sort, pos: 0, char: '' }
   let seq = 0
   async function reload() {
     for (const b of document.querySelectorAll('[data-sort]')) b.setAttribute('aria-pressed', b.dataset.sort === filter.sort)

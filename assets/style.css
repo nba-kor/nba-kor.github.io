@@ -60,7 +60,7 @@ a { color: var(--accent-2); }
 .top .menu-btn { display: none; width: 38px; height: 38px; padding: 0; font-size: 20px; }
 
 /* ---------- 버튼 / 입력 ---------- */
-button, select, input[type="text"], input[type="search"] {
+button, a.btn, select, input[type="text"], input[type="search"] {
   font: inherit;
   color: var(--text);
   background: var(--panel-2);
@@ -69,8 +69,9 @@ button, select, input[type="text"], input[type="search"] {
   padding: 6px 10px;
 }
 button { cursor: pointer; }
-button:hover { border-color: var(--muted); }
-button.primary { background: var(--accent); color: #1a1200; border-color: transparent; font-weight: 700; }
+a.btn { display: inline-block; text-decoration: none; }
+button:hover, a.btn:hover { border-color: var(--muted); }
+button.primary, a.btn.primary { background: var(--accent); color: #1a1200; border-color: transparent; font-weight: 700; }
 button.on { background: var(--accent-2); color: #06121f; border-color: transparent; font-weight: 700; }
 button.danger:hover { border-color: var(--def); color: var(--def); }
 label.check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
@@ -108,7 +109,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
   white-space: nowrap;
 }
 .chip:hover { border-color: var(--accent); }
-.chip img { width: 30px; height: 30px; border-radius: 50%; background: #0b0f16; flex: none; }
+.chip img { -webkit-user-drag: none; width: 30px; height: 30px; border-radius: 50%; background: #0b0f16; flex: none; }
 .chip .nm { font-size: 13px; font-weight: 600; }
 .chip .pos { font-size: 10px; font-weight: 800; color: #06121f; background: var(--muted); border-radius: 4px; padding: 1px 4px; }
 .chip[data-server="cn"] { border-style: dashed; opacity: .92; }
@@ -191,7 +192,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .tier-head .title:hover, .tier-head .title:focus { border-color: var(--line); outline: none; }
 
 .tier-board { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
-.tier-row { display: flex; border-bottom: 1px solid var(--line); min-height: 76px; }
+.tier-row { display: flex; border-bottom: 1px solid var(--line); min-height: 120px; }
 .tier-row:last-child { border-bottom: 0; }
 .tier-label {
   width: 92px; flex: none; display: flex; align-items: center; justify-content: center;
@@ -202,6 +203,25 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .tier-drop.over { background: #ffffff0d; }
 .tier-ctl { flex: none; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 4px 6px; border-left: 1px solid var(--line); }
 .tier-ctl button { padding: 2px 7px; font-size: 11px; line-height: 1.4; }
+
+/* 티어 칸 · 선수 목록의 칩은 큰 초상화 카드 — 얼굴 아래 포지션 · 이름 */
+:is(.tier-drop, .pool) .chip { flex-direction: column; gap: 3px; width: 84px; padding: 4px 4px 6px; border-radius: 10px; white-space: normal; text-align: center; }
+:is(.tier-drop, .pool) .chip img { width: 72px; height: 72px; }
+:is(.tier-drop, .pool) .chip .pos { order: 1; }
+:is(.tier-drop, .pool) .chip .nm { order: 2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+:is(.tier-drop, .pool) .chip[data-server="cn"] .nm::after { display: block; margin: 0; }
+.tiers[hidden] { display: none; }
+.tier-pub:not([hidden]) { display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+.tier-pub label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.tier-pub textarea { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; resize: vertical; }
+.recruit .tier-board .tier-label { display: flex; }
+.recruit .tier-board { margin-bottom: 12px; }
+/* 목록 카드의 작은 티어표 */
+.tl-mini { display: flex; flex-direction: column; gap: 3px; }
+.tl-mini > div { display: flex; align-items: center; gap: 3px; min-width: 0; }
+.tl-mini b { flex: none; min-width: 26px; padding: 2px 4px; border-radius: 4px; color: #10151d; font-size: 11px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 52px; }
+.tl-mini img { width: 24px; height: 24px; border-radius: 50%; background: #0b0f16; flex: none; }
+.tl-mini small { color: var(--muted); font-size: 11px; }
 
 .pool { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
 .pool .chips { max-height: 40vh; }
@@ -221,6 +241,9 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
   .top nav { display: none; order: 1; flex-basis: 100%; flex-direction: column; }
   .top.open nav { display: flex; }
   .tier-label { width: 62px; font-size: 18px; }
+  :is(.tier-drop, .pool) .chip { width: 64px; }
+  :is(.tier-drop, .pool) .chip img { width: 54px; height: 54px; }
+  .tier-row { min-height: 96px; }
   .chip .nm { font-size: 12px; }
 }
 

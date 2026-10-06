@@ -20,6 +20,8 @@ import { channelUrl, createNotifier, errText, guildNick, voiceRooms } from './di
 // 한국 출시만. 공식 홈페이지보다 먼저 인게임에 나온 선수는 upcoming.json 에서 server 를 kr 로 바꿔 올린다
 // (화면 · 카카오 얼굴 · 봇이 같은 규칙을 쓴다). 홈페이지에 오르면 update-players 가 players.json 에 넣으니 upcoming 에서 지운다
 const PLAYERS = new Map([...playersData.players, ...upcomingData.players].filter(p => p.server === 'kr').map(p => [p.id, p]))
+// 티어표에는 미출시 선수도 올릴 수 있다(화면의 「미출시 선수 포함」)
+const ALL_PLAYERS = new Set([...playersData.players, ...upcomingData.players].map(p => p.id))
 const PRESETS = new Map(tacticsData.presets.map(p => [p.id, p.name]))
 const TTL = CFG.ttlHours * 3_600_000
 const L = CFG.limits
@@ -30,8 +32,8 @@ const AUTH_MEMO = { ms: 60_000, max: 500 }         // 로그인 토큰 확인 �
 const ROUTE_KINDS = ['move', 'pass', 'screen']
 const LINK = /:\/\/|www\.|discord\.gg/i
 const TEAM_ID = /^[A-Za-z0-9_-]{8}$/
-// 게시판(잠재력추천 builds · 영상 videos · 커스텀 전술 tactics): /api/<게시판>[/<id>[/like | /comments[/<댓글 id>]]]
-const BOARD_PATH = /^\/api\/(builds|videos|tactics)(?:\/(\d{1,15})(?:\/(like|comments)(?:\/(\d{1,15}))?)?)?$/
+// 게시판(잠재력추천 builds · 영상 videos · 커스텀 전술 tactics · 티어표 tiers): /api/<게시판>[/<id>[/like | /comments[/<댓글 id>]]]
+const BOARD_PATH = /^\/api\/(builds|videos|tactics|tiers)(?:\/(\d{1,15})(?:\/(like|comments)(?:\/(\d{1,15}))?)?)?$/
 const BUILD_CHARS = 5
 // 유튜브 주소 → 영상 id(11자). watch?v= · youtu.be · shorts · live · embed, www · m · music 서브도메인
 const YOUTUBE = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/
@@ -182,6 +184,24 @@ function customTactic(v) {
     title: text(v.title, 30, '전술 이름'), body: text(v.body, 500, '전술 설명', 1, true),
     board: b, preset: v.preset ?? null, chars, positions: positionsOf(chars),
   }
+}
+
+/** 티어표 글: 제목 · 설명 · 티어 1~12줄(이름 · 색 · 선수). 한 선수는 한 줄에만, 한 명 이상은 올려야 한다 */
+function tierList(v) {
+  if (!isObj(v)) fail(400, '요청 형식이 잘못됐어요')
+  if (!listOf(v.tiers, 12, 1)) fail(400, '티어는 1~12줄까지 둘 수 있어요')
+  const seen = new Set()
+  const tiers = v.tiers.map(t => {
+    if (!isObj(t) || !matches(/^#[0-9a-f]{6}$/i, t.color) || !listOf(t.ids, ALL_PLAYERS.size)) fail(400, '티어 정보가 잘못됐어요')
+    for (const id of t.ids) {
+      if (typeof id !== 'string' || !ALL_PLAYERS.has(id) || seen.has(id)) fail(400, '티어에 없는 선수가 있거나 같은 선수가 두 번 들어갔어요')
+      seen.add(id)
+    }
+    return { label: text(t.label, 10, '티어 이름', 0), color: t.color, ids: t.ids }
+  })
+  if (!seen.size) fail(400, '티어에 선수를 한 명 이상 올려 주세요')
+  const chars = [...seen].filter(id => PLAYERS.has(id))
+  return { title: text(v.title, 40, '제목'), body: text(v.body ?? '', 500, '설명', 0, true), tiers, chars, positions: positionsOf(chars) }
 }
 
 /** 잠재력 빌드 글. cat = data/potentials.json(능력치는 최대 레벨 기준). 칸은 비워 둘 수 있지만 한 칸은 채워야 한다 */
@@ -428,7 +448,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     catch { fail(400, '요청 형식이 잘못됐어요') }
   }
 
-  // ------------------------------------------------ 게시판(잠재력추천 · 영상) — 읽기는 공개, 쓰기 · 추천 · 댓글은 로그인
+  // ------------------------------------------------ 게시판(잠재력추천 · 영상 · 커스텀 전술 · 티어표) — 읽기는 공개, 쓰기 · 추천 · 댓글은 로그인
   // 글 · 추천 · 댓글 표가 게시판마다 한 벌씩 있고 모양이 같다. 다른 것은 표 이름 · 글 검증 · 게시판만의 칸 · 목록 필터
 
   const BOARDS = {
@@ -451,6 +471,10 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     tactics: {   // 댓글 없음 — 전술판 프리셋 목록의 "커스텀 전술"
       table: 'custom_tactics', likes: 'custom_tactic_likes', comments: null, fk: 'tactic_id', rpc: ['custom_tactic_toggle_like', 'p_tactic'],
       one: 'tactic', cols: 'preset', validate: customTactic, extra: b => ({ preset: b.preset, board: b.board }),
+    },
+    tiers: {   // 목록 카드에 작은 티어표를 그리려고 목록에도 tiers 를 준다
+      table: 'tier_lists', likes: 'tier_list_likes', comments: 'tier_list_comments', fk: 'list_id', rpc: ['tier_list_toggle_like', 'p_list'],
+      one: 'tier', cols: 'tiers', validate: tierList, extra: b => ({ tiers: b.tiers }),
     },
   }
   const nameOf = async user => (await mine(user))?.discord_name ?? user.name
