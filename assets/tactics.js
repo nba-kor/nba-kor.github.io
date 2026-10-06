@@ -1,8 +1,8 @@
 // 전술판 — 하프코트 3:3 배치 / 동선 / 프리셋(기본 + 커스텀) / 재생 / 공유(링크 · 카카오톡)
-import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, mountTop, decodeState, encodeState, share, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, kakaoList, shareFace } from './app.js?v=2ce73e96'
-import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=ce09df4e'
+import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, pickMenu, mountTop, decodeState, encodeState, share, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, kakaoList, shareFace } from './app.js?v=3de4668d'
+import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=886b1610'
 import { api } from './auth.js?v=5d44380b'
-import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=469f0b18'
+import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=a9bf1646'
 
 const STORE = 'dc.tactics'
 
@@ -24,7 +24,7 @@ let pool = []            // 현재 필터가 적용된 선수 목록
 let tactics = { presets: [] }
 let mode = 'move'        // 'move' | 'route'
 let routeKind = 'move'   // 'move' | 'pass' | 'screen'
-let side = 'off'         // 새 선수를 놓을 진영
+let sideNow = 'off'      // 새 선수를 놓을 진영(툴바의 공격 · 수비 배치)
 let selected = null      // token key
 let animating = false
 
@@ -62,9 +62,9 @@ function renderSelected() {
   const box = $('#sel-info')
   const t = state.tokens.find(t => t.key === selected)
   const p = t && t.playerId && data.byId.get(t.playerId)
-  if (!t) { box.innerHTML = '<p class="empty" style="padding:0">코트 위 선수를 눌러 선택하세요.</p>'; return }
+  if (!t) { box.innerHTML = '<p class="empty" style="padding:0">코트 위 선수를 눌러 선택하세요. 목록의 선수를 누르면 코트 선수와 바꿀 수 있어요.</p>'; return }
   if (!p) {   // 이름표는 공유 링크로 들어온 남의 글자일 수 있다 — HTML 로 넣지 않는다
-    box.innerHTML = '<p class="empty" style="padding:0"><b></b> — 선수를 끌어다 놓으세요.</p>'
+    box.innerHTML = '<p class="empty" style="padding:0"><b></b> — 목록에서 선수를 누르세요.</p>'
     box.querySelector('b').textContent = t.label
     return
   }
@@ -87,7 +87,7 @@ const nextKey = s => {
   return [1, 2, 3].map(i => `${s[0]}${i}`).find(k => !used.has(k))
 }
 
-function place(playerId, nx, ny, target) {
+function place(playerId, nx, ny, target, side = sideNow) {
   // 인게임에서 같은 선수를 양 팀이 동시에 쓸 수 있으므로, 중복 제거는 같은 진영 안에서만 한다.
   const to = target ? target.side : side
   state.tokens.forEach(t => { if (t.playerId === playerId && t.side === to) t.playerId = null })
@@ -102,6 +102,23 @@ function place(playerId, nx, ny, target) {
     moveToken(t, nx, ny)
   }
   render()
+}
+
+// 누르기로 새로 올릴 때의 자리 — 공격은 탑 · 양 윙, 수비는 그 앞
+const SPOTS = { o1: [0.5, 0.7], o2: [0.2, 0.45], o3: [0.8, 0.45], d1: [0.5, 0.58], d2: [0.27, 0.38], d3: [0.73, 0.38] }
+
+/** 목록에서 선수를 누르면: 코트 위 선수와 바꾸기 · 빈 진영에 새로 올리기 */
+function choose(p) {
+  const name = id => data.byId.get(id)?.short || data.byId.get(id)?.name
+  const items = ['off', 'def'].flatMap(s => [
+    ...tokensOf(s).map(t => ({
+      label: `${t.label} · ${t.playerId ? name(t.playerId) : '빈 자리'}`, on: t.playerId === p.id,
+      img: t.playerId && data.byId.has(t.playerId) ? faceOf(data.byId.get(t.playerId)) : null,
+      pick: () => { selected = t.key; place(p.id, t.x, t.y, t) },
+    })),
+    ...nextKey(s) ? [{ label: `${s === 'off' ? '공격' : '수비'}에 새로 올리기`, pick: () => { const k = nextKey(s); selected = k; place(p.id, ...SPOTS[k], null, s) } }] : [],
+  ])
+  pickMenu(p, '코트의 어느 선수와 바꿀까요?', items)
 }
 
 const r3 = v => Math.round(v * 1000) / 1000     // 저장·공유 링크가 길어지지 않도록
@@ -401,6 +418,7 @@ const boot = async () => {
     if (!list.length) chips.innerHTML = '<p class="empty">조건에 맞는 선수가 없습니다.</p>'
     for (const p of list) {
       const c = chipEl(p)
+      c.addEventListener('click', () => choose(p))
       c.addEventListener('pointerdown', ev => startDrag(ev, c, {
         onDrop: (x, y, under) => {
           if (!under || !svg.contains(under)) return
@@ -419,7 +437,7 @@ const boot = async () => {
   })
   group('[data-mode]', b => mode = b.dataset.mode)
   group('[data-kind]', b => routeKind = b.dataset.kind)
-  group('[data-side]', b => side = b.dataset.side)
+  group('[data-side]', b => sideNow = b.dataset.side)
 
   $('#apply-preset').onclick = () => applyPreset($('#preset').value, false)
   $('#apply-keep').onclick = () => applyPreset($('#preset').value, true)

@@ -1,7 +1,7 @@
 // 티어표 — 드래그로 선수를 티어에 올리고 링크로 공유. 올리면 게시판(?list 목록 · ?t=<id> 글 · ?edit=<id> 고치기)에 뜬다. 게시판 공용 부분은 board.js
-import { mountFilters, chipEl, startDrag, mountTop, decodeState, share, faceOf, loadKakao, kakaoList, shareFace } from './app.js?v=2ce73e96'
+import { mountFilters, chipEl, startDrag, pickMenu, mountTop, decodeState, share, faceOf, loadKakao, kakaoList, shareFace } from './app.js?v=3de4668d'
 import { api } from './auth.js?v=5d44380b'
-import { h, P, data, loadData, startAuth, loggedIn, listView, card, itemView, showItem } from './board.js?v=469f0b18'
+import { h, P, data, loadData, startAuth, loggedIn, listView, card, itemView, showItem } from './board.js?v=a9bf1646'
 
 const STORE = 'dc.tiers'
 const DEFAULT = () => ({
@@ -37,7 +37,20 @@ function indexAt(container, x, y, dragId) {
   return kids.length
 }
 
+/** 누르면 티어 고르기 메뉴. 이미 올라간 선수는 「목록으로 내리기」 도 */
+function choose(id) {
+  const at = state.rows.findIndex(r => r.ids.includes(id))
+  pickMenu(data.byId.get(id), '어느 티어에 올릴까요?', [
+    ...state.rows.map((r, i) => ({
+      label: `${r.label || '(이름 없음)'} · ${r.ids.length}명`, color: r.color, on: i === at,
+      pick: () => { removeId(id); state.rows[i].ids.push(id); render() },
+    })),
+    ...at >= 0 ? [{ label: '목록으로 내리기', pick: () => { removeId(id); render() } }] : [],
+  ])
+}
+
 function attachDrag(el, id) {
+  el.addEventListener('click', () => choose(id))
   el.addEventListener('pointerdown', ev => startDrag(ev, el, {
     onDrop: (x, y, under) => {
       const row = under?.closest?.('.tier-drop')

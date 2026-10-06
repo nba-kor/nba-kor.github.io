@@ -136,12 +136,46 @@ export function startDrag(ev, source, { onDrop, onMove }) {
   const up = e => {
     const dragged = !!ghost
     stop()
-    if (dragged) onDrop(e.clientX, e.clientY, document.elementFromPoint(e.clientX, e.clientY))
+    if (!dragged) return
+    // 끌어서 놓았으면 뒤따르는 click(누르기 메뉴)은 먹는다. click 이 안 오는 경우도 있어 한 박자 뒤에 걷는다
+    const eat = c => { c.stopPropagation(); c.preventDefault() }
+    window.addEventListener('click', eat, { capture: true, once: true })
+    setTimeout(() => window.removeEventListener('click', eat, { capture: true }))
+    onDrop(e.clientX, e.clientY, document.elementFromPoint(e.clientX, e.clientY))
   }
   window.addEventListener('pointermove', move)
   window.addEventListener('pointerup', up)
   window.addEventListener('pointercancel', stop)
-  if (touch) timer = setTimeout(() => begin(ev), 220)
+  if (touch) timer = setTimeout(() => begin(ev), 350)   // 짧게 누르면 click(선택 메뉴), 꾹 누르면 드래그
+}
+
+/**
+ * 선수를 눌렀을 때 뜨는 선택 메뉴(모바일에선 아래에서 올라오는 시트). 드래그가 어려운 터치 화면용.
+ * items: [{ label, color?, img?, on?, pick() }] — label 은 사용자 글자일 수 있어 textContent 로만 넣는다
+ */
+export function pickMenu(p, title, items) {
+  const d = document.createElement('dialog')
+  d.className = 'pick-menu'
+  d.innerHTML = `<div class="pm-head"><img src="${faceOf(p)}" alt=""><div><b></b><small></small></div></div><div class="pm-items"></div><button type="button" class="pm-cancel">취소</button>`
+  d.querySelector('.pm-head b').textContent = p.name
+  d.querySelector('.pm-head small').textContent = title
+  for (const it of items) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = `pm-item${it.on ? ' on' : ''}`
+    if (it.color) b.append(Object.assign(document.createElement('i'), { style: `background:${it.color}` }))
+    if (it.img) b.append(Object.assign(document.createElement('img'), { src: it.img, alt: '' }))
+    b.append(Object.assign(document.createElement('span'), { textContent: it.label }))
+    b.onclick = () => { d.close(); it.pick() }
+    d.querySelector('.pm-items').append(b)
+  }
+  d.querySelector('.pm-cancel').onclick = () => d.close()
+  d.onclick = e => { if (e.target === d) d.close() }   // 바깥(backdrop) 누르면 닫기
+  d.onclose = () => d.remove()
+  d.tabIndex = -1
+  document.body.append(d)
+  d.showModal()
+  d.focus()   // 첫 항목에 포커스 테두리가 생기면 이미 고른 것처럼 보인다
 }
 
 /** 상단 네비게이션 + 데이터 갱신일 표시. */
