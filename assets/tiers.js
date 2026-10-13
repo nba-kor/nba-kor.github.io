@@ -217,7 +217,7 @@ function kakaoPayload(t) {
 
 let tierId
 const showTier = () => showItem(`/tiers/${tierId}`, ({ tier: t, liked, comments }) => {
-  document.title = `${t.title} · 티어표 · NBA덩크시티-TNAB`
+  document.title = `${t.title} · 티어표 · TNAB Vipers`
   const take = () => {
     if (placed().size && !confirm('지금 만들던 티어표를 이 티어표로 바꿀까요?')) return
     state = { title: t.title, rows: toRows(t.tiers) }

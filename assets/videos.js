@@ -54,7 +54,7 @@ function kakaoPayload(v) {
 let view = 'list', videoId
 
 const showVideo = () => showItem(`/videos/${videoId}`, ({ video: v, liked, comments, prev, next }) => {
-  document.title = `${v.title} · 영상 · NBA덩크시티-TNAB`
+  document.title = `${v.title} · 영상 · TNAB Vipers`
   return itemView({
     path: `/videos/${v.id}`, item: v, liked, comments, listUrl: '/videos/', reload: showVideo, onEdit: () => openForm(v),
     share: { payload: () => kakaoPayload(v), title: `${v.title} · 영상`, url: videoUrl(v) },

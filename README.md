@@ -17,7 +17,7 @@
 
 ### 검색 · 공유 (SEO · 미리보기)
 
-사이트 이름은 **NBA덩크시티-TNAB** 다(TNAB = 덩크시티 아레나 이름). 제목 · 설명 · Open Graph 태그가
+사이트 이름은 **TNAB Vipers** 다(TNAB = 덩크시티 아레나 이름, 예전 이름 NBA덩크시티-TNAB 는 ld+json 의 alternateName 에 남겼다). 제목 · 설명 · Open Graph 태그가
 페이지마다 들어 있고, 카카오톡 · 디스코드 · 트위터가 모두 이 태그로 미리보기를 만든다.
 
 ```

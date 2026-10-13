@@ -822,7 +822,7 @@ function showGone(msg) {
   $('p', box).textContent = msg
   box.hidden = false
   box.focus()   // 누른 버튼(해제 · 방출)이 #team-body 와 같이 사라진다 — 포커스가 body 로 떨어지지 않게
-  document.title = '팀원모집 · NBA덩크시티-TNAB'
+  document.title = '팀원모집 · TNAB Vipers'
 }
 
 async function showTeam(id) {
@@ -975,7 +975,7 @@ async function showTeam(id) {
   function render() {
     if (dead) return
     const mm = mine(), name = titleOf(team)
-    document.title = `${name} · 팀원모집 · NBA덩크시티-TNAB`
+    document.title = `${name} · 팀원모집 · TNAB Vipers`
     $('#team-title').textContent = name
     $('#team-status').textContent = `${STATUS[team.status]} ${team.members.length}/${team.size}`
     $('#team-status').className = `rc-status is-${team.status}`

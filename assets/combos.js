@@ -94,7 +94,7 @@ const sideView = (k, label, s) => h('div', { className: `cb-side is-${k}` },
   !s.chars.length && !s.combos.length && h('p', { className: 'rc-muted' }, '없음'))
 
 const showCombo = () => showItem(`/combos/${comboId}`, ({ combo: c, liked, comments }) => {
-  document.title = `${c.title} · 조합표 · NBA덩크시티-TNAB`
+  document.title = `${c.title} · 조합표 · TNAB Vipers`
   const players = h('div', { className: 'cb-players' })
   const paint = bs => players.replaceChildren(...c.chars.map((id, i) => playerView(id, c.builds[i], bs)))
   paint()

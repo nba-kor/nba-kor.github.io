@@ -137,7 +137,7 @@ function kakaoPayload(b) {
 let view = 'list', buildId
 
 const showBuild = () => showItem(`/builds/${buildId}`, ({ build: b, liked, comments }) => {
-  document.title = `${b.title} · 잠재력추천 · NBA덩크시티-TNAB`
+  document.title = `${b.title} · 잠재력추천 · TNAB Vipers`
   return itemView({
     path: `/builds/${b.id}`, item: b, liked, comments, listUrl: '/potentials/', reload: showBuild, onEdit: () => openForm(b),
     share: { payload: () => kakaoPayload(b), title: `${b.title} · 잠재력추천`, url: buildUrl(b) },
