@@ -23,13 +23,15 @@
 ```
 robots.txt              색인 허용 + /discord/ 제외 + sitemap 위치
 sitemap.xml             일곱 페이지. 새 페이지를 만들면 여기에도 넣는다
-assets/og.jpg           1200x630 미리보기 이미지 (tools/og-image.py 가 생성)
-assets/icon.png         512x512 파비콘 · 홈 화면 아이콘 (같은 스크립트)
+tools/logo.png          사이트 로고 원본 (VIPERS TNAB). 아래 세 장은 tools/og-image.py 가 이걸로 굽는다
+assets/og.jpg           1200x630 미리보기 이미지
+assets/icon.png         512x512 파비콘 · 홈 화면 아이콘 · 헤더 로고
+assets/share/logo.jpg   300x300 카카오 리스트 카드에서 얼굴이 없는 줄(설명 · 작성자)의 썸네일
 index.html 의 ld+json   검색 결과의 사이트 이름 (WebSite 구조화 데이터)
 ```
 
 ```sh
-tools/cn-faces/.venv/bin/python tools/og-image.py   # 이미지를 다시 굽는다(색은 style.css 의 :root 를 따른다)
+tools/cn-faces/.venv/bin/python tools/og-image.py   # 로고를 바꿨으면 이미지를 다시 굽는다
 ```
 
 이미지를 바꿨으면 각 페이지의 `og:image` · `rel=icon` 뒤 `?v=` 를 올린다. **카카오는 이미지를 URL 기준으로 캐시하므로**

@@ -382,7 +382,7 @@ function kakaoPayload() {
   const who = state.tokens.filter(t => data.byId.get(t.playerId)?.server === 'kr')
   if (who.length < 2) {
     const link = { mobileWebUrl: url, webUrl: url }
-    return { objectType: 'feed', content: { title, description: '하프코트 3:3 전술 — 눌러서 동선 재생', imageUrl: `${location.origin}/assets/og.jpg`, link }, buttons: [{ title: '전술 보기', link }] }
+    return { objectType: 'feed', content: { title, description: '하프코트 3:3 전술 — 눌러서 동선 재생', imageUrl: `${location.origin}/assets/og.jpg?v=2`, link }, buttons: [{ title: '전술 보기', link }] }
   }
   // 공격이 모자라면(수비만 올린 보드 등) 수비로 채운다
   const lineup = [...who.filter(t => t.side === 'off'), ...who.filter(t => t.side === 'def')].slice(0, 3)
@@ -391,7 +391,7 @@ function kakaoPayload() {
   }))
   const c = customId(state.presetId)
   const desc = c ? detail.get(c)?.tactic.body : tactics.presets.find(p => p.id === state.presetId)?.desc
-  if (desc) rows.push({ title: '전술 설명', desc: desc.replace(/\s+/g, ' '), img: `${location.origin}/assets/og.jpg` })   // 설명은 한 줄로 잘린다
+  if (desc) rows.push({ title: '전술 설명', desc: desc.replace(/\s+/g, ' '), img: shareFace('logo') })   // 설명은 한 줄로 잘린다
   return kakaoList({
     header: title, url, rows,
     buttons: [{ title: '전술 보기', url }, { title: '팀원 모집', url: `${location.origin}/recruit/` }],   // 나란히 두 개라 5자 이내

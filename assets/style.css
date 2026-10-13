@@ -43,7 +43,8 @@ a { color: var(--accent-2); }
   z-index: 50;
   flex-wrap: wrap;
 }
-.top .brand { font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+.top .brand { font-weight: 800; letter-spacing: -.02em; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.top .brand img { width: 28px; height: 28px; border-radius: 6px; }
 .top .brand span { color: var(--accent); }
 .top nav { display: flex; gap: 4px; }
 .top nav a {

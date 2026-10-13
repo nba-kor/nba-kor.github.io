@@ -123,7 +123,7 @@ function kakaoPayload(b) {
   const rows = [
     { title: `추천: ${b.chars.map(id => P(id).name).join(' · ')}`, desc: top, img: shareFace(b.chars[0]) },
     ...tops.map(row),
-    body && { title: '빌드 설명', desc: body, img: `${location.origin}/assets/og.jpg` },
+    body && { title: '빌드 설명', desc: body, img: shareFace('logo') },
   ].filter(Boolean)
   return kakaoList({
     // 버튼은 둘이 나란히라 5자 이내(넘으면 두 줄로 접힌다)

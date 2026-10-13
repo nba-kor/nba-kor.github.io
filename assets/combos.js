@@ -62,7 +62,7 @@ function kakaoPayload(c) {
       }).filter(Boolean).join(' / '),
       img: shareFace([easy, hard].flatMap(s => [...s.chars, ...s.combos.flat()])[0]),
     },
-    body && { title: '조합 설명', desc: body, img: `${location.origin}/assets/og.jpg` },
+    body && { title: '조합 설명', desc: body, img: shareFace('logo') },
   ].filter(Boolean)
   return kakaoList({
     header: `🧩 ${c.title} · 조합표`, url, rows,

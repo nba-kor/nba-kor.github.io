@@ -201,7 +201,7 @@ function showList() {
 const tierUrl = t => `${location.origin}/tiers/?t=${t.id}`
 /** 리스트 카드: 선수가 있는 티어 줄(얼굴 = 그 줄 첫 한국 서버 선수) + 티어 4줄까지 + 마지막 줄 작성자 · 설명 */
 function kakaoPayload(t) {
-  const url = tierUrl(t), og = `${location.origin}/assets/og.jpg`
+  const url = tierUrl(t), og = shareFace('logo')
   const rows = t.tiers.filter(x => x.ids.length).slice(0, 4).map(x => {
     const kr = x.ids.find(id => P(id).server === 'kr')
     return { title: `${x.label} 티어`, desc: x.ids.map(id => P(id).short || P(id).name).join(' · '), img: kr ? shareFace(kr) : og }
