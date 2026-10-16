@@ -224,6 +224,9 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
 | 요청 | 권한 | 결과 |
 | --- | --- | --- |
 | `GET /api/health` | – | `{ ok, voice, login }` — `voice` 는 디스코드 봇 토큰 · 서버 ID, `login` 은 publishable key 가 있는지 |
+| `GET /api/gate?g=<토큰>` | – | `{ on, ok }` — 접근 비밀번호가 켜져 있는지 · 그 토큰이 아직 맞는지 |
+| `POST /api/gate` | – | `{ code }` → `{ token }`(꺼져 있으면 `null`). 틀리면 403, 한 IP 가 10분에 10번 틀리면 429 |
+| `PUT /api/gate` | 마스터 | `{ code }`(4~32자) → `{ code, token, changedAt }` — 바꾸면 토큰이 새로 생겨 모두 다시 입력한다 |
 | `GET /api/teams` | – | 만료 전 방, 모집 중 → 다 찬 순, 각각 오래된 순, 최대 100개 |
 | `GET /api/teams/:id` | – | 팀. 없거나 만료 → 404 |
 | `GET /api/me` | 로그인 | `{ user: { id, name }, profile \| null, teamId \| null }` |
@@ -545,6 +548,23 @@ API 가 팀을 보여 줄 때 그 줄을 `entries` 맨 앞으로 옮기므로 �
 3. 마이그레이션 `20261016000000_kakao_guests.sql` 을 SQL Editor 에 붙여 넣어 Run(사용자 ID 형식 · 비회원 칸 · 만들기/가입 RPC). 옛 함수도 이 스키마로 그대로 돈다.
 4. TNAB 봇을 돌리고 있으면 새 코드로 먼저 다시 띄운다(옛 봇은 비회원 · 카카오 팀원이 낀 팀에서 목록을 못 읽는다). 2026-10 부터는 봇을 쓰지 않는다.
 5. `sh tools/deploy-api.sh` → `node tools/stamp-assets.mjs` 후 main 푸시.
+
+### 접근 비밀번호
+
+사이트에 들어오려면 비밀번호를 한 번 넣는다. 맞히면 그 브라우저에 토큰을 두고 다음부터는 묻지 않는다 —
+마스터가 비밀번호를 바꾸면 토큰도 바뀌어 다시 묻는다(화면은 하루에 한 번 서버에 확인하고, 그 사이에도 API 가 옛 토큰을 거절하면 바로 묻는다).
+
+- **켜고 바꾸기**: 마스터 계정으로 로그인 → 팀원모집 「내 프로필」 의 「사이트 접근 비밀번호」. 직접 쓰거나 「랜덤 생성」(숫자 6자리) → 「바꾸기」.
+  지금 비밀번호도 거기서 보고 복사한다(회원끼리 나눠 쓰는 공용 비밀번호라 해시하지 않고 그대로 둔다). 처음 정하기 전에는 꺼져 있다.
+- **마스터 추가 · 빼기**: 화면은 없다. SQL Editor 에서
+  `insert into public.site_masters (user_id, note) values ('<디스코드 ID 또는 k카카오번호>', '<누구>');` / `delete from public.site_masters where user_id = '…';`
+- **끄기**: `delete from public.site_gate;` (함수 워커는 이 줄을 30초 기억한다).
+- **막는 범위**: API(모집 · 게시판 · 프로필)는 서버가 막는다 — 켜져 있으면 모든 요청이 `?g=<토큰>` 을 싣고, 없거나 틀리면 401 `{ gate: true }`.
+  화면은 HTML 머리의 한 줄 스크립트가 토큰 없는 브라우저를 가리고 `assets/auth.js` 가 비밀번호 창을 띄운다.
+  **GitHub Pages 라 HTML · JS · `data/*.json` · 이미지는 주소만 알면 누구나 받는다**(저장소도 공개) — 완전히 막으려면 로그인이 붙는 호스팅으로 옮겨야 한다.
+  서버에 닿지 않으면 화면은 연다(정적 화면은 서버 없이도 돈다).
+- 처음 운영에 올릴 때: `20261017000000_site_gate.sql` 을 SQL Editor 에서 Run(마스터 갓보노가 같이 들어간다) → `sh tools/deploy-api.sh` → main 푸시 →
+  마스터가 「내 프로필」 에서 비밀번호를 정한다(그 전까지는 꺼져 있다). 함수를 먼저 올리면 `site_gate` 가 없어 모든 API 가 503 이다.
 
 ## 잠재력추천
 

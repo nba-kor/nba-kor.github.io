@@ -1,6 +1,6 @@
 // 게시판 공용 — 잠재력추천 · 영상이 같이 쓴다: 로그인 표시, 캐릭터 고르기, 목록 카드 틀, 글 머리(추천 · 공유 · 수정 · 삭제), 댓글
 import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=3de4668d'
-import { api, initAuth, chooseLogin, logout, session, showWho, IN_KAKAO } from './auth.js?v=c990f40b'
+import { api, initAuth, chooseLogin, logout, session, showWho, IN_KAKAO } from './auth.js?v=e2ffcda1'
 
 export const $ = (s, root = document) => root.querySelector(s)
 /** DOM 생성. 문자열 자식은 텍스트 노드가 되므로 사용자 입력을 그대로 넣어도 안전하다. */

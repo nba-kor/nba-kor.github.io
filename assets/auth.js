@@ -23,8 +23,9 @@ export async function api(path, { method = 'GET', body, withToken, guest } = {})
   const token = withToken && (await sb?.auth.getSession())?.data.session?.access_token   // getSession 이 만료된 토큰을 갱신해 준다
   // 헤더는 latin1 만 실린다 — 한글 비밀번호는 퍼센트 인코딩
   const authorization = token ? `Bearer ${token}` : guest && `Guest ${guest.id}:${encodeURIComponent(guest.pw)}`
+  const g = gateToken()   // 접근 비밀번호 토큰은 주소에 — 헤더로 보내면 공개 GET 도 preflight 가 붙는다
   try {
-    r = await fetch(`${API_ORIGIN}/api${path}`, {
+    r = await fetch(`${API_ORIGIN}/api${path}${g ? `${path.includes('?') ? '&' : '?'}g=${encodeURIComponent(g)}` : ''}`, {
       method, cache: 'no-store',
       headers: { ...(body && { 'content-type': 'application/json' }), ...(authorization && { authorization }) },
       body: body && JSON.stringify(body),
@@ -33,7 +34,10 @@ export async function api(path, { method = 'GET', body, withToken, guest } = {})
   const j = await r.json().catch(() => null)
   // 정적 호스팅이 대신 답한 404·502 HTML 등은 서버가 없는 것으로 본다
   if (!j) throw new Error(NO_SERVER)
-  if (!r.ok) throw Object.assign(new Error(j.error || NO_SERVER), { status: r.status })
+  if (!r.ok) {
+    if (j.gate) { store.del(GATE); showGate() }   // 그새 마스터가 비밀번호를 바꿨다
+    throw Object.assign(new Error(j.error || NO_SERVER), { status: r.status })
+  }
   return j
 }
 
@@ -44,6 +48,65 @@ const store = {
   set: (k, v) => { try { localStorage.setItem(k, v) } catch {} },
   del: k => { try { localStorage.removeItem(k) } catch {} },
 }
+
+// ---------------------------------------------------------------- 접근 비밀번호
+// 켜져 있으면 처음 한 번 넣는다. 맞히면 서버가 준 토큰을 이 브라우저에 두고 다음부터는 묻지 않는다 — 마스터가 비밀번호를 바꾸면
+// 토큰도 바뀌어 다시 묻는다(하루에 한 번 서버에 확인하고, 그 사이에도 API 가 거절하면 바로).
+// ponytail: GitHub Pages 라 HTML · JS · data/*.json 은 주소만 알면 누구나 받는다 — 화면을 가리고 API(모집 · 게시판 · 프로필)를 막을 뿐이다.
+// 완전히 막으려면 사이트를 로그인이 붙는 호스팅(Cloudflare Access 등) 뒤로 옮겨야 한다
+const GATE = 'dc.gate', GATE_AT = 'dc.gate.at', DAY = 86_400_000   // 토큰(꺼져 있으면 'off') · 마지막으로 서버에 확인한 시각. HTML 머리의 한 줄 스크립트도 GATE 를 본다
+const gateToken = () => { const v = store.get(GATE); return v && v !== 'off' ? v : '' }
+/** 비밀번호를 맞혔을 때 · 마스터가 바꾼 뒤(바꾼 사람의 브라우저는 새 토큰으로 그대로 들어와 있다) */
+export const saveGate = token => { store.set(GATE, token || 'off'); store.set(GATE_AT, String(Date.now())) }
+const unlock = () => { document.documentElement.classList.remove('gated'); document.querySelector('.gate')?.remove() }
+
+function showGate() {
+  document.documentElement.classList.add('gated')
+  if (document.querySelector('.gate')) return
+  const box = Object.assign(document.createElement('div'), { className: 'gate' })
+  box.innerHTML = `<form class="gate-card" novalidate>
+    <img src="/assets/icon.png?v=2" alt="">
+    <h1>TNAB <span>Vipers</span></h1>
+    <p>접근 비밀번호를 입력해 주세요</p>
+    <input type="text" name="code" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="접근 비밀번호">
+    <button class="primary">들어가기</button>
+    <p class="gate-err" role="alert" hidden></p></form>`
+  const form = box.firstElementChild, err = form.querySelector('.gate-err'), btn = form.querySelector('button')
+  form.onsubmit = async e => {
+    e.preventDefault()
+    const code = form.code.value.trim()
+    if (!code) return form.code.focus()
+    btn.disabled = true
+    try {
+      saveGate((await api('/gate', { method: 'POST', body: { code } })).token)
+      unlock()
+    } catch (e) {
+      err.textContent = e.message
+      err.hidden = false
+      form.code.select()
+    } finally { btn.disabled = false }
+  }
+  document.body.append(box)
+  form.code.focus()
+}
+
+/** 하루에 한 번: 켜져 있는지 · 들고 있는 토큰이 아직 맞는지. 아무것도 없으면(처음 온 브라우저) 바로 */
+async function checkGate() {
+  const v = store.get(GATE)
+  if (v && Date.now() - (+store.get(GATE_AT) || 0) < DAY) return
+  let r = null
+  try {
+    const res = await fetch(`${API_ORIGIN}/api/gate${gateToken() ? `?g=${encodeURIComponent(gateToken())}` : ''}`, { cache: 'no-store' })
+    r = res.ok ? await res.json() : null
+  } catch {}
+  // ponytail: 서버에 닿지 않으면 연다 — 정적 화면(전술판 · 티어표)은 서버 없이도 돌고, 화면 가리기는 어차피 우회할 수 있다
+  if (!r) return unlock()
+  if (!r.on) { saveGate(null); return unlock() }
+  if (r.ok && v) { store.set(GATE_AT, String(Date.now())); return unlock() }
+  store.del(GATE)
+  showGate()
+}
+checkGate()
 
 /**
  * SDK 를 불러와 세션을 지켜본다. 로그인한 사람이 바뀔 때(처음 포함)마다 onUser() — 토큰 갱신 · 탭 복귀로는 부르지 않는다.

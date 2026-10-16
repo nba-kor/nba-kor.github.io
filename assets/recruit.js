@@ -1,7 +1,7 @@
 // 팀원모집 — 로그인(디스코드 · 카카오) 또는 비회원 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
 import { loadPlayers, faceOf, mountTop, POS, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, copyLink, shareFace } from './app.js?v=3de4668d'
 import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=886b1610'
-import { api, initAuth as startAuth, chooseLogin, logout, session, linkKakao, hasProvider, showWho, KAKAO_SVG, IN_KAKAO, IS_MOBILE } from './auth.js?v=c990f40b'
+import { api, initAuth as startAuth, chooseLogin, logout, session, linkKakao, hasProvider, showWho, saveGate, KAKAO_SVG, IN_KAKAO, IS_MOBILE } from './auth.js?v=e2ffcda1'
 
 // ---------------------------------------------------------------- 설정
 
@@ -71,7 +71,7 @@ const leftMsg = left => left && (left.disbanded ? '기존 파티를 해제하고
 // ---------------------------------------------------------------- 로그인 (Supabase Auth · Discord)
 
 let auth = 'loading'  // loading · down(SDK 못 불러옴) · out · in · error(로그인은 됐는데 /api/me 실패)
-let me = null         // auth === 'in' 이면 GET /api/me — { user: { id, name }, profile, teamId }
+let me = null         // auth === 'in' 이면 GET /api/me — { user: { id, name }, profile, teamId, master?, gate? }
 let meSeq = 0
 const meSubs = []     // me 가 바뀌면 부를 화면 갱신
 let meReady
@@ -580,6 +580,37 @@ async function renderLinks() {
   box.hidden = auth !== 'in' || !user
 }
 
+/** 마스터만: 사이트 접근 비밀번호 보기 · 바꾸기(GET /api/me 의 master · gate). 「바꾸기」 는 프로필 저장과 따로 바로 저장한다 */
+function renderGateAdmin() {
+  const box = $('#profile-gate'), err = $('.rc-err', box), input = $('#gate-code')
+  box.hidden = !(auth === 'in' && me?.master)
+  if (box.hidden) return
+  const g = me.gate, when = g && new Date(g.changedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  $('#gate-now').replaceChildren(...g
+    ? ['지금 비밀번호 ', h('b', { className: 'rc-gate-code' }, g.code), ' ', h('button', { type: 'button', onclick: e => copyLink(e.currentTarget, g.code) }, '복사'), h('small', {}, ` · ${when} 바꿈`)]
+    : ['꺼져 있어요 — 누구나 들어와요. 비밀번호를 정하면 켜져요.'])
+  err.hidden = true
+  input.oninput = () => { err.hidden = true }
+  // 숫자 6자리 — 카톡으로 알려 주고 휴대폰으로 치기 쉽게. 직접 정한 글자도 된다
+  $('#gate-random').onclick = () => { input.value = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1e6).padStart(6, '0'); err.hidden = true }
+  $('#gate-save').onclick = async e => {
+    const code = input.value.trim(), btn = e.currentTarget
+    if (!code) return input.focus()
+    if (!confirm(`사이트 접근 비밀번호를 「${code}」(으)로 바꿀까요?\n다른 사람은 새 비밀번호를 다시 입력해야 해요.`)) return
+    btn.disabled = true
+    try {
+      const r = await api('/gate', { method: 'PUT', body: { code }, withToken: true })
+      saveGate(r.token)
+      me.gate = { code: r.code, changedAt: r.changedAt }
+      input.value = ''
+      renderGateAdmin()
+    } catch (e) {
+      err.textContent = e.message
+      err.hidden = false
+    } finally { btn.disabled = false }
+  }
+}
+
 /** 프로필 폼을 연다 — 로그인했으면 계정 프로필, 아니면 이 기기의 비회원 프로필. after = 저장하면 이어서 부를 함수, why = 왜 열렸는지 한 줄 */
 function openProfile(after = null, why = '') {
   const guest = guestMode()
@@ -593,6 +624,7 @@ function openProfile(after = null, why = '') {
   $('#guest-pw').value = guest ? prof?.password || '' : ''
   $('#profile-link').hidden = true
   if (!guest) renderLinks()
+  renderGateAdmin()
   $('#profile-why').textContent = why
   $('#profile-why').hidden = !why
   $('.rc-form-err', form).hidden = true

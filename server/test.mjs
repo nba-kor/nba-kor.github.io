@@ -140,8 +140,9 @@ function fakeNet({ channels = CHANNELS, db } = {}) {
   }
   return net
 }
-// 요청 수 제한(recruit_hit)은 1, 프로필 조회는 "없음" 으로 답하는 가짜 DB — DB 없이 신원 · 검증 · 404 · 413 을 본다
-const FAKE_DB = u => u.pathname === '/rest/v1/rpc/recruit_hit' ? [200, '1'] : u.pathname === '/rest/v1/recruit_profiles' ? [200, '[]'] : [503, '']
+// 요청 수 제한(recruit_hit)은 1, 프로필 · 접근 비밀번호(꺼짐) · 마스터 조회는 "없음" 으로 답하는 가짜 DB — DB 없이 신원 · 검증 · 404 · 413 을 본다
+const EMPTY = new Set(['/rest/v1/recruit_profiles', '/rest/v1/site_gate', '/rest/v1/site_masters'])
+const FAKE_DB = u => u.pathname === '/rest/v1/rpc/recruit_hit' ? [200, '1'] : EMPTY.has(u.pathname) ? [200, '[]'] : [503, '']
 
 let appNo = 0
 /** 앱 하나 = 시계 하나 · 웹훅 경로 하나 */
@@ -1283,6 +1284,10 @@ dbTest('Data API 권한: anon · authenticated 키나 키 없이는 팀원모집
       ['/recruit_teams?select=id&recruit_member_count=lt.3', {}],
       ['/recruit_members?select=discord_user_id&limit=1', {}],
       ['/recruit_hits?select=key&limit=1', {}],
+      ['/site_gate?select=code,token&limit=1', {}],
+      ['/site_masters?select=user_id&limit=1', {}],
+      ['/site_masters', post({ user_id: someone })],
+      ['/site_gate', post({ id: 1, code: '1234', token: 'x', changed_at: 0, changed_by: someone })],
       ['/recruit_profiles', post({ discord_user_id: someone, discord_name: 'x', mic: true, entries: [], created_at: 0, updated_at: 0 })],
       ['/recruit_teams', post({ id: 'AAAAAAAA', room: {}, tactic: {}, created_at: 0, expires_at: 0 })],
       ['/recruit_members', post({ team_id: 'AAAAAAAA', discord_user_id: someone, joined_at: 0 })],
@@ -1594,6 +1599,82 @@ dbTest('비회원: 간이 프로필 + 비밀번호로 만들기 · 가입 → Gu
   ip = '5.6.7.8'
   assert.equal(await ipApi(ipApp, lead, '비번 1234'), 200)
   assert.equal((await tm.disband(leadAs)).status, 200, '비회원 팀장이 해제')
+})
+
+dbTest('접근 비밀번호: 꺼져 있으면 누구나 · 마스터만 정하고 본다 · 켜지면 모든 API 가 ?g=토큰(봇 키는 빼고) · 10번 틀리면 그 IP 만 429 · 바꾸면 옛 토큰은 거절', async () => {
+  let ip = '5.6.7.8'
+  const app = start(), clock = futureClock()
+  // 워커 하나 = 핸들러 하나(접근 비밀번호 줄을 30초 기억한다)
+  const worker = () => createHandler({ env: { SUPABASE_URL: SUPA, SUPABASE_SECRET_KEY: KEY, SUPABASE_PUBLISHABLE_KEY: PUB, TNAB_BOT_KEY: BOT_KEY }, now: clock, fetch: app.net.fetch, log, ipOf: () => ip })
+  const call = async (h, method, path, body, headers = {}) => {
+    const res = await h(new Request(`http://api.test${path}`, {
+      method, headers: { ...(body !== undefined && { 'content-type': 'application/json' }), ...headers },
+      body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
+    }))
+    const text = await res.text()
+    responses.push(text)
+    return { status: res.status, body: text ? JSON.parse(text) : null }
+  }
+  await rest('/site_gate?id=eq.1', { method: 'DELETE' })   // 지난 실행이 중간에 죽었으면 남아 있다
+  const boss = uid(), other = await person(app.api)
+  assert.equal((await rest('/site_masters', { method: 'POST', body: JSON.stringify({ user_id: boss, note: 'test' }) })).status, 201)
+  try {
+    // 꺼져 있으면 누구나 · 비밀번호를 넣어도 token null
+    const w1 = worker()
+    assert.deepEqual((await call(w1, 'GET', '/api/gate')).body, { on: false, ok: true })
+    assert.equal((await call(w1, 'GET', '/api/teams')).status, 200)
+    assert.deepEqual((await call(w1, 'POST', '/api/gate', { code: 'x' })).body, { token: null })
+
+    // 마스터만 보고 바꾼다
+    assert.deepEqual(Object.entries((await call(w1, 'GET', '/api/me', undefined, web(boss))).body).filter(([k]) => ['master', 'gate'].includes(k)), [['master', true], ['gate', null]])
+    const plain = (await call(w1, 'GET', '/api/me', undefined, other.as)).body
+    assert.deepEqual(['master' in plain, 'gate' in plain], [false, false], '마스터가 아니면 둘 다 없다')
+    assert.equal((await call(w1, 'PUT', '/api/gate', { code: '1234' })).status, 401)
+    assert.equal((await call(w1, 'PUT', '/api/gate', { code: '1234' }, other.as)).status, 403)
+    assert.equal((await call(w1, 'PUT', '/api/gate', 'code=1234', { 'content-type': 'text/plain', ...web(boss) })).status, 415)
+    for (const code of ['123', '   12  ', 'x'.repeat(33), `12${ctrl(10)}34`, 1234, null]) {
+      assert.equal((await call(w1, 'PUT', '/api/gate', { code }, web(boss))).status, 400, JSON.stringify(code))
+    }
+    const set = await call(w1, 'PUT', '/api/gate', { code: '  비번 7788 ' }, web(boss))
+    assert.deepEqual([set.status, set.body.code, typeof set.body.token], [200, '비번 7788', 'string'])
+    const token = set.body.token
+
+    // 켜졌다 — 처음 뜬 워커는 바로 안다. 신원 · 게시판 · 404 보다 먼저 막는다. health · 봇 키는 그대로
+    const w2 = worker()
+    const no = await call(w2, 'GET', '/api/teams')
+    assert.deepEqual([no.status, no.body], [401, { error: '접근 비밀번호를 입력해 주세요', gate: true }])
+    for (const [m, p, as] of [['GET', '/api/builds'], ['GET', '/api/me', other.as], ['GET', '/api/nope'], ['POST', '/api/teams', web(boss)]]) {
+      assert.equal((await call(w2, m, p, undefined, as)).status, 401, `${m} ${p}`)
+    }
+    assert.equal((await call(w2, 'GET', `/api/teams?g=${token}`)).status, 200)
+    assert.equal((await call(w2, 'GET', '/api/teams', undefined, bot(uid()))).status, 200, '봇 키가 맞으면 비밀번호 없이')
+    assert.equal((await call(w2, 'GET', '/api/teams', undefined, { authorization: 'Bot not-the-key' })).status, 401, '틀린 봇 키는 아니다')
+    assert.equal((await call(w2, 'GET', '/api/health')).status, 200)
+    assert.deepEqual((await call(w2, 'GET', `/api/gate?g=${token}`)).body, { on: true, ok: true })
+    assert.deepEqual((await call(w2, 'GET', '/api/gate?g=old')).body, { on: true, ok: false })
+    const bossMe = (await call(w2, 'GET', `/api/me?g=${token}`, undefined, web(boss))).body
+    assert.deepEqual([bossMe.master, bossMe.gate.code, typeof bossMe.gate.changedAt], [true, '비번 7788', 'number'])
+    assert.ok(!JSON.stringify(bossMe).includes(token), '/me 에는 토큰이 없다')
+
+    // 비밀번호 → 토큰(앞뒤 공백은 뗀다). 한 IP 가 10번 틀리면 맞는 비밀번호도 10분 막힌다 · 다른 IP 는 된다 · JSON 이 아니면 세기 전에 415
+    assert.equal((await call(w2, 'POST', '/api/gate', 'code=x', { 'content-type': 'text/plain' })).status, 415)
+    assert.deepEqual((await call(w2, 'POST', '/api/gate', { code: ' 비번 7788' })).body, { token })
+    for (let i = 0; i < 10; i++) assert.equal((await call(w2, 'POST', '/api/gate', { code: `틀림${i}` })).status, 403)
+    assert.equal((await call(w2, 'POST', '/api/gate', { code: '비번 7788' })).status, 429)
+    ip = '5.6.7.9'
+    assert.deepEqual((await call(w2, 'POST', '/api/gate', { code: '비번 7788' })).body, { token })
+
+    // 바꾸면 새 토큰 — 옛 토큰은 거절(바꾼 워커는 바로)
+    const again = await call(w2, 'PUT', '/api/gate', { code: '5555' }, web(boss))
+    assert.equal(again.status, 200)
+    assert.notEqual(again.body.token, token)
+    assert.equal((await call(w2, 'GET', `/api/teams?g=${token}`)).status, 401)
+    assert.equal((await call(w2, 'GET', `/api/teams?g=${again.body.token}`)).status, 200)
+    assert.deepEqual((await call(w2, 'POST', '/api/gate', { code: '비번 7788' })).status, 403, '옛 비밀번호도')
+  } finally {
+    await rest('/site_gate?id=eq.1', { method: 'DELETE' })
+    await rest(`/site_masters?user_id=eq.${boss}`, { method: 'DELETE' })
+  }
 })
 
 test('응답 어디에도 토큰 · 봇 키 · auth_user_id · 옛 비밀번호 필드가 없다', () => {

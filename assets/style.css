@@ -30,6 +30,28 @@ body {
 
 a { color: var(--accent-2); }
 
+/* ---------- 접근 비밀번호 (assets/auth.js) — 확인 전에는 화면 전체를 가린다 ---------- */
+html.gated body > :not(.gate) { display: none !important; }
+.gate {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px;
+  background: radial-gradient(120% 80% at 50% 0%, #f5a6231a, transparent 60%), var(--bg);
+}
+.gate-card {
+  width: min(360px, 100%); display: flex; flex-direction: column; gap: 12px; padding: 28px 22px 24px; text-align: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 24px 64px #000c;
+}
+.gate-card img { width: 56px; height: 56px; margin: 0 auto 2px; border-radius: 12px; }
+.gate-card h1 { margin: 0; font-size: 20px; letter-spacing: -.02em; }
+.gate-card h1 span { color: var(--accent); }
+.gate-card p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.gate-card input {
+  width: 100%; padding: 12px; font: inherit; font-size: 18px; text-align: center; letter-spacing: .08em;
+  color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px;
+}
+.gate-card input:focus { outline: none; border-color: var(--accent); }
+.gate-card button { padding: 12px; font-size: 15px; border-radius: 12px; }
+.gate-card .gate-err { color: var(--def); }
+
 /* ---------- 공통 헤더 ---------- */
 .top {
   display: flex;
@@ -883,6 +905,15 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-guest { display: grid; gap: 8px; margin-bottom: 14px; }
 .rc-guest input { max-width: 280px; }
 :is(.rc-guest, .rc-links) button { padding: 3px 10px; font-size: 12.5px; }
+/* 내 프로필 — 마스터의 사이트 접근 비밀번호 */
+.rc-gate-admin { margin: 0 0 14px; padding: 12px 14px; background: #f5a62312; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 12px; }
+.rc-gate-admin label small { margin-left: 4px; font-size: 11px; font-weight: 700; color: var(--accent); }
+.rc-gate-admin .rc-note { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; }
+.rc-gate-admin .rc-note button { padding: 2px 10px; font-size: 12px; }
+.rc-gate-code { font-size: 16px; letter-spacing: .08em; color: var(--text); }
+.rc-gate-row { display: flex; gap: 6px; }
+.rc-gate-row input { flex: 1; min-width: 0; }
+.rc-gate-row button { flex: none; white-space: nowrap; }
 .rc-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 14px; }
 .rc-sso.is-sm { height: 36px; padding: 0 14px 0 38px; font-size: 13px; border-radius: 10px; }   /* 프로필의 「카카오 로그인 연결」 — 로그인 창 버튼의 작은 판 */
 .rc-sso.is-sm svg { left: 12px; width: 18px; height: 18px; }

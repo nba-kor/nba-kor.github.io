@@ -31,6 +31,9 @@ const MAX_LIST = 100
 const LIMIT = { max: 30, windowMs: 10 * 60_000 }   // 한 사람(계정 · 비회원 팀원) 당 쓰기 요청. 비회원 만들기 · 가입은 IP 당
 const PW_LIMIT = { max: 5, memberMax: 20, windowMs: 10 * 60_000 }   // 틀린 비회원 비밀번호: 한 IP 가 한 팀원에 · 그 팀원 전체
 const PW_LEN = [4, 32]
+const GATE_LIMIT = { max: 10, windowMs: 10 * 60_000 }   // 틀린 접근 비밀번호: 한 IP 당
+const GATE_MEMO_MS = 30_000   // 접근 비밀번호 줄을 워커 메모리에 — 바꾸면 다른 워커는 길어야 30초 뒤에 안다
+const GATE_LEN = [4, 32]
 const AUTH_MEMO = { ms: 60_000, max: 500 }         // 로그인 토큰 확인 결과를 워커 메모리에 잠깐 — 요청마다 Auth 를 부르지 않게
 const ROUTE_KINDS = ['move', 'pass', 'screen']
 const LINK = /:\/\/|www\.|discord\.gg/i
@@ -59,6 +62,7 @@ const GUEST_ACTIONS = new Set(['GET me', 'GET profiles', 'DELETE team', 'POST te
 const PREFLIGHT = { 'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '600' }
 
 const LOGIN = '로그인해 주세요'
+const GATE = '접근 비밀번호를 입력해 주세요'
 const AUTH_DOWN = '로그인 서버에 연결할 수 없어요'
 const NO_PROFILE = '먼저 프로필을 등록해 주세요'
 const DB_DOWN = '모집 서버 DB 에 연결할 수 없어요'
@@ -432,9 +436,12 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
    * 봇: 봇 키가 맞으면 헤더의 디스코드 ID · 이름을 믿는다(봇이 interaction.user 에서 넣는다). 관리자 여부도 봇이 디스코드 권한을 보고 넣는다.
    * 키가 32자보다 짧거나 없으면 봇 인증을 끈다 — 짧은 키는 찍어 맞힐 수 있다.
    */
-  function botUser(request, key) {
+  const botKeyOk = key => {
     const got = Buffer.from(key)
-    if (botKey.length < 32 || got.length !== botKey.length || !timingSafeEqual(got, botKey)) fail(401, LOGIN)
+    return botKey.length >= 32 && got.length === botKey.length && timingSafeEqual(got, botKey)
+  }
+  function botUser(request, key) {
+    if (!botKeyOk(key)) fail(401, LOGIN)
     const h = request.headers, id = h.get('x-discord-user') || ''
     if (!SNOWFLAKE.test(id)) fail(400, '디스코드 사용자 ID 가 잘못됐어요')
     let name = ''
@@ -472,6 +479,66 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const kind = scheme.toLowerCase()
     if (kind === 'guest') return guestOk ? guestUser(request, cred) : fail(401, LOGIN)
     return kind === 'bot' ? botUser(request, cred) : webUser(cred)
+  }
+
+  // ------------------------------------------------ 접근 비밀번호 (site_gate) · 마스터 (site_masters)
+  // 켜져 있으면(줄이 있으면) 모든 API 가 ?g=<토큰> 을 싣는다 — 헤더로 보내면 공개 GET 도 preflight 가 붙어 호출이 두 배가 된다.
+  // 토큰은 비밀번호를 맞히면 받고, 마스터가 비밀번호를 바꾸면 새로 만들어져 모두 다시 입력한다
+
+  let gateMemo = null   // { row, until }
+  async function gateRow(fresh = false) {
+    if (!fresh && gateMemo && gateMemo.until > now()) return gateMemo.row
+    const [row] = await db('/site_gate?select=code,token,changed_at&id=eq.1')
+    gateMemo = { row: row || null, until: now() + GATE_MEMO_MS }
+    return gateMemo.row
+  }
+  const same = (a, b) => {
+    const x = Buffer.from(String(a ?? '')), y = Buffer.from(String(b ?? ''))
+    return x.length === y.length && timingSafeEqual(x, y)
+  }
+  /** 이 요청이 들어와도 되는지 — 꺼져 있거나, 토큰이 맞거나, 봇 키가 맞으면(봇은 서버끼리라 비밀번호를 모른다) */
+  async function gatePass(request) {
+    const [, bot] = /^Bot\s+(\S+)$/i.exec(request.headers.get('authorization') || '') || []
+    if (bot && botKeyOk(bot)) return true
+    const row = await gateRow()
+    return !row || same(new URL(request.url).searchParams.get('g'), row.token)
+  }
+  const isMaster = async user => !user.guest && (await db(`/site_masters?select=user_id&user_id=eq.${enc(user.id)}`)).length > 0
+  function gateCode(v) {
+    const code = typeof v === 'string' ? v.trim() : '', n = [...code].length
+    if (CONTROL.test(code) || n < GATE_LEN[0] || n > GATE_LEN[1]) fail(400, `접근 비밀번호는 ${GATE_LEN[0]}~${GATE_LEN[1]}자로 정해 주세요`)
+    return code
+  }
+
+  async function gate(request) {
+    switch (request.method) {
+      case 'GET': {   // 화면이 처음 열릴 때: 켜져 있는지 · 들고 있는 토큰이 아직 맞는지
+        const row = await gateRow()
+        return [200, { on: !!row, ok: !row || same(new URL(request.url).searchParams.get('g'), row.token) }]
+      }
+      case 'POST': {   // 비밀번호 입력 → 토큰. 꺼져 있으면 token null
+        const body = await readJson(request)   // JSON 이 아니면 세기 전에 415 — 폼 POST 로 남의 IP 한도를 태우지 못하게
+        const row = await gateRow(true)
+        if (!row) return [200, { token: null }]
+        // 먼저 세고, 맞으면 되돌린다 — 확인과 증가 사이에 동시 요청이 끼어도 한도를 넘지 못한다
+        const key = `gate ${ipKey(request)}`
+        if (await hit(key, GATE_LIMIT.windowMs) > GATE_LIMIT.max) fail(429, '비밀번호를 너무 많이 틀렸어요. 10분 뒤에 다시 시도해 주세요')
+        if (!same(isObj(body) && typeof body.code === 'string' ? body.code.trim() : '', row.code)) fail(403, '비밀번호가 맞지 않아요')
+        await hit(key, GATE_LIMIT.windowMs, -1)
+        return [200, { token: row.token }]
+      }
+      case 'PUT': {   // 마스터: 비밀번호 바꾸기(처음이면 켜기). 새 토큰을 돌려줘 바꾼 사람의 브라우저는 그대로 들어와 있다
+        const user = await identity(request)
+        if (!await isMaster(user)) fail(403, '마스터만 접근 비밀번호를 바꿀 수 있어요')
+        if (await hit(`w ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
+        const body = await readJson(request)
+        const row = { id: 1, code: gateCode(isObj(body) ? body.code : null), token: randomBytes(24).toString('base64url'), changed_at: now(), changed_by: user.id }
+        await db('/site_gate?on_conflict=id', { method: 'POST', body: row, prefer: 'resolution=merge-duplicates' })
+        gateMemo = { row, until: now() + GATE_MEMO_MS }
+        return [200, { code: row.code, token: row.token, changedAt: row.changed_at }]
+      }
+    }
+    fail(404, '없는 주소예요')
   }
 
   // ------------------------------------------------ 팀 · 프로필 읽기
@@ -690,11 +757,13 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   async function route(request) {
     const { pathname } = new URL(request.url)
     const method = request.method
-    const b = pathname.match(BOARD_PATH)
-    if (b) return board(request, b, now())
     if (pathname === '/api/health' && method === 'GET') {
       return [200, { ok: true, voice: !!(env.DISCORD_BOT_TOKEN && env.DISCORD_GUILD_ID), login: !!publishable }]
     }
+    if (pathname === '/api/gate') return gate(request)
+    if (!await gatePass(request)) throw Object.assign(new Error(GATE), { status: 401, gate: true })
+    const b = pathname.match(BOARD_PATH)
+    if (b) return board(request, b, now())
     const me = pathname.match(/^\/api\/me(\/profile)?$/)
     const m = pathname.match(/^\/api\/teams(?:\/([^/]+)(?:\/(members|extend)(?:\/([^/]+))?)?)?$/)
     const [, id, sub, userId] = m || []
@@ -732,9 +801,11 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       case 'GET me': {
         // 비회원 = 비밀번호 확인(다른 기기에서 내 팀을 관리하려고). 프로필 · 소속 팀은 그 기기에만 있다
         if (user.guest) return [200, { user: { id: user.id, name: user.name }, profile: null, teamId: null }]
-        const p = await mine(user)
+        const [p, master] = await Promise.all([mine(user), isMaster(user)])
         const teamId = p?.member?.team?.expires_at > t ? p.member.team_id : null   // 만료됐지만 아직 안 지운 팀은 없는 팀
-        return [200, { user: { id: user.id, name: user.name }, profile: p && profileView(user, p), teamId }]
+        // 마스터에게만 master · 지금 접근 비밀번호(내 프로필에서 보고 바꾼다). 꺼져 있으면 gate: null
+        const g = master && await gateRow(true)
+        return [200, { user: { id: user.id, name: user.name }, profile: p && profileView(user, p), teamId, ...(master && { master, gate: g && { code: g.code, changedAt: g.changed_at } }) }]
       }
 
       case 'PUT me profile': {
@@ -863,7 +934,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...cors, ...(cors['access-control-allow-origin'] && PREFLIGHT) } })
     const [status, body] = await route(request).catch(e => {
       if (!e.status) log(`API 오류 ${request.method} ${new URL(request.url).pathname}:`, e)
-      return [e.status || 500, { error: e.status ? e.message : '서버 오류가 났어요' }]
+      return [e.status || 500, { error: e.status ? e.message : '서버 오류가 났어요', ...(e.gate && { gate: true }) }]
     })
     return new Response(JSON.stringify(body), {
       status,
