@@ -1,7 +1,7 @@
 // 팀원모집 — 로그인(디스코드 · 카카오) 또는 비회원 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
 import { loadPlayers, faceOf, mountTop, POS, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, copyLink, shareFace } from './app.js?v=3de4668d'
 import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=886b1610'
-import { api, initAuth as startAuth, chooseLogin, logout, session, linkKakao, hasProvider, IN_KAKAO, IS_MOBILE } from './auth.js?v=715cce5a'
+import { api, initAuth as startAuth, chooseLogin, logout, session, linkKakao, hasProvider, IN_KAKAO, IS_MOBILE } from './auth.js?v=f131863e'
 
 // ---------------------------------------------------------------- 설정
 

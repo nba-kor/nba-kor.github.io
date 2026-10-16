@@ -844,7 +844,20 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 /* 로그인 고르기 · 비회원 본인 확인 창 — 내용만큼 */
 .rc-login-dialog, .rc-pw-dialog { width: min(400px, calc(100vw - 32px)); height: fit-content; }
 .rc-login-opts, .rc-pw-body { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
-.rc-login-opts button { padding: 11px 14px; font-size: 15px; }
+/* 디스코드 · 카카오 버튼 — 아이콘은 왼쪽 끝, 글자는 가운데(카카오 로그인 디자인 가이드 모양) */
+.rc-sso {
+  position: relative; display: flex; align-items: center; justify-content: center; height: 50px; padding: 0 52px;
+  font-size: 15px; font-weight: 700; color: #fff; background: #5865f2; border: 0; border-radius: 12px;
+  transition: transform .15s, box-shadow .15s;
+}
+.rc-sso svg { position: absolute; left: 18px; width: 22px; height: 22px; fill: currentColor; }
+.rc-sso.is-kakao { color: #000000d9; background: #fee500; }
+.rc-sso.is-kakao svg { fill: #000; }
+.rc-sso:hover { transform: translateY(-1px); box-shadow: 0 8px 20px -6px #5865f2b3; }
+.rc-sso.is-kakao:hover { box-shadow: 0 8px 20px -6px #fee500a6; }
+.rc-sso:active { transform: none; box-shadow: none; }
+.rc-sso:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.rc-login-opts p { margin-top: 4px; text-align: center; }
 :is(.rc-login-opts, .rc-pw-body) p { margin: 0; font-size: 12.5px; }
 .rc-pw-body .rc-actions { margin-top: 4px; }
 @media (max-width: 560px) { .rc-login-dialog, .rc-pw-dialog { width: 100%; height: fit-content; max-height: 86dvh; } }

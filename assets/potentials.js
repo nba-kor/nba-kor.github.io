@@ -1,7 +1,7 @@
 // 잠재력추천 — 빌드 목록(추천순 · 최신순 · 포지션 · 캐릭터 필터) · 글(30칸 판 · 추천 · 댓글) · 쓰기 · 고치기. 게시판 공용 부분은 board.js
 import { mountTop, loadKakao, faceOf, kakaoList, shareFace } from './app.js?v=3de4668d'
-import { api } from './auth.js?v=715cce5a'
-import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=1e976c2c'
+import { api } from './auth.js?v=f131863e'
+import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=ab90ed13'
 
 let cat, pot
 const plus = v => `+${+v.toFixed(2)}`   // 0.15 × 10 같은 합에 붙는 부동소수점 꼬리를 뗀다
