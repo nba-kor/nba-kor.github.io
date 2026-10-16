@@ -237,15 +237,16 @@ function playAsPicker(entries) {
 function meCard() {
   const box = h('div', { className: 'rc-mecard' })
   const act = (label, onclick) => h('button', { type: 'button', onclick }, label)
+  const add = (...kids) => box.append(...kids.filter(k => k != null && k !== false))   // DOM append 는 null · false 를 글자로 찍는다 — h() 처럼 거른다
   const prof = myProfile()
-  if (auth === 'loading') box.append(h('p', { className: 'rc-muted' }, '로그인 확인 중…'))
-  else if (auth === 'error') box.append(h('p', { className: 'rc-muted rc-bad' }, '로그인 정보를 확인하지 못했어요.'), act('다시 시도', loadMe))
-  else if (!prof && guestMode()) box.append(h('p', { className: 'rc-muted' }, '로그인하면 계정 프로필로, 아니면 이 기기에 비회원 프로필을 만들어 바로 만들고 가입해요.'),
+  if (auth === 'loading') add(h('p', { className: 'rc-muted' }, '로그인 확인 중…'))
+  else if (auth === 'error') add(h('p', { className: 'rc-muted rc-bad' }, '로그인 정보를 확인하지 못했어요.'), act('다시 시도', loadMe))
+  else if (!prof && guestMode()) add(h('p', { className: 'rc-muted' }, '로그인하면 계정 프로필로, 아니면 이 기기에 비회원 프로필을 만들어 바로 만들고 가입해요.'),
     auth === 'out' && act('로그인', chooseLogin), act('비회원 프로필', () => openProfile()))
-  else if (!prof) box.append(h('p', { className: 'rc-muted' }, h('b', {}, me.user.name), ' 님, 게임 계정과 마이크를 적은 프로필을 먼저 등록해 주세요.'), act('프로필 등록', () => openProfile()))
+  else if (!prof) add(h('p', { className: 'rc-muted' }, h('b', {}, me.user.name), ' 님, 게임 계정과 마이크를 적은 프로필을 먼저 등록해 주세요.'), act('프로필 등록', () => openProfile()))
   else {
     const e = prof.entries[playAs], p = P(e.char), n = prof.entries.length - 1
-    box.append(h('img', { src: faceOf(p), alt: '' }),
+    add(h('img', { src: faceOf(p), alt: '' }),
       h('div', {},
         h('div', { className: 'rc-acct-name' }, h('b', {}, myName()), guestMode() && h('span', { className: 'rc-badge guest' }, '비회원'), micTag(prof.mic)),
         h('small', {}, `${e.nick} · ${e.tier} · ${charLine(e)}${n ? ` 외 ${n}개` : ''}`)),
