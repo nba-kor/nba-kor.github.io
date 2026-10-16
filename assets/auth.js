@@ -14,6 +14,7 @@ export const IN_KAKAO = /KAKAOTALK/i.test(navigator.userAgent)
 export const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
 
 export let sb = null   // supabase 클라이언트 — 못 불러오면 null 로 남고 로그인만 안 된다
+let currentUser = null   // 마지막 세션의 사용자 — 머리 아래 이름 줄의 디스코드 · 카카오 표시
 
 /** withToken = 로그인 토큰을 붙인다. 공개 GET 에는 붙이지 않는다 — Authorization 헤더가 붙으면 preflight 로 함수 호출이 두 배가 된다.
  *  guest = { id: 'g<번호>', pw } — 팀원모집 비회원이 자기 팀을 관리할 때 */
@@ -71,6 +72,7 @@ export async function initAuth(onUser) {
   if (failed && failed !== 'access_denied') setTimeout(() => alert(`로그인 · 연결에 실패했어요${why ? `\n${why}` : ''}`))
   let uid
   sb.auth.onAuthStateChange((event, session) => {
+    currentUser = session?.user ?? null
     if (session?.user?.identities?.some(i => i.provider === 'discord')) store.set(AUTHORIZED, '1')   // 이 브라우저에서 디스코드 승인을 끝냈다
     const id = session?.user?.id
     if (event !== 'INITIAL_SESSION' && id === uid) return
@@ -157,6 +159,17 @@ function oauth(provider) {
 export async function linkKakao() {
   const { error } = await sb.auth.linkIdentity({ provider: 'kakao', options: { redirectTo: back() } })
   if (error) alert(`카카오를 연결하지 못했어요: ${error.message}`)
+}
+
+/** 머리 아래 줄에 지금 누구로 들어와 있는지. 버튼 옆에 두면 좁은 화면에서 이름이 잘려서 줄을 따로 둔다. name 이 없으면 줄을 뺀다 */
+export function showWho(name, { guest = false } = {}) {
+  const top = document.querySelector('.top')
+  let row = top?.querySelector('.rc-whoami')
+  if (!top || !name) return row?.remove()
+  if (!row) top.append(row = Object.assign(document.createElement('div'), { className: 'rc-whoami' }))
+  const icons = guest ? '' : (hasProvider(currentUser, 'discord') ? `<i>${DISCORD_SVG}</i>` : '') + (hasProvider(currentUser, 'kakao') ? `<i class="is-kakao">${KAKAO_SVG}</i>` : '')
+  row.innerHTML = `<span title="${guest ? '비회원 — 이 기기에만 저장된 프로필' : '로그인한 계정'}">${icons}<b></b>${guest ? '<small>비회원</small>' : ''}</span>`
+  row.querySelector('b').textContent = name   // 이름은 사용자 입력 — 글자로만 넣는다
 }
 
 // 로그아웃하면 다음 로그인은 승인 화면부터 — 다른 디스코드 계정으로 바꾸려는 경우일 수 있다. 끝나면 홈으로

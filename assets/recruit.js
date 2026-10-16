@@ -1,7 +1,7 @@
 // 팀원모집 — 로그인(디스코드 · 카카오) 또는 비회원 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
 import { loadPlayers, faceOf, mountTop, POS, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, copyLink, shareFace } from './app.js?v=3de4668d'
 import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=886b1610'
-import { api, initAuth as startAuth, chooseLogin, logout, session, linkKakao, hasProvider, IN_KAKAO, IS_MOBILE } from './auth.js?v=f131863e'
+import { api, initAuth as startAuth, chooseLogin, logout, session, linkKakao, hasProvider, showWho, IN_KAKAO, IS_MOBILE } from './auth.js?v=27180c68'
 
 // ---------------------------------------------------------------- 설정
 
@@ -149,14 +149,15 @@ function askPassword(why) {
 function renderAuth() {
   const btn = (label, onclick, props = {}) => h('button', { type: 'button', onclick, ...props }, label)
   const g = guestMode() && guestProfile()
-  const guestBtns = g ? [h('b', { className: 'rc-uname', title: '비회원 — 이 기기에만 저장된 프로필' }, `${g.name} (비회원)`), btn('내 프로필', () => openProfile())] : []
+  const guestBtns = g ? [btn('내 프로필', () => openProfile())] : []
   $('#auth').replaceChildren(...{
     loading: [h('span', { className: 'rc-muted' }, '로그인 확인 중…')],
     down: [...guestBtns, h('span', { className: 'rc-muted', title: '로그인 모듈을 불러오지 못했어요. 새로고침해 보세요' }, '로그인 불가')],
     out: [...guestBtns, btn('로그인', chooseLogin, { className: 'rc-login' })],
     error: [h('span', { className: 'rc-muted rc-bad' }, '로그인 확인 실패'), btn('다시 시도', loadMe)],
-    in: me && [h('b', { className: 'rc-uname', title: '프로필 표시 이름' }, myName()), btn('내 프로필', () => openProfile()), btn('로그아웃', logout)],
+    in: me && [btn('내 프로필', () => openProfile()), btn('로그아웃', logout)],
   }[auth])
+  showWho(auth === 'in' ? me && myName() : ['out', 'down'].includes(auth) && g?.name, { guest: auth !== 'in' })
   const need = $('#need')
   need.textContent = auth === 'down' ? '로그인을 불러오지 못했어요 — 비회원으로는 팀을 만들고 가입할 수 있어요. 로그인하려면 새로고침해 보세요.'
     : auth !== 'out' || g ? ''

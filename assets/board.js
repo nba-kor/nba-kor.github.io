@@ -1,6 +1,6 @@
 // 게시판 공용 — 잠재력추천 · 영상이 같이 쓴다: 로그인 표시, 캐릭터 고르기, 목록 카드 틀, 글 머리(추천 · 공유 · 수정 · 삭제), 댓글
 import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=3de4668d'
-import { api, initAuth, chooseLogin, logout, session, IN_KAKAO } from './auth.js?v=f131863e'
+import { api, initAuth, chooseLogin, logout, session, showWho, IN_KAKAO } from './auth.js?v=27180c68'
 
 export const $ = (s, root = document) => root.querySelector(s)
 /** DOM 생성. 문자열 자식은 텍스트 노드가 되므로 사용자 입력을 그대로 넣어도 안전하다. */
@@ -53,8 +53,9 @@ function setAuth(state, v = null) {
     down: [h('span', { className: 'rc-muted', title: '로그인 모듈을 불러오지 못했어요. 새로고침해 보세요' }, '로그인 불가')],
     out: [btn('로그인', chooseLogin, { className: 'rc-login' })],
     error: [h('span', { className: 'rc-muted rc-bad' }, '로그인 확인 실패'), btn('다시 시도', loadMe)],
-    in: me && [h('b', { className: 'rc-uname' }, me.name), btn('로그아웃', logout)],
+    in: me && [btn('로그아웃', logout)],
   }[auth])
+  showWho(auth === 'in' && me?.name)
   const need = $('#need')
   need.textContent = auth === 'out' ? `${needText}${IN_KAKAO ? ' 디스코드 로그인은 평소 쓰는 브라우저로 열려요.' : ''}` : ''
   need.hidden = !need.textContent
