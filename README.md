@@ -543,7 +543,7 @@ API 가 팀을 보여 줄 때 그 줄을 `entries` 맨 앞으로 옮기므로 �
 2. Supabase **Authentication > Sign In / Providers > Kakao** 를 켜고 REST API 키(Client ID) · Client Secret 을 넣고 **Allow users without an email** 을 켠다.
    같은 화면의 **Allow manual linking**(카카오 연결)도 켠다. Redirect URLs 는 그대로(페이지 목록이 같다).
 3. 마이그레이션 `20261016000000_kakao_guests.sql` 을 SQL Editor 에 붙여 넣어 Run(사용자 ID 형식 · 비회원 칸 · 만들기/가입 RPC). 옛 함수도 이 스키마로 그대로 돈다.
-4. TNAB 봇을 새 코드로 다시 띄운다(위 「TNAB 봇」).
+4. TNAB 봇을 돌리고 있으면 새 코드로 먼저 다시 띄운다(옛 봇은 비회원 · 카카오 팀원이 낀 팀에서 목록을 못 읽는다). 2026-10 부터는 봇을 쓰지 않는다.
 5. `sh tools/deploy-api.sh` → `node tools/stamp-assets.mjs` 후 main 푸시.
 
 ## 잠재력추천
