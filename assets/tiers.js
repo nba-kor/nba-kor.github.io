@@ -1,7 +1,7 @@
 // 티어표 — 드래그로 선수를 티어에 올리고 링크로 공유. 올리면 게시판(?list 목록 · ?t=<id> 글 · ?edit=<id> 고치기)에 뜬다. 게시판 공용 부분은 board.js
 import { mountFilters, chipEl, startDrag, pickMenu, mountTop, decodeState, share, faceOf, loadKakao, kakaoList, shareFace } from './app.js?v=3de4668d'
-import { api } from './auth.js?v=5d44380b'
-import { h, P, data, loadData, startAuth, loggedIn, listView, card, itemView, showItem } from './board.js?v=a9bf1646'
+import { api } from './auth.js?v=715cce5a'
+import { h, P, data, loadData, startAuth, loggedIn, listView, card, itemView, showItem } from './board.js?v=1e976c2c'
 
 const STORE = 'dc.tiers'
 const DEFAULT = () => ({
@@ -246,7 +246,7 @@ const boot = async () => {
   const q = new URLSearchParams(location.search), id = q.get('t')
   const view = /^\d+$/.test(id || '') ? 'tier' : q.has('list') ? 'list' : 'edit'
   if (view === 'tier') tierId = id
-  startAuth('티어표를 올리거나 추천 · 댓글을 달려면 디스코드 로그인이 필요해요.', () => view === 'tier' && showTier())
+  startAuth('티어표를 올리거나 추천 · 댓글을 달려면 로그인이 필요해요.', () => view === 'tier' && showTier())
   if (view === 'list') showList()
   if (view === 'edit') showEditor()
 }

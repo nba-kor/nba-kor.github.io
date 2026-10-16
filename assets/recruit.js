@@ -1,7 +1,7 @@
-// 팀원모집 — 디스코드 로그인 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
+// 팀원모집 — 로그인(디스코드 · 카카오) 또는 비회원 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
 import { loadPlayers, faceOf, mountTop, POS, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, copyLink, shareFace } from './app.js?v=3de4668d'
 import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=886b1610'
-import { api, initAuth as startAuth, login, logout, session, IN_KAKAO, IS_MOBILE } from './auth.js?v=5d44380b'
+import { api, initAuth as startAuth, chooseLogin, logout, session, linkKakao, hasProvider, IN_KAKAO, IS_MOBILE } from './auth.js?v=715cce5a'
 
 // ---------------------------------------------------------------- 설정
 
@@ -11,6 +11,9 @@ const DISCORD_URL = `${location.origin}/discord/`
 
 const PRESETS_KEY = 'dc.recruit.presets' // [{ name, entries }] — 자주 쓰는 캐릭터 구성, 최대 cfg.maxPresets 개
 const LEFT_KEY = 'dc.recruit.left'       // 팀을 만들고 팀 화면으로 넘어갈 때 "기존 파티에서 빠졌어요" 를 들고 간다 (sessionStorage)
+const GUEST_KEY = 'dc.recruit.guest'     // 비회원 간이 프로필 { name, mic, entries, password } — 이 기기(브라우저)에만
+const GUEST_TEAMS_KEY = 'dc.recruit.guestTeams'   // 비회원으로 만들거나 들어간 팀 { [팀 id]: { id: 'g<번호>', pw } } — 그 팀을 관리할 때 쓴다
+const MAX_GUEST_TEAMS = 20
 const MOVE_ASK = '기존 파티에서 빠지고 이동할까요? (팀장이면 기존 파티는 해제돼요)'
 const STATUS = { open: '모집 중', full: '모집 완료' }
 const LINK_RE = /:\/\/|www\.|discord\.gg/i   // 서버와 같은 규칙 — 이름에 링크 금지
@@ -25,6 +28,7 @@ const h = (tag, props = {}, ...kids) => {
 }
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
 const saveJson = (k, v) => localStorage.setItem(k, JSON.stringify(v))
+const trySave = (k, v) => { try { saveJson(k, v) } catch {} }   // 저장이 막힌 브라우저(사생활 보호 등)여도 이번 화면은 그대로 쓴다
 const getJson = p => fetch(p, { cache: 'no-cache' }).then(r => r.json())
 const ago = ms => {
   const m = Math.floor((Date.now() - ms) / 60000)
@@ -98,34 +102,81 @@ async function initAuth() {
   if (!await startAuth(loadMe)) setAuth('down')
 }
 
+// ---------------------------------------------------------------- 비회원 (이 기기의 간이 프로필 + 팀마다 관리 비밀번호)
+
+/** 로그인하지 않았거나 로그인 모듈을 못 불러왔으면 비회원으로 만들고 가입한다 */
+const guestMode = () => auth === 'out' || auth === 'down'
+/** 이 기기의 비회원 프로필. 옛 데이터일 수 있어 모양이 틀리면 없는 것으로 본다 */
+function guestProfile() {
+  const v = load(GUEST_KEY, null), c = cleanPerson(v)
+  return c && typeof v.name === 'string' && typeof v.mic === 'boolean' && typeof v.password === 'string'
+    ? { name: v.name, mic: v.mic, entries: c.entries, password: v.password } : null
+}
+/** 지금 쓰는 프로필 — 로그인했으면 계정 프로필, 아니면 비회원 프로필 */
+const myProfile = () => auth === 'in' ? me?.profile : guestMode() ? guestProfile() : null
+/** 만들기 · 가입 본문에 붙는 비회원 몫 */
+const guestBody = g => ({ guest: { name: g.name, mic: g.mic, entries: g.entries }, password: g.password })
+
+const credsOf = teamId => load(GUEST_TEAMS_KEY, {})[teamId] || null
+function saveCreds(teamId, c) {
+  const all = { ...load(GUEST_TEAMS_KEY, {}), [teamId]: c }
+  for (const k of Object.keys(all).slice(0, -MAX_GUEST_TEAMS)) delete all[k]   // 오래된 팀부터(방은 3시간이면 사라진다)
+  trySave(GUEST_TEAMS_KEY, all)
+}
+function dropCreds(teamId) {
+  const all = load(GUEST_TEAMS_KEY, {})
+  if (!all[teamId]) return
+  delete all[teamId]
+  trySave(GUEST_TEAMS_KEY, all)
+}
+
+/** 비밀번호 입력 창 — 다른 기기에서 비회원 팀원 본인 확인. 확인을 누르면 입력값, 아니면 null */
+function askPassword(why) {
+  const dlg = $('#pw-dialog'), input = $('#pw-input')
+  if (!dlg.dataset.bound) {
+    dlg.dataset.bound = '1'
+    // 닫기 · 취소는 submit 이 아니다 — 입력 칸에서 엔터를 치면 「확인」 이 눌리게(첫 submit 버튼이 기본 버튼이다)
+    for (const b of dlg.querySelectorAll('[data-close]')) b.onclick = () => dlg.close()
+    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close() })
+  }
+  $('#pw-why').textContent = why
+  input.value = ''
+  dlg.returnValue = ''
+  dlg.showModal()
+  return new Promise(res => dlg.addEventListener('close', () => res(dlg.returnValue === 'ok' && input.value || null), { once: true }))
+}
+
 function renderAuth() {
   const btn = (label, onclick, props = {}) => h('button', { type: 'button', onclick, ...props }, label)
+  const g = guestMode() && guestProfile()
+  const guestBtns = g ? [h('b', { className: 'rc-uname', title: '비회원 — 이 기기에만 저장된 프로필' }, `${g.name} (비회원)`), btn('내 프로필', () => openProfile())] : []
   $('#auth').replaceChildren(...{
     loading: [h('span', { className: 'rc-muted' }, '로그인 확인 중…')],
-    down: [h('span', { className: 'rc-muted', title: '로그인 모듈을 불러오지 못했어요. 새로고침해 보세요' }, '로그인 불가')],
-    out: [btn('디스코드 로그인', login, { className: 'rc-login' })],
+    down: [...guestBtns, h('span', { className: 'rc-muted', title: '로그인 모듈을 불러오지 못했어요. 새로고침해 보세요' }, '로그인 불가')],
+    out: [...guestBtns, btn('로그인', chooseLogin, { className: 'rc-login' })],
     error: [h('span', { className: 'rc-muted rc-bad' }, '로그인 확인 실패'), btn('다시 시도', loadMe)],
     in: me && [h('b', { className: 'rc-uname', title: '프로필 표시 이름' }, myName()), btn('내 프로필', () => openProfile()), btn('로그아웃', logout)],
   }[auth])
   const need = $('#need')
-  need.textContent = auth === 'down' ? '로그인을 불러오지 못해 지금은 팀을 만들거나 가입할 수 없어요. 새로고침해 보세요.'
-    : auth !== 'out' ? ''
-    : `팀을 만들거나 가입하려면 디스코드 로그인이 필요해요. ${IN_KAKAO ? '로그인을 누르면 평소 쓰는 브라우저로 열려요(카카오톡 안에서는 매번 비밀번호를 쳐야 해서요).'
+  need.textContent = auth === 'down' ? '로그인을 불러오지 못했어요 — 비회원으로는 팀을 만들고 가입할 수 있어요. 로그인하려면 새로고침해 보세요.'
+    : auth !== 'out' || g ? ''
+    : `디스코드 · 카카오로 로그인하거나, 로그인 없이 비회원으로 팀을 만들고 가입할 수 있어요. ${IN_KAKAO ? '카카오톡 안에서는 카카오 로그인이 바로 돼요(디스코드 로그인은 평소 쓰는 브라우저로 열려요).'
       : IS_MOBILE ? '' : 'PC에서는 디스코드 로그인 화면의 QR 코드를 휴대폰 디스코드 앱으로 찍으면 비밀번호 없이 로그인돼요.'}`.trim()
   need.hidden = !need.textContent
-  $('#new-team').disabled = auth === 'down'
 }
 
 /**
- * 만들기 · 가입 직전 확인. 로그인과 프로필이 준비됐으면 최신 me, 아니면 로그인으로 보내거나(리다이렉트) 프로필 폼을 열고 null.
+ * 만들기 · 가입 직전 확인. 로그인과 프로필이 준비됐으면 최신 me, 비회원이면 { guest }, 아니면 프로필 폼을 열고 null.
  * 1인 1파티 확인창이 틀리지 않게 me(teamId) 는 매번 다시 읽는다.
  */
 async function ready(again, why) {
   await meFirst
-  if (auth === 'down') return null
-  if (auth === 'out') { await login(); return null }
-  await loadMe()
-  if (auth === 'out') { await login(); return null }
+  if (auth === 'in') await loadMe()   // 토큰이 그새 무효가 됐으면 out — 비회원으로 이어 간다
+  if (guestMode()) {
+    const g = guestProfile()
+    if (!g) { openProfile(again, why); return null }
+    return { guest: g, teamId: null }
+  }
   if (auth !== 'in') throw new Error('로그인 정보를 확인하지 못했어요 — 잠시 뒤 다시 눌러 주세요')
   if (!me.profile) { openProfile(again, why); return null }
   return me
@@ -141,7 +192,7 @@ const acctBody = (e, tag) => {
   const p = P(e.char)
   return [h('img', { src: faceOf(p), alt: '' }),
     h('div', {},
-      h('div', { className: 'rc-acct-name' }, h('b', {}, e.nick), h('span', { className: 'rc-tier', 'data-tier': e.tier }, e.tier), tag),
+      h('div', { className: 'rc-acct-name' }, h('b', {}, e.nick), e.tier && h('span', { className: 'rc-tier', 'data-tier': e.tier }, e.tier), tag),
       h('small', {}, h('span', { className: `rc-pos pos-${p.pos}` }, POS[p.pos] || '?'), p.name))]
 }
 
@@ -186,25 +237,27 @@ function playAsPicker(entries) {
 function meCard() {
   const box = h('div', { className: 'rc-mecard' })
   const act = (label, onclick) => h('button', { type: 'button', onclick }, label)
+  const prof = myProfile()
   if (auth === 'loading') box.append(h('p', { className: 'rc-muted' }, '로그인 확인 중…'))
-  else if (auth === 'down') box.append(h('p', { className: 'rc-muted' }, '로그인을 불러오지 못해 지금은 쓸 수 없어요.'))
-  else if (auth === 'out') box.append(h('p', { className: 'rc-muted' }, '디스코드로 로그인하면 내 프로필로 바로 만들고 가입해요.'), act('디스코드 로그인', login))
   else if (auth === 'error') box.append(h('p', { className: 'rc-muted rc-bad' }, '로그인 정보를 확인하지 못했어요.'), act('다시 시도', loadMe))
-  else if (!me.profile) box.append(h('p', { className: 'rc-muted' }, h('b', {}, me.user.name), ' 님, 게임 계정과 마이크를 적은 프로필을 먼저 등록해 주세요.'), act('프로필 등록', () => openProfile()))
+  else if (!prof && guestMode()) box.append(h('p', { className: 'rc-muted' }, '로그인하면 계정 프로필로, 아니면 이 기기에 비회원 프로필을 만들어 바로 만들고 가입해요.'),
+    auth === 'out' && act('로그인', chooseLogin), act('비회원 프로필', () => openProfile()))
+  else if (!prof) box.append(h('p', { className: 'rc-muted' }, h('b', {}, me.user.name), ' 님, 게임 계정과 마이크를 적은 프로필을 먼저 등록해 주세요.'), act('프로필 등록', () => openProfile()))
   else {
-    const e = me.profile.entries[playAs], p = P(e.char), n = me.profile.entries.length - 1
+    const e = prof.entries[playAs], p = P(e.char), n = prof.entries.length - 1
     box.append(h('img', { src: faceOf(p), alt: '' }),
       h('div', {},
-        h('div', { className: 'rc-acct-name' }, h('b', {}, myName()), micTag(me.profile.mic)),
+        h('div', { className: 'rc-acct-name' }, h('b', {}, myName()), guestMode() && h('span', { className: 'rc-badge guest' }, '비회원'), micTag(prof.mic)),
         h('small', {}, `${e.nick} · ${e.tier} · ${charLine(e)}${n ? ` 외 ${n}개` : ''}`)),
       act('프로필 수정', () => openProfile()),
-      playAsPicker(me.profile.entries))
+      playAsPicker(prof.entries))
   }
   return box
 }
-const micTag = on => h('span', { className: `rc-tag ${on ? 'mic-on' : 'mic-no'}` }, on ? '마이크 O' : '마이크 X')
+// 팀장이 직접 넣은 팀원은 마이크를 모른다(null) — 뱃지를 빼서 틀린 정보를 보이지 않는다
+const micTag = on => on != null && h('span', { className: `rc-tag ${on ? 'mic-on' : 'mic-no'}` }, on ? '마이크 O' : '마이크 X')
 const renderMeCards = () => {
-  if (playAs >= (me?.profile?.entries.length || 0)) playAs = 0   // 프로필을 고쳐 줄이 줄었으면 대표로
+  if (playAs >= (myProfile()?.entries.length || 0)) playAs = 0   // 프로필을 고쳐 줄이 줄었으면 대표로
   for (const s of document.querySelectorAll('[data-mecard]')) s.replaceChildren(meCard())
 }
 
@@ -481,42 +534,69 @@ function profileForm() {
   person = personForm($('.rc-person', form))
   clearOnInput($('.rc-seg', form))
   $('#profile-cancel').onclick = () => { sec.hidden = true; profileAfter = null }
+  clearOnInput($('#profile-guest'))
+  for (const b of form.querySelectorAll('[data-login]')) b.onclick = chooseLogin
   form.onsubmit = async e => {
     e.preventDefault()
     const box = $('.rc-seg', form), mic = $('[name=mic]:checked', form), bad = []
     const nameBox = $('#profile-name').closest('.rc-fld'), name = $('#profile-name').value.trim()
-    unflag(box); unflag(nameBox)
-    if (!name) flagErr(bad, $('#profile-name'), $('.rc-err', nameBox), '표시 이름을 입력하세요')
+    const pwIn = $('#guest-pw'), pw = pwIn.value, guest = guestMode()
+    unflag(box); unflag(nameBox); unflag($('#profile-guest'))
+    const nErr = nameErr(name, 32, '표시 이름을 입력하세요')
+    if (nErr) flagErr(bad, $('#profile-name'), $('.rc-err', nameBox), nErr)
     if (!mic) flagErr(bad, $('[name=mic]', form), $('.rc-err', box), '마이크 사용 여부를 고르세요')
+    const n = [...pw].length
+    if (guest && (!pw.trim() || n < 4 || n > 32)) flagErr(bad, pwIn, $('.rc-err', $('#profile-guest')), '비밀번호는 4~32자로 입력하세요')
     const v = person.read(!bad.length)
     if (bad.length) bad[0].focus()
     if (bad.length || !v) return
-    const res = await submit(form, async () => {
-      if (auth !== 'in') throw new Error('디스코드로 로그인해 주세요')
-      return api('/me/profile', { method: 'PUT', withToken: true, body: { name, mic: mic.value === '1', entries: v.entries } })
-    })
-    if (!res) return
+    let res = null
+    if (guest) trySave(GUEST_KEY, { name, mic: mic.value === '1', entries: v.entries, password: pw })   // 비회원 = 이 기기에만
+    else {
+      res = await submit(form, async () => {
+        if (auth !== 'in') throw new Error('로그인해 주세요')
+        return api('/me/profile', { method: 'PUT', withToken: true, body: { name, mic: mic.value === '1', entries: v.entries } })
+      })
+      if (!res) return
+    }
     sec.hidden = true
     const next = profileAfter
     profileAfter = null
-    setAuth('in', { ...me, profile: res.profile })
+    if (guest) setAuth(auth)
+    else setAuth('in', { ...me, profile: res.profile })
     next?.()
   }
 }
 
-/** 프로필 폼을 연다. after = 저장하면 이어서 부를 함수, why = 왜 열렸는지 한 줄 */
+/** 로그인 연결 줄 — 디스코드 계정에 카카오를 붙이면 다음부터 카카오로도 같은 계정에 들어온다 */
+async function renderLinks() {
+  const box = $('#profile-link'), user = (await session())?.user
+  const discord = hasProvider(user, 'discord'), kakao = hasProvider(user, 'kakao')
+  box.replaceChildren(...!discord ? ['카카오로 로그인 중이에요.']
+    : kakao ? ['디스코드 · 카카오 어느 쪽으로 로그인해도 이 계정이에요.']
+    : ['카카오를 연결하면 카카오톡 안에서도 바로 로그인돼요. ', h('button', { type: 'button', className: 'rc-login is-kakao', onclick: linkKakao }, '카카오 로그인 연결')])
+  box.hidden = auth !== 'in' || !user
+}
+
+/** 프로필 폼을 연다 — 로그인했으면 계정 프로필, 아니면 이 기기의 비회원 프로필. after = 저장하면 이어서 부를 함수, why = 왜 열렸는지 한 줄 */
 function openProfile(after = null, why = '') {
-  if (auth !== 'in') return
-  const form = $('#profile-form'), sec = $('#profile')
+  const guest = guestMode()
+  if (auth !== 'in' && !guest) return
+  const form = $('#profile-form'), sec = $('#profile'), prof = myProfile()
   profileAfter = after
-  // 저장된 이름이 있으면 그것을, 처음이면 디스코드 계정 이름을 채워 둔다
-  $('#profile-name').value = me.profile?.name || me.user.name
+  $('h2', form).textContent = guest ? '비회원 프로필' : '내 프로필'
+  // 저장된 이름이 있으면 그것을, 처음이면 계정 이름(디스코드 서버 별명 · 카카오 닉네임)을 채워 둔다
+  $('#profile-name').value = prof?.name || me?.user.name || ''
+  $('#profile-guest').hidden = !guest
+  $('#guest-pw').value = guest ? prof?.password || '' : ''
+  $('#profile-link').hidden = true
+  if (!guest) renderLinks()
   $('#profile-why').textContent = why
   $('#profile-why').hidden = !why
   $('.rc-form-err', form).hidden = true
   unflag(form)
-  for (const r of form.querySelectorAll('[name=mic]')) r.checked = me.profile ? r.value === (me.profile.mic ? '1' : '0') : false
-  const saved = cleanPerson(me.profile)
+  for (const r of form.querySelectorAll('[name=mic]')) r.checked = prof ? r.value === (prof.mic ? '1' : '0') : false
+  const saved = cleanPerson(prof)
   if (saved) person.fill(saved)
   sec.hidden = false
   sec.scrollIntoView({ block: 'start' })
@@ -617,13 +697,13 @@ function roomForm() {
 // 팀 만들기 폼은 팀 정보 수정에도 쓴다(팀 화면으로 옮겨 붙인다) — 핸들러는 한 번만 건다
 let createBuilt = false
 const ensureCreateForm = () => { if (!createBuilt) { createForm(); createBuilt = true } }
-let editing = null   // 팀 정보 수정 중이면 { team, done(team) }
+let editing = null   // 팀 정보 수정 중이면 { team, done(team), as: 팀장으로 부를 api 옵션(토큰 · 비회원 비밀번호) }
 
 /** 팀 정보 수정: 만들기 폼을 팀 화면 맨 위로 옮기고 지금 값으로 채운다. 전술은 「현재 전술 유지」 가 기본 */
-function openEdit(team, done) {
+function openEdit(team, done, as) {
   ensureCreateForm()
   const sec = $('#create'), form = $('#create-form'), sel = $('#tactic'), room = $('#room')
-  editing = { team, done }
+  editing = { team, done, as }
   $('#team-view').insertBefore(sec, $('#team-body'))
   $('h2', form).textContent = '팀 정보 수정'
   $('[type=submit]', form).textContent = '수정 저장'
@@ -728,8 +808,8 @@ function createForm() {
           ? { preset: presetOf(board.presetId) ? board.presetId : null, board: { tokens: board.tokens.map(thinRoutes) }, name: nameIn.value.trim() }
           : { preset: sel.value || null, board: null }
       }
-      const { team: t, done } = editing
-      const res = await submit(form, () => api(`/teams/${t.id}`, { method: 'PUT', withToken: true, body: { room, ...(!keep && { tactic }) } }))
+      const { team: t, done, as } = editing
+      const res = await submit(form, () => api(`/teams/${t.id}`, { method: 'PUT', ...as, body: { room, ...(!keep && { tactic }) } }))
       if (res) { closeEdit(); done(res.team) }
       return
     }
@@ -746,8 +826,12 @@ function createForm() {
     const res = await submit(form, async () => {
       const cur = await ready(again, '팀을 만들기 전에 프로필을 먼저 등록해 주세요')
       if (!cur || (cur.teamId && !confirm(MOVE_ASK))) return null
-      try { return await api('/teams', { method: 'POST', withToken: true, body: { room, tactic, entry: playAs } }) }
-      catch (e) { if (e.status === 428) { openProfile(again, e.message); return null } throw e }
+      const g = cur.guest
+      try {
+        const r = await api('/teams', { method: 'POST', withToken: !g, body: { room, tactic, entry: playAs, ...(g && guestBody(g)) } })
+        if (r.member) saveCreds(r.team.id, { id: r.member, pw: g.password })   // 비회원 팀장 — 이 기기에서는 비밀번호를 다시 묻지 않는다
+        return r
+      } catch (e) { if (e.status === 428) { openProfile(again, e.message); return null } throw e }
     })
     if (!res) return
     try { if (res.left) sessionStorage.setItem(LEFT_KEY, leftMsg(res.left)) } catch {}
@@ -770,8 +854,8 @@ function teamTokens(t) {
   return presetTokens(pr, ids.map(c => c || pool.shift() || null), [])
 }
 
-/** 화면에 보이는 내 이름 — 프로필에 저장된 표시 이름이 먼저다(디스코드 서버 별명 · 본인이 고친 이름) */
-const myName = () => me?.profile?.name || me?.user?.name || ''
+/** 화면에 보이는 내 이름 — 프로필에 저장된 표시 이름이 먼저다(디스코드 서버 별명 · 카카오 닉네임 · 본인이 고친 이름) */
+const myName = () => guestMode() ? guestProfile()?.name || '' : me?.profile?.name || me?.user?.name || ''
 
 const teamUrl = t => `${location.origin}/recruit/?t=${t.id}`
 
@@ -799,7 +883,8 @@ function kakaoPayload(t) {
     return {
       // 캐릭터 이름은 넣지 않는다 — 오른쪽 얼굴이 대신하고, 설명 줄은 한 줄에서 잘린다
       title: `${m.leader ? '👑 ' : ''}${e.nick}${n ? ` +${n}` : ''}`,
-      description: `${POS[P(e.char).pos] || '?'} · ${e.tier} · 마이크 ${m.mic ? 'O' : 'X'}`,
+      // 팀장이 넣은 팀원은 티어('') · 마이크(null)를 모를 수 있다 — 그 칸은 뺀다(봇 kakao_share 도 같다)
+      description: [POS[P(e.char).pos] || '?', e.tier, m.mic != null && `마이크 ${m.mic ? 'O' : 'X'}`].filter(Boolean).join(' · '),
       imageUrl: img(e.char), link,
     }
   })
@@ -842,7 +927,7 @@ async function showTeam(id) {
   }
   $('#team-error').hidden = true
   $('#team-body').hidden = false
-  const end = msg => { dead = true; showGone(msg) }
+  const end = msg => { dead = true; dropCreds(team.id); showGone(msg) }
 
   const courtBox = $('#team-court'), court = viewer($('svg', courtBox))
   let courtKey = ''
@@ -852,9 +937,11 @@ async function showTeam(id) {
     setInterval(() => document.hidden || dead || court.play(), 4500)
   }
 
-  // 로그인한 내가 이 팀의 누구인지 — 디스코드 ID(문자열)로 비교한다
-  const mine = () => auth === 'in' && team.members.find(m => m.userId === me.user.id) || null
-  const notMine = () => { if (me?.teamId === team.id) me.teamId = null }
+  // 내가 이 팀의 누구인지 — 로그인한 계정 ID, 아니면 이 기기에 비밀번호를 둔 비회원 팀원(g<번호>)
+  const mine = () => auth === 'in' && team.members.find(m => m.userId === me.user.id) || team.members.find(m => m.userId === credsOf(team.id)?.id) || null
+  // 나로서 부르는 api 옵션 — 비회원 팀원이면 비밀번호, 아니면 로그인 토큰
+  const as = () => { const m = mine(); return m?.kind === 'guest' ? { guest: credsOf(team.id) } : { withToken: true } }
+  const notMine = () => { if (me?.teamId === team.id) me.teamId = null; dropCreds(team.id) }
 
   // 팀원 본인의 나가기
   const leave = async (btn, m) => {
@@ -863,7 +950,7 @@ async function showTeam(id) {
     msg.hidden = true
     btn.disabled = true
     try {
-      const res = await api(`/teams/${team.id}/members/${m.userId}`, { method: 'DELETE', withToken: true })
+      const res = await api(`/teams/${team.id}/members/${m.userId}`, { method: 'DELETE', ...as() })
       notMine()
       if (!res.team) return end(goneMsg())
       team = res.team
@@ -882,9 +969,13 @@ async function showTeam(id) {
       const head = h('div', { className: 'rc-mhead' },
         m.leader && h('span', { className: 'rc-badge' }, '팀장'),
         self && h('span', { className: 'rc-badge me' }, '나'),
-        h('b', { title: '디스코드 이름' }, m.name), micTag(m.mic))
+        m.kind === 'guest' && h('span', { className: 'rc-badge guest', title: '로그인 없이 비밀번호로 들어온 팀원' }, '비회원'),
+        m.kind === 'added' && h('span', { className: 'rc-badge guest', title: '팀장이 닉네임 · 캐릭터로 직접 넣은 팀원' }, '팀장이 추가'),
+        h('b', { title: '표시 이름' }, m.name), micTag(m.mic))
       if (self && !m.leader) head.append(h('button', { type: 'button', className: 'danger', onclick: e => leave(e.currentTarget, m) }, '나가기'))
-      const mine = self && me?.profile?.entries
+      // 다른 기기에서 만들었거나 가입한 비회원 — 비밀번호를 넣으면 이 기기에서도 그 팀원으로 관리한다
+      if (!mm && m.kind === 'guest') head.append(h('button', { type: 'button', onclick: () => claim(m) }, '본인 확인'))
+      const mine = self && m.kind === 'user' && me?.profile?.entries   // 비회원은 가입할 때 보낸 줄만 있어 바꾸지 않는다 — 나갔다 다시 들어온다
       const change = mine?.length > 1 && h('button', {
         type: 'button', className: 'rc-more-accts', 'aria-haspopup': 'dialog',
         onclick: async e => {
@@ -894,7 +985,7 @@ async function showTeam(id) {
           if (i == null || i === now) return
           const btn = e.target.closest('button')
           btn.disabled = true
-          try { team = (await api(`/teams/${team.id}/members/${m.userId}`, { method: 'PUT', withToken: true, body: { entry: i } })).team; render() }
+          try { team = (await api(`/teams/${team.id}/members/${m.userId}`, { method: 'PUT', ...as(), body: { entry: i } })).team; render() }
           catch (err) { alert(err.message); btn.disabled = false }
         },
       }, '캐릭터 변경')
@@ -913,14 +1004,26 @@ async function showTeam(id) {
     $('#team-roster').replaceChildren(...items)
   }
 
-  // ---- 팀장 관리: 로그인한 팀장에게만 (연장 · 팀 해제 · 방출)
+  /** 비회원 본인 확인 — 맞으면 이 기기에 비밀번호를 두고 그 팀원으로 보여 준다(팀장이면 관리 칸이 열린다) */
+  async function claim(m) {
+    const pw = await askPassword(`${m.name} 님이 정한 비밀번호를 넣으면 이 기기에서도 관리할 수 있어요.`)
+    if (!pw) return
+    try {
+      await api('/me', { guest: { id: m.userId, pw } })
+      saveCreds(team.id, { id: m.userId, pw })
+      render()
+    } catch (e) { alert(e.message) }
+  }
+
+  // ---- 팀장 관리: 팀장에게만 (수정 · 연장 · 팀 해제 · 방출 · 팀원 직접 추가)
   const box = $('#manage'), mErr = $('#manage-err')
   $('[data-ttl]', box).textContent = cfg.ttlHours
 
   function manage(mm) {
     box.hidden = !mm?.leader
     if (box.hidden) return
-    $('#edit-team').onclick = () => openEdit(team, t => { team = t; render(); flash('팀 정보를 고쳤어요') })
+    $('#add-member').hidden = team.status !== 'open'
+    $('#edit-team').onclick = () => openEdit(team, t => { team = t; render(); flash('팀 정보를 고쳤어요') }, as())
     $('#kicks').replaceChildren(...team.members.filter(m => !m.leader).map(m => {
       const p = P(m.entries[0].char)
       return h('li', {}, h('img', { src: faceOf(p), alt: '' }), h('b', {}, m.name),
@@ -935,7 +1038,7 @@ async function showTeam(id) {
     $('#manage-ok').hidden = true
     btn.disabled = true
     try {
-      return await api(path, { method, withToken: true })
+      return await api(path, { method, ...as() })
     } catch (e) {
       // 404 는 팀이 없거나(해제 · 만료) 방출할 팀원이 이미 나갔거나다 — 팀을 다시 읽어 없을 때만 끝낸다
       if (e.status === 404) { await refresh(); if (dead) return null }
@@ -964,6 +1067,60 @@ async function showTeam(id) {
   }
   $('#disband').onclick = async e => {
     if (await asLeader(e.currentTarget, '팀을 해제할까요? 팀이 바로 삭제되고 되돌릴 수 없어요.', `/teams/${team.id}`, 'DELETE')) { notMine(); end('팀을 해제했어요.') }
+  }
+
+  // 팀원 직접 추가 — 카톡 · 디스코드로 이미 모인 사람을 닉네임 · 캐릭터로 넣는다. 가입된 사람은 표시 이름 · 닉네임을 치면 목록에 떠서
+  // 고르면 캐릭터 · 티어가 채워진다(계정과 잇지는 않는다 — 그 사람이 직접 가입하면 이 줄은 방출한다)
+  const addForm = $('#add-member'), nickIn = $('[name=nick]', addForm), tierSel = $('[name=tier]', addForm), charBtn = $('#add-char'), addErr = $('.rc-err', addForm)
+  let addChar = '', found = [], findSeq = 0
+  if (tierSel.options.length < 2) tierSel.append(...cfg.tiers.map(t => h('option', { value: t }, t)))
+  const showChar = () => {
+    const p = addChar && P(addChar)
+    charBtn.replaceChildren(p ? h('img', { src: faceOf(p), alt: '' }) : h('span', { className: 'rc-hole' }), p ? p.short || p.name : '캐릭터 선택')
+  }
+  showChar()
+  charBtn.onclick = async () => {
+    const id = await pickChar(new Set(), addChar)
+    if (id) { addChar = id; showChar() }
+    charBtn.focus()
+  }
+  nickIn.oninput = () => {
+    const q = nickIn.value.trim()
+    // 목록에서 고른 값이면(닉네임이 같은 줄) 캐릭터 · 티어를 채운다 — 한 계정에 캐릭터가 여럿이면 대표 쪽 줄
+    const pick = found.flatMap(p => p.entries).find(e => e.nick === q)
+    if (pick) { addChar = pick.char; tierSel.value = pick.tier; showChar(); return }
+    clearTimeout(nickIn.t)
+    nickIn.t = setTimeout(async () => {
+      const seq = ++findSeq
+      const res = q ? await api(`/profiles?q=${encodeURIComponent(q)}`, as()).catch(() => null) : null
+      if (seq !== findSeq) return
+      found = res?.profiles || []
+      // 같은 닉네임이 여러 줄이면 첫 줄만 — datalist 는 값이 같으면 고른 줄을 구분하지 못한다
+      const seen = new Set()
+      $('#add-names').replaceChildren(...found.flatMap(p => p.entries.map(e => [p, e])).filter(([, e]) => !seen.has(e.nick) && seen.add(e.nick))
+        .map(([p, e]) => h('option', { value: e.nick, label: `${p.name} · ${e.tier} · ${P(e.char).name}` })))
+    }, 250)
+  }
+  addForm.onsubmit = async e => {
+    e.preventDefault()
+    const nick = nickIn.value.trim(), btn = $('[type=submit]', addForm)
+    const bad = nameErr(nick, 20, '게임 닉네임을 입력하세요', '게임 닉네임') || (!addChar && '캐릭터를 고르세요')
+    addErr.textContent = bad || ''
+    addErr.hidden = !bad
+    if (bad) return (addChar || !nick ? nickIn : charBtn).focus()
+    btn.disabled = true
+    try {
+      team = (await api(`/teams/${team.id}/members`, { method: 'POST', ...as(), body: { add: { nick, char: addChar, tier: tierSel.value } } })).team
+      nickIn.value = ''
+      tierSel.value = ''
+      addChar = ''
+      showChar()
+      render()
+    } catch (err) {
+      addErr.textContent = err.message
+      addErr.hidden = false
+      if (err.status === 404 || err.status === 409) refresh()   // 그새 찼거나 사라졌다
+    } finally { btn.disabled = false }
   }
 
   const tick = () => {
@@ -1049,15 +1206,19 @@ async function showTeam(id) {
       const cur = await ready(again, '팀에 가입하기 전에 프로필을 먼저 등록해 주세요')
       if (!cur || mine()) return null
       if (cur.teamId && cur.teamId !== team.id && !confirm(MOVE_ASK)) return null
-      try { return await api(`/teams/${team.id}/members`, { method: 'POST', withToken: true, body: { entry: playAs } }) }
-      catch (e) {
+      const g = cur.guest
+      try {
+        const r = await api(`/teams/${team.id}/members`, { method: 'POST', withToken: !g, body: { entry: playAs, ...(g && guestBody(g)) } })
+        if (r.member) saveCreds(team.id, { id: r.member, pw: g.password })   // 비회원 — 이 기기에서 나가기 · 캐릭터 확인에 쓴다
+        return r
+      } catch (e) {
         if (e.status === 428) { openProfile(again, e.message); return null }
         failed = true
         throw e
       }
     })
     if (!res) { if (failed) refresh(); return }   // 그새 팀이 찼거나 사라졌을 수 있다 — 찼으면 가입 폼이 내려간다
-    me.teamId = res.team.id
+    if (me) me.teamId = res.team.id
     team = res.team
     render()
     flash(leftMsg(res.left))

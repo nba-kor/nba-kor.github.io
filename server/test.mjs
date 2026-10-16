@@ -83,7 +83,7 @@ const web = (id, name) => ({ authorization: `Bearer web.${id}${name ? `.${encode
 const bot = (id, name = `봇${id.slice(-4)}`, admin) => ({
   authorization: `Bot ${BOT_KEY}`, 'x-discord-user': id, 'x-discord-name': encodeURIComponent(name), ...(admin && { 'x-discord-admin': '1' }),
 })
-const LOGIN = { error: '디스코드로 로그인해 주세요' }
+const LOGIN = { error: '로그인해 주세요' }
 const AUTH_DOWN = { error: '로그인 서버에 연결할 수 없어요' }
 
 // ---------------------------------------------------------------- 공용 준비물
@@ -180,7 +180,7 @@ const boardToken = (o = {}) => ({
 
 const PROFILE_KEYS = ['userId', 'name', 'mic', 'entries', 'updatedAt']
 const VIEW_KEYS = ['id', 'room', 'tactic', 'voice', 'status', 'size', 'createdAt', 'expiresAt', 'members']
-const MEMBER_KEYS = ['userId', 'name', 'mic', 'entries', 'leader', 'joinedAt']
+const MEMBER_KEYS = ['userId', 'name', 'mic', 'entries', 'leader', 'joinedAt', 'kind']
 const count = list => list.reduce((c, v) => ({ ...c, [v]: (c[v] || 0) + 1 }), {})
 
 /** 프로필을 등록한 사람 하나. kind 'web' | 'bot' */
@@ -488,6 +488,20 @@ test('웹 신원: Auth(/auth/v1/user)로 토큰 확인 · 디스코드 ID 는 id
   assert.equal(net.auth.length, calls)
 })
 
+test('웹 신원: 카카오만 있으면 k<회원번호> · 이름은 user_metadata.nickname(없거나 링크면 기본값) · 디스코드도 있으면 디스코드 ID', async () => {
+  const { api, net } = start({ db: FAKE_DB })
+  const kakao = (id, meta) => ({ id: 'aaaaaaaa-0000-4000-8000-000000000001', user_metadata: meta, identities: [{ id, provider: 'kakao', identity_data: { name: '실명' } }] })
+  const user = async body => { net.authReply = () => json(200, body); return api('GET', '/api/me', undefined, { as: web(uid()) }) }
+  assert.deepEqual((await user(kakao('4321', { nickname: ' 보노 ' }))).body.user, { id: 'k4321', name: '보노' })
+  assert.equal((await user(kakao('4321', {}))).body.user.name, '카카오 사용자', '카카오 닉네임(대개 실명)은 쓰지 않는다')
+  assert.equal((await user(kakao('4321', { nickname: 'discord.gg/x' }))).body.user.name, '카카오 사용자')
+  assert.equal((await user(kakao('4321', { nickname: '가'.repeat(40) }))).body.user.name, '가'.repeat(32))
+  const both = authUser('12345678901234567')
+  both.identities.push(kakao('4321').identities[0])
+  assert.equal((await user(both)).body.user.id, '12345678901234567', '디스코드에 카카오를 연결해도 디스코드 ID')
+  for (const id of ['abc', 4321, '1'.repeat(21)]) assert.equal((await user(kakao(id, {}))).status, 401, String(id))
+})
+
 test('웹 신원: 서버 별명이 있으면 그것을 이름으로(없거나 서버 밖이면 계정 이름) · 10분 기억 · 봇은 안 부른다', async () => {
   let clock = 1_000_000
   const id = uid(), seen = []
@@ -750,7 +764,7 @@ dbTest('팀 만들기: 팀 뷰 모양(팀원 = 프로필) · 방 마이크 3단�
   assert.deepEqual([team.status, team.size, team.expiresAt - team.createdAt], ['open', 3, TTL])
   assert.match(team.id, /^[A-Za-z0-9_-]{8}$/)
   assert.deepEqual(team.members.map(m => Object.keys(m)), [MEMBER_KEYS])
-  assert.deepEqual(team.members[0], { userId: lead.id, name: '팀장 봇', mic: false, entries: [entry(), entry({ char: 'klfd' })], leader: true, joinedAt: team.createdAt })
+  assert.deepEqual(team.members[0], { userId: lead.id, name: '팀장 봇', mic: false, entries: [entry(), entry({ char: 'klfd' })], leader: true, joinedAt: team.createdAt, kind: 'user' })
   assert.equal((await me(api, lead)).body.teamId, team.id)
   assert.deepEqual((await api('GET', `/api/teams/${team.id}`)).body, team)
 
@@ -906,7 +920,7 @@ dbTest('가입 → 모집 완료 → 4번째 409 · 같은 팀 다시 409 · 알
   assert.equal(j1.status, 201)
   assert.deepEqual(Object.keys(j1.body), ['team', 'left'])
   assert.deepEqual([j1.body.left, j1.body.team.status, userIds(j1.body.team)], [null, 'open', [lead.id, a.id]])
-  assert.deepEqual(j1.body.team.members[1], { userId: a.id, name: 'A 봇', mic: false, entries: j1.body.team.members[1].entries, leader: false, joinedAt: j1.body.team.members[1].joinedAt })
+  assert.deepEqual(j1.body.team.members[1], { userId: a.id, name: 'A 봇', mic: false, entries: j1.body.team.members[1].entries, leader: false, joinedAt: j1.body.team.members[1].joinedAt, kind: 'user' })
   for (const who of [a, lead]) assert.deepEqual([(await tm.join(who)).status, (await tm.join(who)).body], [409, { error: '이미 이 팀에 있어요' }])
   const j2 = await tm.join(b)
   assert.deepEqual([j2.status, j2.body.team.status, userIds(j2.body.team)], [201, 'full', [lead.id, a.id, b.id]])
@@ -1447,7 +1461,7 @@ test('Data API 오류 → HTTP: PT404 · PT409(full · already) · PT428 은 사
   assert.deepEqual([ok.status, ok.body.left, ok.body.team.status, userIds(ok.body.team)], [201, null, 'open', ['111111111111111111', id]])
   assert.deepEqual(seen.find(s => s.path === '/rest/v1/rpc/recruit_hit').body, { p_key: `w ${id}`, p_now: 0, p_window: 600_000, p_add: 1 })
   const call = seen.find(s => s.path === '/rest/v1/rpc/recruit_join_team')
-  assert.deepEqual(call.body, { p_team: 'AAAAAAAA', p_actor: id, p_now: 0, p_size: 3 })
+  assert.deepEqual(call.body, { p_team: 'AAAAAAAA', p_actor: id, p_now: 0, p_size: 3, p_entry: 0, p_guest: null, p_pw: null })
   assert.equal(call.headers.apikey, 'sb_secret_from_keys', 'SUPABASE_SECRET_KEYS 의 default 가 먼저')
   assert.equal(call.headers.authorization, undefined, 'secret key 는 Authorization 에 싣지 않는다')
   assert.deepEqual([call.headers['content-type'], call.headers.accept], ['application/json', 'application/json'])
@@ -1464,7 +1478,7 @@ test('Data API 오류 → HTTP: PT404 · PT409(full · already) · PT428 은 사
   seen.length = 0
   assert.equal((await api('POST', '/api/teams', { room: ROOM, tactic: { preset: 'pnr' } }, { as })).status, 201)
   const cr = seen.find(s => s.path === '/rest/v1/rpc/recruit_create_team').body
-  assert.deepEqual(Object.keys(cr).sort(), ['p_actor', 'p_expires_at', 'p_id', 'p_now', 'p_room', 'p_rooms', 'p_tactic'])
+  assert.deepEqual(Object.keys(cr).sort(), ['p_actor', 'p_entry', 'p_expires_at', 'p_guest', 'p_id', 'p_now', 'p_pw', 'p_room', 'p_rooms', 'p_tactic'])
   assert.deepEqual([cr.p_actor, cr.p_expires_at, cr.p_room], [id, TTL, ROOM])
   assert.deepEqual(cr.p_rooms, [{ id: '11', name: '음성 4' }, { id: '4', name: '음성 3' }, { id: '3', name: '음성 2' }, { id: '2', name: '음성 1' }])
   assert.equal((await api('PUT', '/api/me/profile', { mic: false, entries: [entry()] }, { as })).status, 200)
@@ -1510,9 +1524,81 @@ test('Data API 오류 → HTTP: PT404 · PT409(full · already) · PT428 은 사
   assert.ok(!elogs.join('\n').includes('sb_secret_'), '키는 로그에 남기지 않는다')
 })
 
+dbTest('비회원: 간이 프로필 + 비밀번호로 만들기 · 가입 → Guest 신원으로 관리 · 틀린 비밀번호 403 · 5번 틀리면 그 IP 만 429 · 계정 일은 못 한다', async () => {
+  let ip = '1.2.3.4'
+  const app = start(), { api, idle, hooks } = app
+  const ipApp = createHandler({ env: { SUPABASE_URL: SUPA, SUPABASE_SECRET_KEY: KEY, SUPABASE_PUBLISHABLE_KEY: PUB }, now: futureClock(), fetch: app.net.fetch, log, ipOf: () => ip })
+  const guestProfile = (name, o = {}) => ({ name, mic: false, entries: [entry({ nick: name }), entry({ nick: name, char: 'klfd' })], ...o })
+  const as = (member, pw) => ({ authorization: `Guest ${member}:${encodeURIComponent(pw)}` })
+
+  // 만들기 — 본문 검증(이름 · 비밀번호 4~32자) · 참가 캐릭터 · 응답의 member
+  for (const [body, why] of [
+    [{ guest: guestProfile('비회원'), password: '123' }, '짧은 비밀번호'], [{ guest: guestProfile('비회원'), password: '    ' }, '공백 비밀번호'],
+    [{ guest: guestProfile('비회원'), password: 'x'.repeat(33) }, '긴 비밀번호'], [{ guest: { mic: true, entries: [entry()] }, password: '1234' }, '이름 없음'],
+    [{ guest: guestProfile('비회원', { entries: [] }), password: '1234' }, '캐릭터 없음'],
+  ]) assert.equal((await api('POST', '/api/teams', { room: ROOM, tactic: null, ...body })).status, 400, why)
+  assert.equal((await api('POST', '/api/teams', 'room=x', { headers: { 'content-type': 'text/plain' } })).status, 415, 'JSON 이 아니면 세기 전에 거절')
+  const made = await api('POST', '/api/teams', { room: ROOM, tactic: null, guest: guestProfile('비회원 팀장'), password: '비번 1234', entry: 1 })
+  assert.equal(made.status, 201, made.text)
+  const { team, member: lead } = made.body
+  assert.match(lead, /^g\d+$/)
+  assert.deepEqual(team.members.map(m => [m.userId, m.name, m.kind, m.entries[0].char]), [[lead, '비회원 팀장', 'guest', 'klfd']])
+  const tm = teamApi(api, team.id), leadAs = { as: as(lead, '비번 1234') }
+
+  // Guest 신원 — 비밀번호 확인(GET me) · 틀리면 403 · 계정 일(프로필 · 게시판)은 401
+  assert.deepEqual((await api('GET', '/api/me', undefined, leadAs)).body, { user: { id: lead, name: '비회원 팀장' }, profile: null, teamId: null })
+  assert.deepEqual((await api('GET', '/api/me', undefined, { as: as(lead, '틀림') })).body, { error: '비밀번호가 맞지 않아요' })
+  assert.equal((await api('PUT', '/api/me/profile', { mic: true, entries: [entry()] }, leadAs)).status, 401)
+  assert.equal((await api('POST', '/api/builds', {}, leadAs)).status, 401)
+  assert.equal((await api('GET', '/api/me', undefined, { as: as('g999999999', '비번 1234') })).status, 401, '없는 팀원')
+
+  // 팀장 관리 — 수정 · 연장 · 직접 넣기(계정 아님 · 마이크 모름) · 자동완성
+  assert.equal((await api('PUT', `/api/teams/${team.id}`, { room: { ...ROOM, title: '비회원 방' } }, leadAs)).body.team.room.title, '비회원 방')
+  assert.equal((await tm.extend(leadAs)).status, 200)
+  const acct = await person(api, { name: `자동완성${RUN}` })   // 프로필은 DB 에 남으므로 실행마다 다른 이름
+  assert.equal((await api('GET', `/api/profiles?q=${RUN}`)).status, 401, '자동완성은 신원이 있어야')
+  const found = await api('GET', `/api/profiles?q=${encodeURIComponent(`완성${RUN}`)}`, undefined, leadAs)
+  assert.deepEqual(found.body.profiles.map(p => p.name), [`자동완성${RUN}`])
+  assert.deepEqual((await api('GET', '/api/profiles?q=*', undefined, leadAs)).body, { profiles: [] })
+  for (const [add, why] of [[{ nick: '', char: 'bl' }, '닉네임'], [{ nick: 'x', char: 'nope' }, '캐릭터'], [{ nick: 'x', char: 'bl', tier: '없는 티어' }, '티어']]) {
+    assert.equal((await api('POST', `/api/teams/${team.id}/members`, { add }, leadAs)).status, 400, why)
+  }
+  const add = await api('POST', `/api/teams/${team.id}/members`, { add: { nick: '친구', char: 'bl' } }, leadAs)
+  assert.equal(add.status, 201, add.text)
+  const friend = add.body.team.members[1]
+  assert.deepEqual([friend.name, friend.mic, friend.kind, friend.entries], ['친구', null, 'added', [{ nick: '친구', tier: '', char: 'bl' }]])
+  assert.equal((await api('POST', `/api/teams/${team.id}/members`, { add: { nick: 'x', char: 'bl' } }, { as: acct.as })).status, 403, '팀장만 넣는다')
+  assert.equal((await api('POST', `/api/teams/${team.id}/members`, { add: { nick: 'x', char: 'bl' } })).status, 401)
+  assert.equal((await api('GET', '/api/me', undefined, { as: as(friend.userId, 'x'.repeat(4)) })).status, 401, '팀장이 넣은 팀원은 비밀번호가 없다')
+
+  // 비회원 가입 → 다 참 → 계정 멘션만 · 팀원은 나가기만, 팀장은 방출
+  const joined = await api('POST', `/api/teams/${team.id}/members`, { guest: guestProfile('비회원 팀원'), password: 'pass' })
+  assert.equal(joined.status, 201, joined.text)
+  const g2 = joined.body.member
+  assert.equal(joined.body.team.status, 'full')
+  await idle()
+  const full = hooks().at(-1)
+  assert.match(full.embeds[0].title, /모집 완료/)
+  assert.deepEqual(full.allowed_mentions, { parse: [] }, '디스코드 계정이 없으면 아무도 멘션하지 않는다')
+  assert.match(full.embeds[0].description, /\*\*친구\*\* · /, '모르는 티어 · 마이크는 줄에서 뺀다')
+  assert.equal((await api('PUT', `/api/teams/${team.id}/members/${g2}`, { entry: 1 }, { as: as(g2, 'pass') })).body.team.members[2].entries[0].char, 'klfd')
+  assert.equal((await tm.kick(friend.userId, { as: as(g2, 'pass') })).status, 403, '팀원은 남을 못 뺀다')
+  assert.equal((await tm.kick(g2, { as: as(lead, 'pass') })).status, 403, '다른 팀원의 비밀번호로는 그 팀원일 뿐')
+  assert.deepEqual(userIds((await tm.kick(friend.userId, leadAs)).body.team), [lead, g2])
+  assert.deepEqual(userIds((await tm.kick(g2, { as: as(g2, 'pass') })).body.team), [lead])
+
+  // 틀린 비밀번호: 한 IP 가 5번 넘게 틀리면 그 IP 만 10분 잠김 — 다른 IP 의 팀장은 그대로 쓴다
+  const ipApi = (h, ...a) => ipApp(new Request(`http://api.test/api/me`, { headers: as(...a) })).then(r => r.status)
+  for (let i = 0; i < 5; i++) assert.equal(await ipApi(ipApp, lead, '틀림'), 403)
+  assert.equal(await ipApi(ipApp, lead, '비번 1234'), 429, '맞는 비밀번호도 그 IP 에서는 잠김')
+  ip = '5.6.7.8'
+  assert.equal(await ipApi(ipApp, lead, '비번 1234'), 200)
+  assert.equal((await tm.disband(leadAs)).status, 200, '비회원 팀장이 해제')
+})
+
 test('응답 어디에도 토큰 · 봇 키 · auth_user_id · 옛 비밀번호 필드가 없다', () => {
   const all = responses.join('\n')
-  for (const secret of [BOT_KEY, 'Bearer', 'web.', 'auth_user_id', 'authUserId', '00000000-0000-4000-8000', PUB, 'sb_secret', 'password', 'token_hash']) {
+  for (const secret of [BOT_KEY, 'Bearer', 'web.', 'auth_user_id', 'authUserId', '00000000-0000-4000-8000', PUB, 'sb_secret', 'password', 'token_hash', 'pw_hash', 'scrypt$', '비번 1234']) {
     assert.ok(!all.includes(secret), secret)
   }
   assert.ok(responses.length > (noDb ? 150 : 500), responses.length)

@@ -3,11 +3,12 @@
 // 운영은 Supabase Edge Function(supabase/functions/recruit/index.mjs)이 이 함수를 부르고, 로컬 docker compose 는 같은
 // edge-runtime 으로 띄운다(nginx 의 /api/ → 함수). 테스트(server/test.mjs)는 Node 에서 이 함수를 직접 부른다.
 // 그래서 웹 표준(fetch · Request · Response)과 node:crypto · node:buffer 만 쓴다 — node:http · node:fs 는 Deno 에서 못 쓴다.
-// 부르는 쪽은 둘이다: 웹 화면(Supabase Auth 디스코드 로그인 토큰)과 TNAB 디스코드 봇(봇 키 + 디스코드 ID 헤더).
+// 부르는 쪽은 셋이다: 웹 화면(Supabase Auth 디스코드 · 카카오 로그인 토큰, 또는 비회원 비밀번호)과 TNAB 디스코드 봇(봇 키 + 디스코드 ID 헤더).
 // 둘 다 Supabase DB 에는 붙지 않는다 — 검증 · 권한 · 1인 1파티 · 요청 수 제한 · secret key 가 전부 여기 있다.
 
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { Buffer } from 'node:buffer'
+import { promisify } from 'node:util'
 // 데이터는 글자 그대로의 import 로 읽는다 — 배포 CLI 가 이 구문만 보고 JSON 파일을 함수에 같이 묶는다(readFileSync 는 못 찾는다)
 import CFG from '../data/recruit.json' with { type: 'json' }
 import playersData from '../data/players.json' with { type: 'json' }
@@ -27,7 +28,9 @@ const TTL = CFG.ttlHours * 3_600_000
 const L = CFG.limits
 const MAX_BODY = 32 * 1024
 const MAX_LIST = 100
-const LIMIT = { max: 30, windowMs: 10 * 60_000 }   // 한 사람(디스코드 ID) 당 쓰기 요청
+const LIMIT = { max: 30, windowMs: 10 * 60_000 }   // 한 사람(계정 · 비회원 팀원) 당 쓰기 요청. 비회원 만들기 · 가입은 IP 당
+const PW_LIMIT = { max: 5, memberMax: 20, windowMs: 10 * 60_000 }   // 틀린 비회원 비밀번호: 한 IP 가 한 팀원에 · 그 팀원 전체
+const PW_LEN = [4, 32]
 const AUTH_MEMO = { ms: 60_000, max: 500 }         // 로그인 토큰 확인 결과를 워커 메모리에 잠깐 — 요청마다 Auth 를 부르지 않게
 const ROUTE_KINDS = ['move', 'pass', 'screen']
 const LINK = /:\/\/|www\.|discord\.gg/i
@@ -40,6 +43,7 @@ const COMBO_VS = 10   // 조합표: 상대하기 편한 · 힘든 쪽마다 캐�
 const YOUTUBE = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/
 const CATEGORIES = new Set(videosData.categories.map(c => c.id))
 const SNOWFLAKE = /^\d{17,20}$/
+const GUEST_ID = /^g(\d{1,15})$/   // 비회원 · 팀장이 넣은 팀원의 userId = 'g' + recruit_members.id
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const CONTROL = /[\x00-\x1f\x7f]/
 const JSON_TYPE = /^application\/json\b/i
@@ -47,11 +51,14 @@ const JSON_TYPE = /^application\/json\b/i
 const ACTIONS = new Set([
   'GET me', 'PUT me profile', 'GET', 'POST', 'POST quick', 'GET team', 'DELETE team', 'POST team members', 'DELETE team members member', 'POST team extend',
   'PUT team', 'PUT team members member',   // 팀 정보 수정(팀장) · 참가 캐릭터 바꾸기(본인)
+  'GET profiles',   // 팀장이 팀원을 직접 넣을 때 자동완성
 ])
+// 비회원(Authorization: Guest)이 할 수 있는 것 — 자기 팀 안의 일뿐. 프로필 · 게시판은 계정만
+const GUEST_ACTIONS = new Set(['GET me', 'GET profiles', 'DELETE team', 'POST team members', 'DELETE team members member', 'POST team extend', 'PUT team', 'PUT team members member'])
 // 브라우저는 authorization · content-type 만 보낸다(커스텀 x- 헤더는 운영 게이트웨이 preflight 에서 잘릴 수 있다). 봇의 x-discord-* 는 서버끼리라 preflight 가 없다
 const PREFLIGHT = { 'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS', 'access-control-allow-headers': 'authorization, content-type', 'access-control-max-age': '600' }
 
-const LOGIN = '디스코드로 로그인해 주세요'
+const LOGIN = '로그인해 주세요'
 const AUTH_DOWN = '로그인 서버에 연결할 수 없어요'
 const NO_PROFILE = '먼저 프로필을 등록해 주세요'
 const DB_DOWN = '모집 서버 DB 에 연결할 수 없어요'
@@ -68,6 +75,14 @@ const matches = (re, v) => typeof v === 'string' && re.test(v)   // 정규식 te
 const listOf = (a, max, min = 0) => Array.isArray(a) && a.length >= min && a.length <= max
 const r3 = v => Math.round(v * 1000) / 1000
 const enc = encodeURIComponent
+const scryptAsync = promisify(scrypt)   // 비동기만 — scryptSync 는 워커 CPU 시간(2초)을 먹는다
+// IPv6 는 보통 한 가입자가 /64 를 통째로 받는다 — 앞 64비트로 센다(IPv4 · ::ffff:a.b.c.d · 이상한 값은 그대로)
+const rateKey = ip => {
+  const [a, b, ...extra] = ip.split('%')[0].split('::'), head = a ? a.split(':') : [], tail = b ? b.split(':') : []
+  const full = b === undefined ? head : [...head, ...Array(Math.max(0, 8 - head.length - tail.length)).fill('0'), ...tail]
+  if (extra.length || full.length !== 8 || !full.every(x => /^[0-9a-f]{1,4}$/i.test(x))) return ip
+  return `${full.slice(0, 4).map(x => parseInt(x, 16).toString(16)).join(':')}::/64`
+}
 /** Supabase 키 — 운영은 Supabase 가 넣어 주는 SUPABASE_*_KEYS(JSON 의 default), 로컬 compose 는 SUPABASE_*_KEY */
 const keyOf = (env, name) => {
   try { return JSON.parse(env[`${name}S`] || '{}').default || env[name] || '' }
@@ -261,6 +276,37 @@ function build(v, cat) {
 /** 이 파티에서 쓰는 줄(entry)을 맨 앞으로. 프로필을 고쳐 그 줄이 없어졌으면 대표 그대로 */
 const playing = (entries, i) => i > 0 && i < entries.length ? [entries[i], ...entries.filter((_, k) => k !== i)] : entries
 
+/** 팀장이 직접 넣는 팀원: 게임 닉네임 · 캐릭터(+ 티어, 모르면 ''). 마이크는 모른다(null) */
+function added(v) {
+  if (!isObj(v)) fail(400, '넣을 팀원 정보가 없어요')
+  const nick = text(v.nick, 20, '게임 닉네임')
+  const tier = v.tier ?? ''
+  if (tier !== '' && !CFG.tiers.includes(tier)) fail(400, '티어를 골라 주세요')
+  if (typeof v.char !== 'string' || !PLAYERS.has(v.char)) fail(400, '한국 서버에 출시된 캐릭터만 고를 수 있어요')
+  return { name: nick, mic: null, entries: [{ nick, tier, char: v.char }], added: true }
+}
+
+// ---------------------------------------------------------------- 비회원 비밀번호
+
+// 솔트 붙인 scrypt 해시로만 저장한다. 비동기 scrypt 는 워커 스레드에서 돌아 CPU 시간 한도에 안 잡히고 다른 요청도 막지 않는다
+async function hashPassword(pw) {
+  const salt = randomBytes(16)
+  return `scrypt$${salt.toString('base64url')}$${(await scryptAsync(pw, salt, 32)).toString('base64url')}`
+}
+async function passwordOk(pw, stored) {
+  const [, salt, hash] = stored.split('$')
+  return timingSafeEqual(await scryptAsync(pw, Buffer.from(salt, 'base64url'), 32), Buffer.from(hash, 'base64url'))
+}
+
+/** 비회원 만들기 · 가입: 그 기기에 둔 간이 프로필(이름 · 마이크 · 계정 줄) + 관리 비밀번호 → 행에 담을 guest + 해시 */
+async function guestOf(v) {
+  const p = profile(isObj(v) ? v.guest : null)
+  if (p.name == null) fail(400, '이름을 입력해 주세요')
+  const pw = v.password, n = typeof pw === 'string' ? [...pw].length : 0
+  if (typeof pw !== 'string' || !pw.trim() || CONTROL.test(pw) || n < PW_LEN[0] || n > PW_LEN[1]) fail(400, `비밀번호는 ${PW_LEN[0]}~${PW_LEN[1]}자로 입력해 주세요`)
+  return { guest: { name: p.name, mic: p.mic, entries: p.entries }, hash: await hashPassword(pw) }
+}
+
 // ---------------------------------------------------------------- Supabase Data API (PostgREST)
 
 /**
@@ -305,9 +351,12 @@ function supabase({ url = '', key = '', fetch, log }) {
   }
 }
 
-// 팀원은 팀장 먼저, 들어온 순. 이름 · 마이크 · 계정은 프로필을 조인한다 — 프로필을 고치면 파티에도 바로 보인다. auth_user_id 는 고르지 않는다
-const MEMBERS = 'members:recruit_members(discord_user_id,leader,joined_at,entry,profile:recruit_profiles(discord_name,mic,entries))'
-  + '&members.order=leader.desc,joined_at.asc,discord_user_id.asc'
+// 팀원은 팀장 먼저, 들어온 순. 계정 팀원의 이름 · 마이크 · 계정은 프로필을 조인한다 — 프로필을 고치면 파티에도 바로 보인다.
+// 계정 없는 팀원은 행의 guest. auth_user_id · pw_hash 는 고르지 않는다
+const MEMBERS = 'members:recruit_members(id,discord_user_id,leader,joined_at,entry,guest,profile:recruit_profiles(name:discord_name,mic,entries))'
+  + '&members.order=leader.desc,joined_at.asc,id.asc'
+/** 팀원 한 줄을 고르는 Data API 조건 — 계정 팀원은 계정 ID, 계정 없는 팀원은 행 번호(g<id>) */
+const memberRow = (teamId, userId) => `team_id=eq.${enc(teamId)}&${GUEST_ID.test(userId) ? `id=eq.${GUEST_ID.exec(userId)[1]}` : `discord_user_id=eq.${enc(userId)}`}`
 
 // ---------------------------------------------------------------- API
 
@@ -316,7 +365,7 @@ const MEMBERS = 'members:recruit_members(discord_user_id,leader,joined_at,entry,
  * now 는 테스트가 시간을 돌리려고, fetch 는 가짜 Data API · Auth · 디스코드를 끼우려고 받는다. waitUntil = 응답 뒤에도 끝내야 할 일(디스코드 알림).
  * 워커 메모리에는 로그인 확인 결과(60초)만 둔다 — 제한 횟수 · 방 배정 · 1인 1파티는 DB 가 센다.
  */
-export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fetch, waitUntil = p => p, log = console.log, potentials = potentialsData } = {}) {
+export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fetch, waitUntil = p => p, log = console.log, potentials = potentialsData, ipOf = () => '' } = {}) {
   const db = supabase({ url: env.SUPABASE_URL, key: keyOf(env, 'SUPABASE_SECRET_KEY'), fetch, log })
   const publishable = keyOf(env, 'SUPABASE_PUBLISHABLE_KEY')
   const botKey = Buffer.from(env.TNAB_BOT_KEY || '')
@@ -326,13 +375,19 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   const rooms = () => voiceRooms({ botToken: env.DISCORD_BOT_TOKEN, guildId: env.DISCORD_GUILD_ID, categoryId: env.DISCORD_VOICE_CATEGORY_ID, fetch, now, log })
   // 화면이 다른 도메인(GitHub Pages)에서 부른다 — 목록에 있는 Origin 만 그대로 돌려준다(쉼표로 여러 개)
   const origins = (env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean)
+  // 요청 수 제한 키로만 쓴다(권한 판단에는 안 쓴다). 헤더가 없으면 '-' 한 통으로 센다(제한이 풀리지 않게). 긴 헤더로 키를 부풀리지 못하게 자른다
+  const ipKey = request => rateKey(String(ipOf(request) || '').trim().slice(0, 64)) || '-'
 
-  // ------------------------------------------------ 신원: { id: 디스코드 ID 문자열, name, authUserId, admin }
+  // ------------------------------------------------ 신원: { id, name, authUserId, admin, guest? }
+  // id = 디스코드 ID(디스코드를 연결한 계정 · 봇) · k<카카오 회원번호>(카카오로만 로그인한 계정) · g<팀원 행 번호>(비회원)
 
   const authMemo = new Map()   // sha256(토큰) → { user, until }
   /**
-   * 웹: Supabase Auth 에 토큰을 보여 사용자를 받는다. 디스코드 ID 는 identities 의 discord 항목에서만 꺼낸다 —
-   * user_metadata 는 사용자가 updateUser 로 고칠 수 있어 믿지 않는다.
+   * 웹: Supabase Auth 에 토큰을 보여 사용자를 받는다. ID 는 identities(디스코드 먼저, 없으면 카카오)에서만 꺼낸다 —
+   * user_metadata 는 사용자가 updateUser 로 고칠 수 있어 ID 로는 믿지 않는다(본인이 고르는 표시 이름에만 쓴다).
+   * 디스코드 계정에 카카오를 연결해도 디스코드 ID 그대로라 프로필 · 파티 · 글이 이어지고, 봇과도 같은 사람이다.
+   * ponytail: 카카오로 먼저 쓰던 계정에 디스코드가 붙으면(같은 이메일 자동 연결 등) ID 가 디스코드로 바뀌어 옛 프로필 · 글과 끊긴다 —
+   * 화면은 디스코드 계정에 카카오를 붙이는 연결만 연다. 반대 방향이 필요해지면 처음 쓴 ID 를 DB 에 묶어 둘 것
    */
   async function webUser(token) {
     const key = sha256(token), memo = authMemo.get(key)
@@ -352,14 +407,22 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       fail(503, AUTH_DOWN)
     }
     if (!isObj(body)) { log(`로그인 확인 응답 ${res.status}`); fail(503, AUTH_DOWN) }
-    const identity = Array.isArray(body.identities) && body.identities.find(i => i?.provider === 'discord')
-    if (!matches(SNOWFLAKE, identity?.id)) fail(401, LOGIN)   // 디스코드가 아닌 계정(또는 연결을 끊은 계정)
-    const d = isObj(identity.identity_data) ? identity.identity_data : {}
-    const name = [d.custom_claims?.global_name, d.full_name, d.name]
-      .map(s => typeof s === 'string' ? s.replace(/[\x00-\x1f\x7f]/g, '').trim() : '').find(Boolean) || 'Discord 사용자'
-    // 같은 서버 사람들은 별명으로 서로를 안다 — 별명이 있으면 그것을 이름으로 쓴다(봇은 이미 별명을 보낸다)
-    const nick = await guildNick({ botToken: env.DISCORD_BOT_TOKEN, guildId: env.DISCORD_GUILD_ID, userId: identity.id, fetch, now, log })
-    const user = { id: identity.id, name: nick || [...name].slice(0, 80).join(''), authUserId: matches(UUID, body.id) ? body.id : null, admin: false }
+    const ids = Array.isArray(body.identities) ? body.identities : []
+    const discord = ids.find(i => i?.provider === 'discord'), kakao = ids.find(i => i?.provider === 'kakao')
+    const clean = s => typeof s === 'string' ? s.replace(/[\x00-\x1f\x7f]/g, '').trim() : ''
+    const authUserId = matches(UUID, body.id) ? body.id : null
+    let user
+    if (matches(SNOWFLAKE, discord?.id)) {
+      const d = isObj(discord.identity_data) ? discord.identity_data : {}
+      const name = [d.custom_claims?.global_name, d.full_name, d.name].map(clean).find(Boolean) || 'Discord 사용자'
+      // 같은 서버 사람들은 별명으로 서로를 안다 — 별명이 있으면 그것을 이름으로 쓴다(봇은 이미 별명을 보낸다)
+      const nick = await guildNick({ botToken: env.DISCORD_BOT_TOKEN, guildId: env.DISCORD_GUILD_ID, userId: discord.id, fetch, now, log })
+      user = { id: discord.id, name: nick || [...name].slice(0, 80).join(''), authUserId, admin: false }
+    } else if (matches(/^\d{1,20}$/, kakao?.id)) {
+      // 카카오 닉네임은 대개 실명이라 쓰지 않는다 — 처음 로그인할 때 화면이 받아 user_metadata.nickname 에 둔 이름
+      const nick = [...clean(isObj(body.user_metadata) ? body.user_metadata.nickname : '')].slice(0, 32).join('')
+      user = { id: `k${kakao.id}`, name: nick && !LINK.test(nick) ? nick : '카카오 사용자', authUserId, admin: false }
+    } else fail(401, LOGIN)   // 디스코드 · 카카오가 아닌 계정(또는 연결을 끊은 계정)
     if (authMemo.size >= AUTH_MEMO.max) authMemo.clear()   // 오래된 것부터 고르는 대신 통째로 — 다음 요청이 Auth 를 한 번 더 부를 뿐
     authMemo.set(key, { user, until: now() + AUTH_MEMO.ms })
     return user
@@ -380,20 +443,50 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     return { id, name, authUserId: null, admin: h.get('x-discord-admin') === '1' }
   }
 
-  async function identity(request) {
-    const [, scheme, cred] = /^(Bearer|Bot)\s+(\S+)$/i.exec(request.headers.get('authorization') || '') || []
+  /**
+   * 비회원: Guest g<팀원 행 번호>:<퍼센트 인코딩한 비밀번호>. 그 행의 비밀번호가 맞으면 그 팀원이다 — 행 번호가 그 팀 안의 userId 라
+   * 다른 팀에는 권한이 없다. 틀린 비밀번호는 한 IP 가 한 팀원에 5번, 그 팀원 전체로 20번(10분)에서 막는다 —
+   * 팀원 단위로만 막으면 링크를 받은 누구나 5번 틀려서 그 사람을 10분씩 잠글 수 있다. 이미 막힌 IP 의 요청은 전체에 세지 않는다
+   */
+  async function guestUser(request, cred) {
+    const [, mid, raw] = /^g(\d{1,15}):(.+)$/.exec(cred) || []
+    let pw = ''
+    try { pw = decodeURIComponent(raw || '') } catch {}
+    if (!mid || !pw) fail(401, LOGIN)
+    const [row] = await db(`/recruit_members?select=guest,pw_hash&id=eq.${mid}`)
+    if (!row?.pw_hash) fail(401, '없는 팀원이거나 비밀번호로 관리할 수 없는 팀원이에요')
+    // 먼저 한 번 센다 — 확인과 증가 사이에 scrypt(await)가 끼면 동시에 온 요청이 전부 '아직 0번'을 보고 통과한다. 맞으면 되돌린다
+    const keys = [`pw g${mid} ${ipKey(request)}`, `pwm g${mid}`]
+    if (await hit(keys[0], PW_LIMIT.windowMs) > PW_LIMIT.max || await hit(keys[1], PW_LIMIT.windowMs) > PW_LIMIT.memberMax) {
+      fail(429, '비밀번호를 너무 많이 틀렸어요. 10분 뒤에 다시 시도해 주세요')
+    }
+    if (!await passwordOk(pw, row.pw_hash)) fail(403, '비밀번호가 맞지 않아요')
+    await Promise.all(keys.map(k => hit(k, PW_LIMIT.windowMs, -1)))
+    return { id: `g${mid}`, name: row.guest.name, authUserId: null, admin: false, guest: true }
+  }
+
+  /** guestOk = 비회원 비밀번호도 받는 요청(GUEST_ACTIONS). 나머지는 계정만 */
+  async function identity(request, guestOk = false) {
+    const [, scheme, cred] = /^(Bearer|Bot|Guest)\s+(\S+)$/i.exec(request.headers.get('authorization') || '') || []
     if (!scheme) fail(401, LOGIN)
-    return scheme.toLowerCase() === 'bot' ? botUser(request, cred) : webUser(cred)
+    const kind = scheme.toLowerCase()
+    if (kind === 'guest') return guestOk ? guestUser(request, cred) : fail(401, LOGIN)
+    return kind === 'bot' ? botUser(request, cred) : webUser(cred)
   }
 
   // ------------------------------------------------ 팀 · 프로필 읽기
 
   // 클라이언트가 보는 팀 모양은 이것 하나뿐 — 필드를 골라 새로 만든다(auth_user_id 같은 내부 값은 넣지 않는다).
   // 목록 행은 tactic 대신 preset · name 만 온다.
+  // kind: user 계정 · guest 비회원(비밀번호로 관리) · added 팀장이 넣은 팀원(마이크 null, 티어 '' 일 수 있다)
   function view(t) {
-    const members = t.members.map(m => ({
-      userId: m.discord_user_id, name: m.profile.discord_name, mic: m.profile.mic, entries: playing(m.profile.entries, m.entry), leader: m.leader, joinedAt: m.joined_at,
-    }))
+    const members = t.members.map(m => {
+      const p = m.profile || m.guest
+      return {
+        userId: m.discord_user_id ?? `g${m.id}`, name: p.name, mic: p.mic, entries: playing(p.entries, m.entry), leader: m.leader, joinedAt: m.joined_at,
+        kind: !m.guest ? 'user' : m.guest.added ? 'added' : 'guest',
+      }
+    })
     return {
       id: t.id,
       room: t.room,
@@ -416,7 +509,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   const isLeader = (team, user) => !!team.members.find(m => m.userId === user.id)?.leader
 
   // 고정 창 카운터(recruit_hit RPC) — 한 문장 upsert 라 워커 여러 개가 동시에 세도 틀리지 않는다. 늘어난 횟수를 돌려준다
-  const hit = (key, windowMs) => db('/rpc/recruit_hit', { method: 'POST', body: { p_key: key, p_now: now(), p_window: windowMs, p_add: 1 } })
+  const hit = (key, windowMs, add = 1) => db('/rpc/recruit_hit', { method: 'POST', body: { p_key: key, p_now: now(), p_window: windowMs, p_add: add } })
 
   /** 내 프로필 + 지금 든 팀 id. 표시 이름은 프로필에 저장된 것을 쓴다 —
    *  처음 만들 때 디스코드 이름으로 채워지고, 그 뒤로는 본인이 화면에서 고칠 때만 바뀐다(서버 별명이 다른 경우) */
@@ -438,8 +531,6 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (!Number.isInteger(e) || e < 0 || e >= entries) fail(400, '참가할 캐릭터를 다시 골라 주세요')
     return e
   }
-  // 만들기 · 가입 RPC 뒤에, 알림용 팀 모양을 읽기 전에 적는다. 대표면 기본값(0) 그대로라 부르지 않는다
-  const setEntry = (teamId, user, entry) => entry && db(`/recruit_members?team_id=eq.${enc(teamId)}&discord_user_id=eq.${user.id}`, { method: 'PATCH', body: { entry } })
 
   // 1인 1파티로 빠진 기존 팀 알림. 스냅샷은 RPC 전에 읽은 것 — 그 사이 다른 팀으로 바뀌었으면(드묾) 알림만 건너뛴다
   function leftNotice(left, old, userId) {
@@ -449,15 +540,17 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     else if (me) notifier.memberLeft({ ...before, members: before.members.filter(m => m !== me) }, me, 'move')
   }
 
-  async function join(id, user, old, t, entry = 0) {
+  /** g = 계정 없는 팀원(비회원 · 팀장이 넣은 팀원)이면 { guest, hash } 이고 user · old 는 null. 돌려주는 member = 넣은 사람의 userId */
+  async function join(id, user, old, t, entry = 0, g = null) {
     // 만료 · 이미 이 팀 · 정원 확인, 기존 팀에서 빠지기, INSERT 를 RPC 가 전역 잠금 안에서 한 트랜잭션으로 한다 —
     // 여러 요청이 동시에 와도 정원을 넘지 않고, 같은 사람이 두 팀에 남지 않는다
-    const { left, count } = await db('/rpc/recruit_join_team', { method: 'POST', body: { p_team: id, p_actor: user.id, p_now: t, p_size: CFG.teamSize } })
-    await setEntry(id, user, entry)
-    const team = view(await teamOf(id, t))
-    leftNotice(left, old, user.id)
-    notifier.memberJoined(team, user.id, count)
-    return { team, left }
+    const r = await db('/rpc/recruit_join_team', {
+      method: 'POST', body: { p_team: id, p_actor: user?.id ?? null, p_now: t, p_size: CFG.teamSize, p_entry: entry, p_guest: g?.guest ?? null, p_pw: g?.hash ?? null },
+    })
+    const team = view(await teamOf(id, t)), member = user?.id ?? `g${r.member}`
+    if (user) leftNotice(r.left, old, user.id)
+    notifier.memberJoined(team, member, r.count)
+    return { team, left: r.left, member }
   }
 
   // 본문은 32KB 까지만 읽는다 — content-length 가 없거나(chunked) 거짓이어도 읽으면서 센다
@@ -606,6 +699,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const m = pathname.match(/^\/api\/teams(?:\/([^/]+)(?:\/(members|extend)(?:\/([^/]+))?)?)?$/)
     const [, id, sub, userId] = m || []
     const action = me ? `${method} me${me[1] ? ' profile' : ''}`
+      : pathname === '/api/profiles' ? `${method} profiles`
       : m && (id === 'quick' && !sub ? `${method} quick` : [method, id && 'team', sub, userId && 'member'].filter(Boolean).join(' '))
     if (!ACTIONS.has(action)) fail(404, '없는 주소예요')
     if (id && action !== 'POST quick' && !TEAM_ID.test(id)) fail(404, NOT_FOUND)
@@ -622,15 +716,22 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     }
     if (action === 'GET team') return [200, view(await teamOf(id, t))]
 
-    const user = await identity(request)
-    // 쓰기는 신원을 확인한 뒤 사람 단위로 센다 — 로그인 · 봇 키 없이 온 요청은 여기까지 못 와서 남의 한도를 태우지 못한다
-    if (method !== 'GET' && await hit(`w ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
+    // 비회원 만들기 · 가입 = 신원 없이 본문의 간이 프로필 + 비밀번호. 비밀번호를 정한 뒤로는 Guest 신원으로 그 팀 안의 일을 한다
+    const anon = ['POST', 'POST team members'].includes(action) && !request.headers.has('authorization')
+    // JSON 이 아닌 본문(폼 POST 등)은 아무 사이트나 preflight 없이 보낼 수 있다 — 세기 전에 거절해 방문자 IP 의 한도를 태우지 못하게 한다
+    if (anon && !JSON_TYPE.test(request.headers.get('content-type') || '')) fail(415, 'JSON 으로 보내 주세요')
+    const user = anon ? null : await identity(request, GUEST_ACTIONS.has(action))
+    // 쓰기는 신원을 확인한 뒤 사람 단위로 센다 — 로그인 · 봇 키 없이 온 요청은 여기까지 못 와서 남의 한도를 태우지 못한다. 비회원 만들기 · 가입은 IP 단위
+    // ponytail: 모바일 통신사는 여러 사람이 IP 하나를 나눠 쓴다 — 비회원끼리 한도에 걸리기 시작하면 IP 한도만 따로 늘린다
+    if (method !== 'GET' && await hit(`w ${user?.id ?? `ip ${ipKey(request)}`}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
     // 가입은 본문이 없어도 된다(봇 · 옛 화면) — JSON 으로 { entry } 를 보낼 때만 읽는다. 나머지는 본문을 읽지 않는다
     const joinBody = action === 'POST team members' && JSON_TYPE.test(request.headers.get('content-type') || '')
     const body = ['POST', 'PUT me profile', 'PUT team', 'PUT team members member'].includes(action) || joinBody ? await readJson(request) : null
 
     switch (action) {
       case 'GET me': {
+        // 비회원 = 비밀번호 확인(다른 기기에서 내 팀을 관리하려고). 프로필 · 소속 팀은 그 기기에만 있다
+        if (user.guest) return [200, { user: { id: user.id, name: user.name }, profile: null, teamId: null }]
         const p = await mine(user)
         const teamId = p?.member?.team?.expires_at > t ? p.member.team_id : null   // 만료됐지만 아직 안 지운 팀은 없는 팀
         return [200, { user: { id: user.id, name: user.name }, profile: p && profileView(user, p), teamId }]
@@ -649,25 +750,50 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       case 'POST': {
         if (!isObj(body)) fail(400, '요청 형식이 잘못됐어요')
         const r = room(body.room), tac = tactic(body.tactic)
-        const [{ old, entries }, candidates] = await Promise.all([current(user, t), rooms()])
+        const g = user ? null : await guestOf(body)   // 비회원: 1인 1파티 · 프로필 확인 없음(계정이 없다)
+        const [{ old, entries }, candidates] = await Promise.all([g ? { old: null, entries: g.guest.entries.length } : current(user, t), rooms()])
         const entry = entryOf(body, entries)
         const teamId = randomBytes(6).toString('base64url'), at = now()
         // 방 고르기(끝 방부터, 만료 전 팀이 안 잡은 첫 방) · 만료된 팀 청소 · 기존 팀에서 빠지기 · 팀 + 팀장 저장을 RPC 가 전역 잠금 안에서
         // 한 트랜잭션으로 한다 — 워커가 여럿이어도 두 팀이 같은 방을 받지 않고, 한 사람이 두 팀에 남지 않는다
-        const { left } = await db('/rpc/recruit_create_team', {
+        const { left, member } = await db('/rpc/recruit_create_team', {
           method: 'POST',
-          body: { p_id: teamId, p_actor: user.id, p_room: r, p_tactic: tac, p_rooms: candidates, p_now: at, p_expires_at: at + TTL },
+          body: {
+            p_id: teamId, p_actor: user?.id ?? null, p_room: r, p_tactic: tac, p_rooms: candidates, p_now: at, p_expires_at: at + TTL,
+            p_entry: entry, p_guest: g?.guest ?? null, p_pw: g?.hash ?? null,
+          },
         })
-        await setEntry(teamId, user, entry)
         const team = view(await teamOf(teamId, at))
-        leftNotice(left, old, user.id)
+        if (user) leftNotice(left, old, user.id)
         notifier.teamCreated(team)
-        return [201, { team, left }]
+        // 비회원은 자기 userId(g<번호>)를 받아 그 기기에 비밀번호와 같이 둔다 — 이것으로 팀을 관리한다
+        return [201, { team, left, ...(g && { member: `g${member}` }) }]
       }
 
       case 'POST team members': {
+        if (body?.add !== undefined) {   // 팀장이 직접 넣는 팀원(닉네임 · 캐릭터). 계정과 잇지 않는다 — 그 사람이 나중에 직접 가입하면 팀장이 이 줄을 뺀다
+          if (!user) fail(401, LOGIN)
+          const v = added(body.add)
+          if (!isLeader(view(await teamOf(id, t)), user)) fail(403, '팀장만 팀원을 넣을 수 있어요')
+          return [201, { team: (await join(id, null, null, t, 0, { guest: v, hash: null })).team }]
+        }
+        if (user?.guest) fail(400, '비회원은 비밀번호를 새로 정해 가입해 주세요')
+        if (!user) {
+          const g = await guestOf(body)
+          const { team, member } = await join(id, null, null, t, entryOf(body, g.guest.entries.length), g)
+          return [201, { team, left: null, member }]
+        }
         const { old, entries } = await current(user, t)
-        return [201, await join(id, user, old, t, entryOf(body, entries))]
+        const { team, left } = await join(id, user, old, t, entryOf(body, entries))
+        return [201, { team, left }]
+      }
+
+      case 'GET profiles': {   // 팀장이 팀원을 직접 넣을 때 자동완성 — 표시 이름이나 대표 게임 닉네임에 q 가 들어간 프로필, 최근에 고친 순 8개
+        const q = (new URL(request.url).searchParams.get('q') || '').replace(/[*"\\]/g, '').trim()   // 따옴표로 감싸 넘긴다 — 와일드카드(*) · 따옴표 · 역슬래시만 뺀다
+        if (!q || [...q].length > 20) return [200, { profiles: [] }]
+        const like = enc(`"*${q}*"`)
+        const rows = await db(`/recruit_profiles?select=discord_name,entries&or=(discord_name.ilike.${like},entries->0->>nick.ilike.${like})&order=updated_at.desc&limit=8`)
+        return [200, { profiles: rows.map(p => ({ name: p.discord_name, entries: p.entries })) }]
       }
 
       case 'POST quick': {   // 봇의 "빠른 참가": 가장 오래된 모집 중 팀(내 팀 제외). 고르는 사이 차거나 없어진 팀은 건너뛴다
@@ -675,7 +801,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         const open = await db(`/recruit_teams?select=id&${live(t)}&recruit_member_count=lt.${CFG.teamSize}`
           + `${old ? `&id=neq.${enc(old.id)}` : ''}&order=created_at.asc,id.asc&limit=5`)
         for (const row of open) {
-          try { return [201, await join(row.id, user, old, t)] }
+          try { const { team, left } = await join(row.id, user, old, t); return [201, { team, left }] }
           catch (e) { if (![404, 409].includes(e.status)) throw e }
         }
         fail(404, '참가할 수 있는 모집 중인 팀이 없어요')
@@ -704,12 +830,11 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         return [200, { team: view(await teamOf(id, t)) }]
       }
 
-      case 'PUT team members member': {   // 참가 캐릭터 바꾸기 — 본인만. { entry } = 프로필 몇 번째 줄
+      case 'PUT team members member': {   // 참가 캐릭터 바꾸기 — 본인만. { entry } = 프로필(비회원은 가입할 때 보낸 계정 줄) 몇 번째 줄
         if (userId !== user.id) fail(403, '내 캐릭터만 바꿀 수 있어요')
-        const before = view(await teamOf(id, t))
-        if (!before.members.some(m => m.userId === user.id)) fail(404, '팀원을 찾을 수 없어요')
-        const entry = entryOf(body, (await mine(user))?.entries.length || 0)
-        await db(`/recruit_members?team_id=eq.${enc(id)}&discord_user_id=eq.${user.id}`, { method: 'PATCH', body: { entry } })
+        const self = view(await teamOf(id, t)).members.find(m => m.userId === user.id) || fail(404, '팀원을 찾을 수 없어요')
+        const entry = entryOf(body, self.entries.length)   // 보여 줄 때 순서만 바꾼다 — 줄 수는 프로필과 같다
+        await db(`/recruit_members?${memberRow(id, user.id)}`, { method: 'PATCH', body: { entry } })
         return [200, { team: view(await teamOf(id, t)) }]
       }
 
@@ -722,7 +847,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
           notifier.teamDisbanded(before, 'leader')
           return [200, { ok: true, team: null }]
         }
-        await db(`/recruit_members?team_id=eq.${enc(id)}&discord_user_id=eq.${enc(userId)}`, { method: 'DELETE' })
+        await db(`/recruit_members?${memberRow(id, userId)}`, { method: 'DELETE' })
         const team = view(await teamOf(id, t))   // 다 찬 팀이면 다시 모집 중 → 목록에서 앞으로
         notifier.memberLeft(team, target, target.userId === user.id ? 'leave' : 'kick')
         return [200, { ok: true, team }]

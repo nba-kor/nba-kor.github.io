@@ -1,6 +1,6 @@
 // 게시판 공용 — 잠재력추천 · 영상이 같이 쓴다: 로그인 표시, 캐릭터 고르기, 목록 카드 틀, 글 머리(추천 · 공유 · 수정 · 삭제), 댓글
 import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=3de4668d'
-import { api, initAuth, login, logout, session, IN_KAKAO } from './auth.js?v=5d44380b'
+import { api, initAuth, chooseLogin, logout, session, IN_KAKAO } from './auth.js?v=715cce5a'
 
 export const $ = (s, root = document) => root.querySelector(s)
 /** DOM 생성. 문자열 자식은 텍스트 노드가 되므로 사용자 입력을 그대로 넣어도 안전하다. */
@@ -51,12 +51,12 @@ function setAuth(state, v = null) {
   $('#auth').replaceChildren(...{
     loading: [h('span', { className: 'rc-muted' }, '로그인 확인 중…')],
     down: [h('span', { className: 'rc-muted', title: '로그인 모듈을 불러오지 못했어요. 새로고침해 보세요' }, '로그인 불가')],
-    out: [btn('디스코드 로그인', login, { className: 'rc-login' })],
+    out: [btn('로그인', chooseLogin, { className: 'rc-login' })],
     error: [h('span', { className: 'rc-muted rc-bad' }, '로그인 확인 실패'), btn('다시 시도', loadMe)],
     in: me && [h('b', { className: 'rc-uname' }, me.name), btn('로그아웃', logout)],
   }[auth])
   const need = $('#need')
-  need.textContent = auth === 'out' ? `${needText}${IN_KAKAO ? ' 로그인을 누르면 평소 쓰는 브라우저로 열려요.' : ''}` : ''
+  need.textContent = auth === 'out' ? `${needText}${IN_KAKAO ? ' 디스코드 로그인은 평소 쓰는 브라우저로 열려요.' : ''}` : ''
   need.hidden = !need.textContent
   if (state !== 'loading') onChange?.()   // 추천 여부 · 내 글 버튼이 로그인에 따라 달라진다
 }
@@ -73,7 +73,7 @@ export function startAuth(need, change) {
 export async function loggedIn() {
   await authFirst
   if (auth === 'in') return true
-  if (auth === 'out') login()
+  if (auth === 'out') chooseLogin()
   else alert('로그인 정보를 확인하지 못했어요 — 새로고침해 보세요')
   return false
 }
@@ -159,7 +159,7 @@ export function itemView({ path, item: x, liked, comments, body, share, onEdit, 
   }
 
   const form = h('form', { className: 'pt-cform', novalidate: true },
-    h('textarea', { name: 'body', rows: 2, maxLength: 500, placeholder: auth === 'in' ? '댓글을 남겨 주세요' : '댓글은 디스코드 로그인 후 쓸 수 있어요' }),
+    h('textarea', { name: 'body', rows: 2, maxLength: 500, placeholder: auth === 'in' ? '댓글을 남겨 주세요' : '댓글은 로그인 후 쓸 수 있어요' }),
     h('div', { className: 'rc-actions' }, h('button', { type: 'submit', className: 'primary' }, '댓글 달기')),
     h('p', { className: 'rc-form-err', role: 'alert', hidden: true }))
   form.onsubmit = async e => {

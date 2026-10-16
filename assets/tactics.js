@@ -1,8 +1,8 @@
 // 전술판 — 하프코트 3:3 배치 / 동선 / 프리셋(기본 + 커스텀) / 재생 / 공유(링크 · 카카오톡)
 import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, pickMenu, mountTop, decodeState, encodeState, share, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, kakaoList, shareFace } from './app.js?v=3de4668d'
 import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=886b1610'
-import { api } from './auth.js?v=5d44380b'
-import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=a9bf1646'
+import { api } from './auth.js?v=715cce5a'
+import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=1e976c2c'
 
 const STORE = 'dc.tactics'
 
@@ -466,7 +466,7 @@ const boot = async () => {
   }
 
   // 로그인은 등록 · 좋아요에만 필요하다. 로그인 상태가 정해지거나 바뀌면 보던 커스텀의 좋아요 여부 · 내 것 표시를 다시 읽는다
-  startAuth('등록하려면 디스코드 로그인이 필요해요.', () => customId($('#preset').value) && showDesc(true))
+  startAuth('등록하려면 로그인이 필요해요.', () => customId($('#preset').value) && showDesc(true))
 
   // ?c=<id> — 카톡 · 링크로 받은 커스텀 전술. 보드는 그 전술 그대로(선수 포함)
   const shared = new URLSearchParams(location.search).get('c')

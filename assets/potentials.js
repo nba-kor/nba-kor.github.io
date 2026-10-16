@@ -1,7 +1,7 @@
 // 잠재력추천 — 빌드 목록(추천순 · 최신순 · 포지션 · 캐릭터 필터) · 글(30칸 판 · 추천 · 댓글) · 쓰기 · 고치기. 게시판 공용 부분은 board.js
 import { mountTop, loadKakao, faceOf, kakaoList, shareFace } from './app.js?v=3de4668d'
-import { api } from './auth.js?v=5d44380b'
-import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=a9bf1646'
+import { api } from './auth.js?v=715cce5a'
+import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=1e976c2c'
 
 let cat, pot
 const plus = v => `+${+v.toFixed(2)}`   // 0.15 × 10 같은 합에 붙는 부동소수점 꼬리를 뗀다
@@ -256,7 +256,7 @@ const boot = async () => {
   bindForm()
   const id = new URLSearchParams(location.search).get('b')
   if (/^\d+$/.test(id || '')) { view = 'build'; buildId = id }
-  startAuth('빌드를 쓰거나 추천 · 댓글을 달려면 디스코드 로그인이 필요해요.', () => view === 'build' && showBuild())
+  startAuth('빌드를 쓰거나 추천 · 댓글을 달려면 로그인이 필요해요.', () => view === 'build' && showBuild())
   if (view === 'list') showList()
 }
 

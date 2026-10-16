@@ -63,7 +63,7 @@ export function createNotifier({ webhookUrl, siteUrl, guildId, players, modes = 
     queue = queue
       .then(() => {
         const [embed, users] = make()   // 멘션은 embed 안에서는 안 울린다 — content 에 싣는다
-        const mention = users ? { content: users.map(id => `<@${id}>`).join(' '), allowed_mentions: { users } } : { allowed_mentions: { parse: [] } }
+        const mention = users?.length ? { content: users.map(id => `<@${id}>`).join(' '), allowed_mentions: { users } } : { allowed_mentions: { parse: [] } }
         return send({ username: 'NBA 덩크 시티 팀원모집', embeds: [embed], ...mention })
       })
       .catch(e => log(`디스코드 웹훅 오류: ${errText(e)}`))
@@ -77,7 +77,8 @@ export function createNotifier({ webhookUrl, siteUrl, guildId, players, modes = 
   const line = m => {
     const [e] = m.entries, p = players.get(e.char) || { pos: 0, name: e.char }
     const more = m.entries.length - 1
-    return `**${esc(m.name)}** (${e.tier}) · ${`${POS[p.pos]} ${p.name}`.trim()}${more ? ` 외 ${more}개` : ''} · 마이크 ${m.mic ? 'O' : 'X'}`
+    // 팀장이 넣은 팀원은 티어('')와 마이크(null)를 모를 수 있다
+    return `**${esc(m.name)}**${e.tier ? ` (${e.tier})` : ''} · ${`${POS[p.pos]} ${p.name}`.trim()}${more ? ` 외 ${more}개` : ''}${m.mic == null ? '' : ` · 마이크 ${m.mic ? 'O' : 'X'}`}`
   }
   const voiceField = (t, lead) => ({
     name: '음성채널',
@@ -97,9 +98,10 @@ export function createNotifier({ webhookUrl, siteUrl, guildId, players, modes = 
       ...embed(t, COLOR.start, `🏀 팀원 모집 시작 · ${subject(t)}`, `${line(t.members[0])}\n\n모집 ${t.members.length}/${t.size}`, [voiceField(t, '')]),
       thumbnail: { url: `${site}/assets/players/${t.members[0].entries[0].char}.png` },
     }]),
-    // count = 넣은 뒤 인원(RPC 가 잠금 안에서 센 값). 다시 읽은 팀 뷰에는 뒤이은 가입이 섞일 수 있어 인원은 이걸로 판단한다 — 완료 알림은 한 번만
+    // count = 넣은 뒤 인원(RPC 가 잠금 안에서 센 값). 다시 읽은 팀 뷰에는 뒤이은 가입이 섞일 수 있어 인원은 이걸로 판단한다 — 완료 알림은 한 번만.
+    // 멘션은 디스코드 계정만(카카오 · 비회원 · 팀장이 넣은 팀원은 디스코드 ID 가 없다)
     memberJoined: (t, userId, count) => enqueue(() => count >= t.size
-      ? [embed(t, COLOR.full, `🎉 모집 완료 · ${subject(t)}`, t.members.map(line).join('\n'), [voiceField(t, ' 로 모여주세요')]), t.members.map(m => m.userId)]
+      ? [embed(t, COLOR.full, `🎉 모집 완료 · ${subject(t)}`, t.members.map(line).join('\n'), [voiceField(t, ' 로 모여주세요')]), t.members.map(m => m.userId).filter(id => /^\d{17,20}$/.test(id))]
       : [embed(t, COLOR.join, `✅ 팀원 합류 · ${subject(t)} (${count}/${t.size})`, line(t.members.find(m => m.userId === userId)))]),
     // t = 빠진 뒤의 팀, m = 빠진 사람. reason: leave 나가기 · kick 방출 · move 다른 팀으로 이동
     memberLeft: (t, m, reason) => enqueue(() => [

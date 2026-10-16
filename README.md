@@ -10,9 +10,9 @@
 | `/tactics/` | `tactics/index.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종 + 커스텀 전술(등록 · 좋아요), 재생, 링크 · 카톡 공유 |
 | `/tiers/` | `tiers/index.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유. 올리면 「모두의 티어표」(`?list`, 최신순 · 추천순) 게시판에 뜨고 추천 · 댓글 · 가져오기([티어표 게시판](#티어표-게시판)) |
 | `/combos/` | `combos/index.html` | **조합표** — 선수 3명 조합 게시판. 선수마다 잠재력추천 빌드를 참고로 붙이고, 상대하기 편한/힘든 캐릭터와 조합(3명 세트)을 고른다. 추천 · 댓글([조합표](#조합표)) |
-| `/potentials/` | `potentials/index.html` | **잠재력추천** — 빨강 · 초록 · 파랑 30칸 잠재력 빌드 게시판. 추천 캐릭터 · 포지션 필터, 추천 · 댓글(디스코드 로그인). API 는 팀원모집 함수를 같이 쓴다([잠재력추천](#잠재력추천)) |
+| `/potentials/` | `potentials/index.html` | **잠재력추천** — 빨강 · 초록 · 파랑 30칸 잠재력 빌드 게시판. 추천 캐릭터 · 포지션 필터, 추천 · 댓글(디스코드 · 카카오 로그인). API 는 팀원모집 함수를 같이 쓴다([잠재력추천](#잠재력추천)) |
 | `/videos/` | `videos/index.html` | **영상** — 유튜브 링크 게시판. 분류(강의 · 하이라이트 · 공략 · 매드무비 · 기타) · 캐릭터 필터, 추천 · 댓글 · 카톡 공유. 최신 강의는 홈에도 뜬다 |
-| `/recruit/` | `recruit/index.html` | **팀원모집** — 디스코드 로그인 · 방 만들기·가입(TNAB 봇과 같은 목록), 디스코드 알림 + 빈 음성채널 배정, 카카오톡 공유, 3시간 뒤 자동 삭제 |
+| `/recruit/` | `recruit/index.html` | **팀원모집** — 디스코드 · 카카오 로그인 또는 비회원 · 방 만들기·가입(TNAB 봇과 같은 목록) · 팀장이 팀원 직접 추가, 디스코드 알림 + 빈 음성채널 배정, 카카오톡 공유, 3시간 뒤 자동 삭제 |
 | `/discord/` | `discord/index.html` | 카카오 카드의 **디스코드** 버튼이 거쳐 가는 곳. `discord://` 앱 주소로 넘긴다 — `discord.com` 으로 곧장 보내면 브라우저에 세션이 없어 매번 로그인해야 한다. 서버 · 채널은 `data/recruit.json` 의 `discord` 에서 읽는다 |
 
 ### 검색 · 공유 (SEO · 미리보기)
@@ -174,7 +174,8 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
 `/recruit/` — 3:3 이라 팀장 포함 3명이 한 팀이다. **웹 화면과 TNAB 디스코드 봇이 같은 파티 목록을 쓴다** — 웹에서 만든 팀에 봇으로 가입하거나 그 반대도 된다.
 규칙 · 검증 · 권한 · 알림은 전부 Edge Function 한 곳(`server/index.mjs`)에 있다.
 
-1. **디스코드로 로그인**한다(Supabase Auth). 봇은 디스코드 계정 그대로 쓴다. 신원 = 디스코드 계정이라 방 비밀번호 · 브라우저 토큰은 없다.
+1. **디스코드 · 카카오로 로그인**하거나 **비회원**으로 쓴다(Supabase Auth, [카카오 로그인 · 비회원](#카카오-로그인--비회원)). 봇은 디스코드 계정 그대로 쓴다.
+   계정이면 신원 = 그 계정이라 비밀번호가 없고, 비회원만 팀마다 관리 비밀번호를 쓴다.
 2. **내 프로필**을 한 번 등록한다: 게임 계정(닉네임·티어·캐릭터) 1~10줄(`data/recruit.json` 의 `maxEntries`) + 개인 마이크 O/X. 첫 줄 캐릭터가 대표다.
    **표시 이름**(로스터 · 알림 · 카톡 카드에 보이는 이름)은 **디스코드 서버 별명**으로 채워진다 — 같은 서버 사람들은 별명으로 서로를 알기 때문이다.
    봇은 `interaction` 에서 별명을 그대로 보내고, 웹은 로그인이 계정 이름만 알려 줘서 함수가 봇 토큰으로 별명을 한 번 읽는다(워커마다 10분 기억, 없으면 계정 이름).
@@ -190,7 +191,7 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
 6. **팀원**이 링크로 들어오면(로그인 없이도 볼 수 있다) 방 정보 · 전술 설명 · 전술 애니메이션 · 로스터를 보고 버튼 하나로 가입한다.
    가입할 때마다 디스코드 알림, 3명이 차면 "모집 완료" 알림에서 **그 파티원 3명만 멘션**한다.
 
-**1인 1파티** — 한 사람은 한 팀에만 있을 수 있다(DB 의 `unique(discord_user_id)`). 다른 팀을 만들거나 가입하면 기존 팀에서 자동으로 빠지고,
+**1인 1파티** — 한 사람(계정)은 한 팀에만 있을 수 있다(DB 의 `unique(discord_user_id)`. 비회원은 계정이 없어 걸리지 않는다). 다른 팀을 만들거나 가입하면 기존 팀에서 자동으로 빠지고,
 **기존 팀의 팀장이었으면 기존 팀은 해제**된다. 응답의 `left` 로 어디서 빠졌는지 알려 주고, 옛 팀에도 이탈 · 해제 알림이 간다.
 
 **목록 순서** — 모집 중인 방이 먼저, 다 찬 방은 맨 뒤. 각각 먼저 만든 방이 위라 새 방은 모집 중 목록 맨 아래에 붙는다.
@@ -215,7 +216,8 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
 모든 본문은 JSON, 오류는 `{ "error": "한국어 문구" }`. **디스코드 ID 는 어디서나 문자열**이다(JS number 는 snowflake 정밀도를 잃는다).
 
 - 팀: `{ id, room: { title, mic: required|listen|off, mode: fun|serious, memo }, tactic, voice: { id, name, url } | null, status: open|full, size, createdAt, expiresAt, members }` — 목록은 `tactic.board` 를 뺀다
-- 팀원: `{ userId, name, mic: boolean, entries: [{ nick, tier, char }], leader, joinedAt }` — 팀장 먼저, 들어온 순
+- 팀원: `{ userId, name, mic: boolean | null, entries: [{ nick, tier, char }], leader, joinedAt, kind: user|guest|added }` — 팀장 먼저, 들어온 순.
+  `userId` 는 디스코드 ID · `k<카카오 회원번호>`(카카오로만 로그인한 계정) · `g<번호>`(비회원 `guest` · 팀장이 넣은 팀원 `added`). `added` 는 `mic: null` · `tier: ''` 일 수 있다
 - 프로필: `{ userId, name, mic, entries, updatedAt }`
 - `left`: `null` 또는 `{ teamId, disbanded }` — 1인 1파티로 빠진 기존 팀(`disbanded` = 팀장이라 해제됨)
 
@@ -226,24 +228,29 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
 | `GET /api/teams/:id` | – | 팀. 없거나 만료 → 404 |
 | `GET /api/me` | 로그인 | `{ user: { id, name }, profile \| null, teamId \| null }` |
 | `PUT /api/me/profile` | 로그인 | `{ mic, entries, name? }` → `{ profile }`. `name` 은 표시 이름(1~32자). 안 보내면 저장된 이름을 그대로 두고, 프로필이 없으면 디스코드 이름으로 채운다 |
-| `POST /api/teams` | 로그인 | `{ room: { title?, mic, mode, memo? }, tactic }` → 201 `{ team, left }`. 프로필이 없으면 428 |
+| `POST /api/teams` | 로그인 · 비회원 | `{ room: { title?, mic, mode, memo? }, tactic }` → 201 `{ team, left }`. 프로필이 없으면 428. 비회원은 인증 헤더 없이 `guest: { name, mic, entries }` · `password`(4~32자)를 더 보내고 `member`(`g<번호>`)를 받는다 |
 | `POST /api/teams/quick` | 로그인 | 가장 오래된 모집 중 팀(내 팀 제외)에 가입 → 201 `{ team, left }`. 없으면 404 |
-| `POST /api/teams/:id/members` | 로그인 | 본인 가입(본문 없음) → 201 `{ team, left }`. 없거나 만료 404 · 다 참 · 이미 이 팀 409 · 프로필 없음 428 |
+| `POST /api/teams/:id/members` | 로그인 · 비회원 | 본인 가입(본문 없음) → 201 `{ team, left }`. 없거나 만료 404 · 다 참 · 이미 이 팀 409 · 프로필 없음 428. 비회원은 만들기와 같은 `guest` · `password` → `member` |
+| `POST /api/teams/:id/members` `{ add: { nick, char, tier? } }` | 팀장(비회원 포함) | 팀원 직접 추가(계정과 잇지 않음, `kind: added`) → 201 `{ team }` |
+| `GET /api/profiles?q=` | 로그인 · 비회원 | 직접 추가 자동완성 — 표시 이름 · 대표 게임 닉네임에 `q` 가 들어간 프로필 8개 `{ profiles: [{ name, entries }] }` |
 | `DELETE /api/teams/:id/members/:userId` | 본인 = 나가기, 팀장 = 방출 | `{ ok: true, team }`. 팀장이 대상이면 해제되고 `team: null` |
 | `DELETE /api/teams/:id` | 팀장, 봇 + `X-Discord-Admin: 1` | 팀 해제(삭제) → `{ ok: true }` |
 | `POST /api/teams/:id/extend` | 팀장 | 만료 = 지금 + 3시간 → `{ team }` |
 | `PUT /api/teams/:id` | 팀장 | `{ room, tactic? }` 팀 정보 수정 — 방 설정은 통째로, 전술은 보냈을 때만(`null` = 전술 자유). 팀원 · 음성채널 · 남은 시간은 그대로 → `{ team }` |
 | `PUT /api/teams/:id/members/:userId` | 본인 | `{ entry }` 참가 캐릭터 바꾸기(프로필 몇 번째 줄) → `{ team }` |
 
-**신원**은 두 가지다. 없거나 틀리면 401 「디스코드로 로그인해 주세요」.
+**신원**은 세 가지다. 없거나 틀리면 401 「로그인해 주세요」.
 
 - **웹**: `Authorization: Bearer <Supabase access token>`. 함수가 `GET ${SUPABASE_URL}/auth/v1/user`(publishable key)로 확인하고,
-  디스코드 ID 는 `identities` 의 `discord` 항목에서만 꺼낸다 — `user_metadata` 는 사용자가 고칠 수 있어 쓰지 않는다. 디스코드 신원이 없는 계정은 401,
+  ID 는 `identities` 에서만 꺼낸다 — `discord` 가 있으면 디스코드 ID, 없고 `kakao` 만 있으면 `k<카카오 회원번호>`. `user_metadata` 는 사용자가 고칠 수 있어 ID 로 쓰지 않는다
+  (카카오 계정의 표시 이름 `user_metadata.nickname` 에만 쓴다). 둘 다 없는 계정은 401,
   Auth 가 응답하지 않으면 503 「로그인 서버에 연결할 수 없어요」. 확인 결과는 워커마다 토큰 해시로 60초 기억한다(로그아웃한 토큰도 최대 60초는 통한다).
 - **봇**: `Authorization: Bot <TNAB_BOT_KEY>` + `X-Discord-User: <17~20자리 ID>` + `X-Discord-Name: <퍼센트 인코딩한 UTF-8, 1~80자>` + 선택 `X-Discord-Admin: 1`.
   키가 맞으면 헤더의 ID 를 믿는다. 서버 키가 32자보다 짧거나 없으면 봇 인증은 꺼진다. ID · 이름 형식이 틀리면 400.
+- **비회원**: `Authorization: Guest g<번호>:<퍼센트 인코딩한 비밀번호>`. 그 팀원 행의 scrypt 해시와 맞으면 그 팀원이다 — 자기 팀 안의 일(관리 · 나가기 · 자동완성 · `GET /api/me` 로 비밀번호 확인)만 되고
+  프로필 · 게시판은 401. 틀리면 403, 한 IP 가 한 팀원에 5번 · 그 팀원 전체로 20번(10분) 틀리면 429.
 
-PUT · POST · DELETE 는 신원을 확인한 뒤 **한 사람(디스코드 ID) 당 10분에 30번**까지다(웹 · 봇 합산, 넘으면 429).
+PUT · POST · DELETE 는 신원을 확인한 뒤 **한 사람(계정 · 비회원 팀원) 당 10분에 30번**까지다(웹 · 봇 합산, 넘으면 429). 비회원 만들기 · 가입은 IP 당 같은 수.
 CORS 는 `CORS_ORIGIN` 에 적은 화면 주소만 허용한다(preflight 는 함수가 직접 204 로 답한다). 봇은 서버끼리 부르므로 CORS 와 상관없다.
 
 ### 구조
@@ -503,6 +510,39 @@ API 가 팀을 보여 줄 때 그 줄을 `entries` 맨 앞으로 옮기므로 �
 프로필에서 그 줄을 지우면 대표로 보인다.
 모집 상세의 로스터는 팀원마다 참가 캐릭터 하나만 보이고, 나머지는 「캐릭터 N개 보기」 모달로 연다. 참가 캐릭터 고르기도 같은 모달이다.
 **TNAB 봇의 `tnab/service.py` `MAX_ENTRIES`(3)** 는 봇에서 대표를 바꿀 때 나머지 줄을 그 수로 자른다 — `maxEntries` 를 바꾸면 봇도 같이 올린다. 마이그레이션 `20261001000000_recruit_entry.sql` 을 **함수 배포보다 먼저** 넣는다(팀 조회가 entry 칸을 읽는다).
+
+### 카카오 로그인 · 비회원
+
+**카카오 로그인** — 머리의 「로그인」 이 디스코드 · 카카오를 고르는 창을 연다(`assets/auth.js` 의 `chooseLogin`, 게시판도 같다). 카카오톡 인앱 브라우저에서도 카카오 로그인은 바로 된다
+(디스코드만 평소 쓰는 브라우저로 넘긴다). 카카오로만 로그인한 계정의 ID 는 `k<카카오 회원번호>` 이고, **처음 로그인할 때 닉네임을 한 번 묻는다** — 카카오 닉네임은 대개 실명이라 쓰지 않고,
+입력한 이름을 `user_metadata.nickname` 에 둔다(취소하면 「카카오 사용자」, 다음에 또 묻는다). 팀원모집 프로필의 표시 이름이 있으면 그것이 먼저다.
+
+**카카오 연결** — 디스코드로 로그인한 사람은 팀원모집 「내 프로필」 의 「카카오 로그인 연결」 로 같은 계정에 카카오를 붙인다(`linkIdentity`). 그 뒤로는 카카오로 들어와도
+디스코드 ID 그대로라 프로필 · 파티 · 글 · 봇이 이어진다. 그 카카오로 따로 로그인해 만든 계정이 이미 있으면 Supabase 가 거절하고 이유가 뜬다.
+반대(카카오 계정에 디스코드 붙이기)는 화면에 없다 — ID 가 디스코드로 바뀌어 카카오 때의 프로필 · 글과 끊기기 때문이다.
+
+**비회원** — 로그인하지 않으면(로그인 모듈을 못 불러왔을 때도) 「비회원 프로필」 을 쓴다: 표시 이름 · 마이크 · 캐릭터 줄 · **관리 비밀번호(4~32자)** 를 이 브라우저 localStorage(`dc.recruit.guest`)에만 둔다.
+만들기 · 가입 때 서버로 보내 팀원 행(`recruit_members.guest`)에 복사하고 비밀번호는 scrypt 해시(`pw_hash`)만 남긴다. 응답의 `g<번호>` 와 비밀번호를 `dc.recruit.guestTeams` 에 팀마다 두어
+그 기기에서는 다시 묻지 않고, **다른 기기**(카톡 인앱 브라우저 포함)에서는 로스터의 「본인 확인」 에 비밀번호를 넣으면 관리 칸이 열린다.
+비회원은 1인 1파티 · 프로필 연동 · 모집 완료 멘션 · 게시판 쓰기가 없다. 프로필을 고쳐도 이미 들어간 팀에는 반영되지 않는다(가입할 때의 복사본). 참가 캐릭터 바꾸기도 계정만 — 나갔다 다시 들어온다.
+
+**팀원 직접 추가** — 팀장(비회원 팀장 포함) 관리 칸의 「팀원 직접 추가」 로 게임 닉네임 · 캐릭터(+ 티어)만 넣는다. 닉네임을 치면 `GET /api/profiles?q=` 로 가입된 프로필이 목록에 뜨고,
+고르면 캐릭터 · 티어가 채워진다. **계정과 잇지 않는다** — 그 사람이 나중에 직접 가입하면 두 줄이 되니 팀장이 이 줄을 방출한다. 마이크는 모르므로 `null`(로스터 · 알림 · 카톡 카드에서 빠진다).
+
+**TNAB 봇** — 팀원 `userId` 가 숫자가 아닐 수 있고(`k…` · `g…`), `mic` 이 `null` · `tier` 가 `''` 일 수 있다. 봇은 숫자면 int, 아니면 문자열 그대로 받는다(`tnab/service.py` `_member_id`).
+**봇을 먼저 올린다** — 옛 봇은 `int(userId)` 에서 터져, 비회원이 낀 팀이 하나만 있어도 목록을 못 읽는다.
+
+**처음 운영에 올릴 때** (순서대로)
+
+1. [Kakao Developers](https://developers.kakao.com) — 사이트 공유에 쓰는 같은 앱에서 **카카오 로그인**을 켜고, **앱 > 플랫폼 키 > REST API 키**의 **카카오 로그인 리다이렉트 URI** 에
+   `https://lgchgqxjjlapszmxarun.supabase.co/auth/v1/callback` 을 넣는다. **카카오 로그인 > 보안**(Client Secret)을 만들어 켠다.
+   **동의항목**은 닉네임 · 프로필 사진을 켠다. 이메일(`account_email`)은 비즈 앱만 고를 수 있다 — 로그인 때 KOE205(설정하지 않은 동의 항목)가 나면
+   앱을 비즈 앱으로 바꿔(개인 개발자도 된다) 이메일을 선택 동의로 켠다.
+2. Supabase **Authentication > Sign In / Providers > Kakao** 를 켜고 REST API 키(Client ID) · Client Secret 을 넣고 **Allow users without an email** 을 켠다.
+   같은 화면의 **Allow manual linking**(카카오 연결)도 켠다. Redirect URLs 는 그대로(페이지 목록이 같다).
+3. 마이그레이션 `20261016000000_kakao_guests.sql` 을 SQL Editor 에 붙여 넣어 Run(사용자 ID 형식 · 비회원 칸 · 만들기/가입 RPC). 옛 함수도 이 스키마로 그대로 돈다.
+4. TNAB 봇을 새 코드로 다시 띄운다(위 「TNAB 봇」).
+5. `sh tools/deploy-api.sh` → `node tools/stamp-assets.mjs` 후 main 푸시.
 
 ## 잠재력추천
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>팀원모집 · TNAB Vipers</title>
-<meta name="description" content="NBA 덩크 시티 3:3 팀원모집. 디스코드로 로그인해 팀을 만들면 알림과 빈 음성채널이 배정되고, 카카오톡으로 바로 공유됩니다. TNAB 디스코드 봇과 같은 파티 목록을 씁니다.">
+<meta name="description" content="NBA 덩크 시티 3:3 팀원모집. 디스코드 · 카카오 로그인이나 비회원으로 팀을 만들면 디스코드 알림과 빈 음성채널이 배정되고, 카카오톡으로 바로 공유됩니다. TNAB 디스코드 봇과 같은 파티 목록을 씁니다.">
 <link rel="canonical" href="https://nba-kor.github.io/recruit/">
 <link rel="icon" href="/assets/icon.png?v=2" type="image/png">
 <link rel="apple-touch-icon" href="/assets/icon.png?v=2">
@@ -15,13 +15,13 @@
 <meta property="og:locale" content="ko_KR">
 <meta property="og:url" content="https://nba-kor.github.io/recruit/">
 <meta property="og:title" content="팀원모집 · TNAB Vipers">
-<meta property="og:description" content="NBA 덩크 시티 3:3 팀원모집. 디스코드로 로그인해 팀을 만들면 알림과 빈 음성채널이 배정되고, 카카오톡으로 바로 공유됩니다. TNAB 디스코드 봇과 같은 파티 목록을 씁니다.">
+<meta property="og:description" content="NBA 덩크 시티 3:3 팀원모집. 디스코드 · 카카오 로그인이나 비회원으로 팀을 만들면 디스코드 알림과 빈 음성채널이 배정되고, 카카오톡으로 바로 공유됩니다. TNAB 디스코드 봇과 같은 파티 목록을 씁니다.">
 <meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="/assets/style.css?v=65dd0c0a">
+<link rel="stylesheet" href="/assets/style.css?v=17cf4595">
 </head>
 <body>
 
@@ -42,7 +42,7 @@
 
 <main class="recruit">
 
-  <!-- 내 프로필 — 디스코드 로그인 계정에 붙는다. 팀을 만들거나 가입하기 전에 한 번 -->
+  <!-- 내 프로필 — 로그인 계정(디스코드 · 카카오)에 붙거나, 비회원이면 이 기기에만. 팀을 만들거나 가입하기 전에 한 번 -->
   <section id="profile" class="card rc-create rc-profile" hidden>
     <form id="profile-form" novalidate>
       <h2>내 프로필</h2>
@@ -51,7 +51,7 @@
         <div class="rc-fld">
           <label for="profile-name">표시 이름</label>
           <input type="text" id="profile-name" name="name" maxlength="32" autocomplete="off" spellcheck="false" required>
-          <small class="rc-hint">로스터 · 알림 · 카톡 카드에 이 이름이 보여요. 디스코드 서버 별명이 다르면 여기서 맞추세요</small>
+          <small class="rc-hint">로스터 · 알림 · 카톡 카드 · 게시판에 이 이름이 보여요</small>
           <small class="rc-err" hidden></small>
         </div>
         <fieldset class="rc-seg">
@@ -63,6 +63,17 @@
           <small class="rc-err" hidden></small>
         </fieldset>
       </div>
+      <!-- 비회원만 — 만든 팀 · 가입을 고치거나 지울 때 쓴다 -->
+      <div class="rc-guest" id="profile-guest" hidden>
+        <div class="rc-fld">
+          <label for="guest-pw">관리 비밀번호</label>
+          <input type="password" id="guest-pw" autocomplete="new-password" maxlength="32">
+          <small class="rc-hint">비회원으로 만든 팀 · 가입을 고치거나 지울 때 써요(4~32자). 다른 기기에서는 로스터의 「본인 확인」 에 넣어요</small>
+          <small class="rc-err" hidden></small>
+        </div>
+        <p class="rc-note">비회원 프로필은 이 기기(브라우저)에만 저장돼요. <button type="button" data-login>로그인</button>하면 어느 기기에서나 같은 프로필이고, 디스코드 계정은 모집 완료 멘션도 받아요.</p>
+      </div>
+      <p class="rc-note rc-links" id="profile-link" hidden></p>
       <div class="rc-person">
         <div class="rc-presets">
           <span class="rc-presets-head">내 프리셋 <small></small></span>
@@ -248,6 +259,19 @@
               <button type="button" class="danger" id="disband">팀 해제</button>
             </div>
             <ul class="rc-kicks" id="kicks"></ul>
+            <!-- 카톡 · 디스코드로 이미 모인 사람을 닉네임 · 캐릭터로 넣는다. 가입된 사람은 자동완성 -->
+            <form class="rc-add-member" id="add-member" novalidate hidden>
+              <b>팀원 직접 추가</b>
+              <small class="rc-muted">가입된 사람은 이름 · 닉네임을 치면 목록에 떠요. 나중에 그 사람이 직접 가입하면 이 줄은 방출하세요.</small>
+              <div class="rc-add-row">
+                <input type="text" name="nick" list="add-names" autocomplete="off" maxlength="20" placeholder="게임 닉네임" aria-label="게임 닉네임">
+                <datalist id="add-names"></datalist>
+                <button type="button" class="rc-add-char" id="add-char" aria-haspopup="dialog" aria-label="캐릭터 선택"></button>
+                <select name="tier" aria-label="티어 (모르면 비워 두기)"><option value="">티어 모름</option></select>
+                <button type="submit" class="primary">추가</button>
+              </div>
+              <p class="rc-err" role="alert" hidden></p>
+            </form>
           </section>
         </div>
       </div>
@@ -278,6 +302,24 @@
   </form>
 </dialog>
 
-<script type="module" src="/assets/recruit.js?v=902f1a6b"></script>
+<!-- 비회원 본인 확인 — 다른 기기에서 만들었거나 가입한 팀을 관리할 때 -->
+<dialog id="pw-dialog" class="rc-dialog rc-pw-dialog" aria-labelledby="pw-title">
+  <form method="dialog">
+    <header>
+      <h2 id="pw-title">비회원 본인 확인</h2>
+      <button type="button" data-close aria-label="닫기">✕</button>
+    </header>
+    <div class="rc-pw-body">
+      <p class="rc-muted" id="pw-why"></p>
+      <input type="password" id="pw-input" autocomplete="current-password" maxlength="32" aria-label="비밀번호">
+      <div class="rc-actions">
+        <button type="button" data-close>취소</button>
+        <button type="submit" value="ok" class="primary">확인</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="/assets/recruit.js?v=127f2da8"></script>
 </body>
 </html>

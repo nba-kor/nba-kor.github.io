@@ -61,7 +61,7 @@ a { color: var(--accent-2); }
 .top .menu-btn { display: none; width: 38px; height: 38px; padding: 0; font-size: 20px; }
 
 /* ---------- 버튼 / 입력 ---------- */
-button, a.btn, select, input[type="text"], input[type="search"] {
+button, a.btn, select, input[type="text"], input[type="search"], input[type="password"] {
   font: inherit;
   color: var(--text);
   background: var(--panel-2);
@@ -350,7 +350,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .recruit fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 .recruit legend { padding: 0; margin-bottom: 10px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .recruit legend small { font-weight: 500; opacity: .8; margin-left: 4px; }
-.recruit input[type="text"], .recruit select { padding: 9px 11px; min-width: 0; }
+.recruit input:is([type="text"], [type="password"]), .recruit select, .rc-pw-body input { padding: 9px 11px; min-width: 0; }
 .recruit textarea {
   font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
   padding: 9px 11px; min-width: 0; width: 100%;
@@ -367,8 +367,10 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 /* 로그인 바 (상단 헤더 오른쪽) */
 .rc-auth { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .rc-auth button { padding: 5px 11px; font-size: 13px; font-weight: 600; }
-.rc-auth .rc-login { color: #fff; background: #5865f2; border-color: transparent; font-weight: 700; }
-.rc-auth .rc-login:hover { background: #4752c4; }
+.rc-login { color: #fff; background: #5865f2; border-color: transparent; font-weight: 700; }   /* 디스코드 */
+.rc-login.is-kakao { color: #191600; background: #fee500; }
+.rc-login:hover { filter: brightness(.92); }
+.rc-auth .rc-login { color: #1a1200; background: var(--accent); }   /* 머리의 「로그인」 — 누르면 디스코드 · 카카오를 고른다 */
 .rc-uname { min-width: 0; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rc-need { margin-top: 6px; }
 .rc-ok { margin-top: 10px; color: #35c6a7; }
@@ -838,6 +840,32 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-acct-pick { width: 100%; text-align: left; padding: 8px 10px; border-radius: 12px; }
 .rc-acct-pick[aria-pressed="true"] { border-color: var(--accent); background: #f5a6231a; }
 @media (max-width: 560px) { .rc-accts-dialog { width: 100%; height: fit-content; max-height: 86dvh; } }
+
+/* 로그인 고르기 · 비회원 본인 확인 창 — 내용만큼 */
+.rc-login-dialog, .rc-pw-dialog { width: min(400px, calc(100vw - 32px)); height: fit-content; }
+.rc-login-opts, .rc-pw-body { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.rc-login-opts button { padding: 11px 14px; font-size: 15px; }
+:is(.rc-login-opts, .rc-pw-body) p { margin: 0; font-size: 12.5px; }
+.rc-pw-body .rc-actions { margin-top: 4px; }
+@media (max-width: 560px) { .rc-login-dialog, .rc-pw-dialog { width: 100%; height: fit-content; max-height: 86dvh; } }
+
+/* 비회원 · 팀장이 넣은 팀원 뱃지 */
+.rc-badge.guest { color: var(--text); background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); }
+
+/* 프로필: 비회원 관리 비밀번호 · 카카오 연결 */
+.rc-guest { display: grid; gap: 8px; margin-bottom: 14px; }
+.rc-guest input { max-width: 280px; }
+:is(.rc-guest, .rc-links) button { padding: 3px 10px; font-size: 12.5px; }
+.rc-links { margin: 0 0 14px; }
+
+/* 팀장 관리: 팀원 직접 추가 */
+.rc-add-member { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.rc-add-member > small { font-size: 12px; }
+.rc-add-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.rc-add-row input { flex: 1 1 140px; }
+.rc-add-row select { width: auto; flex: 1 0 auto; }   /* .card select 의 width 100% 를 풀어 한 줄에 같이 선다 */
+.rc-add-char { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; }
+.rc-add-char img, .rc-add-char .rc-hole { width: 28px; height: 28px; border-radius: 50%; }
 
 /* 로스터: 「캐릭터 N개 보기」 · 「캐릭터 변경」 */
 .rc-acct-btns { display: flex; gap: 6px; flex-wrap: wrap; }
