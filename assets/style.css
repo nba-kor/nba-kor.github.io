@@ -883,7 +883,9 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-guest { display: grid; gap: 8px; margin-bottom: 14px; }
 .rc-guest input { max-width: 280px; }
 :is(.rc-guest, .rc-links) button { padding: 3px 10px; font-size: 12.5px; }
-.rc-links { margin: 0 0 14px; }
+.rc-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 14px; }
+.rc-sso.is-sm { height: 36px; padding: 0 14px 0 38px; font-size: 13px; border-radius: 10px; }   /* 프로필의 「카카오 로그인 연결」 — 로그인 창 버튼의 작은 판 */
+.rc-sso.is-sm svg { left: 12px; width: 18px; height: 18px; }
 
 /* 팀장 관리: 팀원 직접 추가 */
 .rc-add-member { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px dashed var(--line); }

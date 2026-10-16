@@ -1,7 +1,7 @@
 // 팀원모집 — 로그인(디스코드 · 카카오) 또는 비회원 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
 import { loadPlayers, faceOf, mountTop, POS, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, copyLink, shareFace } from './app.js?v=3de4668d'
 import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=886b1610'
-import { api, initAuth as startAuth, chooseLogin, logout, session, linkKakao, hasProvider, showWho, IN_KAKAO, IS_MOBILE } from './auth.js?v=27180c68'
+import { api, initAuth as startAuth, chooseLogin, logout, session, linkKakao, hasProvider, showWho, KAKAO_SVG, IN_KAKAO, IS_MOBILE } from './auth.js?v=c990f40b'
 
 // ---------------------------------------------------------------- 설정
 
@@ -576,7 +576,7 @@ async function renderLinks() {
   const discord = hasProvider(user, 'discord'), kakao = hasProvider(user, 'kakao')
   box.replaceChildren(...!discord ? ['카카오로 로그인 중이에요.']
     : kakao ? ['디스코드 · 카카오 어느 쪽으로 로그인해도 이 계정이에요.']
-    : ['카카오를 연결하면 카카오톡 안에서도 바로 로그인돼요. ', h('button', { type: 'button', className: 'rc-login is-kakao', onclick: linkKakao }, '카카오 로그인 연결')])
+    : ['카카오를 연결하면 카카오톡 안에서도 바로 로그인돼요. ', h('button', { type: 'button', className: 'rc-sso is-kakao is-sm', onclick: linkKakao, innerHTML: `${KAKAO_SVG}카카오 로그인 연결` })])
   box.hidden = auth !== 'in' || !user
 }
 
