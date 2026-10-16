@@ -180,7 +180,7 @@ export function pickMenu(p, title, items) {
 
 /** 상단 네비게이션 + 데이터 갱신일 표시. */
 export function mountTop(current, updatedAt) {
-  const el = document.querySelector('.top .stamp')
+  const el = document.querySelector('.stamp')   // 홈 맨 아래
   if (el && updatedAt) el.textContent = `선수 데이터 ${updatedAt} 기준`
   document.querySelectorAll('.top nav a').forEach(a => {
     if (a.getAttribute('href') === current) a.setAttribute('aria-current', 'page')

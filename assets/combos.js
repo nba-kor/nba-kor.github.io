@@ -1,8 +1,8 @@
 // 조합표 — 3명 조합 게시판: 목록(추천순 · 최신순 · 포지션 · 캐릭터 필터) · 글(선수별 추천 잠재력 · 상대하기 편한/힘든 캐릭터 · 조합 · 추천 · 댓글) · 쓰기 · 고치기.
 // 게시판 공용 부분은 board.js. 추천 잠재력은 잠재력추천 글 번호만 저장하고, 보여 줄 때 ?ids= 로 한 번에 읽는다(지워진 글은 빠진다)
-import { mountTop, loadKakao, faceOf, kakaoList, shareFace, POS } from './app.js?v=3de4668d'
+import { mountTop, loadKakao, faceOf, kakaoList, shareFace, POS } from './app.js?v=850e30c8'
 import { api } from './auth.js?v=e2ffcda1'
-import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=08b1a4eb'
+import { $, h, P, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem } from './board.js?v=68f6d961'
 
 let cat, pot   // data/potentials.json(추천 잠재력 아이콘)
 const VS_MAX = 10   // 서버 COMBO_VS 와 같다 — 쪽마다 캐릭터 수 · 조합(3명 세트) 수

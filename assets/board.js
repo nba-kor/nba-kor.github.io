@@ -1,5 +1,5 @@
 // 게시판 공용 — 잠재력추천 · 영상이 같이 쓴다: 로그인 표시, 캐릭터 고르기, 목록 카드 틀, 글 머리(추천 · 공유 · 수정 · 삭제), 댓글
-import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=3de4668d'
+import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=850e30c8'
 import { api, initAuth, chooseLogin, logout, session, showWho, IN_KAKAO } from './auth.js?v=e2ffcda1'
 
 export const $ = (s, root = document) => root.querySelector(s)
@@ -56,9 +56,11 @@ function setAuth(state, v = null) {
     in: me && [btn('로그아웃', logout)],
   }[auth])
   showWho(auth === 'in' && me?.name)
-  const need = $('#need')
-  need.textContent = auth === 'out' ? `${needText}${IN_KAKAO ? ' 디스코드 로그인은 평소 쓰는 브라우저로 열려요.' : ''}` : ''
-  need.hidden = !need.textContent
+  const need = $('#need')   // 홈에는 없다
+  if (need) {
+    need.textContent = auth === 'out' ? `${needText}${IN_KAKAO ? ' 디스코드 로그인은 평소 쓰는 브라우저로 열려요.' : ''}` : ''
+    need.hidden = !need.textContent
+  }
   if (state !== 'loading') onChange?.()   // 추천 여부 · 내 글 버튼이 로그인에 따라 달라진다
 }
 
