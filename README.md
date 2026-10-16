@@ -536,8 +536,10 @@ API 가 팀을 보여 줄 때 그 줄을 `entries` 맨 앞으로 옮기므로 �
 
 1. [Kakao Developers](https://developers.kakao.com) — 사이트 공유에 쓰는 같은 앱에서 **카카오 로그인**을 켜고, **앱 > 플랫폼 키 > REST API 키**의 **카카오 로그인 리다이렉트 URI** 에
    `https://lgchgqxjjlapszmxarun.supabase.co/auth/v1/callback` 을 넣는다. **카카오 로그인 > 보안**(Client Secret)을 만들어 켠다.
-   **동의항목**은 닉네임 · 프로필 사진을 켠다. 이메일(`account_email`)은 비즈 앱만 고를 수 있다 — 로그인 때 KOE205(설정하지 않은 동의 항목)가 나면
-   앱을 비즈 앱으로 바꿔(개인 개발자도 된다) 이메일을 선택 동의로 켠다.
+   **동의항목**은 받아 쓰는 게 없어 **필수는 하나도 없다**(신원은 늘 오는 회원번호, 닉네임은 사이트에서 따로 받는다).
+   다만 Supabase 가 scope 에 `account_email profile_image profile_nickname` 을 고정으로 넣고(사이트에서 뺄 수 없다),
+   카카오는 '사용 안함' 인 항목이 scope 에 있으면 KOE205 로 막는다 — 세 개 모두 **선택 동의**로 둔다.
+   이메일은 비즈 앱만 켤 수 있으니 앱을 비즈 앱으로 바꾼다(개인 개발자 비즈 앱, 사업자번호 없이 된다). 사용자가 다 체크 해제해도 로그인은 된다.
 2. Supabase **Authentication > Sign In / Providers > Kakao** 를 켜고 REST API 키(Client ID) · Client Secret 을 넣고 **Allow users without an email** 을 켠다.
    같은 화면의 **Allow manual linking**(카카오 연결)도 켠다. Redirect URLs 는 그대로(페이지 목록이 같다).
 3. 마이그레이션 `20261016000000_kakao_guests.sql` 을 SQL Editor 에 붙여 넣어 Run(사용자 ID 형식 · 비회원 칸 · 만들기/가입 RPC). 옛 함수도 이 스키마로 그대로 돈다.
