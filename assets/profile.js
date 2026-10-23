@@ -12,13 +12,9 @@ export const recruitCfg = () => recruitP ||= json('/data/recruit.json')   // max
 export const arenaCfg = () => arenaP ||= json('/data/arena.json')
 const A = await arenaCfg()   // 주력 포지션 · 돌파 단계
 
-export const POS_COLOR = ['#8b97a8', '#4d9eff', '#35c6a7', '#f5a623', '#d980ff', '#ff7a59']
-export const posColor = id => POS_COLOR[P(id).pos] || POS_COLOR[0]
 // 주력 포지션 — 스코어러 > 중열 > 센터(집계표 순서 = data/arena.json 의 roles 순서)
 export const ROLES = A.roles
-export const ROLE_COLOR = { scorer: '#4d9eff', mid: '#b07cff', center: '#ff5dbe' }
 export const roleLabel = id => ROLES.find(r => r.id === id)?.label || '포지션 미정'
-export const roleColor = roles => ROLE_COLOR[roles?.[0]] || POS_COLOR[0]
 const LINK_RE = /:\/\/|www\.|discord\.gg/i   // 서버와 같은 규칙 — 이름에 링크 금지
 
 /** entries → [{ nick, tier, roles, chars, bt: { 캐릭터: 돌파 } }] — 처음 나온 순서, 첫 계정이 본계정 */
@@ -42,12 +38,12 @@ export const charNames = (chars, bt = {}) => chars.map(id => `${P(id).short || P
 export const charFaces = (chars, max = 4) => h('span', { className: 'ac-faces' },
   chars.slice(0, max).map(id => h('img', { src: faceOf(P(id)), alt: '', title: P(id).name, loading: 'lazy' })),
   chars.length > max && h('em', {}, `+${chars.length - max}`))
-/** 주력 포지션 뱃지 — 1순위는 진하게 */
+/** 주력 포지션 뱃지 — 1순위는 채움 · 2순위는 테두리(색은 한 가지) */
 export const roleTags = roles => h('span', { className: 'ac-roles' }, roles?.length
-  ? roles.map((r, i) => { const t = h('span', { className: i ? '' : 'is-first', title: `${i + 1}순위` }, roleLabel(r)); t.style.setProperty('--rc', ROLE_COLOR[r]); return t })
+  ? roles.map((r, i) => h('span', { className: i ? '' : 'is-first', title: `${i + 1}순위` }, roleLabel(r)))
   : h('span', { className: 'is-none' }, '포지션 미정'))
 
-/** 계정 한 줄: (체크) 본계정/부계정 · 닉네임 · 주력 포지션 · 캐릭터(돌파) · 얼굴 · (✎). 왼쪽 띠 색 = 1순위 포지션 */
+/** 계정 한 줄: (체크) 본계정/부계정 · 닉네임 · 주력 포지션 · 캐릭터(돌파) · 얼굴 · (✎) */
 export function accountRow(a, i, { checked, onCheck, onEdit } = {}) {
   const body = [
     h('span', { className: `ac-kind${i ? '' : ' is-main'}` }, i ? '부계정' : '본계정'),
@@ -55,7 +51,6 @@ export function accountRow(a, i, { checked, onCheck, onEdit } = {}) {
     charFaces(a.chars),
   ]
   const li = h('li', { className: 'ac-row' })
-  li.style.setProperty('--pc', roleColor(a.roles))
   if (onCheck) {
     const box = h('input', { type: 'checkbox', checked: !!checked, onchange: () => onCheck(box.checked) })
     li.append(h('label', { className: 'ac-pick' }, box, ...body))

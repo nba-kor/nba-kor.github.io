@@ -386,7 +386,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 /* 방 정보 뱃지 — 마이크 필수/듣코가능/필요없음 · 즐겜/빡겜, 팀원 마이크 O/X */
 .rc-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; }
 .rc-tag { padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; border: 1px solid var(--line); color: var(--muted); }
-:is(.rc-tag.mic-required, .rc-tag.mic-on) { color: #35c6a7; border-color: #35c6a755; }
+:is(.rc-tag.mic-required, .rc-tag.mic-on) { color: var(--accent); border-color: #f5a62355; }
 .rc-tag.mic-listen { color: #f5c542; border-color: #f5c54255; }
 .rc-tag.is-fun { color: var(--accent-2); border-color: #4d9eff55; }
 .rc-tag.is-serious { color: var(--def); border-color: #ff5d5d66; }
@@ -411,7 +411,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-seg-opts input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .rc-seg-opts span { display: block; padding: 6px 14px; border-radius: 7px; font-weight: 700; font-size: 13px; color: var(--muted); white-space: nowrap; }
 .rc-seg-opts label:hover span { color: var(--text); }
-.rc-seg-opts input:checked + span { background: var(--accent-2); color: #06121f; }
+.rc-seg-opts input:checked + span { background: var(--accent); color: #06121f; }
 .rc-seg-opts input:focus-visible + span { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 .rc-seg:has([aria-invalid]) .rc-seg-opts { border-color: var(--def); }
 .rc-form-grid { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 22px; align-items: start; }
@@ -485,17 +485,12 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
   padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
 }
 /* 포지션 필터 뱃지 — 누르면 그 포지션 칸만 남긴다 */
-.rc-filter { --pc: var(--text); flex: 1 0 100%; display: flex; gap: 6px; flex-wrap: wrap; }
+.rc-filter { --pc: var(--muted); flex: 1 0 100%; display: flex; gap: 6px; flex-wrap: wrap; }
 :is(.rc-dialog, .pt) .rc-filter button {
   width: auto; height: auto; padding: 4px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 800;
   color: var(--pc); background: transparent; border-color: color-mix(in srgb, var(--pc) 45%, transparent);
 }
-.rc-filter [data-pos="1"] { --pc: #4d9eff; }
-.rc-filter [data-pos="2"] { --pc: #35c6a7; }
-.rc-filter [data-pos="3"] { --pc: #f5a623; }
-.rc-filter [data-pos="4"] { --pc: #d980ff; }
-.rc-filter [data-pos="5"] { --pc: #ff7a59; }
-:is(.rc-dialog, .pt) .rc-filter [aria-pressed="true"] { color: #06121f; background: var(--pc); border-color: var(--pc); }
+:is(.rc-dialog, .pt) .rc-filter [aria-pressed="true"] { color: #06121f; background: var(--accent); border-color: var(--accent); }
 .rc-dialog h2 { margin: 0; font-size: 16px; }
 .rc-dialog header button { width: 34px; height: 34px; padding: 0; }
 .rc-chars { padding: 4px 16px 18px; }
@@ -955,7 +950,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .me-arena { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--muted); }
 .me-arena b { color: var(--text); }
 .me-arena .btn { margin-left: auto; }
-.me-at { color: #35c6a7; font-weight: 700; }
+.me-at { color: var(--accent); font-weight: 700; }
 
 .cats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .cat {
@@ -976,7 +971,7 @@ a.cat:hover, a.cat:focus-visible, .cat:has(a:hover) { border-color: var(--accent
 /* ---------- 게임 계정 · 보유 캐릭터 (마이페이지 · 아레나 신청 — assets/profile.js) ---------- */
 .ac-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .ac-list.is-off { opacity: .45; }
-.ac-row { --pc: var(--muted); display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-left: 4px solid var(--pc); border-radius: 12px; background: var(--panel-2); }
+.ac-row { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
 .ac-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
 label.ac-pick { cursor: pointer; }
 .ac-pick input { width: 20px !important; height: 20px; flex: none; accent-color: var(--accent); }
@@ -1024,7 +1019,7 @@ label.ac-pick { cursor: pointer; }
 .mp-history a { font-weight: 700; color: var(--text); text-decoration: none; }
 .mp-history em { margin-left: 6px; font-style: normal; font-size: 11px; color: var(--accent); }
 .mp-history small { color: var(--muted); font-size: 12px; }
-.mp-history small.is-on { color: #35c6a7; font-weight: 700; }
+.mp-history small.is-on { color: var(--accent); font-weight: 700; }
 .mp-admin li { display: flex; flex-direction: column; padding: 10px 12px; border-radius: 10px; background: var(--panel-2); }
 .mp-admin a { font-weight: 700; }
 .mp-admin small { color: var(--muted); font-size: 12px; }
@@ -1032,7 +1027,7 @@ label.ac-pick { cursor: pointer; }
 .mp .rc-gate-admin { margin: 0; display: flex; flex-direction: column; gap: 8px; }
 
 /* ---------- 아레나 운영 ---------- */
-.ar { --ok: #35c6a7; --wait: #f5a623; }
+.ar { --sc: var(--accent); --ok: var(--accent); --wait: var(--muted); }   /* 색은 강조색 하나 + 회색 */
 .ar-head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .ar-head h1 { letter-spacing: .02em !important; }
 .ar-week { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
@@ -1049,15 +1044,14 @@ label.ac-pick { cursor: pointer; }
 .ar-all { flex: none; padding: 4px 12px; font-size: 12.5px; font-weight: 700; }
 .ar-count { margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 700; }
 .ar-state { flex: none; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; color: var(--muted); background: var(--panel-2); }
-.ar-state.is-on { color: var(--ok); background: #35c6a722; }
+.ar-state.is-on { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
 .ar-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }   /* 한 줄에 하루(1차 · 1.5차 · 2차) */
 .ar-opts.is-extra { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.ar-opt { --sc: var(--muted); display: flex; align-items: center; gap: 10px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); cursor: pointer; font-size: 15px; font-weight: 700; }
+.ar-opt { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); cursor: pointer; font-size: 15px; font-weight: 700; }
 .ar-opt input { width: 20px !important; height: 20px; accent-color: var(--sc); flex: none; }
 .ar-opt small { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 500; }
 .ar-opt:has(input:checked) { border-color: var(--sc); background: color-mix(in srgb, var(--sc) 14%, var(--panel-2)); }
 .ar-opts.is-extra .ar-opt { font-size: 14px; padding: 10px 14px; }
-.ar-opt.is-absent { --sc: var(--def); }
 .ar-first { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px dashed var(--line); border-radius: 12px; }
 .ar-memo input { max-width: 420px; }
 .ar-signup .rc-form-err { margin: 0; }
@@ -1108,10 +1102,10 @@ label.ac-pick { cursor: pointer; }
 .ar-table .ar-nick { text-align: left; }
 .ar-nick small { margin-left: 6px; color: var(--muted); font-size: 11px; }
 .ar-badge { display: inline-block; min-width: 46px; padding: 2px 8px; border-radius: 7px; font-weight: 800; font-size: 12px; color: #06121f; background: var(--sc); }
-.ar-want { font-size: 11px; color: var(--sc); opacity: .75; }
+.ar-want { font-size: 11px; color: var(--muted); }
 .ar-dash { color: #3b4657; }
-.ar-st { padding: 1px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 800; color: var(--wait); background: #f5a6231f; }
-.ar-st.is-ok { color: var(--ok); background: #35c6a71f; }
+.ar-st { padding: 1px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 800; color: var(--wait); background: #ffffff0d; }
+.ar-st.is-ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
 .ar-poll { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .ar-poll li { display: grid; grid-template-columns: 9.5em 3em 1fr; align-items: baseline; gap: 8px; padding: 6px 0; border-bottom: 1px solid #2b344466; font-size: 13.5px; }
 .ar-poll b { font-variant-numeric: tabular-nums; }
@@ -1127,8 +1121,6 @@ label.ac-pick { cursor: pointer; }
 .ar-pool-head h3 { margin: 0 !important; }
 .ar-pool > .rc-muted { margin: -4px 0 10px; font-size: 12px; }
 .ar-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 40px; }
-.ar-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 10px; color: var(--muted); font-size: 11.5px; }
-.ar-legend span { --pc: var(--muted); padding: 0 7px; border-radius: 6px; font-weight: 800; color: #06121f; background: var(--pc); }
 .ar-chip {
   --pc: var(--muted); display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 10px 4px 4px;
   border: 1px solid color-mix(in srgb, var(--pc) 60%, transparent); border-radius: 999px;
@@ -1165,8 +1157,7 @@ label.ac-pick { cursor: pointer; }
 }
 
 /* 관리자 매뉴얼 — 계정 글자색 = 소유자의 참가 계정 수(빨강 1 · 주황 2 · 노랑 3 · 초록 4~), 주력 포지션 뱃지 */
-.ar-cnt { color: var(--cc, var(--text)); font-weight: 700; }
-.ar-legend .ar-cnt { padding: 0 4px; color: var(--cc); background: none; }
+.ar-cnt { font-weight: 700; }
 .ac-roles { display: inline-flex; flex-wrap: wrap; gap: 3px; margin-left: 6px; vertical-align: 1px; }
 .ac-roles span { --rc: var(--muted); padding: 0 6px; border-radius: 6px; font-size: 10.5px; font-weight: 800; line-height: 1.6; color: var(--rc); border: 1px solid color-mix(in srgb, var(--rc) 55%, transparent); white-space: nowrap; }
 .ac-roles span.is-first { color: #06121f; background: var(--rc); }
@@ -1203,7 +1194,7 @@ label.ac-pick { cursor: pointer; }
 .mp-members .ar-nick small { margin-left: 6px; color: var(--muted); font-size: 11px; }
 .mp-role { padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
 .mp-role.is-master { color: #1a1200; background: var(--accent); border-color: transparent; }
-.mp-role.is-admin { color: #35c6a7; border-color: #35c6a766; }
+.mp-role.is-admin { color: var(--accent); border-color: #f5a62366; }
 .mp-acts { display: inline-flex; gap: 4px; }
 .mp-acts button { padding: 3px 10px; font-size: 12px; white-space: nowrap; }
 #members { scroll-margin-top: 110px; }
@@ -1217,10 +1208,9 @@ label.ac-pick { cursor: pointer; }
 .mp-sub ~ .mp-sub { margin-top: 16px !important; }
 .mp-attend .ar-nick small { margin-left: 6px; color: var(--muted); font-size: 11px; }
 .mp-now { padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: var(--muted); background: var(--panel-2); white-space: nowrap; }
-.mp-now.is-in { color: #35c6a7; background: #35c6a71f; }
-.mp-now.is-absent { color: var(--def); background: #ff5d5d1a; }
-.mp-streak { color: #51cf66; }
-.mp-missed { color: #ffa94d; }
+.mp-now.is-in { color: var(--accent); background: #f5a6231f; }
+.mp-streak { color: var(--accent); }
+.mp-missed { color: var(--muted); }
 #attendance { scroll-margin-top: 110px; }
 
 /* 아레나 편성 — 칩: 부계정이면 본계정 닉네임 줄, 「자세히 보기」 면 캐릭터 */
@@ -1230,7 +1220,7 @@ label.ac-pick { cursor: pointer; }
 .ar-chip.is-detail { align-items: flex-start; border-radius: 14px; padding: 6px 10px 6px 6px; }
 .ar-chip .ar-chars { margin-top: 3px; max-width: 260px; }
 .ar-pool-head .ar-detail-btn { margin-left: auto; padding: 4px 12px; font-size: 12.5px; font-weight: 700; }
-.ar-detail-btn[aria-pressed="true"] { color: #06121f; background: var(--accent-2); border-color: transparent; }
+.ar-detail-btn[aria-pressed="true"] { color: #06121f; background: var(--accent); border-color: transparent; }
 .pm-detail { display: flex; flex-direction: column; gap: 6px; margin: -4px 0 12px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); }
 .pm-detail .ac-roles { margin: 0; }
 

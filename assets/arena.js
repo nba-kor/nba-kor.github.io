@@ -3,7 +3,7 @@
 import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=915be0c5'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=e2ffcda1'
 import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=3a1e630f'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, posColor, charNames, roleTags, roleColor, ROLES, ROLE_COLOR } from './profile.js?v=df837796'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, ROLES } from './profile.js?v=4896bfb5'
 
 await loadData()
 mountTop('/arena/')
@@ -12,12 +12,8 @@ const A = await arenaCfg()
 const SLOTS = A.slots
 const LABEL = Object.fromEntries([...SLOTS.map(s => [s.id, s.label]), ...A.extra.map(c => [c.id, c.label])])
 const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replace(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short])])   // 토1 · 토1.5 · FA
-// 시간대 색 — 화면 뱃지와 카톡 이미지가 같이 쓴다
-const SLOT_COLOR = { sat1: '#9b7cff', sat15: '#4dd0e1', sat2: '#4d9eff', sun1: '#ff6b8b', sun15: '#ff9f68', sun2: '#f5c542' }
-const colorOf = id => SLOT_COLOR[id] || '#8b97a8'
-// 관리자 매뉴얼: 소유자의 참가 계정이 많을수록 빨강(1) · 주황(2) · 노랑(3) · 초록(4~) — 계정 글자색
-const COUNT_COLOR = ['', '#ff6b6b', '#ffa94d', '#ffd43b', '#51cf66']
-const countColor = n => COUNT_COLOR[Math.min(n, 4)] || COUNT_COLOR[1]
+// 색은 강조색(주황) 하나 + 회색 — 시간대 · 포지션 · 계정 수는 글자로 구분한다. 카톡 이미지도 같은 색
+const ACCENT = '#f5a623'
 // 같은 날 시간이 겹치는 두 시간대(서버와 같은 규칙) — 1.5차는 1차 · 2차와 겹친다
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT = Object.fromEntries(SLOTS.map(s => [s.id, s]))
@@ -25,8 +21,8 @@ const clash = (x, y) => { const a = SLOT[x], b = SLOT[y]; return a.day === b.day
 // 집계 순서(관리자 매뉴얼): 소유자의 참가 계정 수 많은 순 → 1순위 포지션(스코어러 > 중열 > 센터) → 계정 이름(가나다 · 영문)
 const roleRank = a => { const i = ROLES.findIndex(r => r.id === a.roles[0]); return i < 0 ? ROLES.length : i }
 const byTally = (x, y) => y.count - x.count || roleRank(x) - roleRank(y) || x.n.localeCompare(y.n, 'ko')
-/** 계정 이름 — 글자색 = 소유자의 참가 계정 수 */
-const nickEl = (a, tag = 'b') => { const el = h(tag, { className: 'ar-cnt', title: `${a.owner} 님 참가 계정 ${a.count}개` }, a.n); el.style.setProperty('--cc', countColor(a.count)); return el }
+/** 계정 이름 — 마우스를 올리면 소유자의 참가 계정 수 */
+const nickEl = (a, tag = 'b') => h(tag, { className: 'ar-cnt', title: `${a.owner} 님 참가 계정 ${a.count}개` }, a.n)
 
 const key = (u, n) => `${u}\n${n}`
 const addDays = (w, n) => new Date(Date.parse(`${w}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
@@ -89,7 +85,7 @@ function renderSignup() {
     h('p', { className: 'rc-note' }, !mine ? '아직 이번 주 신청을 안 했어요. 참석할 시간과 계정을 골라 신청해 주세요.'
       : absent ? `사유불참${mine.memo ? ` · ${mine.memo}` : ''}`
       : `계정 ${mine.accounts.map(a => a.nick).join(', ')}${mine.memo ? ` · 메모 ${mine.memo}` : ''}`),
-    mine && !absent && myTeams(),
+    mine && !absent ? myTeams() : '',   // replaceChildren 은 undefined 를 글자로 넣는다
     h('div', { className: 'rc-actions' },
       mine && h('button', { type: 'button', className: 'danger', onclick: cancel }, '신청 취소'),
       h('button', { type: 'button', className: 'primary rc-big', onclick: openSignup }, mine ? '신청 수정' : '신청하기')))
@@ -109,7 +105,6 @@ function myTeams() {
       h('div', { className: 'ar-mine-me' }, h('span', { className: 'ar-mine-k' }, '내 계정'), ...who(a), roleTags(a.roles)),
       h('div', { className: 'ar-mine-mates' }, h('span', { className: 'ar-mine-k' }, '같은 팀'),
         mates.length ? mates.map(m => h('span', { className: 'ar-mate' }, ...who(m), roleTags(m.roles))) : h('span', { className: 'rc-muted' }, '아직 혼자예요')))
-    row.style.setProperty('--sc', colorOf(s.id))
     return [row]
   }))
   return h('div', { className: 'ar-mine' }, h('p', { className: 'ar-mine-title' }, '내 배정'),
@@ -165,9 +160,7 @@ function renderForm() {
       } else d.slots.delete(c.id)
       renderForm()
     } })
-    const el = h('label', { className: `ar-opt${c.id === 'absent' ? ' is-absent' : ''}` }, box, h('span', {}, c.label), sub && h('small', {}, sub))
-    if (SLOT_COLOR[c.id]) el.style.setProperty('--sc', colorOf(c.id))
-    return el
+    return h('label', { className: 'ar-opt' }, box, h('span', {}, c.label), sub && h('small', {}, sub))
   }
 
   // 계정 — 프로필이 있으면 고칠 때마다 프로필에 바로 저장한다(마이페이지와 같은 계정). 없으면 신청할 때 프로필도 같이 만든다
@@ -301,20 +294,15 @@ function tallyCard() {
   })
   const tabs = h('div', { className: 'ar-tabs', role: 'tablist' }, [{ id: 'all', short: '전체' }, ...SLOTS, ...A.extra].map(c => {
     const g = groups.find(x => x.c.id === c.id)
-    const b = h('button', { type: 'button', role: 'tab', 'aria-selected': tallyTab === c.id, onclick: () => { tallyTab = c.id; renderPlan() } },
+    return h('button', { type: 'button', role: 'tab', 'aria-selected': tallyTab === c.id, onclick: () => { tallyTab = c.id; renderPlan() } },
       g ? `${c.short} (${g.who.length})` : '전체')
-    if (SLOT_COLOR[c.id]) b.style.setProperty('--sc', colorOf(c.id))
-    return b
   }))
   const acctCells = a => [h('td', {}, roleTags(a.roles)), h('td', { className: 'ar-chars-cell', title: charNames(a.chars, a.bt) }, charNames(a.chars, a.bt))]
   const personRows = (s, i, slot) => {
     const a = lead(s), more = s.accounts.length > 1, id = `${slot}:${s.userId}`, open = more && opened.has(id)
     const toggle = more && h('button', { type: 'button', className: 'ar-more', 'aria-expanded': open, onclick: () => { open ? opened.delete(id) : opened.add(id); renderPlan() } },
       open ? '접기' : [h('span', { className: 'ar-long' }, '상세 '), `+${s.accounts.length - 1}`])   // 휴대폰은 「+3」 만
-    const owner = h('b', { className: 'ar-cnt' }, s.owner)
-    owner.style.setProperty('--cc', countColor(a.count))
-    const count = h('span', { className: 'ar-cnt' }, `${a.count}개`)
-    count.style.setProperty('--cc', countColor(a.count))
+    const owner = h('b', { className: 'ar-cnt' }, s.owner), count = h('span', { className: 'ar-cnt' }, `${a.count}개`)
     return [
       h('tr', {}, h('td', {}, i + 1), h('td', { className: 'ar-nick' }, owner, a.n !== s.owner && h('small', {}, `참가 ${a.n}`), h('small', { className: 'ar-inline-chars' }, charNames(a.chars, a.bt))), ...acctCells(a), h('td', {}, count), h('td', {}, toggle)),
       ...open ? s.accounts.slice(1).map(x => {
@@ -333,15 +321,9 @@ function tallyCard() {
           h('thead', {}, h('tr', {}, ['#', '본계정', '포지션', '보유 캐릭터', '계정 수', ''].map(t => h('th', {}, t)))),
           h('tbody', {}, rows.flatMap((x, i) => personRows(x, i, c.id)))))   // 사람마다 [본계정 줄, 펼친 부계정 줄들]
           : h('p', { className: 'rc-muted ar-none' }, '아직 없어요'))
-    if (SLOT_COLOR[c.id]) sec.style.setProperty('--sc', colorOf(c.id))
     return sec
   })
-  const legend = h('p', { className: 'ar-legend' }, '본계정 글자색 = 참가 계정 수 ', [1, 2, 3, 4].map(n => {
-    const t = h('span', { className: 'ar-cnt' }, n < 4 ? `${n}개` : '4개~')
-    t.style.setProperty('--cc', countColor(n))
-    return t
-  }))
-  return h('section', { className: 'card ar-card' }, h('h3', {}, '집계표'), legend, tabs, sections)
+  return h('section', { className: 'card ar-card' }, h('h3', {}, '집계표'), tabs, sections)
 }
 
 /** 이번 주 미신청 — 프로필(게임 계정)은 있는데 이번 주 신청이 없는 사람의 본계정 닉네임 */
@@ -364,10 +346,8 @@ function membersCard(at) {
     SLOTS.map(s => {
       const w = where.find(x => x.slot === s.id)
       const applied = a.slots.includes(s.id) || a.slots.includes('flex')
-      const td = h('td', {}, w ? h('span', { className: 'ar-badge' }, `${w.team}팀`)
+      return h('td', {}, w ? h('span', { className: 'ar-badge' }, `${w.team}팀`)
         : applied ? h('span', { className: 'ar-want', title: '신청' }, h('span', { className: 'ar-long' }, '신청'), h('span', { className: 'ar-short' }, '○')) : h('span', { className: 'ar-dash' }, '-'))   // 휴대폰은 ○
-      td.style.setProperty('--sc', colorOf(s.id))
-      return td
     }),
     h('td', {}, h('span', { className: `ar-st${where.length ? ' is-ok' : ''}` }, where.length ? '확정' : '대기'))))
   return h('section', { className: 'card ar-card' },
@@ -381,12 +361,8 @@ function membersCard(at) {
 /** 팀별 편성 명단 — 탭: 전체 · 시간대 */
 function teamsCard() {
   const tabs = h('div', { className: 'ar-tabs', role: 'tablist' },
-    [{ id: 'all', short: '전체' }, ...SLOTS].map(s => {
-      const b = h('button', { type: 'button', role: 'tab', 'aria-selected': tab === s.id, onclick: () => { tab = s.id; renderPlan() } },
-        s.id === 'all' ? '전체' : `${s.short} (${teamsOf(s.id).length}팀)`)
-      if (s.id !== 'all') b.style.setProperty('--sc', colorOf(s.id))
-      return b
-    }))
+    [{ id: 'all', short: '전체' }, ...SLOTS].map(s => h('button', { type: 'button', role: 'tab', 'aria-selected': tab === s.id, onclick: () => { tab = s.id; renderPlan() } },
+      s.id === 'all' ? '전체' : `${s.short} (${teamsOf(s.id).length}팀)`)))
   const blocks = SLOTS.filter(s => tab === 'all' || tab === s.id).map(s => {
     const teams = teamsOf(s.id)
     const el = h('div', { className: 'ar-slot' },
@@ -395,7 +371,6 @@ function teamsCard() {
         h('div', { className: 'ar-team-head' }, `${s.short} - ${i + 1}팀`),
         h('div', { className: 'ar-members' }, tm.map(x => memberCard(accts.get(key(x.u, x.n)) || { u: x.u, n: x.n, owner: '', chars: [] }))))))
         : h('p', { className: 'rc-muted ar-none' }, '아직 편성 전이에요'))
-    el.style.setProperty('--sc', colorOf(s.id))
     return el
   })
   return h('section', { className: 'card ar-card' }, h('h3', {}, '팀별 편성 명단'), tabs, blocks)
@@ -410,13 +385,9 @@ function memberCard(a) {
   return el
 }
 
-/** 캐릭터 뱃지(돌파, 테두리 색 = NBA 포지션). max 를 주면 앞 max 개 + 나머지 수 */
+/** 캐릭터 뱃지(돌파). max 를 주면 앞 max 개 + 나머지 수 */
 function charTags(a, max = Infinity) {
-  return h('div', { className: 'ar-chars' }, a.chars.slice(0, max).map(id => {
-    const t = h('span', {}, `${P(id).short || P(id).name}${a.bt?.[id] ? ` ${a.bt[id]}돌` : ''}`)
-    t.style.setProperty('--pc', posColor(id))
-    return t
-  }), a.chars.length > max && h('em', { title: charNames(a.chars.slice(max), a.bt) }, `+${a.chars.length - max}`))
+  return h('div', { className: 'ar-chars' }, a.chars.slice(0, max).map(id => h('span', {}, `${P(id).short || P(id).name}${a.bt?.[id] ? ` ${a.bt[id]}돌` : ''}`)), a.chars.length > max && h('em', { title: charNames(a.chars.slice(max), a.bt) }, `+${a.chars.length - max}`))
 }
 
 /** 요일 · 시간대별 참여 — 이번 주 신청한 사람(사유불참 빼고) 중 그 시간대를 고른 비율. 막대는 CSS 로만 그린다 */
@@ -427,10 +398,8 @@ function chartCard() {
     const who = players.filter(s => s.slots.includes(id)), accounts = who.reduce((k, s) => k + s.accounts.length, 0)
     const fill = h('i', {})
     fill.style.width = `${pct(who.length)}%`
-    const el = h('div', { className: 'ar-bar' }, h('span', { className: 'ar-bar-label' }, label), h('span', { className: 'ar-bar-track' }, fill),
+    return h('div', { className: 'ar-bar' }, h('span', { className: 'ar-bar-label' }, label), h('span', { className: 'ar-bar-track' }, fill),
       h('span', { className: 'ar-bar-val' }, h('b', {}, `${pct(who.length)}%`), ` ${who.length}명 · ${accounts}계정`))
-    el.style.setProperty('--sc', colorOf(id))
-    return el
   }
   const days = ['토요일', '일요일'].map((name, day) => {
     const ids = SLOTS.filter(s => s.day === day).map(s => s.id), any = players.filter(p => p.slots.some(x => ids.includes(x))).length
@@ -461,15 +430,10 @@ function editor() {
     : bySlot.filter(a => a.roles.includes(roleTab)).sort((x, y) => (x.roles[0] !== roleTab) - (y.roles[0] !== roleTab) || byTally(x, y))
   const roleTabs = h('div', { className: 'ar-tabs ar-role-tabs' }, [{ id: 'all', label: '전체' }, ...ROLES].map(r => {
     const n = r.id === 'all' ? bySlot.length : bySlot.filter(a => a.roles.includes(r.id)).length
-    const b = h('button', { type: 'button', 'aria-selected': roleTab === r.id, onclick: () => { roleTab = r.id; renderPlan() } }, `${r.label} ${n}`)
-    if (ROLE_COLOR[r.id]) b.style.setProperty('--sc', ROLE_COLOR[r.id])
-    return b
+    return h('button', { type: 'button', 'aria-selected': roleTab === r.id, onclick: () => { roleTab = r.id; renderPlan() } }, `${r.label} ${n}`)
   }))
-  const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '미배정' }, ...SLOTS].map(s => {
-    const b = h('button', { type: 'button', 'aria-selected': poolTab === s.id, onclick: () => { poolTab = s.id; renderPlan() } }, s.short)
-    if (s.id !== 'all') b.style.setProperty('--sc', colorOf(s.id))
-    return b
-  }))
+  const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '미배정' }, ...SLOTS].map(s =>
+    h('button', { type: 'button', 'aria-selected': poolTab === s.id, onclick: () => { poolTab = s.id; renderPlan() } }, s.short)))
   const poolBox = h('section', { className: 'card ar-pool', 'data-drop': 'pool' },
     h('div', { className: 'ar-pool-head' }, h('h3', {}, '배치할 계정'), h('small', { className: 'rc-muted' }, '끌어서 배치하거나, 눌러서 팀을 고르세요'),
       h('button', { type: 'button', className: 'ar-detail-btn', 'aria-pressed': detail, onclick: () => {
@@ -480,9 +444,7 @@ function editor() {
     poolTabs,
     roleTabs,
     h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름)' : `${LABEL[poolTab]} 신청(+ FA) 중 겹치는 시간대에 아직 없는 사람`),
-    h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요')),
-    h('div', { className: 'ar-legend' }, '칩 색 = 1순위 포지션 ', ROLES.map(r => { const s = h('span', {}, r.label); s.style.setProperty('--pc', ROLE_COLOR[r.id]); return s }),
-      ' · 글자색 = 소유자 계정 수 ', [1, 2, 3, 4].map(n => { const s = h('span', { className: 'ar-cnt' }, n < 4 ? n : '4~'); s.style.setProperty('--cc', countColor(n)); return s })))
+    h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요')))
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
     const box = h('div', { className: 'ar-slot ar-edit' },
@@ -491,7 +453,6 @@ function editor() {
         h('div', { className: 'ar-drop-head' }, `${i + 1}팀`, h('small', {}, `${tm.length}/${A.teamSize}`)),
         tm.map(x => chip(accts.get(key(x.u, x.n)), { slot: s.id, ti: i })))),
       h('div', { className: 'ar-drop is-new', 'data-drop': `${s.id}:new` }, '+ 새 팀 — 여기에 놓기'))
-    box.style.setProperty('--sc', colorOf(s.id))
     return box
   }))
   return [poolBox, status, grid, memoCard()]
@@ -504,11 +465,7 @@ function memoCard() {
     h('h3', {}, `신청 메모 ${rows.length}개`),
     rows.length ? h('ul', {}, rows.map(s => h('li', {},
       h('b', {}, s.owner),
-      h('span', { className: 'ar-memo-slots' }, s.slots.map(id => {
-        const t = h('span', {}, TAG[id] || LABEL[id])
-        t.style.setProperty('--sc', id === 'absent' ? 'var(--def)' : colorOf(id))
-        return t
-      })),
+      h('span', { className: 'ar-memo-slots' }, s.slots.map(id => h('span', {}, TAG[id] || LABEL[id]))),
       h('p', {}, s.memo))))
       : h('p', { className: 'rc-muted' }, '메모를 남긴 신청이 없어요'))
 }
@@ -519,9 +476,8 @@ function chip(a, from) {
     h('img', { src: faceOf(P(a.chars[0])), alt: '', draggable: false }),
     h('span', { className: 'ar-chip-body' }, h('span', { className: 'ar-chip-top' }, nickEl(a), roleTags(a.roles)),   // 주력 포지션 1 · 2순위
       a.owner !== a.n && h('span', { className: 'ar-owner' }, '본계 ', h('b', {}, a.owner)),
-      h('small', {}, a.slots.map(s => TAG[s]).filter(Boolean).join(' ')),
+      h('small', {}, `계정 ${a.count} · `, a.slots.map(s => TAG[s]).filter(Boolean).join(' ')),   // 소유자의 참가 계정 수(집계 순서 1번) · 신청 시간대
       detail && charTags(a)))
-  el.style.setProperty('--pc', roleColor(a.roles))
   el.onpointerdown = e => startDrag(e, el, { onDrop: (x, y, target) => move(a, from, target?.closest('[data-drop]')?.dataset.drop) })
   el.onclick = () => menu(a, from)
   el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); menu(a, from) } }
@@ -551,12 +507,12 @@ function menu(a, from) {
   for (const s of SLOTS) {
     const teams = teamsOf(s.id), applied = a.slots.includes(s.id) || a.slots.includes('flex')
     if (SLOTS.some(o => clash(s.id, o.id) && teamsOf(o.id).some((tm, ti) => tm.some(x => x.u === a.u && !(from?.slot === o.id && from.ti === ti && x.n === a.n))))) continue   // 겹치는 시간대에 이미 있다
-    // 색 = 시간대(늘 칠한다). 이 사람이 신청하지 않은 시간대(FA 도 아니면)는 줄마다 「신청 안 함」
+    // 이 사람이 신청하지 않은 시간대(FA 도 아니면)는 줄마다 「신청 안 함」
     const note = applied ? '' : ' · 신청 안 함'
     teams.forEach((tm, ti) => {
-      if (tm.length < A.teamSize && !(from?.slot === s.id && from.ti === ti)) items.push({ label: `${s.short} · ${ti + 1}팀 (${tm.length}/${A.teamSize})${note}`, color: colorOf(s.id), pick: () => move(a, from, `${s.id}:${ti}`) })
+      if (tm.length < A.teamSize && !(from?.slot === s.id && from.ti === ti)) items.push({ label: `${s.short} · ${ti + 1}팀 (${tm.length}/${A.teamSize})${note}`, pick: () => move(a, from, `${s.id}:${ti}`) })
     })
-    items.push({ label: `${s.short} · 새 팀${note}`, color: colorOf(s.id), pick: () => move(a, from, `${s.id}:new`) })
+    items.push({ label: `${s.short} · 새 팀${note}`, pick: () => move(a, from, `${s.id}:new`) })
   }
   // 메뉴 머리 아래에 포지션 · 캐릭터 — 어느 캐릭터로 뛸 수 있는지 보고 고른다
   pickMenu({ name: a.n, img: faceOf(P(a.chars[0])) }, `${a.owner === a.n ? '본계정' : `본계 ${a.owner}`} · 신청 ${a.slots.map(s => TAG[s] || LABEL[s]).join(' ')}`, items,
@@ -680,7 +636,7 @@ async function drawPlan() {
   }
 
   box(0, 0, W, H, 0, '#0d1117')
-  text('VIPERS ARENA', PAD, 50, 30, '#f5a623', 800)
+  text('VIPERS ARENA', PAD, 50, 30, ACCENT, 800)
   text('아레나전 편성 결과', PAD + g.measureText('VIPERS ARENA').width + 14, 50, 22, '#e6edf3', 700)
   const nTeams = SLOTS.reduce((n, s) => n + teamsOf(s.id).length, 0)
   text(`${weekLabel(week)} · 총 ${nTeams}팀 · 팀당 ${A.teamSize}명`, PAD, 82, 15, '#8b97a8')
@@ -688,7 +644,7 @@ async function drawPlan() {
   let y = 104
   for (const r of rows) {
     r.forEach((s, ci) => {
-      const x = PAD + ci * (COL + GAP), color = colorOf(s.id), teams = teamsOf(s.id)
+      const x = PAD + ci * (COL + GAP), color = ACCENT, teams = teamsOf(s.id)
       box(x, y, COL, blockH(s), 12, '#161b22')
       box(x, y + 10, 4, 22, 2, color)
       text(s.short, x + 14, y + 28, 18, color, 800)
@@ -705,7 +661,7 @@ async function drawPlan() {
           g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15, 0, Math.PI * 2); g.fillStyle = '#0b0f16'; g.fill(); g.clip()
           if (img) g.drawImage(img, cx, ty + ROW / 2 - 15, 30, 30)
           g.restore()
-          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15.5, 0, Math.PI * 2); g.strokeStyle = a ? roleColor(a.roles) : '#2b3444'; g.lineWidth = 2; g.stroke()
+          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15.5, 0, Math.PI * 2); g.strokeStyle = '#2b3444'; g.lineWidth = 2; g.stroke()
           text(m.n, cx + 36, ty + 25, 13.5, '#e6edf3', 700, cw - 40)
           text(a ? charNames(a.chars, a.bt) : '', cx + 36, ty + 43, 11, '#8b97a8', 400, cw - 40)
         })
