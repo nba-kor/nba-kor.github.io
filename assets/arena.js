@@ -483,7 +483,23 @@ function editor() {
     box.style.setProperty('--sc', colorOf(s.id))
     return box
   }))
-  return [poolBox, status, grid]
+  return [poolBox, status, grid, memoCard()]
+}
+
+/** 편성 페이지 맨 아래 — 신청할 때 남긴 메모(사유불참은 사유). 신청 순서대로 */
+function memoCard() {
+  const rows = data.signups.filter(s => s.memo)
+  return h('section', { className: 'card ar-card ar-memos' },
+    h('h3', {}, `신청 메모 ${rows.length}개`),
+    rows.length ? h('ul', {}, rows.map(s => h('li', {},
+      h('b', {}, s.owner),
+      h('span', { className: 'ar-memo-slots' }, s.slots.map(id => {
+        const t = h('span', {}, TAG[id] || LABEL[id])
+        t.style.setProperty('--sc', id === 'absent' ? 'var(--def)' : colorOf(id))
+        return t
+      })),
+      h('p', {}, s.memo))))
+      : h('p', { className: 'rc-muted' }, '메모를 남긴 신청이 없어요'))
 }
 
 function chip(a, from) {
