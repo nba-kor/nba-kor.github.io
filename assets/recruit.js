@@ -556,7 +556,13 @@ function profileForm() {
     else {
       res = await submit(form, async () => {
         if (auth !== 'in') throw new Error('로그인해 주세요')
-        return api('/me/profile', { method: 'PUT', withToken: true, body: { name, mic: mic.value === '1', entries: v.entries } })
+        // 이 폼에는 아레나 칸(주력 포지션 · 돌파)이 없다 — 저장된 값을 계정 · 캐릭터마다 그대로 실어 지우지 않는다
+        const old = me.profile?.entries || []
+        const keep = e => {
+          const acct = old.find(x => x.nick === e.nick), same = old.find(x => x.nick === e.nick && x.char === e.char)
+          return { ...e, ...(acct?.roles && { roles: acct.roles }), ...(same?.breakthrough && { breakthrough: same.breakthrough }) }
+        }
+        return api('/me/profile', { method: 'PUT', withToken: true, body: { name, mic: mic.value === '1', entries: v.entries.map(keep) } })
       })
       if (!res) return
     }

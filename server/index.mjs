@@ -53,6 +53,11 @@ const CONTROL = /[\x00-\x1f\x7f]/
 const JSON_TYPE = /^application\/json\b/i
 // 아레나전: 시간대(토 · 일 1팟 · 2팟) + 미정(당일 용병) · 사유불참. 주는 그 주 토요일 날짜
 const SLOTS = new Set(ARENA.slots.map(s => s.id))
+const ROLES = new Set(ARENA.roles.map(r => r.id))   // 계정의 주력 포지션 1 · 2순위 — 스코어러 · 중열 · 센터
+// 같은 날 시간이 겹치는 두 시간대 — 1.5차(20:00~)는 1차 · 2차와 겹친다. 한 사람은 겹치는 시간대에 한 번만 들어간다(계정 둘을 동시에 못 한다)
+const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
+const SLOT_AT = new Map(ARENA.slots.map(s => [s.id, s]))
+const clash = (x, y) => { const a = SLOT_AT.get(x), b = SLOT_AT.get(y); return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
 const CHOICES = [...SLOTS, ...ARENA.extra.map(c => c.id)]
 const WEEK = /^\d{4}-\d{2}-\d{2}$/
 const PLAN_LIMIT = { max: 300, windowMs: 10 * 60_000 }   // 관리자 편성표 저장 — 끌어다 놓을 때마다 저장한다
@@ -137,7 +142,12 @@ function profile(v) {
     const key = `${nick}\n${e.char}`   // 닉네임에 제어문자가 없으니 \n 으로 이어도 겹치지 않는다
     if (seen.has(key)) fail(400, '같은 계정에 같은 캐릭터가 두 번 들어갔어요')
     seen.add(key)
-    return { nick, tier, char: e.char }
+    // 아레나 — 계정의 주력 포지션(1 · 2순위, 그 계정의 줄마다 같은 값)과 캐릭터 돌파(1~7). 둘 다 없어도 된다(팀원모집 · 옛 프로필)
+    const roles = e.roles ?? []
+    if (!listOf(roles, 2) || roles.some(r => !ROLES.has(r)) || new Set(roles).size !== roles.length) fail(400, '주력 포지션을 다시 골라 주세요')
+    const bt = e.breakthrough ?? null
+    if (bt !== null && !(Number.isInteger(bt) && bt >= 1 && bt <= ARENA.breakthrough)) fail(400, `돌파는 1~${ARENA.breakthrough} 중에 골라 주세요`)
+    return { nick, tier, char: e.char, ...(roles.length && { roles }), ...(bt && { breakthrough: bt }) }
   })
   return { name: v.name == null ? null : text(v.name, 32, '표시 이름'), mic: v.mic, entries }
 }
@@ -307,7 +317,8 @@ export function arenaWeek(ms) {
   return d.toISOString().slice(0, 10)
 }
 
-/** 아레나 신청: 시간대(여럿 · 사유불참은 혼자) + 참가 계정(내 프로필의 게임 닉네임, 사유불참이면 없음) + 메모 */
+/** 아레나 신청: 시간대(여럿 · 사유불참은 혼자) + 참가 계정(내 프로필의 게임 닉네임, 사유불참이면 없음) + 메모.
+ *  nicks = 내 프로필의 계정 닉네임 → 주력 포지션 — 집계표가 1순위로 나누므로 참가 계정은 1순위가 있어야 한다 */
 function arenaSignup(v, nicks) {
   if (!isObj(v)) fail(400, '신청 정보가 없어요')
   if (!listOf(v.slots, CHOICES.length, 1) || v.slots.some(s => !CHOICES.includes(s)) || new Set(v.slots).size !== v.slots.length) fail(400, '참석할 시간을 골라 주세요')
@@ -315,24 +326,26 @@ function arenaSignup(v, nicks) {
   if (absent && v.slots.length > 1) fail(400, '사유불참은 다른 시간과 같이 고를 수 없어요')
   const picked = absent ? [] : v.nicks
   if (!absent && (!listOf(picked, nicks.size, 1) || picked.some(n => !nicks.has(n)) || new Set(picked).size !== picked.length)) fail(400, '참가할 계정을 내 프로필에서 골라 주세요')
+  const noRole = picked.find(n => !nicks.get(n)?.length)
+  if (noRole) fail(400, `「${noRole}」 계정의 주력 포지션(1순위)을 정해 주세요`)
   return { slots: CHOICES.filter(c => v.slots.includes(c)), nicks: picked, memo: text(v.memo ?? '', ARENA.memo, '메모', 0) }
 }
 
-/** 편성표: { 시간대: [[{ u, n }]] } — 신청한 계정만, 팀당 teamSize 명까지, 한 사람은 한 시간대에 한 번(계정 둘을 동시에 못 한다). 빈 팀은 버린다 */
+/** 편성표: { 시간대: [[{ u, n }]] } — 신청한 계정만, 팀당 teamSize 명까지, 한 사람은 겹치는 시간대에 한 번(계정 둘을 동시에 못 한다). 빈 팀은 버린다 */
 function arenaPlan(v, signups) {
   if (!isObj(v)) fail(400, '편성표 형식이 잘못됐어요')
   const ok = new Set(signups.flatMap(s => s.accounts.map(a => `${s.userId}\n${a.nick}`)))
-  const out = {}
+  const out = {}, at = new Map()   // 사람 → 들어간 시간대들
   for (const [slot, teams] of Object.entries(v)) {
     if (!SLOTS.has(slot) || !listOf(teams, ARENA.maxTeams) || !teams.every(Array.isArray)) fail(400, '편성표 형식이 잘못됐어요')
-    const users = new Set()
     out[slot] = teams.filter(team => team.length).map(team => {
       if (team.length > ARENA.teamSize) fail(400, `한 팀은 ${ARENA.teamSize}명까지예요`)
       return team.map(a => {
         if (!isObj(a) || typeof a.u !== 'string' || typeof a.n !== 'string') fail(400, '편성표 형식이 잘못됐어요')
         if (!ok.has(`${a.u}\n${a.n}`)) fail(409, STALE_PLAN)   // 그새 신청을 취소했거나 계정을 뺐다
-        if (users.has(a.u)) fail(400, '한 사람은 같은 시간대에 한 계정만 넣을 수 있어요')
-        users.add(a.u)
+        const mine = at.get(a.u) || []
+        if (mine.some(x => clash(x, slot))) fail(400, '한 사람은 겹치는 시간대에 한 번만 넣을 수 있어요')
+        at.set(a.u, [...mine, slot])
         return { u: a.u, n: a.n }
       })
     })
@@ -810,10 +823,14 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   // ------------------------------------------------ 아레나전 — 보기는 공개, 신청은 로그인(프로필 필요), 편성표는 관리자
 
   // 신청 한 줄 = 그 사람의 프로필을 조인한다 — 계정(게임 닉네임)의 캐릭터 · 표시 이름은 늘 지금 프로필 것. 프로필에서 빠진 닉네임은 안 보인다
+  // owner = 본계(프로필 첫 줄) 닉네임 — 길드에서는 본계 닉네임으로 사람을 안다. 계정: 주력 포지션 · 캐릭터 · 돌파({ 캐릭터: 1~7 })
   const signupsOf = async week => (await db(`/arena_signups?select=user_id,slots,nicks,memo,updated_at,profile:recruit_profiles(name:discord_name,entries)&week=eq.${week}&order=created_at.asc,user_id.asc`))
     .map(s => ({
-      userId: s.user_id, name: s.profile.name, slots: s.slots, memo: s.memo, updatedAt: s.updated_at,
-      accounts: s.nicks.map(nick => ({ nick, chars: s.profile.entries.filter(e => e.nick === nick).map(e => e.char) })).filter(a => a.chars.length),
+      userId: s.user_id, name: s.profile.name, owner: s.profile.entries[0]?.nick ?? s.profile.name, slots: s.slots, memo: s.memo, updatedAt: s.updated_at,
+      accounts: s.nicks.map(nick => {
+        const rows = s.profile.entries.filter(e => e.nick === nick)
+        return { nick, roles: rows[0]?.roles ?? [], chars: rows.map(e => e.char), bt: Object.fromEntries(rows.filter(e => e.breakthrough).map(e => [e.char, e.breakthrough])) }
+      }).filter(a => a.chars.length),
     }))
 
   async function arena(request, sub, t) {
@@ -829,7 +846,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         signupsOf(week),
         db(`/arena_plans?select=plan,updated_at&week=eq.${week}`),
         // ponytail: 최근에 프로필을 고친 1000명까지만 센다 — 길드 인원이면 넉넉하다
-        week === cur ? db('/recruit_profiles?select=discord_user_id,discord_name&order=updated_at.desc&limit=1000') : [],
+        week === cur ? db('/recruit_profiles?select=discord_user_id,discord_name,main:entries->0->>nick&order=updated_at.desc&limit=1000') : [],
       ])
       const live = new Set(signups.flatMap(s => s.accounts.map(a => `${s.userId}\n${a.nick}`)))
       const signed = new Set(signups.map(s => s.userId))
@@ -838,7 +855,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         // 그새 신청을 취소했거나 계정을 뺀 줄은 편성표에서도 안 보인다(관리자가 다음에 저장하면 빠진다)
         plan: Object.fromEntries(Object.entries(plan?.plan || {}).map(([slot, teams]) => [slot, teams.map(tm => tm.filter(a => live.has(`${a.u}\n${a.n}`)))])),
         planAt: plan?.updated_at ?? null,
-        missing: members.filter(p => !signed.has(p.discord_user_id)).map(p => p.discord_name),   // 프로필은 있는데 이번 주 신청이 없는 사람
+        missing: members.filter(p => !signed.has(p.discord_user_id)).map(p => p.main || p.discord_name),   // 프로필은 있는데 이번 주 신청이 없는 사람(본계 닉네임)
       }]
     }
 
@@ -862,7 +879,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       case 'PUT signup': {
         const body = await readJson(request)
         const p = await mine(user) || fail(428, NO_PROFILE)
-        const v = arenaSignup(body, new Set(p.entries.map(e => e.nick)))
+        const v = arenaSignup(body, new Map([...p.entries].reverse().map(e => [e.nick, e.roles ?? []])))   // 뒤집어 넣어 계정의 첫 줄 값이 남는다
         // created_at 은 안 보낸다 — 처음 넣을 때만 DB 기본값, 다시 저장해도 신청 순서가 그대로다
         await db('/arena_signups?on_conflict=week,user_id', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { week: cur, user_id: user.id, ...v, updated_at: t } })
         return [200, { week: cur, signup: { ...v, updatedAt: t } }]

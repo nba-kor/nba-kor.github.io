@@ -620,6 +620,8 @@ test('검증: 프로필(마이크 O/X · 계정 1~maxEntries 줄) 이 잘못되�
   await bad({ ...ok, mic: null }, '마이크 null')
   await bad({ ...ok, entries: [entry({ tier: '마스터' })] }, '없는 티어(티어는 안 적어도 되지만 적으면 목록 안에서)')
   await bad({ ...ok, entries: [entry({ char: 'nope' })] }, '없는 캐릭터')
+  for (const [roles, why] of [[['x'], '없는 포지션'], [['scorer', 'mid', 'center'], '포지션 3개'], [['mid', 'mid'], '같은 포지션 두 번'], ['scorer', '포지션이 배열 아님']]) await bad({ ...ok, entries: [entry({ roles })] }, why)
+  for (const breakthrough of [0, 8, 2.5, '3']) await bad({ ...ok, entries: [entry({ breakthrough })] }, `돌파 ${breakthrough}`)
   await bad({ ...ok, entries: [entry({ char: UPCOMING })] }, '미출시 캐릭터')
   await bad({ ...ok, entries: Array.from({ length: CFG.maxEntries + 1 }, (_, i) => entry({ nick: `n${i}` })) }, `${CFG.maxEntries + 1}개`)
   await bad({ ...ok, entries: [] }, '0개')
@@ -1719,10 +1721,12 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   let clock = futureBase()
   const { api } = start({ now: () => clock })
   const week = arenaWeek(clock)
-  const a = await person(api, { name: `아레나A${RUN}`, entries: [entry({ nick: 'A본', tier: '' }), entry({ nick: 'A본', char: 'sga', tier: '' }), entry({ nick: 'A부', char: 'klfd', tier: '' })] })
-  const b = await person(api, { name: `아레나B${RUN}`, entries: [entry({ nick: 'B본' })] })
-  const c = await person(api, { name: `아레나C${RUN}` })
-  const boss = await person(api, { name: `아레나관리${RUN}`, entries: [entry({ nick: '관리' })] })
+  const a = await person(api, { name: `아레나A${RUN}`, entries: [
+    entry({ nick: 'A본', tier: '', roles: ['scorer'], breakthrough: 5 }), entry({ nick: 'A본', char: 'sga', tier: '', roles: ['scorer'] }), entry({ nick: 'A부', char: 'klfd', tier: '', roles: ['center', 'mid'] }),
+  ] })
+  const b = await person(api, { name: `아레나B${RUN}`, entries: [entry({ nick: `B${RUN}`, roles: ['mid'] })] })
+  const c = await person(api, { name: `아레나C${RUN}`, entries: [entry({ nick: `C${RUN}`, roles: ['scorer'] })] })
+  const boss = await person(api, { name: `아레나관리${RUN}`, entries: [entry({ nick: `관리${RUN}` })] })
   const signup = (who, body) => api('PUT', '/api/arena/signup', body, { as: who.as })
   const view = (w = '') => api('GET', `/api/arena${w}`).then(r => r.body)
   const plan = (who, p, version) => api('PUT', '/api/arena/plan', { week, version, plan: p }, { as: who.as })
@@ -1730,63 +1734,67 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   // 신청 검증
   for (const [body, why] of [
     [{ slots: [], nicks: ['A본'] }, '시간대 없음'], [{ slots: ['mon1'], nicks: ['A본'] }, '없는 시간대'], [{ slots: ['sat1', 'sat1'], nicks: ['A본'] }, '같은 시간대 두 번'],
-    [{ slots: ['absent', 'sat1'], nicks: ['A본'] }, '사유불참 + 시간대'], [{ slots: ['sat1'], nicks: [] }, '계정 없음'], [{ slots: ['sat1'], nicks: ['B본'] }, '남의 계정'],
+    [{ slots: ['absent', 'sat1'], nicks: ['A본'] }, '사유불참 + 시간대'], [{ slots: ['sat1'], nicks: [] }, '계정 없음'], [{ slots: ['sat1'], nicks: [`B${RUN}`] }, '남의 계정'],
     [{ slots: ['sat1'], nicks: ['A본', 'A본'] }, '같은 계정 두 번'], [{ slots: ['sat1'], nicks: ['A본'], memo: 'x'.repeat(51) }, '메모 51자'], [{ slots: 'sat1', nicks: ['A본'] }, '시간대가 배열 아님'],
   ]) assert.equal((await signup(a, body)).status, 400, why)
   assert.equal((await api('PUT', '/api/arena/signup', { slots: ['sat1'], nicks: ['x'] }, { as: web(uid()) })).status, 428, '프로필 없음')
+  const noRole = await signup(boss, { slots: ['sat1'], nicks: [`관리${RUN}`] })
+  assert.deepEqual([noRole.status, noRole.body.error], [400, `「관리${RUN}」 계정의 주력 포지션(1순위)을 정해 주세요`], '집계표가 1순위로 나눈다')
   assert.equal((await api('PUT', '/api/arena/signup', { slots: ['sat1'], nicks: ['x'] })).status, 401, '로그인 없음')
 
   const okA = await signup(a, { slots: ['sun2', 'sat1', 'flex'], nicks: ['A부', 'A본'], memo: ' 늦을 수도 ' })
   assert.deepEqual([okA.status, okA.body], [200, { week, signup: { slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'], memo: '늦을 수도', updatedAt: clock } }], '시간대는 정해진 순서로')
   clock += MIN
-  assert.equal((await signup(b, { slots: ['sat1', 'sat2'], nicks: ['B본'] })).status, 200)
+  assert.equal((await signup(b, { slots: ['sat1', 'sat2'], nicks: [`B${RUN}`] })).status, 200)
   assert.equal((await signup(c, { slots: ['absent'], nicks: ['무시된다'], memo: '출장' })).status, 200, '사유불참은 계정을 안 본다')
 
   let v = await view()
   assert.deepEqual([v.week, v.current, v.plan, v.planAt], [week, week, {}, null])
-  assert.deepEqual(v.signups.map(s => [s.userId, s.slots, s.accounts]), [
-    [a.id, ['sat1', 'sun2', 'flex'], [{ nick: 'A부', chars: ['klfd'] }, { nick: 'A본', chars: ['bl', 'sga'] }]],
-    [b.id, ['sat1', 'sat2'], [{ nick: 'B본', chars: ['bl'] }]],
-    [c.id, ['absent'], []],
-  ], '신청 순서 · 계정 캐릭터는 프로필에서')
-  assert.ok(v.missing.includes(boss.name) && !v.missing.includes(a.name), '미신청 = 프로필은 있는데 신청이 없는 사람')
+  assert.deepEqual(v.signups.map(s => [s.userId, s.owner, s.slots, s.accounts]), [
+    [a.id, 'A본', ['sat1', 'sun2', 'flex'], [{ nick: 'A부', roles: ['center', 'mid'], chars: ['klfd'], bt: {} }, { nick: 'A본', roles: ['scorer'], chars: ['bl', 'sga'], bt: { bl: 5 } }]],
+    [b.id, `B${RUN}`, ['sat1', 'sat2'], [{ nick: `B${RUN}`, roles: ['mid'], chars: ['bl'], bt: {} }]],
+    [c.id, `C${RUN}`, ['absent'], []],
+  ], '신청 순서 · 소유자 = 본계 닉네임 · 계정의 포지션 · 캐릭터 · 돌파는 프로필에서')
+  assert.ok(v.missing.includes(`관리${RUN}`) && !v.missing.includes(`C${RUN}`), '미신청 = 프로필은 있는데 신청이 없는 사람(본계 닉네임) — 사유불참도 신청이다')
   clock += MIN
   assert.equal((await signup(a, { slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'] })).status, 200)
   assert.equal((await view()).signups[0].userId, a.id, '다시 저장해도 신청 순서 그대로')
 
   // 편성표 — 관리자만
-  const p1 = { sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: 'B본' }], []], sun2: [[{ u: a.id, n: 'A부' }]] }
+  const p1 = { sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: `B${RUN}` }], []], sat2: [[{ u: a.id, n: 'A부' }]] }   // 1차 · 2차는 안 겹친다
   assert.equal((await plan(a, p1, null)).status, 403, '관리자가 아니면 403')
   assert.equal((await rest('/site_admins', { method: 'POST', body: JSON.stringify({ user_id: boss.id, note: 'test' }) })).status, 201)
   assert.equal((await api('GET', '/api/me', undefined, { as: boss.as })).body.admin, true)
   for (const [p, status, why] of [
     [{ sat1: [[{ u: a.id, n: 'A본' }], [{ u: a.id, n: 'A부' }]] }, 400, '같은 시간대에 한 사람 두 계정'],
-    [{ sat1: [[{ u: a.id, n: 'A본' }, { u: boss.id, n: '관리' }]] }, 409, '신청 안 한 계정'],
-    [{ sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: 'B본' }, { u: a.id, n: 'A부' }, { u: b.id, n: 'B본' }]] }, 400, '4명'],
+    [{ sat1: [[{ u: a.id, n: 'A본' }]], sat15: [[{ u: a.id, n: 'A부' }]] }, 400, '1차와 1.5차는 겹친다'],
+    [{ sat15: [[{ u: a.id, n: 'A본' }]], sat2: [[{ u: a.id, n: 'A본' }]] }, 400, '1.5차와 2차도 겹친다(같은 계정이어도)'],
+    [{ sat1: [[{ u: a.id, n: 'A본' }, { u: boss.id, n: `관리${RUN}` }]] }, 409, '신청 안 한 계정'],
+    [{ sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: `B${RUN}` }, { u: a.id, n: 'A부' }, { u: b.id, n: `B${RUN}` }]] }, 400, '4명'],
     [{ mon1: [] }, 400, '없는 시간대'], [{ sat1: [{ u: a.id, n: 'A본' }] }, 400, '팀이 배열 아님'], [[], 400, '배열 편성표'],
   ]) assert.equal((await plan(boss, p, null)).status, status, why)
   assert.equal((await api('PUT', '/api/arena/plan', { week: '2000-01-01', version: null, plan: p1 }, { as: boss.as })).status, 409, '지난 주')
   clock += MIN
   const saved = await plan(boss, p1, null)
-  assert.deepEqual([saved.status, saved.body], [200, { plan: { sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: 'B본' }]], sun2: [[{ u: a.id, n: 'A부' }]] }, planAt: clock }], '빈 팀은 버린다')
+  assert.deepEqual([saved.status, saved.body], [200, { plan: { sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: `B${RUN}` }]], sat2: [[{ u: a.id, n: 'A부' }]] }, planAt: clock }], '빈 팀은 버린다')
   assert.equal((await plan(boss, p1, null)).status, 409, '읽은 뒤 누가 저장했으면(버전이 다르면) 409')
   assert.deepEqual([(await view()).planAt, (await view()).plan.sat1], [clock, saved.body.plan.sat1], '편성표는 누구나 본다')
 
   // 프로필에서 계정을 빼면 신청 · 편성표에서도 안 보인다
   clock += MIN
-  await api('PUT', '/api/me/profile', { mic: true, entries: [entry({ nick: 'A본', char: 'sga', tier: '' })] }, { as: a.as })
+  await api('PUT', '/api/me/profile', { mic: true, entries: [entry({ nick: 'A본', char: 'sga', tier: '', roles: ['mid', 'scorer'] })] }, { as: a.as })
   v = await view()
-  assert.deepEqual(v.signups[0].accounts, [{ nick: 'A본', chars: ['sga'] }])
-  assert.deepEqual(v.plan.sun2, [[]], 'A부 가 빠졌다')
+  assert.deepEqual(v.signups[0].accounts, [{ nick: 'A본', roles: ['mid', 'scorer'], chars: ['sga'], bt: {} }])
+  assert.deepEqual(v.plan.sat2, [[]], 'A부 가 빠졌다')
   // 신청 취소 → 편성표에서도 빠진다
   assert.equal((await api('DELETE', '/api/arena/signup', undefined, { as: b.as })).status, 200)
   v = await view()
   assert.deepEqual([v.signups.map(s => s.userId), v.plan.sat1], [[a.id, c.id], [[{ u: a.id, n: 'A본' }]]])
-  assert.ok(v.missing.includes(b.name))
+  assert.ok(v.missing.includes(`B${RUN}`), '취소하면 미신청')
 
   // 이력 · 지난 주는 보기만
   const mine = await api('GET', '/api/arena/mine', undefined, { as: a.as })
-  assert.deepEqual(mine.body, { current: week, history: [{ week, slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'], memo: '', assigned: [{ slot: 'sat1', team: 1, nick: 'A본' }, { slot: 'sun2', team: 1, nick: 'A부' }] }] }, '이력은 저장된 편성표 그대로')
+  assert.deepEqual(mine.body, { current: week, history: [{ week, slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'], memo: '', assigned: [{ slot: 'sat1', team: 1, nick: 'A본' }, { slot: 'sat2', team: 1, nick: 'A부' }] }] }, '이력은 저장된 편성표 그대로')
   clock += 8 * 24 * HOUR
   assert.notEqual(arenaWeek(clock), week)
   const past = await view(`?w=${week}`)

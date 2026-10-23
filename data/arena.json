@@ -1,17 +1,26 @@
 {
-  "note": "아레나전 설정 — 서버(server/index.mjs) · 화면(assets/arena.js · assets/me.js · index.html) 이 같이 읽는다. 고치면 함수도 다시 배포한다.",
+  "note": "아레나전 설정 — 서버(server/index.mjs) · 화면(assets/arena.js · assets/profile.js · assets/me.js · index.html) 이 같이 읽는다. 고치면 함수도 다시 배포한다. 시간대 id 는 저장된 신청 · 편성표에 남으니 바꾸지 말고 더하기만 한다",
   "teamSize": 3,
   "maxTeams": 20,
   "closeAt": "21:30",
   "memo": 50,
+  "maxChars": 3,
+  "breakthrough": 7,
+  "roles": [
+    { "id": "scorer", "label": "스코어러" },
+    { "id": "mid", "label": "중열" },
+    { "id": "center", "label": "센터" }
+  ],
   "slots": [
-    { "id": "sat1", "day": 0, "label": "토요일 1팟", "short": "토 1팟", "time": "19:30", "end": "20:30" },
-    { "id": "sat2", "day": 0, "label": "토요일 2팟", "short": "토 2팟", "time": "20:30", "end": "21:30" },
-    { "id": "sun1", "day": 1, "label": "일요일 1팟", "short": "일 1팟", "time": "19:30", "end": "20:30" },
-    { "id": "sun2", "day": 1, "label": "일요일 2팟", "short": "일 2팟", "time": "20:30", "end": "21:30" }
+    { "id": "sat1", "day": 0, "label": "토요일 1차", "short": "토 1차", "time": "19:30", "end": "20:30" },
+    { "id": "sat15", "day": 0, "label": "토요일 1.5차", "short": "토 1.5차", "time": "20:00", "end": "21:30" },
+    { "id": "sat2", "day": 0, "label": "토요일 2차", "short": "토 2차", "time": "20:30", "end": "21:30" },
+    { "id": "sun1", "day": 1, "label": "일요일 1차", "short": "일 1차", "time": "19:30", "end": "20:30" },
+    { "id": "sun15", "day": 1, "label": "일요일 1.5차", "short": "일 1.5차", "time": "20:00", "end": "21:30" },
+    { "id": "sun2", "day": 1, "label": "일요일 2차", "short": "일 2차", "time": "20:30", "end": "21:30" }
   ],
   "extra": [
-    { "id": "flex", "label": "미정 (당일 용병)" },
-    { "id": "absent", "label": "사유불참" }
+    { "id": "flex", "label": "Free Agent (시간 미정 · 용병)", "short": "FA" },
+    { "id": "absent", "label": "사유불참", "short": "불참" }
   ]
 }

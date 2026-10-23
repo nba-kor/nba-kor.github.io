@@ -2,7 +2,7 @@
 import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=c4085f32'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=e2ffcda1'
 import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=6ff260c0'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, posColor, charNames, POS_COLOR } from './profile.js?v=861d2f59'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, posColor, charNames, roleTags, roleColor, ROLES, ROLE_COLOR } from './profile.js?v=a27b93e0'
 
 await loadData()
 mountTop('/arena/')
@@ -10,10 +10,22 @@ loadKakao()
 const A = await arenaCfg()
 const SLOTS = A.slots
 const LABEL = Object.fromEntries([...SLOTS.map(s => [s.id, s.label]), ...A.extra.map(c => [c.id, c.label])])
-const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replace(' ', '').replace('팟', '')]), ['flex', '미정']])   // 토1 · 일2 · 미정
+const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replace(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short])])   // 토1 · 토1.5 · FA
 // 시간대 색 — 화면 뱃지와 카톡 이미지가 같이 쓴다
-const SLOT_COLOR = { sat1: '#8b7cff', sat2: '#4d9eff', sun1: '#ff6b8b', sun2: '#f5a623' }
+const SLOT_COLOR = { sat1: '#9b7cff', sat15: '#4dd0e1', sat2: '#4d9eff', sun1: '#ff6b8b', sun15: '#ff9f68', sun2: '#f5c542' }
 const colorOf = id => SLOT_COLOR[id] || '#8b97a8'
+// 관리자 매뉴얼: 소유자의 참가 계정이 많을수록 빨강(1) · 주황(2) · 노랑(3) · 초록(4~) — 계정 글자색
+const COUNT_COLOR = ['', '#ff6b6b', '#ffa94d', '#ffd43b', '#51cf66']
+const countColor = n => COUNT_COLOR[Math.min(n, 4)] || COUNT_COLOR[1]
+// 같은 날 시간이 겹치는 두 시간대(서버와 같은 규칙) — 1.5차는 1차 · 2차와 겹친다
+const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
+const SLOT = Object.fromEntries(SLOTS.map(s => [s.id, s]))
+const clash = (x, y) => { const a = SLOT[x], b = SLOT[y]; return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
+// 집계 순서(관리자 매뉴얼): 소유자의 참가 계정 수 많은 순 → 1순위 포지션(스코어러 > 중열 > 센터) → 계정 이름(가나다 · 영문)
+const roleRank = a => { const i = ROLES.findIndex(r => r.id === a.roles[0]); return i < 0 ? ROLES.length : i }
+const byTally = (x, y) => y.count - x.count || roleRank(x) - roleRank(y) || x.n.localeCompare(y.n, 'ko')
+/** 계정 이름 — 글자색 = 소유자의 참가 계정 수 */
+const nickEl = (a, tag = 'b') => { const el = h(tag, { className: 'ar-cnt', title: `${a.owner} 님 참가 계정 ${a.count}개` }, a.n); el.style.setProperty('--cc', countColor(a.count)); return el }
 
 const key = (u, n) => `${u}\n${n}`
 const addDays = (w, n) => new Date(Date.parse(`${w}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
@@ -24,7 +36,7 @@ const show = (box, msg) => { box.textContent = msg; box.hidden = !msg }
 let week = new URLSearchParams(location.search).get('w') || ''   // '' = 이번 주(서버가 정한다)
 let data = null      // GET /api/arena — { week, current, signups, plan, planAt, missing }
 let plan = {}        // 편성표 사본 { 시간대: [[{ u, n }]] } — 관리자가 고친다
-let accts = new Map()   // 신청한 계정 key → { u, n, name, chars, slots }
+let accts = new Map()   // 신청한 계정 key → { u, n, owner(본계 닉네임), roles, chars, bt, slots, count(소유자의 참가 계정 수) }
 let editing = false, tab = 'all', poolTab = 'all'
 let draft = null     // 신청 폼 상태 — 다시 그려도 남는다. 신청 · 취소하면 서버 값으로 다시 채운다
 
@@ -34,7 +46,7 @@ async function load() {
   show($('#ar-error'), '')
   week = data.week
   plan = structuredClone(data.plan)
-  accts = new Map(data.signups.flatMap(s => s.accounts.map(a => [key(s.userId, a.nick), { u: s.userId, n: a.nick, name: s.name, chars: a.chars, slots: s.slots }])))
+  accts = new Map(data.signups.flatMap(s => s.accounts.map(a => [key(s.userId, a.nick), { u: s.userId, n: a.nick, owner: s.owner, roles: a.roles, chars: a.chars, bt: a.bt, slots: s.slots, count: s.accounts.length }])))
   render()
 }
 
@@ -118,14 +130,14 @@ function renderSignup() {
     h('div', { className: 'ar-form-head' }, h('h2', {}, '참가 신청'),
       h('span', { className: `ar-state${mine ? ' is-on' : ''}` }, mine ? `신청 완료 · ${mine.slots.map(s => TAG[s] || LABEL[s]).join(' ')}` : '미신청')),
     h('h3', {}, '1. 참석 가능한 시간'),
-    h('div', { className: 'ar-opts' }, SLOTS.map(s => opt(s, `${s.time} ~ ${s.end}`))),
+    h('div', { className: 'ar-opts' }, SLOTS.map(s => opt(s, `${s.time} ~ ${s.end === A.closeAt ? '종료' : s.end}`))),
     h('div', { className: 'ar-opts is-extra' }, A.extra.map(c => opt(c))),
-    h('p', { className: 'rc-muted' }, '여러 타임 선택 가능 · 실제 배정은 운영진이 진행해요'),
+    h('p', { className: 'rc-muted' }, '여러 개 선택 가능 · 1.5차는 20:00 부터 종료까지 · 실제 배정은 운영진이 진행해요'),
     h('h3', {}, '2. 이번 주 참가 계정 ', h('small', { className: 'ar-count' }, absent ? '불참' : `${picked}개 계정`)),
     person && h('div', { className: 'ar-first' }, h('p', { className: 'rc-muted' }, '처음이에요 — 프로필에 쓸 이름과 마이크도 한 번 정해 주세요'), person.el),
     list,
     h('div', { className: 'rc-add' }, h('button', { type: 'button', onclick: () => edit(null) }, '+ 계정 추가')),
-    h('p', { className: 'rc-muted' }, '계정 · 캐릭터는 내 프로필에 저장되어 다음 주에도 그대로예요'),
+    h('p', { className: 'rc-muted' }, '아레나전에 실제로 쓸 계정만 골라 주세요. 계정 · 포지션 · 캐릭터는 내 프로필에 저장되어 다음 주에도 그대로예요'),
     h('label', { className: 'rc-fld ar-memo' }, h('span', {}, absent ? '불참 사유' : '메모 ', h('small', {}, '선택')), memo),
     err,
     h('div', { className: 'rc-actions' },
@@ -134,8 +146,9 @@ function renderSignup() {
   form.onsubmit = async e => {
     e.preventDefault()
     const slots = [...d.slots], nicks = d.accounts.filter(a => d.nicks.has(a.nick)).map(a => a.nick)
+    const noRole = !absent && d.accounts.find(a => d.nicks.has(a.nick) && !a.roles.length)
     const bad = !slots.length ? '참석할 시간을 골라 주세요' : !d.accounts.length ? '계정을 하나 이상 등록해 주세요'
-      : !absent && !nicks.length ? '참가할 계정을 골라 주세요' : ''
+      : !absent && !nicks.length ? '참가할 계정을 골라 주세요' : noRole ? `「${noRole.nick}」 계정의 주력 포지션을 정해 주세요 — ✎ 로 고쳐요` : ''
     if (bad) return show(err, bad)
     const p = person && person.read()
     if (person && !p) return
@@ -195,33 +208,61 @@ function renderPlan() {
     stat('대기', players.filter(s => !placedUsers.has(s.userId)).length, '명', 'is-wait'),
     stat('참가 계정', accts.size, '개'))
 
-  sec.replaceChildren(head, stats, ...edit ? editor() : [teamsCard(), membersCard(at), pollCard()])
+  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), teamsCard(), membersCard(at)])
   if (edit) document.documentElement.style.setProperty('--top-h', `${$('.top').offsetHeight}px`)   // 대기 목록이 머리 바로 아래에 붙는다(머리 높이는 로그인 줄에 따라 다르다)
   if (nTeams && !edit) queueShot()
 }
 
-/** 카카오 투표처럼 — 시간대 · 미정 · 사유불참마다 몇 명 · 누구 */
-function pollCard() {
-  const rows = [...SLOTS.map(s => s.id), ...A.extra.map(c => c.id)].map(id => {
-    const who = data.signups.filter(s => s.slots.includes(id))
-    return h('li', {},
-      h('span', { className: 'ar-poll-label' }, LABEL[id]),
-      h('b', {}, `${who.length}명`),
-      h('small', {}, who.map(s => id === 'absent' && s.memo ? `${s.name}(${s.memo})` : s.name).join(', ') || '-'))
+/** 집계표(관리자 매뉴얼) — 신청 시간대별로 계정을 집계 순서(byTally)대로. 사유불참은 사유, 이번 주 미신청은 접어 둔다 */
+let tallyTab = 'all'
+function tallyCard() {
+  const groups = [...SLOTS, ...A.extra].map(c => {
+    const who = data.signups.filter(s => s.slots.includes(c.id))
+    return { c, who, rows: who.flatMap(s => s.accounts.map(a => accts.get(key(s.userId, a.nick)))).sort(byTally) }
+  })
+  const tabs = h('div', { className: 'ar-tabs', role: 'tablist' }, [{ id: 'all', short: '전체' }, ...SLOTS, ...A.extra].map(c => {
+    const g = groups.find(x => x.c.id === c.id)
+    const b = h('button', { type: 'button', role: 'tab', 'aria-selected': tallyTab === c.id, onclick: () => { tallyTab = c.id; renderPlan() } },
+      g ? `${c.short} (${c.id === 'absent' ? g.who.length : g.rows.length})` : '전체')
+    if (SLOT_COLOR[c.id]) b.style.setProperty('--sc', colorOf(c.id))
+    return b
+  }))
+  const sections = groups.filter(g => tallyTab === 'all' || tallyTab === g.c.id).map(({ c, who, rows }) => {
+    const sec = h('div', { className: 'ar-slot' },
+      h('div', { className: 'ar-slot-head' }, h('b', {}, c.short), h('span', {}, c.id === 'absent' ? `${who.length}명` : `${who.length}명 · ${rows.length}계정`),
+        SLOT[c.id] && h('small', {}, slotWhen(week, SLOT[c.id]))),
+      c.id === 'absent'
+        ? h('p', { className: 'ar-absent' }, who.map(s => s.memo ? `${s.owner}(${s.memo})` : s.owner).join(', ') || '-')
+        : rows.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table ar-tally' },
+          h('thead', {}, h('tr', {}, ['#', '계정', '소유자', '포지션', '주력 캐릭터', '계정 수'].map(t => h('th', {}, t)))),
+          h('tbody', {}, rows.map((a, i) => {
+            const tr = h('tr', {}, h('td', {}, i + 1), h('td', { className: 'ar-nick' }, nickEl(a)), h('td', {}, a.owner), h('td', {}, roleTags(a.roles)),
+              h('td', { className: 'ar-nick' }, h('small', {}, charNames(a.chars, a.bt))), h('td', {}, h('span', { className: 'ar-cnt' }, `${a.count}개`)))
+            tr.lastChild.firstChild.style.setProperty('--cc', countColor(a.count))
+            return tr
+          }))))
+          : h('p', { className: 'rc-muted ar-none' }, '아직 없어요'))
+    if (SLOT_COLOR[c.id]) sec.style.setProperty('--sc', colorOf(c.id))
+    return sec
   })
   const missing = week === data.current && data.missing.length > 0 && h('details', { className: 'ar-missing' },
-    h('summary', {}, `미신청 ${data.missing.length}명`), h('p', {}, [...data.missing].sort((a, b) => a.localeCompare(b, 'ko')).join(', ')))
-  return h('section', { className: 'card ar-card' }, h('h3', {}, '신청 현황'), h('ul', { className: 'ar-poll' }, rows), missing)
+    h('summary', {}, `이번 주 미신청 ${data.missing.length}명`), h('p', {}, [...data.missing].sort((a, b) => a.localeCompare(b, 'ko')).join(', ')))
+  const legend = h('p', { className: 'ar-legend' }, '계정 글자색 = 소유자의 참가 계정 수 ', [1, 2, 3, 4].map(n => {
+    const t = h('span', { className: 'ar-cnt' }, n < 4 ? `${n}개` : '4개~')
+    t.style.setProperty('--cc', countColor(n))
+    return t
+  }))
+  return h('section', { className: 'card ar-card' }, h('h3', {}, '집계표'), legend, tabs, sections, missing)
 }
 
 /** 멤버(계정)별 배치 현황 — 행 = 계정, 칸 = 시간대마다 몇 팀 */
 function membersCard(at) {
   const order = [...accts.values()].map(a => ({ a, where: at.get(key(a.u, a.n)) || [] }))
   const rank = x => x.where.length ? SLOTS.findIndex(s => s.id === x.where[0].slot) * 100 + x.where[0].team : 1e6
-  order.sort((x, y) => rank(x) - rank(y) || x.a.name.localeCompare(y.a.name, 'ko'))
+  order.sort((x, y) => rank(x) - rank(y) || byTally(x.a, y.a))
   const body = order.map(({ a, where }, i) => h('tr', {},
     h('td', {}, i + 1),
-    h('td', { className: 'ar-nick' }, h('b', {}, a.n), a.name !== a.n && h('small', {}, a.name)),
+    h('td', { className: 'ar-nick' }, nickEl(a), a.owner !== a.n && h('small', {}, a.owner)),
     SLOTS.map(s => {
       const w = where.find(x => x.slot === s.id)
       const applied = a.slots.includes(s.id) || a.slots.includes('flex')
@@ -253,7 +294,7 @@ function teamsCard() {
       h('div', { className: 'ar-slot-head' }, h('b', {}, s.short), h('span', {}, `(${teams.length}팀)`), h('small', {}, slotWhen(week, s))),
       teams.length ? h('div', { className: 'ar-teams' }, teams.map((tm, i) => h('div', { className: 'ar-team' },
         h('div', { className: 'ar-team-head' }, `${s.short} - ${i + 1}팀`),
-        h('div', { className: 'ar-members' }, tm.map(x => memberCard(accts.get(key(x.u, x.n)) || { u: x.u, n: x.n, name: '', chars: [] }))))))
+        h('div', { className: 'ar-members' }, tm.map(x => memberCard(accts.get(key(x.u, x.n)) || { u: x.u, n: x.n, owner: '', chars: [] }))))))
         : h('p', { className: 'rc-muted ar-none' }, '아직 편성 전이에요'))
     el.style.setProperty('--sc', colorOf(s.id))
     return el
@@ -265,9 +306,9 @@ function memberCard(a) {
   const mine = auth === 'in' && a.u === me?.id
   const el = h('div', { className: `ar-member${mine ? ' is-me' : ''}` },
     a.chars[0] ? h('img', { src: faceOf(P(a.chars[0])), alt: '' }) : h('span', { className: 'rc-hole' }),
-    h('div', { className: 'ar-who' }, h('b', {}, a.n), h('small', {}, a.name !== a.n ? a.name : '')),
+    h('div', { className: 'ar-who' }, a.count ? nickEl(a) : h('b', {}, a.n), h('small', {}, a.owner && a.owner !== a.n ? a.owner : ''), a.roles && roleTags(a.roles)),
     h('div', { className: 'ar-chars' }, a.chars.slice(0, 3).map(id => {
-      const t = h('span', {}, P(id).short || P(id).name)
+      const t = h('span', {}, `${P(id).short || P(id).name}${a.bt?.[id] ? ` ${a.bt[id]}돌` : ''}`)
       t.style.setProperty('--pc', posColor(id))
       return t
     })))
@@ -280,11 +321,11 @@ const status = h('p', { className: 'ar-status', role: 'status' })
 const say = (msg, bad = false) => { status.textContent = msg; status.classList.toggle('is-bad', bad) }
 
 function editor() {
-  const inSlot = (slot, u) => teamsOf(slot).some(tm => tm.some(x => x.u === u))
+  const busy = (slot, u) => SLOTS.some(s => clash(slot, s.id) && teamsOf(s.id).some(tm => tm.some(x => x.u === u)))   // 겹치는 시간대에 이미 있다
   const at = placements()
-  const all = [...accts.values()].sort((x, y) => P(x.chars[0]).pos - P(y.chars[0]).pos || x.n.localeCompare(y.n, 'ko'))
+  const all = [...accts.values()].sort(byTally)
   const pool = poolTab === 'all' ? all.filter(a => !at.has(key(a.u, a.n)))
-    : all.filter(a => (a.slots.includes(poolTab) || a.slots.includes('flex')) && !inSlot(poolTab, a.u))
+    : all.filter(a => (a.slots.includes(poolTab) || a.slots.includes('flex')) && !busy(poolTab, a.u))
   const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '미배정' }, ...SLOTS].map(s => {
     const b = h('button', { type: 'button', 'aria-selected': poolTab === s.id, onclick: () => { poolTab = s.id; renderPlan() } }, s.short)
     if (s.id !== 'all') b.style.setProperty('--sc', colorOf(s.id))
@@ -293,9 +334,10 @@ function editor() {
   const poolBox = h('section', { className: 'card ar-pool', 'data-drop': 'pool' },
     h('div', { className: 'ar-pool-head' }, h('h3', {}, '배치할 계정'), h('small', { className: 'rc-muted' }, '끌어서 배치하거나, 눌러서 팀을 고르세요')),
     poolTabs,
-    h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정' : `${LABEL[poolTab]} 신청(+ 미정) 중 이 시간대에 아직 없는 사람`),
+    h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름)' : `${LABEL[poolTab]} 신청(+ FA) 중 겹치는 시간대에 아직 없는 사람`),
     h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요')),
-    h('div', { className: 'ar-legend' }, '첫 캐릭터 포지션 ', ['PG', 'SG', 'SF', 'PF', 'C'].map((p, i) => { const s = h('span', {}, p); s.style.setProperty('--pc', POS_COLOR[i + 1]); return s })))
+    h('div', { className: 'ar-legend' }, '칩 색 = 1순위 포지션 ', ROLES.map(r => { const s = h('span', {}, r.label); s.style.setProperty('--pc', ROLE_COLOR[r.id]); return s }),
+      ' · 글자색 = 소유자 계정 수 ', [1, 2, 3, 4].map(n => { const s = h('span', { className: 'ar-cnt' }, n < 4 ? n : '4~'); s.style.setProperty('--cc', countColor(n)); return s })))
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
     const box = h('div', { className: 'ar-slot ar-edit' },
@@ -311,10 +353,10 @@ function editor() {
 }
 
 function chip(a, from) {
-  const el = h('div', { className: 'ar-chip', tabIndex: 0, title: `${a.name} · ${charNames(a.chars)}` },
+  const el = h('div', { className: 'ar-chip', tabIndex: 0, title: `${a.owner} · ${a.roles.map(r => ROLES.find(x => x.id === r)?.label).join(' / ')} · ${charNames(a.chars, a.bt)}` },
     h('img', { src: faceOf(P(a.chars[0])), alt: '', draggable: false }),
-    h('span', {}, h('b', {}, a.n), h('small', {}, a.name !== a.n ? `${a.name} · ` : '', a.slots.map(s => TAG[s]).filter(Boolean).join(' '))))
-  el.style.setProperty('--pc', posColor(a.chars[0]))
+    h('span', {}, nickEl(a), h('small', {}, a.owner !== a.n ? `${a.owner} · ` : '', a.slots.map(s => TAG[s]).filter(Boolean).join(' '))))
+  el.style.setProperty('--pc', roleColor(a.roles))
   el.onpointerdown = e => startDrag(e, el, { onDrop: (x, y, target) => move(a, from, target?.closest('[data-drop]')?.dataset.drop) })
   el.onclick = () => menu(a, from)
   el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); menu(a, from) } }
@@ -328,7 +370,7 @@ function move(a, from, to) {
   if (from) next[from.slot][from.ti] = next[from.slot][from.ti].filter(x => !same(x))
   if (to !== 'pool') {
     const [slot, t] = to.split(':'), teams = next[slot] ||= []
-    if (teams.some(tm => tm.some(x => x.u === a.u))) return say(`${a.name} 님은 이 시간대에 이미 다른 계정으로 들어가 있어요`, true)
+    if (SLOTS.some(o => clash(slot, o.id) && (next[o.id] || []).some(tm => tm.some(x => x.u === a.u)))) return say(`${a.owner} 님은 겹치는 시간대에 이미 들어가 있어요`, true)
     const ti = t === 'new' ? teams.length : +t, team = teams[ti] ||= []
     if (team.length >= A.teamSize) return say(`${ti + 1}팀은 이미 ${A.teamSize}명이에요`, true)
     team.push({ u: a.u, n: a.n })
@@ -343,13 +385,13 @@ function menu(a, from) {
   if (from) items.push({ label: '빼기 (대기로)', pick: () => move(a, from, 'pool') })
   for (const s of SLOTS) {
     const teams = teamsOf(s.id), applied = a.slots.includes(s.id) || a.slots.includes('flex')
-    if (teams.some((tm, ti) => tm.some(x => x.u === a.u && !(from?.slot === s.id && from.ti === ti && x.n === a.n)))) continue   // 이 시간대에 다른 계정이 있다
+    if (SLOTS.some(o => clash(s.id, o.id) && teamsOf(o.id).some((tm, ti) => tm.some(x => x.u === a.u && !(from?.slot === o.id && from.ti === ti && x.n === a.n))))) continue   // 겹치는 시간대에 이미 있다
     teams.forEach((tm, ti) => {
       if (tm.length < A.teamSize && !(from?.slot === s.id && from.ti === ti)) items.push({ label: `${s.short} · ${ti + 1}팀 (${tm.length}/${A.teamSize})`, color: applied ? colorOf(s.id) : '', pick: () => move(a, from, `${s.id}:${ti}`) })
     })
     items.push({ label: `${s.short} · 새 팀${applied ? '' : ' (신청 안 함)'}`, color: applied ? colorOf(s.id) : '', pick: () => move(a, from, `${s.id}:new`) })
   }
-  pickMenu({ name: a.n, img: faceOf(P(a.chars[0])) }, `${a.name} · 신청 ${a.slots.map(s => TAG[s] || LABEL[s]).join(' ')}`, items)
+  pickMenu({ name: a.n, img: faceOf(P(a.chars[0])) }, `${a.owner} · 신청 ${a.slots.map(s => TAG[s] || LABEL[s]).join(' ')}`, items)
 }
 
 // 저장은 한 번에 하나 — 그 사이에 또 바꾸면 끝난 뒤 한 번 더. 그새 다른 관리자가 저장했거나 신청이 바뀌었으면(409) 새로 불러온다
@@ -442,10 +484,10 @@ async function saveImage(btn) {
 
 /** 편성표 그림 — 2열(토 · 일 × 1팟 · 2팟). 팀 한 줄에 3명(얼굴 · 닉네임 · 캐릭터) */
 async function drawPlan() {
-  const W = 1000, PAD = 28, GAP = 16, COL = (W - PAD * 2 - GAP) / 2, ROW = 58, HEAD = 40, Z = 2
+  const PER = 3, W = 1400, PAD = 28, GAP = 16, COL = (W - PAD * 2 - GAP * (PER - 1)) / PER, ROW = 58, HEAD = 40, Z = 2
   const FONT = '"Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif'
   const blockH = s => HEAD + Math.max(1, teamsOf(s.id).length) * (ROW + 6) + 8
-  const rows = [SLOTS.slice(0, 2), SLOTS.slice(2, 4)].filter(r => r.length)
+  const rows = Array.from({ length: Math.ceil(SLOTS.length / PER) }, (_, i) => SLOTS.slice(i * PER, i * PER + PER))   // 한 줄에 하루(1차 · 1.5차 · 2차)
   const H = 112 + rows.reduce((n, r) => n + Math.max(...r.map(blockH)) + GAP, 0) + 30
 
   // 얼굴은 같은 도메인 그림이라 캔버스가 더럽혀지지 않는다
@@ -494,9 +536,9 @@ async function drawPlan() {
           g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15, 0, Math.PI * 2); g.fillStyle = '#0b0f16'; g.fill(); g.clip()
           if (img) g.drawImage(img, cx, ty + ROW / 2 - 15, 30, 30)
           g.restore()
-          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15.5, 0, Math.PI * 2); g.strokeStyle = a ? posColor(a.chars[0]) : '#2b3444'; g.lineWidth = 2; g.stroke()
+          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15.5, 0, Math.PI * 2); g.strokeStyle = a ? roleColor(a.roles) : '#2b3444'; g.lineWidth = 2; g.stroke()
           text(m.n, cx + 36, ty + 25, 13.5, '#e6edf3', 700, cw - 40)
-          text(a ? charNames(a.chars) : '', cx + 36, ty + 43, 11, '#8b97a8', 400, cw - 40)
+          text(a ? charNames(a.chars, a.bt) : '', cx + 36, ty + 43, 11, '#8b97a8', 400, cw - 40)
         })
       })
     })
