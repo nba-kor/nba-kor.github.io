@@ -278,6 +278,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 @media (max-width: 560px) {
   .top { gap: 10px; padding: 8px 10px; }
   .top .menu-btn { display: block; }
+  .top .brand { min-height: 38px; }   /* ☰ 버튼(38px)은 스크립트가 나중에 붙인다 — 첫 줄 높이를 미리 맞춰 둔다 */
   .top nav { display: none; order: 1; flex-basis: 100%; flex-direction: column; }
   .top.open nav { display: flex; }
   .tier-label { width: 62px; font-size: 18px; }
@@ -812,8 +813,10 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 @media (max-width: 560px) { .rc-accts-dialog { width: 100%; height: fit-content; max-height: 86dvh; } }
 
 /* 머리 아래 줄: 누구로 들어와 있는지(디스코드 · 카카오 아이콘 또는 비회원). 이름은 자르지 않고 줄바꿈한다 */
-.top:has(.rc-whoami) { row-gap: 6px; }
-.rc-whoami { order: 3; flex-basis: 100%; display: flex; justify-content: flex-end; }
+/* 이름 줄은 로그인 확인이 끝난 뒤에 붙는다 — 확인 전 · 로그아웃이어도 같은 높이를 비워 둬 페이지를 옮길 때 머리 높이가 출렁이지 않게 한다 */
+.top:has(.rc-auth) { row-gap: 6px; --who-h: 30px; }
+.top:has(.rc-auth):not(:has(.rc-whoami))::after { content: ""; order: 3; flex-basis: 100%; height: var(--who-h); }
+.rc-whoami { order: 3; flex-basis: 100%; display: flex; align-items: center; justify-content: flex-end; min-height: var(--who-h); }
 .rc-whoami > span {
   display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 3px 12px 3px 4px;
   font-size: 12.5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px;
