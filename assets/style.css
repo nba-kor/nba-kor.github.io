@@ -175,14 +175,14 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
   display: block;
   height: auto;
   flex: none;
-  width: calc(var(--zoom) * min(100%, (100dvh - var(--court-chrome) - var(--subnav, 0px)) * 500 / 470));
+  width: calc(var(--zoom) * min(100%, (100dvh - var(--court-chrome)) * 500 / 470));
   min-width: 260px;
   touch-action: pan-x pan-y;
   border-radius: 8px;
   background: var(--court);
 }
 @supports not (height: 100dvh) {
-  #court { width: calc(var(--zoom) * min(100%, (100vh - var(--court-chrome) - var(--subnav, 0px)) * 500 / 470)); }
+  #court { width: calc(var(--zoom) * min(100%, (100vh - var(--court-chrome)) * 500 / 470)); }
 }
 .zoom { display: flex; align-items: center; gap: 2px; }
 .zoom button { padding: 4px 9px; font-variant-numeric: tabular-nums; }
@@ -279,7 +279,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
   .top { gap: 10px; padding: 8px 10px; }
   .top .menu-btn { display: block; }
   .top .brand { min-height: 38px; }   /* ☰ 버튼(38px)은 스크립트가 나중에 붙인다 — 첫 줄 높이를 미리 맞춰 둔다 */
-  .top nav { display: none; order: 1; flex-basis: 100%; flex-direction: column; }
+  .top nav { display: none; order: 1; flex-basis: 100%; flex-direction: column; margin-top: 8px; }
   .top.open nav { display: flex; }
   .tier-label { width: 62px; font-size: 18px; }
   :is(.tier-drop, .pool) .chip { width: 64px; }
@@ -814,9 +814,12 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 
 /* 머리 아래 줄: 누구로 들어와 있는지(디스코드 · 카카오 아이콘 또는 비회원). 이름은 자르지 않고 줄바꿈한다 */
 /* 이름 줄은 로그인 확인이 끝난 뒤에 붙는다 — 확인 전 · 로그아웃이어도 같은 높이를 비워 둬 페이지를 옮길 때 머리 높이가 출렁이지 않게 한다 */
-.top:has(.rc-auth) { row-gap: 6px; --who-h: 30px; }
-.top:has(.rc-auth):not(:has(.rc-whoami))::after { content: ""; order: 3; flex-basis: 100%; height: var(--who-h); }
-.rc-whoami { order: 3; flex-basis: 100%; display: flex; align-items: center; justify-content: flex-end; min-height: var(--who-h); }
+/* 머리 둘째 줄 = 왼쪽 전략·공략 하위 메뉴(그 네 페이지만) + 오른쪽 이름. 모든 페이지 · 로그인 상태에서 같은 높이 —
+   ::before 가 줄을 바꾸고, 이름이 아직 없으면(로그인 확인 전 · 로그아웃 · 로그인 칸이 없는 페이지) ::after 가 그 높이를 비워 둔다 */
+.top { row-gap: 0; --who-h: 30px; }
+.top::before { content: ""; order: 2; flex-basis: 100%; }
+.top:not(:has(.rc-whoami))::after { content: ""; order: 4; height: var(--who-h); margin-top: 6px; }
+.rc-whoami { order: 4; flex: none; max-width: 100%; display: flex; align-items: center; min-height: var(--who-h); margin: 6px 0 0 auto; }
 .rc-whoami > span {
   display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 3px 12px 3px 4px;
   font-size: 12.5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px;
@@ -934,9 +937,8 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 }
 
 /* ---------- 전략·공략 하위 메뉴 (전술판 · 티어표 · 조합표 · 잠재력추천) ---------- */
-body:has(.subnav) { --subnav: 45px; }   /* 전술판 코트 높이에서 이 줄만큼 뺀다 */
-.subnav { display: flex; gap: 4px; padding: 6px 16px; overflow-x: auto; background: var(--bg); border-bottom: 1px solid var(--line); }
-.subnav a { flex: none; padding: 6px 14px; border-radius: 999px; color: var(--muted); text-decoration: none; font-weight: 700; font-size: 13.5px; }
+.subnav { order: 3; flex: 1; min-width: 0; height: var(--who-h); margin-top: 6px; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.subnav a { flex: none; padding: 4px 12px; border-radius: 999px; color: var(--muted); text-decoration: none; font-weight: 700; font-size: 13px; }
 .subnav a:hover { color: var(--text); background: var(--panel-2); }
 .subnav a[aria-current] { color: #1a1200; background: var(--accent); }
 
