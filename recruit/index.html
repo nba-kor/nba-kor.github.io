@@ -9,6 +9,7 @@
 <link rel="icon" href="/assets/icon.png?v=2" type="image/png">
 <link rel="apple-touch-icon" href="/assets/icon.png?v=2">
 <meta name="theme-color" content="#0d1117">
+<meta name="robots" content="noindex">   <!-- 메뉴에서 숨긴 기능(관리자 메뉴에서만) -->
 <!-- 카카오톡 · 디스코드 · 트위터 미리보기. 이미지를 바꾸면 ?v= 도 올린다(카카오는 URL 로 캐시한다) -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TNAB Vipers">
@@ -22,7 +23,7 @@
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=77c9a8c0">
+<link rel="stylesheet" href="/assets/style.css?v=4b514365">
 </head>
 <body>
 
@@ -30,12 +31,10 @@
   <div class="brand"><img src="/assets/icon.png?v=2" alt="">TNAB <span>Vipers</span></div>
   <nav>
     <a href="/">홈</a>
-    <a href="/tactics/">전술판</a>
-    <a href="/tiers/">티어표</a>
-    <a href="/combos/">조합표</a>
-    <a href="/potentials/">잠재력추천</a>
-    <a href="/videos/">영상</a>
-    <a href="/recruit/">팀원모집</a>
+    <a href="/arena/">아레나 운영</a>
+    <a href="/tactics/" data-group="/tactics/ /tiers/ /combos/ /potentials/">전략·공략</a>
+    <a href="/videos/">영상 자료실</a>
+    <a href="/me/">마이페이지</a>
   </nav>
   <div class="spacer"></div>
   <div class="rc-auth" id="auth" aria-live="polite"></div>
@@ -75,20 +74,6 @@
         <p class="rc-note">비회원 프로필은 이 기기(브라우저)에만 저장돼요. <button type="button" data-login>로그인</button>하면 어느 기기에서나 같은 프로필이고, 디스코드 계정은 모집 완료 멘션도 받아요.</p>
       </div>
       <p class="rc-note rc-links" id="profile-link" hidden></p>
-      <!-- 마스터만 — 사이트 접근 비밀번호 보기 · 바꾸기. 「바꾸기」 가 바로 저장한다(프로필 저장과 따로) -->
-      <div class="rc-gate-admin" id="profile-gate" hidden>
-        <div class="rc-fld">
-          <label for="gate-code">사이트 접근 비밀번호 <small>마스터만 보여요</small></label>
-          <p class="rc-note" id="gate-now"></p>
-          <div class="rc-gate-row">
-            <input type="text" id="gate-code" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="새 비밀번호">
-            <button type="button" id="gate-random">랜덤 생성</button>
-            <button type="button" id="gate-save" class="primary">바꾸기</button>
-          </div>
-          <small class="rc-hint">4~32자. 바꾸면 다른 사람은 새 비밀번호를 한 번 다시 입력해야 해요(이 기기는 그대로 들어와 있어요).</small>
-          <small class="rc-err" hidden></small>
-        </div>
-      </div>
       <div class="rc-person">
         <div class="rc-presets">
           <span class="rc-presets-head">내 프리셋 <small></small></span>
@@ -335,6 +320,6 @@
   </form>
 </dialog>
 
-<script type="module" src="/assets/recruit.js?v=ef5e555a"></script>
+<script type="module" src="/assets/recruit.js?v=a79d139e"></script>
 </body>
 </html>

@@ -1,0 +1,17 @@
+{
+  "note": "아레나전 설정 — 서버(server/index.mjs) · 화면(assets/arena.js · assets/me.js · index.html) 이 같이 읽는다. 고치면 함수도 다시 배포한다.",
+  "teamSize": 3,
+  "maxTeams": 20,
+  "closeAt": "21:30",
+  "memo": 50,
+  "slots": [
+    { "id": "sat1", "day": 0, "label": "토요일 1팟", "short": "토 1팟", "time": "19:30", "end": "20:30" },
+    { "id": "sat2", "day": 0, "label": "토요일 2팟", "short": "토 2팟", "time": "20:30", "end": "21:30" },
+    { "id": "sun1", "day": 1, "label": "일요일 1팟", "short": "일 1팟", "time": "19:30", "end": "20:30" },
+    { "id": "sun2", "day": 1, "label": "일요일 2팟", "short": "일 2팟", "time": "20:30", "end": "21:30" }
+  ],
+  "extra": [
+    { "id": "flex", "label": "미정 (당일 용병)" },
+    { "id": "absent", "label": "사유불참" }
+  ]
+}

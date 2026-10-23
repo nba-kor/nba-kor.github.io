@@ -51,7 +51,8 @@ else {
       return (await r.json())[0]?.[col] ?? 0
     }
     // 2100년 이후, 그리고 지난 실행이 남긴 팀 · 요청 수 기록보다 뒤에서 시작한다 → 다시 돌려도 창(TTL · 10분)이 겹치지 않는다
-    clockBase = Math.max(4_102_444_800_000, await latest('recruit_teams', 'created_at') + 1e9, await latest('recruit_hits', 'reset_at') + 1e9)
+    clockBase = Math.max(4_102_444_800_000, await latest('recruit_teams', 'created_at') + 1e9, await latest('recruit_hits', 'reset_at') + 1e9, await latest('arena_signups', 'updated_at') + 1e9,
+      await latest('recruit_profiles', 'updated_at') + 1e9)   // 아레나 미신청은 최근에 고친 프로필부터 센다 — 지난 실행의 프로필보다 뒤에서
   } catch (e) { noDb = `Data API(${SUPA}) 에 연결할 수 없어 DB 테스트는 건너뜁니다(docker compose up -d): ${e.message}` }
 }
 if (noDb) console.log(`# ${noDb}`)
@@ -141,7 +142,7 @@ function fakeNet({ channels = CHANNELS, db } = {}) {
   return net
 }
 // 요청 수 제한(recruit_hit)은 1, 프로필 · 접근 비밀번호(꺼짐) · 마스터 조회는 "없음" 으로 답하는 가짜 DB — DB 없이 신원 · 검증 · 404 · 413 을 본다
-const EMPTY = new Set(['/rest/v1/recruit_profiles', '/rest/v1/site_gate', '/rest/v1/site_masters'])
+const EMPTY = new Set(['/rest/v1/recruit_profiles', '/rest/v1/site_gate', '/rest/v1/site_masters', '/rest/v1/site_admins'])
 const FAKE_DB = u => u.pathname === '/rest/v1/rpc/recruit_hit' ? [200, '1'] : EMPTY.has(u.pathname) ? [200, '[]'] : [503, '']
 
 let appNo = 0
@@ -422,7 +423,7 @@ test('웹 신원: Auth(/auth/v1/user)로 토큰 확인 · 디스코드 ID 는 id
   const id = uid()
   // 봇 헤더를 같이 보내도 웹 토큰이면 Auth 의 신원만 쓴다
   const r = await api('GET', '/api/me', undefined, { as: web(id), headers: { 'x-discord-user': '99999999999999999', 'x-discord-admin': '1' } })
-  assert.deepEqual([r.status, r.body], [200, { user: { id, name: `웹${id.slice(-4)}` }, profile: null, teamId: null }])
+  assert.deepEqual([r.status, r.body], [200, { user: { id, name: `웹${id.slice(-4)}` }, profile: null, teamId: null, admin: false }])
   const [call] = net.auth
   assert.equal(call.url, 'http://db.test/auth/v1/user')
   assert.deepEqual([call.headers.apikey, call.headers.authorization], [PUB, `Bearer web.${id}`])
@@ -566,7 +567,7 @@ test('봇 신원: 봇 키(32자 이상 · timingSafeEqual) + X-Discord-User(17~2
   const { api, net } = start({ db: FAKE_DB })
   const id = uid()
   const ok = await api('GET', '/api/me', undefined, { as: bot(id, '  보노 🏀 봇  ') })
-  assert.deepEqual([ok.status, ok.body], [200, { user: { id, name: '보노 🏀 봇' }, profile: null, teamId: null }], '디코드 · 앞뒤 공백 자르기')
+  assert.deepEqual([ok.status, ok.body], [200, { user: { id, name: '보노 🏀 봇' }, profile: null, teamId: null, admin: false }], '디코드 · 앞뒤 공백 자르기')
   assert.equal((await api('GET', '/api/me', undefined, { as: bot('12345678901234567') })).status, 200, '17자리')
   assert.equal((await api('GET', '/api/me', undefined, { as: bot('99999999999999999999') })).body.user.id, '99999999999999999999', '20자리 — 정밀도 손실 없이 문자열')
   assert.equal((await api('GET', '/api/me', undefined, { as: bot(id, '가'.repeat(80)) })).status, 200, '이름 80자')
@@ -617,7 +618,7 @@ test('검증: 프로필(마이크 O/X · 계정 1~maxEntries 줄) 이 잘못되�
   await bad({ ...ok, mic: 'true' }, '마이크 문자열')
   await bad({ ...ok, mic: 1 }, '마이크 숫자')
   await bad({ ...ok, mic: null }, '마이크 null')
-  await bad({ ...ok, entries: [entry({ tier: '마스터' })] }, '없는 티어')
+  await bad({ ...ok, entries: [entry({ tier: '마스터' })] }, '없는 티어(티어는 안 적어도 되지만 적으면 목록 안에서)')
   await bad({ ...ok, entries: [entry({ char: 'nope' })] }, '없는 캐릭터')
   await bad({ ...ok, entries: [entry({ char: UPCOMING })] }, '미출시 캐릭터')
   await bad({ ...ok, entries: Array.from({ length: CFG.maxEntries + 1 }, (_, i) => entry({ nick: `n${i}` })) }, `${CFG.maxEntries + 1}개`)
@@ -700,7 +701,7 @@ dbTest('프로필: 저장 · 다시 저장 · /me · 표시 이름은 본인이 
   let clock = futureBase()
   const { api, net } = start({ now: () => clock })
   const id = uid(), as = web(id)
-  assert.deepEqual((await api('GET', '/api/me', undefined, { as })).body, { user: { id, name: `웹${id.slice(-4)}` }, profile: null, teamId: null })
+  assert.deepEqual((await api('GET', '/api/me', undefined, { as })).body, { user: { id, name: `웹${id.slice(-4)}` }, profile: null, teamId: null, admin: false })
 
   const saved = await api('PUT', '/api/me/profile', {
     mic: false, entries: [{ ...entry({ nick: '  보노 ' }), extra: 1 }, entry({ nick: '😀'.repeat(20), tier: '실버', char: 'klfd' })], name: '  보노보노 ', userId: '1', evil: 1,
@@ -711,7 +712,7 @@ dbTest('프로필: 저장 · 다시 저장 · /me · 표시 이름은 본인이 
   const want = { userId: id, name: '보노보노', mic: false, entries: [entry(), entry({ nick: '😀'.repeat(20), tier: '실버', char: 'klfd' })], updatedAt: clock }
   assert.deepEqual(saved.body.profile, want, '닉네임 · 표시 이름 앞뒤 공백 자르기 · 모르는 필드 버리기')
   const got = await api('GET', '/api/me', undefined, { as })
-  assert.deepEqual(got.body, { user: { id, name: `웹${id.slice(-4)}` }, profile: want, teamId: null }, 'user.name 은 신원, profile.name 은 본인이 고른 이름')
+  assert.deepEqual(got.body, { user: { id, name: `웹${id.slice(-4)}` }, profile: want, teamId: null, admin: false }, 'user.name 은 신원, profile.name 은 본인이 고른 이름')
   let [row] = await rows(`/recruit_profiles?select=*&discord_user_id=eq.${id}`)
   assert.deepEqual([row.auth_user_id, row.discord_name, row.created_at, row.updated_at], [fakeUuid(id), want.name, clock, clock])
 
@@ -1287,6 +1288,11 @@ dbTest('Data API 권한: anon · authenticated 키나 키 없이는 팀원모집
       ['/site_gate?select=code,token&limit=1', {}],
       ['/site_masters?select=user_id&limit=1', {}],
       ['/site_masters', post({ user_id: someone })],
+      ['/site_admins?select=user_id&limit=1', {}],
+      ['/site_admins', post({ user_id: someone })],
+      ['/arena_signups?select=user_id&limit=1', {}],
+      ['/arena_plans?select=plan&limit=1', {}],
+      ['/arena_plans', post({ week: '2100-01-02', plan: {}, updated_at: 0, updated_by: someone })],
       ['/site_gate', post({ id: 1, code: '1234', token: 'x', changed_at: 0, changed_by: someone })],
       ['/recruit_profiles', post({ discord_user_id: someone, discord_name: 'x', mic: true, entries: [], created_at: 0, updated_at: 0 })],
       ['/recruit_teams', post({ id: 'AAAAAAAA', room: {}, tactic: {}, created_at: 0, expires_at: 0 })],
@@ -1698,6 +1704,97 @@ const CAT = {
 }
 const row = (...xs) => [...xs, ...Array(10 - xs.length).fill(null)]
 const BUILD = { title: '픽앤롤 빌드', chars: ['bl'], body: '스크린 받고\n들어갈 때', slots: { red: row('r1', 'r1'), green: row(), blue: row('b1') } }
+
+test('아레나 주: 그 주 토요일(KST) · 일요일 21:30 이 지나면 다음 주 · 연말을 넘는다', async () => {
+  const { arenaWeek } = await import('./index.mjs')
+  for (const [at, week] of [
+    ['2026-10-19T00:00+09:00', '2026-10-24'], ['2026-10-23T23:59+09:00', '2026-10-24'], ['2026-10-24T19:30+09:00', '2026-10-24'],
+    ['2026-10-25T21:29+09:00', '2026-10-24'], ['2026-10-25T21:30+09:00', '2026-10-31'], ['2026-10-25T23:59+09:00', '2026-10-31'],
+    ['2026-10-24T14:59Z', '2026-10-24'], ['2026-10-25T12:30Z', '2026-10-31'], ['2026-12-28T09:00+09:00', '2027-01-02'],
+  ]) assert.equal(arenaWeek(Date.parse(at)), week, at)
+})
+
+dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 혼자) · 보기는 공개 · 미신청 · 프로필을 고치면 신청에도 · 편성표는 관리자만(같은 시간대 한 사람 한 번 · 3명 · 409) · 이력', async () => {
+  const { arenaWeek } = await import('./index.mjs')
+  let clock = futureBase()
+  const { api } = start({ now: () => clock })
+  const week = arenaWeek(clock)
+  const a = await person(api, { name: `아레나A${RUN}`, entries: [entry({ nick: 'A본', tier: '' }), entry({ nick: 'A본', char: 'sga', tier: '' }), entry({ nick: 'A부', char: 'klfd', tier: '' })] })
+  const b = await person(api, { name: `아레나B${RUN}`, entries: [entry({ nick: 'B본' })] })
+  const c = await person(api, { name: `아레나C${RUN}` })
+  const boss = await person(api, { name: `아레나관리${RUN}`, entries: [entry({ nick: '관리' })] })
+  const signup = (who, body) => api('PUT', '/api/arena/signup', body, { as: who.as })
+  const view = (w = '') => api('GET', `/api/arena${w}`).then(r => r.body)
+  const plan = (who, p, version) => api('PUT', '/api/arena/plan', { week, version, plan: p }, { as: who.as })
+
+  // 신청 검증
+  for (const [body, why] of [
+    [{ slots: [], nicks: ['A본'] }, '시간대 없음'], [{ slots: ['mon1'], nicks: ['A본'] }, '없는 시간대'], [{ slots: ['sat1', 'sat1'], nicks: ['A본'] }, '같은 시간대 두 번'],
+    [{ slots: ['absent', 'sat1'], nicks: ['A본'] }, '사유불참 + 시간대'], [{ slots: ['sat1'], nicks: [] }, '계정 없음'], [{ slots: ['sat1'], nicks: ['B본'] }, '남의 계정'],
+    [{ slots: ['sat1'], nicks: ['A본', 'A본'] }, '같은 계정 두 번'], [{ slots: ['sat1'], nicks: ['A본'], memo: 'x'.repeat(51) }, '메모 51자'], [{ slots: 'sat1', nicks: ['A본'] }, '시간대가 배열 아님'],
+  ]) assert.equal((await signup(a, body)).status, 400, why)
+  assert.equal((await api('PUT', '/api/arena/signup', { slots: ['sat1'], nicks: ['x'] }, { as: web(uid()) })).status, 428, '프로필 없음')
+  assert.equal((await api('PUT', '/api/arena/signup', { slots: ['sat1'], nicks: ['x'] })).status, 401, '로그인 없음')
+
+  const okA = await signup(a, { slots: ['sun2', 'sat1', 'flex'], nicks: ['A부', 'A본'], memo: ' 늦을 수도 ' })
+  assert.deepEqual([okA.status, okA.body], [200, { week, signup: { slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'], memo: '늦을 수도', updatedAt: clock } }], '시간대는 정해진 순서로')
+  clock += MIN
+  assert.equal((await signup(b, { slots: ['sat1', 'sat2'], nicks: ['B본'] })).status, 200)
+  assert.equal((await signup(c, { slots: ['absent'], nicks: ['무시된다'], memo: '출장' })).status, 200, '사유불참은 계정을 안 본다')
+
+  let v = await view()
+  assert.deepEqual([v.week, v.current, v.plan, v.planAt], [week, week, {}, null])
+  assert.deepEqual(v.signups.map(s => [s.userId, s.slots, s.accounts]), [
+    [a.id, ['sat1', 'sun2', 'flex'], [{ nick: 'A부', chars: ['klfd'] }, { nick: 'A본', chars: ['bl', 'sga'] }]],
+    [b.id, ['sat1', 'sat2'], [{ nick: 'B본', chars: ['bl'] }]],
+    [c.id, ['absent'], []],
+  ], '신청 순서 · 계정 캐릭터는 프로필에서')
+  assert.ok(v.missing.includes(boss.name) && !v.missing.includes(a.name), '미신청 = 프로필은 있는데 신청이 없는 사람')
+  clock += MIN
+  assert.equal((await signup(a, { slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'] })).status, 200)
+  assert.equal((await view()).signups[0].userId, a.id, '다시 저장해도 신청 순서 그대로')
+
+  // 편성표 — 관리자만
+  const p1 = { sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: 'B본' }], []], sun2: [[{ u: a.id, n: 'A부' }]] }
+  assert.equal((await plan(a, p1, null)).status, 403, '관리자가 아니면 403')
+  assert.equal((await rest('/site_admins', { method: 'POST', body: JSON.stringify({ user_id: boss.id, note: 'test' }) })).status, 201)
+  assert.equal((await api('GET', '/api/me', undefined, { as: boss.as })).body.admin, true)
+  for (const [p, status, why] of [
+    [{ sat1: [[{ u: a.id, n: 'A본' }], [{ u: a.id, n: 'A부' }]] }, 400, '같은 시간대에 한 사람 두 계정'],
+    [{ sat1: [[{ u: a.id, n: 'A본' }, { u: boss.id, n: '관리' }]] }, 409, '신청 안 한 계정'],
+    [{ sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: 'B본' }, { u: a.id, n: 'A부' }, { u: b.id, n: 'B본' }]] }, 400, '4명'],
+    [{ mon1: [] }, 400, '없는 시간대'], [{ sat1: [{ u: a.id, n: 'A본' }] }, 400, '팀이 배열 아님'], [[], 400, '배열 편성표'],
+  ]) assert.equal((await plan(boss, p, null)).status, status, why)
+  assert.equal((await api('PUT', '/api/arena/plan', { week: '2000-01-01', version: null, plan: p1 }, { as: boss.as })).status, 409, '지난 주')
+  clock += MIN
+  const saved = await plan(boss, p1, null)
+  assert.deepEqual([saved.status, saved.body], [200, { plan: { sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: 'B본' }]], sun2: [[{ u: a.id, n: 'A부' }]] }, planAt: clock }], '빈 팀은 버린다')
+  assert.equal((await plan(boss, p1, null)).status, 409, '읽은 뒤 누가 저장했으면(버전이 다르면) 409')
+  assert.deepEqual([(await view()).planAt, (await view()).plan.sat1], [clock, saved.body.plan.sat1], '편성표는 누구나 본다')
+
+  // 프로필에서 계정을 빼면 신청 · 편성표에서도 안 보인다
+  clock += MIN
+  await api('PUT', '/api/me/profile', { mic: true, entries: [entry({ nick: 'A본', char: 'sga', tier: '' })] }, { as: a.as })
+  v = await view()
+  assert.deepEqual(v.signups[0].accounts, [{ nick: 'A본', chars: ['sga'] }])
+  assert.deepEqual(v.plan.sun2, [[]], 'A부 가 빠졌다')
+  // 신청 취소 → 편성표에서도 빠진다
+  assert.equal((await api('DELETE', '/api/arena/signup', undefined, { as: b.as })).status, 200)
+  v = await view()
+  assert.deepEqual([v.signups.map(s => s.userId), v.plan.sat1], [[a.id, c.id], [[{ u: a.id, n: 'A본' }]]])
+  assert.ok(v.missing.includes(b.name))
+
+  // 이력 · 지난 주는 보기만
+  const mine = await api('GET', '/api/arena/mine', undefined, { as: a.as })
+  assert.deepEqual(mine.body, { current: week, history: [{ week, slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'], memo: '', assigned: [{ slot: 'sat1', team: 1, nick: 'A본' }, { slot: 'sun2', team: 1, nick: 'A부' }] }] }, '이력은 저장된 편성표 그대로')
+  clock += 8 * 24 * HOUR
+  assert.notEqual(arenaWeek(clock), week)
+  const past = await view(`?w=${week}`)
+  assert.deepEqual([past.week, past.missing, past.signups.length], [week, [], 2], '지난 주: 미신청은 안 센다')
+  assert.equal((await plan(boss, p1, clock)).status, 409, '지난 주 편성표는 못 고친다')
+  assert.deepEqual((await view()).signups, [], '이번 주는 새로')
+  await rest(`/site_admins?user_id=eq.${boss.id}`, { method: 'DELETE' })
+})
 
 dbTest('잠재력추천: 글 · 검증 · 필터 · 추천 · 댓글 · 권한', async () => {
   const { api } = start({ potentials: CAT })

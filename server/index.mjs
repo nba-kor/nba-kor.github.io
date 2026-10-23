@@ -16,6 +16,7 @@ import upcomingData from '../data/upcoming.json' with { type: 'json' }
 import tacticsData from '../data/tactics.json' with { type: 'json' }
 import potentialsData from '../data/potentials.json' with { type: 'json' }
 import videosData from '../data/videos.json' with { type: 'json' }
+import ARENA from '../data/arena.json' with { type: 'json' }
 import { channelUrl, createNotifier, errText, guildNick, voiceRooms } from './discord.mjs'
 
 // 한국 출시만. 공식 홈페이지보다 먼저 인게임에 나온 선수는 upcoming.json 에서 server 를 kr 로 바꿔 올린다
@@ -50,6 +51,12 @@ const GUEST_ID = /^g(\d{1,15})$/   // 비회원 · 팀장이 넣은 팀원의 us
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const CONTROL = /[\x00-\x1f\x7f]/
 const JSON_TYPE = /^application\/json\b/i
+// 아레나전: 시간대(토 · 일 1팟 · 2팟) + 미정(당일 용병) · 사유불참. 주는 그 주 토요일 날짜
+const SLOTS = new Set(ARENA.slots.map(s => s.id))
+const CHOICES = [...SLOTS, ...ARENA.extra.map(c => c.id)]
+const WEEK = /^\d{4}-\d{2}-\d{2}$/
+const PLAN_LIMIT = { max: 300, windowMs: 10 * 60_000 }   // 관리자 편성표 저장 — 끌어다 놓을 때마다 저장한다
+const STALE_PLAN = '그새 신청이나 편성표가 바뀌었어요 — 새로 불러올게요'
 // 받는 요청 — 메서드 + 경로 조각. 예: 'POST team members' = 가입, 'DELETE team members member' = 방출 · 나가기
 const ACTIONS = new Set([
   'GET me', 'PUT me profile', 'GET', 'POST', 'POST quick', 'GET team', 'DELETE team', 'POST team members', 'DELETE team members member', 'POST team extend',
@@ -114,7 +121,7 @@ function room(v) {
   return { title: text(v.title ?? '', L.title, '방 제목', 0), mic: v.mic, mode: v.mode, memo: text(v.memo ?? '', L.memo, '메모', 0, true) }
 }
 
-/** 프로필: 표시 이름 + 개인 마이크 O/X + 게임 계정 1~3줄(첫 줄 대표).
+/** 프로필: 표시 이름 + 개인 마이크 O/X + 캐릭터 1~maxEntries 줄(첫 줄 대표). 같은 게임 닉네임 줄들이 한 계정이다(첫 줄의 계정 = 본계정).
  *  이름을 안 보내면(봇 · 옛 화면) 저장돼 있던 이름을 그대로 둔다 — 디스코드 서버 별명과 계정 이름이 다를 수 있어 본인이 고른다 */
 function profile(v) {
   if (!isObj(v)) fail(400, '프로필 정보가 없어요')
@@ -124,12 +131,13 @@ function profile(v) {
   const entries = v.entries.map(e => {
     if (!isObj(e)) fail(400, '계정 정보를 확인해 주세요')
     const nick = text(e.nick, 20, '게임 닉네임')
-    if (!CFG.tiers.includes(e.tier)) fail(400, '티어를 골라 주세요')
+    const tier = e.tier ?? ''   // 티어는 이제 안 받는다 — 예전에 적은 티어만 그대로 둔다
+    if (tier !== '' && !CFG.tiers.includes(tier)) fail(400, '티어를 골라 주세요')
     if (typeof e.char !== 'string' || !PLAYERS.has(e.char)) fail(400, '한국 서버에 출시된 캐릭터만 고를 수 있어요')
     const key = `${nick}\n${e.char}`   // 닉네임에 제어문자가 없으니 \n 으로 이어도 겹치지 않는다
     if (seen.has(key)) fail(400, '같은 계정에 같은 캐릭터가 두 번 들어갔어요')
     seen.add(key)
-    return { nick, tier: e.tier, char: e.char }
+    return { nick, tier, char: e.char }
   })
   return { name: v.name == null ? null : text(v.name, 32, '표시 이름'), mic: v.mic, entries }
 }
@@ -288,6 +296,48 @@ function added(v) {
   if (tier !== '' && !CFG.tiers.includes(tier)) fail(400, '티어를 골라 주세요')
   if (typeof v.char !== 'string' || !PLAYERS.has(v.char)) fail(400, '한국 서버에 출시된 캐릭터만 고를 수 있어요')
   return { name: nick, mic: null, entries: [{ nick, tier, char: v.char }], added: true }
+}
+
+/** 아레나 주 = 그 주 토요일 날짜(KST, 'YYYY-MM-DD'). 일요일 closeAt(21:30, 마지막 판이 끝나는 시각)이 지나면 다음 주 */
+export function arenaWeek(ms) {
+  const d = new Date(ms + 9 * 3_600_000)   // KST 시각을 UTC 칸으로 읽는다(한국은 서머타임이 없다)
+  const [hh, mm] = ARENA.closeAt.split(':').map(Number)
+  const dow = d.getUTCDay(), past = d.getUTCHours() * 60 + d.getUTCMinutes() >= hh * 60 + mm
+  d.setUTCDate(d.getUTCDate() + (dow === 0 ? (past ? 6 : -1) : 6 - dow))
+  return d.toISOString().slice(0, 10)
+}
+
+/** 아레나 신청: 시간대(여럿 · 사유불참은 혼자) + 참가 계정(내 프로필의 게임 닉네임, 사유불참이면 없음) + 메모 */
+function arenaSignup(v, nicks) {
+  if (!isObj(v)) fail(400, '신청 정보가 없어요')
+  if (!listOf(v.slots, CHOICES.length, 1) || v.slots.some(s => !CHOICES.includes(s)) || new Set(v.slots).size !== v.slots.length) fail(400, '참석할 시간을 골라 주세요')
+  const absent = v.slots.includes('absent')
+  if (absent && v.slots.length > 1) fail(400, '사유불참은 다른 시간과 같이 고를 수 없어요')
+  const picked = absent ? [] : v.nicks
+  if (!absent && (!listOf(picked, nicks.size, 1) || picked.some(n => !nicks.has(n)) || new Set(picked).size !== picked.length)) fail(400, '참가할 계정을 내 프로필에서 골라 주세요')
+  return { slots: CHOICES.filter(c => v.slots.includes(c)), nicks: picked, memo: text(v.memo ?? '', ARENA.memo, '메모', 0) }
+}
+
+/** 편성표: { 시간대: [[{ u, n }]] } — 신청한 계정만, 팀당 teamSize 명까지, 한 사람은 한 시간대에 한 번(계정 둘을 동시에 못 한다). 빈 팀은 버린다 */
+function arenaPlan(v, signups) {
+  if (!isObj(v)) fail(400, '편성표 형식이 잘못됐어요')
+  const ok = new Set(signups.flatMap(s => s.accounts.map(a => `${s.userId}\n${a.nick}`)))
+  const out = {}
+  for (const [slot, teams] of Object.entries(v)) {
+    if (!SLOTS.has(slot) || !listOf(teams, ARENA.maxTeams) || !teams.every(Array.isArray)) fail(400, '편성표 형식이 잘못됐어요')
+    const users = new Set()
+    out[slot] = teams.filter(team => team.length).map(team => {
+      if (team.length > ARENA.teamSize) fail(400, `한 팀은 ${ARENA.teamSize}명까지예요`)
+      return team.map(a => {
+        if (!isObj(a) || typeof a.u !== 'string' || typeof a.n !== 'string') fail(400, '편성표 형식이 잘못됐어요')
+        if (!ok.has(`${a.u}\n${a.n}`)) fail(409, STALE_PLAN)   // 그새 신청을 취소했거나 계정을 뺐다
+        if (users.has(a.u)) fail(400, '한 사람은 같은 시간대에 한 계정만 넣을 수 있어요')
+        users.add(a.u)
+        return { u: a.u, n: a.n }
+      })
+    })
+  }
+  return out
 }
 
 // ---------------------------------------------------------------- 비회원 비밀번호
@@ -504,6 +554,9 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     return !row || same(new URL(request.url).searchParams.get('g'), row.token)
   }
   const isMaster = async user => !user.guest && (await db(`/site_masters?select=user_id&user_id=eq.${enc(user.id)}`)).length > 0
+  // 관리자(아레나 편성) = site_admins 또는 마스터
+  const inAdmins = async user => !user.guest && (await db(`/site_admins?select=user_id&user_id=eq.${enc(user.id)}`)).length > 0
+  const isAdmin = async user => (await Promise.all([isMaster(user), inAdmins(user)])).some(Boolean)
   function gateCode(v) {
     const code = typeof v === 'string' ? v.trim() : '', n = [...code].length
     if (CONTROL.test(code) || n < GATE_LEN[0] || n > GATE_LEN[1]) fail(400, `접근 비밀번호는 ${GATE_LEN[0]}~${GATE_LEN[1]}자로 정해 주세요`)
@@ -754,6 +807,83 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     }
   }
 
+  // ------------------------------------------------ 아레나전 — 보기는 공개, 신청은 로그인(프로필 필요), 편성표는 관리자
+
+  // 신청 한 줄 = 그 사람의 프로필을 조인한다 — 계정(게임 닉네임)의 캐릭터 · 표시 이름은 늘 지금 프로필 것. 프로필에서 빠진 닉네임은 안 보인다
+  const signupsOf = async week => (await db(`/arena_signups?select=user_id,slots,nicks,memo,updated_at,profile:recruit_profiles(name:discord_name,entries)&week=eq.${week}&order=created_at.asc,user_id.asc`))
+    .map(s => ({
+      userId: s.user_id, name: s.profile.name, slots: s.slots, memo: s.memo, updatedAt: s.updated_at,
+      accounts: s.nicks.map(nick => ({ nick, chars: s.profile.entries.filter(e => e.nick === nick).map(e => e.char) })).filter(a => a.chars.length),
+    }))
+
+  async function arena(request, sub, t) {
+    const action = [request.method, sub].filter(Boolean).join(' ')
+    if (!['GET', 'GET mine', 'PUT signup', 'DELETE signup', 'PUT plan'].includes(action)) fail(404, '없는 주소예요')
+    const cur = arenaWeek(t)
+
+    // ?w=YYYY-MM-DD(그 주 토요일) — 없으면 이번 주. 신청 · 편성은 이번 주만, 지난 주는 보기만
+    if (action === 'GET') {
+      const w = new URL(request.url).searchParams.get('w') || ''
+      const week = WEEK.test(w) && !Number.isNaN(Date.parse(w)) ? w : cur
+      const [signups, [plan], members] = await Promise.all([
+        signupsOf(week),
+        db(`/arena_plans?select=plan,updated_at&week=eq.${week}`),
+        // ponytail: 최근에 프로필을 고친 1000명까지만 센다 — 길드 인원이면 넉넉하다
+        week === cur ? db('/recruit_profiles?select=discord_user_id,discord_name&order=updated_at.desc&limit=1000') : [],
+      ])
+      const live = new Set(signups.flatMap(s => s.accounts.map(a => `${s.userId}\n${a.nick}`)))
+      const signed = new Set(signups.map(s => s.userId))
+      return [200, {
+        week, current: cur, signups,
+        // 그새 신청을 취소했거나 계정을 뺀 줄은 편성표에서도 안 보인다(관리자가 다음에 저장하면 빠진다)
+        plan: Object.fromEntries(Object.entries(plan?.plan || {}).map(([slot, teams]) => [slot, teams.map(tm => tm.filter(a => live.has(`${a.u}\n${a.n}`)))])),
+        planAt: plan?.updated_at ?? null,
+        missing: members.filter(p => !signed.has(p.discord_user_id)).map(p => p.discord_name),   // 프로필은 있는데 이번 주 신청이 없는 사람
+      }]
+    }
+
+    const user = await identity(request)
+    if (action === 'GET mine') {   // 마이페이지 신청 이력 — 최근 10주 + 그 주 편성표에서 내 자리
+      const rows = await db(`/arena_signups?select=week,slots,nicks,memo&user_id=eq.${enc(user.id)}&order=week.desc&limit=10`)
+      const plans = rows.length ? await db(`/arena_plans?select=week,plan&week=in.(${rows.map(r => r.week).join(',')})`) : []
+      const planOf = new Map(plans.map(p => [p.week, p.plan]))
+      return [200, {
+        current: cur,
+        history: rows.map(r => ({
+          ...r,
+          assigned: Object.entries(planOf.get(r.week) || {}).flatMap(([slot, teams]) => teams.flatMap((tm, i) => tm.filter(a => a.u === user.id).map(a => ({ slot, team: i + 1, nick: a.n })))),
+        })),
+      }]
+    }
+    const planning = action === 'PUT plan'
+    if (await hit(`${planning ? 'plan' : 'w'} ${user.id}`, LIMIT.windowMs) > (planning ? PLAN_LIMIT.max : LIMIT.max)) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
+
+    switch (action) {
+      case 'PUT signup': {
+        const body = await readJson(request)
+        const p = await mine(user) || fail(428, NO_PROFILE)
+        const v = arenaSignup(body, new Set(p.entries.map(e => e.nick)))
+        // created_at 은 안 보낸다 — 처음 넣을 때만 DB 기본값, 다시 저장해도 신청 순서가 그대로다
+        await db('/arena_signups?on_conflict=week,user_id', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { week: cur, user_id: user.id, ...v, updated_at: t } })
+        return [200, { week: cur, signup: { ...v, updatedAt: t } }]
+      }
+      case 'DELETE signup':
+        await db(`/arena_signups?week=eq.${cur}&user_id=eq.${enc(user.id)}`, { method: 'DELETE' })
+        return [200, { ok: true }]
+      case 'PUT plan': {   // { week, version: 읽어 온 planAt, plan } — 통째로 바꾼다
+        if (!await isAdmin(user)) fail(403, '관리자만 편성할 수 있어요')
+        const body = await readJson(request)
+        if (!isObj(body) || body.week !== cur) fail(409, STALE_PLAN)
+        const [[old], signups] = await Promise.all([db(`/arena_plans?select=updated_at&week=eq.${cur}`), signupsOf(cur)])
+        // ponytail: 읽고 쓰는 사이에 다른 관리자가 저장하면(같은 순간) 늦게 쓴 쪽이 덮는다 — 관리자 몇 명이라 충분. 겹치면 updated_at 조건부 PATCH 로
+        if ((old?.updated_at ?? null) !== (body.version ?? null)) fail(409, STALE_PLAN)
+        const plan = arenaPlan(body.plan, signups)
+        await db('/arena_plans?on_conflict=week', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { week: cur, plan, updated_at: t, updated_by: user.id } })
+        return [200, { plan, planAt: t }]
+      }
+    }
+  }
+
   async function route(request) {
     const { pathname } = new URL(request.url)
     const method = request.method
@@ -764,6 +894,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (!await gatePass(request)) throw Object.assign(new Error(GATE), { status: 401, gate: true })
     const b = pathname.match(BOARD_PATH)
     if (b) return board(request, b, now())
+    const a = pathname.match(/^\/api\/arena(?:\/(signup|plan|mine))?$/)
+    if (a) return arena(request, a[1], now())
     const me = pathname.match(/^\/api\/me(\/profile)?$/)
     const m = pathname.match(/^\/api\/teams(?:\/([^/]+)(?:\/(members|extend)(?:\/([^/]+))?)?)?$/)
     const [, id, sub, userId] = m || []
@@ -801,11 +933,14 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       case 'GET me': {
         // 비회원 = 비밀번호 확인(다른 기기에서 내 팀을 관리하려고). 프로필 · 소속 팀은 그 기기에만 있다
         if (user.guest) return [200, { user: { id: user.id, name: user.name }, profile: null, teamId: null }]
-        const [p, master] = await Promise.all([mine(user), isMaster(user)])
+        const [p, master, admin] = await Promise.all([mine(user), isMaster(user), inAdmins(user)])
         const teamId = p?.member?.team?.expires_at > t ? p.member.team_id : null   // 만료됐지만 아직 안 지운 팀은 없는 팀
         // 마스터에게만 master · 지금 접근 비밀번호(내 프로필에서 보고 바꾼다). 꺼져 있으면 gate: null
         const g = master && await gateRow(true)
-        return [200, { user: { id: user.id, name: user.name }, profile: p && profileView(user, p), teamId, ...(master && { master, gate: g && { code: g.code, changedAt: g.changed_at } }) }]
+        return [200, {
+          user: { id: user.id, name: user.name }, profile: p && profileView(user, p), teamId, admin: master || admin,   // admin = 아레나 편성 · 숨긴 메뉴(팀원모집)
+          ...(master && { master, gate: g && { code: g.code, changedAt: g.changed_at } }),
+        }]
       }
 
       case 'PUT me profile': {

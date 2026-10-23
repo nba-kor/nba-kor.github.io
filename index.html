@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TNAB Vipers · 3:3 전술판 · 티어표 · 팀원모집</title>
-<meta name="description" content="NBA 덩크 시티(NBA Dunk City) 한국 서버 아레나 TNAB. 3:3 전술판, 티어표, 팀원모집을 한곳에서. 한국 출시 선수 전원 지원, 전술판·티어표는 미출시 선수도 체크 한 번으로.">
+<title>TNAB Vipers · 아레나 운영 · 전술판 · 티어표</title>
+<meta name="description" content="NBA 덩크 시티(NBA Dunk City) 한국 서버 아레나 TNAB Vipers. 주간 아레나전 신청 · 팀 편성, 3:3 전술판 · 티어표 · 조합표 · 잠재력추천, 영상 자료실을 한곳에서.">
 <link rel="canonical" href="https://nba-kor.github.io/">
 <link rel="icon" href="/assets/icon.png?v=2" type="image/png">
 <link rel="apple-touch-icon" href="/assets/icon.png?v=2">
@@ -14,15 +14,15 @@
 <meta property="og:site_name" content="TNAB Vipers">
 <meta property="og:locale" content="ko_KR">
 <meta property="og:url" content="https://nba-kor.github.io/">
-<meta property="og:title" content="TNAB Vipers · 3:3 전술판 · 티어표 · 팀원모집">
-<meta property="og:description" content="NBA 덩크 시티(NBA Dunk City) 한국 서버 아레나 TNAB. 3:3 전술판, 티어표, 팀원모집을 한곳에서. 한국 출시 선수 전원 지원, 전술판·티어표는 미출시 선수도 체크 한 번으로.">
+<meta property="og:title" content="TNAB Vipers · 아레나 운영 · 전술판 · 티어표">
+<meta property="og:description" content="NBA 덩크 시티(NBA Dunk City) 한국 서버 아레나 TNAB Vipers. 주간 아레나전 신청 · 팀 편성, 3:3 전술판 · 티어표 · 조합표 · 잠재력추천, 영상 자료실을 한곳에서.">
 <meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=77c9a8c0">
+<link rel="stylesheet" href="/assets/style.css?v=4b514365">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -36,7 +36,7 @@
   ],
   "url": "https://nba-kor.github.io/",
   "inLanguage": "ko",
-  "description": "NBA 덩크 시티 한국 서버 아레나 TNAB 의 3:3 전술판 · 티어표 · 팀원모집"
+  "description": "NBA 덩크 시티 한국 서버 아레나 TNAB Vipers 의 아레나 운영 · 3:3 전술판 · 티어표"
 }
 </script>
 </head>
@@ -46,12 +46,10 @@
   <div class="brand"><img src="/assets/icon.png?v=2" alt="">TNAB <span>Vipers</span></div>
   <nav>
     <a href="/">홈</a>
-    <a href="/tactics/">전술판</a>
-    <a href="/tiers/">티어표</a>
-    <a href="/combos/">조합표</a>
-    <a href="/potentials/">잠재력추천</a>
-    <a href="/videos/">영상</a>
-    <a href="/recruit/">팀원모집</a>
+    <a href="/arena/">아레나 운영</a>
+    <a href="/tactics/" data-group="/tactics/ /tiers/ /combos/ /potentials/">전략·공략</a>
+    <a href="/videos/">영상 자료실</a>
+    <a href="/me/">마이페이지</a>
   </nav>
   <div class="spacer"></div>
   <div class="rc-auth" id="auth" aria-live="polite"></div>
@@ -59,111 +57,22 @@
 
 <main class="home">
 
-  <section class="hero">
-    <h1>3:3 전술을 짜고, 티어를 매기고,<br>같이 뛸 팀원을 모아보세요</h1>
-    <p class="lead">한국 서버에 출시된 선수 전원을 그대로 씁니다. 전술판과 티어표에서는 아직 안 나온 선수도 체크 한 번이면 미리 써볼 수 있어요.</p>
-    <p class="stat" id="count"></p>
-  </section>
+  <!-- 내 프로필 · 이번 주 아레나 — 로그인 상태에 따라 index.html 아래 스크립트가 채운다 -->
+  <section class="me-card" id="me-card" aria-live="polite"><p class="rc-muted">로그인 확인 중…</p></section>
 
-  <nav class="picker" aria-label="도구 선택">
-    <a class="pick pick-tactics" href="/tactics/">
-      <svg class="pick-art" viewBox="0 0 120 100" aria-hidden="true">
-        <rect x="2" y="2" width="116" height="96" rx="6" fill="#1f2937" stroke="#3b4657"/>
-        <rect x="42" y="2" width="36" height="44" fill="none" stroke="#7d8896" stroke-width="1.4"/>
-        <circle cx="60" cy="46" r="13" fill="none" stroke="#7d8896" stroke-width="1.4"/>
-        <path d="M113,2 L113,32.8 A 57 55.6 0 0 1 7,32.8 L7,2" fill="none" stroke="#7d8896" stroke-width="1.4"/>
-        <path d="M50,9 L70,9" stroke="#7d8896" stroke-width="2"/>
-        <circle cx="60" cy="12.3" r="3.4" fill="none" stroke="#f5a623" stroke-width="1.8"/>
-        <path d="M60,72 C56,58 52,44 58,26" fill="none" stroke="#4d9eff" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M58,26 l-3.6,5.6 l7 .3 z" fill="#4d9eff"/>
-        <circle cx="60" cy="76" r="7" fill="#0b0f16" stroke="#4d9eff" stroke-width="2.4"/>
-        <circle cx="30" cy="60" r="7" fill="#0b0f16" stroke="#4d9eff" stroke-width="2.4"/>
-        <circle cx="94" cy="60" r="7" fill="#0b0f16" stroke="#ff5d5d" stroke-width="2.4"/>
-      </svg>
-      <div class="pick-body">
-        <h2>전술판</h2>
-        <p>하프코트에 선수를 끌어다 놓고 동선을 그리면, 그대로 움직여 보여줍니다.</p>
-        <ul class="pick-tags">
-          <li>기본 전술 14종</li><li>동선 재생</li><li>링크 공유</li>
-        </ul>
-      </div>
-      <span class="pick-go">전술판 열기</span>
+  <nav class="cats" aria-label="메뉴">
+    <a class="cat" href="/arena/">
+      <svg class="cat-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg><b>아레나 운영</b><small>아레나 신청 · 팀 편성 · 일정/결과</small>
     </a>
-
-    <a class="pick pick-tiers" href="/tiers/">
-      <svg class="pick-art" viewBox="0 0 120 100" aria-hidden="true">
-        <rect x="2" y="2" width="116" height="96" rx="6" fill="#161b22" stroke="#3b4657"/>
-        <g>
-          <rect x="8" y="8" width="20" height="19" rx="3" fill="#ff7f7f"/>
-          <rect x="31" y="8" width="81" height="19" rx="3" fill="#1c2230"/>
-          <circle cx="42" cy="17.5" r="6.5" fill="#4d9eff"/><circle cx="57" cy="17.5" r="6.5" fill="#35c6a7"/>
-        </g>
-        <g>
-          <rect x="8" y="30" width="20" height="19" rx="3" fill="#ffbf7f"/>
-          <rect x="31" y="30" width="81" height="19" rx="3" fill="#1c2230"/>
-          <circle cx="42" cy="39.5" r="6.5" fill="#f5a623"/>
-        </g>
-        <g>
-          <rect x="8" y="52" width="20" height="19" rx="3" fill="#ffdf7f"/>
-          <rect x="31" y="52" width="81" height="19" rx="3" fill="#1c2230"/>
-          <circle cx="42" cy="61.5" r="6.5" fill="#d980ff"/><circle cx="57" cy="61.5" r="6.5" fill="#ff7a59"/>
-        </g>
-        <g>
-          <rect x="8" y="74" width="20" height="19" rx="3" fill="#bfff7f"/>
-          <rect x="31" y="74" width="81" height="19" rx="3" fill="#1c2230"/>
-        </g>
-      </svg>
-      <div class="pick-body">
-        <h2>티어표</h2>
-        <p>S부터 D까지, 선수를 끌어 올려 나만의 순위를 만들고 링크로 자랑하세요.</p>
-        <ul class="pick-tags">
-          <li>드래그 정렬</li><li>티어 직접 편집</li><li>링크 공유</li>
-        </ul>
-      </div>
-      <span class="pick-go">티어표 열기</span>
+    <div class="cat">
+      <a class="cat-main" href="/tactics/"><svg class="cat-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5c-1.8-1.4-4.6-2-8-2v14c3.4 0 6.2.6 8 2 1.8-1.4 4.6-2 8-2v-14c-3.4 0-6.2.6-8 2zM12 6.5v14"/></svg><b>전략·공략</b></a>
+      <span class="cat-links"><a href="/tactics/">전술판</a><a href="/tiers/">티어표</a><a href="/combos/">조합표</a><a href="/potentials/">잠재력추천</a></span>
+    </div>
+    <a class="cat" href="/videos/">
+      <svg class="cat-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="13.5" height="12" rx="2.5"/><path d="M16 10.5l5.5-3v9l-5.5-3"/></svg><b>영상 자료실</b><small>강의 영상 · 경기 영상 · 참고 자료</small>
     </a>
-
-    <a class="pick pick-potentials" href="/potentials/">
-      <svg class="pick-art" viewBox="0 0 120 100" aria-hidden="true">
-        <rect x="2" y="2" width="116" height="96" rx="6" fill="#161b22" stroke="#3b4657"/>
-        <circle cx="60" cy="50" r="13" fill="none" stroke="#3b4657" stroke-width="2"/>
-        <circle cx="29.7" cy="28.8" r="3.6" fill="#ef4b2c"/><circle cx="34.9" cy="22.8" r="3.6" fill="#ef4b2c"/><circle cx="41.2" cy="18.1" r="3.6" fill="#ef4b2c"/><circle cx="48.4" cy="14.9" r="3.6" fill="#ef4b2c"/><circle cx="56.1" cy="13.2" r="3.6" fill="#ef4b2c"/><circle cx="63.9" cy="13.2" r="3.6" fill="#ef4b2c"/><circle cx="71.6" cy="14.9" r="3.6" fill="#ef4b2c"/><circle cx="78.8" cy="18.1" r="3.6" fill="#ef4b2c"/><circle cx="85.1" cy="22.8" r="3.6" fill="#ef4b2c"/><circle cx="90.3" cy="28.8" r="3.6" fill="#ef4b2c"/>
-        <circle cx="44.4" cy="83.5" r="3.6" fill="#6fc21b"/><circle cx="37.6" cy="79.5" r="3.6" fill="#6fc21b"/><circle cx="31.9" cy="74.1" r="3.6" fill="#6fc21b"/><circle cx="27.4" cy="67.6" r="3.6" fill="#6fc21b"/><circle cx="24.5" cy="60.3" r="3.6" fill="#6fc21b"/><circle cx="23.1" cy="52.5" r="3.6" fill="#6fc21b"/><circle cx="23.4" cy="44.6" r="3.6" fill="#6fc21b"/><circle cx="25.4" cy="37.0" r="3.6" fill="#6fc21b"/><circle cx="28.9" cy="30.0" r="3.6" fill="#6fc21b"/><circle cx="33.8" cy="23.8" r="3.6" fill="#6fc21b"/>
-        <circle cx="95.7" cy="40.4" r="3.6" fill="#5cc0ff"/><circle cx="97.0" cy="48.2" r="3.6" fill="#5cc0ff"/><circle cx="96.5" cy="56.1" r="3.6" fill="#5cc0ff"/><circle cx="94.4" cy="63.7" r="3.6" fill="#5cc0ff"/><circle cx="90.7" cy="70.6" r="3.6" fill="#5cc0ff"/><circle cx="85.7" cy="76.7" r="3.6" fill="#5cc0ff"/><circle cx="79.4" cy="81.5" r="3.6" fill="#5cc0ff"/><circle cx="72.3" cy="84.9" r="3.6" fill="#5cc0ff"/><circle cx="64.7" cy="86.7" r="3.6" fill="#5cc0ff"/><circle cx="56.8" cy="86.9" r="3.6" fill="#5cc0ff"/>
-      </svg>
-      <div class="pick-body">
-        <h2>잠재력추천</h2>
-        <p>빨강 · 초록 · 파랑 30칸 잠재력 빌드를 캐릭터별로 찾아보고, 내 빌드를 올려 추천과 댓글을 받으세요.</p>
-        <ul class="pick-tags">
-          <li>캐릭터 · 포지션 필터</li><li>추천순 정렬</li><li>댓글</li>
-        </ul>
-      </div>
-      <span class="pick-go">잠재력추천 열기</span>
-    </a>
-
-    <a class="pick pick-recruit" href="/recruit/">
-      <svg class="pick-art" viewBox="0 0 120 100" aria-hidden="true">
-        <rect x="2" y="2" width="116" height="96" rx="6" fill="#161b22" stroke="#3b4657"/>
-        <rect x="10" y="10" width="100" height="26" rx="5" fill="#1c2230"/>
-        <circle cx="22" cy="23" r="6" fill="#35c6a7"/>
-        <rect x="33" y="17" width="46" height="5" rx="2.5" fill="#7d8896"/>
-        <rect x="33" y="26" width="30" height="4" rx="2" fill="#3b4657"/>
-        <rect x="86" y="17" width="17" height="12" rx="6" fill="#35c6a733" stroke="#35c6a7" stroke-width="1.2"/>
-        <circle cx="27" cy="66" r="14" fill="#0b0f16" stroke="#4d9eff" stroke-width="2.4"/>
-        <circle cx="27" cy="62" r="4.6" fill="#4d9eff"/><path d="M19,74.5 a8 7.5 0 0 1 16 0" fill="#4d9eff"/>
-        <circle cx="60" cy="66" r="14" fill="#0b0f16" stroke="#f5a623" stroke-width="2.4"/>
-        <circle cx="60" cy="62" r="4.6" fill="#f5a623"/><path d="M52,74.5 a8 7.5 0 0 1 16 0" fill="#f5a623"/>
-        <circle cx="93" cy="66" r="14" fill="none" stroke="#7d8896" stroke-width="2" stroke-dasharray="4 3"/>
-        <path d="M93,60 v12 M87,66 h12" stroke="#7d8896" stroke-width="2.2" stroke-linecap="round"/>
-      </svg>
-      <div class="pick-body">
-        <h2>팀원모집</h2>
-        <p>원하는 전술과 캐릭터로 3:3 팀을 만들고, 카톡방과 디스코드로 바로 팀원을 모으세요.</p>
-        <ul class="pick-tags">
-          <li>디스코드 알림</li><li>음성채널 배정</li><li>카톡 공유</li>
-        </ul>
-      </div>
-      <span class="pick-go">팀원모집 열기</span>
+    <a class="cat" href="/me/">
+      <svg class="cat-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20.5c1.2-4 4.3-6 8-6s6.8 2 8 6"/></svg><b>마이페이지</b><small>프로필 · 등록 계정 · 보유 캐릭터 · 신청 이력</small>
     </a>
   </nav>
 
@@ -185,17 +94,44 @@
 </main>
 
 <script type="module">
-import { loadPlayers, mountTop } from '/assets/app.js?v=850e30c8'
-import { api } from '/assets/auth.js?v=e2ffcda1'
-import { startAuth } from '/assets/board.js?v=68f6d961'
-const { players, updatedAt } = await loadPlayers()
-mountTop('/', updatedAt)
-startAuth('')   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
-const kr = players.filter(p => p.server === 'kr')
+import { faceOf, mountTop } from '/assets/app.js?v=c4085f32'
+import { api, chooseLogin } from '/assets/auth.js?v=e2ffcda1'
+import { h, P, loadData, data, startAuth, auth, me } from '/assets/board.js?v=6ff260c0'
+import { accountsOf, charFaces, arenaCfg, weekLabel } from '/assets/profile.js?v=861d2f59'
+await loadData()
+mountTop('/', data.updatedAt)
+const kr = data.players.filter(p => p.server === 'kr')
 document.getElementById('faces').innerHTML = kr
   .map(p => `<img src="${p.img}" alt="${p.name}" title="${p.name}" loading="lazy">`).join('')
-document.getElementById('count').textContent =
-  `한국 서버 ${kr.length}명 · 미출시 ${players.length - kr.length}명 지원`
+
+// 내 프로필 + 이번 주 아레나 신청 — 로그인 상태가 정해지거나 바뀔 때마다. 이름 · 닉네임은 사용자 입력이라 h() 로(글자로만) 넣는다
+const A = await arenaCfg(), TAG = Object.fromEntries([...A.slots.map(s => [s.id, s.short]), ...A.extra.map(c => [c.id, c.label])])
+let arena = null
+async function paint() {
+  const box = document.getElementById('me-card'), go = (href, label, cls = '') => h('a', { className: `btn ${cls}`, href }, label)
+  if (auth === 'loading') return
+  if (auth !== 'in') return box.replaceChildren(h('div', { className: 'me-main' },
+    h('div', {}, h('b', {}, '내 프로필'), h('p', { className: 'rc-muted' }, '로그인하면 내 계정 · 캐릭터와 이번 주 아레나 신청 상태가 여기 보여요.')),
+    h('button', { type: 'button', className: 'primary', onclick: chooseLogin }, '로그인')))
+  const accts = accountsOf(me.profile?.entries), main = accts[0]
+  arena ||= api('/arena').catch(() => null)
+  const a = await arena, mine = a?.signups.find(s => s.userId === me.id)
+  const at = a && Object.entries(a.plan).flatMap(([slot, teams]) => teams.flatMap((tm, i) => tm.some(x => x.u === me.id) ? [`${TAG[slot]} ${i + 1}팀`] : []))
+  box.replaceChildren(
+    h('div', { className: 'me-main' },
+      main ? h('img', { src: faceOf(P(main.chars[0])), alt: '' }) : h('span', { className: 'rc-hole' }),
+      h('div', {},
+        h('b', {}, me.name, me.profile && h('span', { className: `rc-tag ${me.profile.mic ? 'mic-on' : 'mic-no'}` }, me.profile.mic ? '마이크 O' : '마이크 X')),
+        main ? h('p', {}, h('span', { className: 'ac-kind is-main' }, '본계정'), ` ${main.nick} `, charFaces(main.chars, 5), accts.length > 1 && h('small', {}, ` 부계정 ${accts.length - 1}개`))
+          : h('p', { className: 'rc-muted' }, '아직 프로필이 없어요 — 게임 계정과 캐릭터를 등록해 주세요')),
+      go('/me/', main ? '마이페이지' : '프로필 만들기', main ? '' : 'primary')),
+    a && h('div', { className: 'me-arena' },
+      h('span', {}, h('b', {}, '이번 주 아레나'), ` ${weekLabel(a.week)}`),
+      h('span', { className: `ar-state${mine ? ' is-on' : ''}` }, !mine ? '미신청' : mine.slots.includes('absent') ? '사유불참' : `신청 완료 · ${mine.slots.map(s => TAG[s]).join(' · ')}`),
+      at?.length > 0 && h('span', { className: 'me-at' }, `배정 ${at.join(' · ')}`),
+      go('/arena/', mine ? '신청 · 편성 보기' : '신청하기', mine ? '' : 'primary')))
+}
+startAuth('', paint)   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
 
 // 최신 강의 4개. 제목 · 작성자는 사용자 입력이라 textContent 로만 넣는다
 try {

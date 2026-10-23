@@ -1,7 +1,7 @@
 // 팀원모집 — 로그인(디스코드 · 카카오) 또는 비회원 · 내 프로필 · 모집 목록 · 팀 만들기(방 설정) · 팀 화면(전술 애니메이션 / 로스터 / 가입 / 팀장 관리) · 카카오톡 공유
-import { loadPlayers, faceOf, mountTop, POS, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, copyLink, shareFace } from './app.js?v=850e30c8'
-import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=4fbce97d'
-import { api, initAuth as startAuth, chooseLogin, logout, session, linkKakao, hasProvider, showWho, saveGate, KAKAO_SVG, IN_KAKAO, IS_MOBILE } from './auth.js?v=e2ffcda1'
+import { loadPlayers, faceOf, mountTop, POS, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, copyLink, shareFace } from './app.js?v=c4085f32'
+import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=8b942a80'
+import { api, initAuth as startAuth, chooseLogin, logout, session, linkKakao, hasProvider, showWho, KAKAO_SVG, IN_KAKAO, IS_MOBILE } from './auth.js?v=e2ffcda1'
 
 // ---------------------------------------------------------------- 설정
 
@@ -250,7 +250,7 @@ function meCard() {
     add(h('img', { src: faceOf(p), alt: '' }),
       h('div', {},
         h('div', { className: 'rc-acct-name' }, h('b', {}, myName()), guestMode() && h('span', { className: 'rc-badge guest' }, '비회원'), micTag(prof.mic)),
-        h('small', {}, `${e.nick} · ${e.tier} · ${charLine(e)}${n ? ` 외 ${n}개` : ''}`)),
+        h('small', {}, `${[e.nick, e.tier, charLine(e)].filter(Boolean).join(' · ')}${n ? ` 외 ${n}개` : ''}`)),
       act('프로필 수정', () => openProfile()),
       playAsPicker(prof.entries))
   }
@@ -403,7 +403,7 @@ function personForm(el) {
   // 대표 계정이 바뀌면 본인계정 줄의 "↳ 닉네임 · 티어" 를 맞춘다
   function sync() {
     const m = main()
-    for (const s of list.querySelectorAll('.rc-same')) s.textContent = `↳ ${m.nick || '대표 닉네임'} · ${m.tier || '티어 미선택'}`
+    for (const s of list.querySelectorAll('.rc-same')) s.textContent = `↳ ${m.nick || '대표 닉네임'}${m.tier ? ` · ${m.tier}` : ''}`
   }
 
   function rowEl(r, i) {
@@ -426,8 +426,8 @@ function personForm(el) {
       const nick = h('input', { type: 'text', name: 'nick', autocomplete: 'off', value: r.nick,
         placeholder: i ? '부계정 닉네임' : '게임 닉네임', 'aria-label': i ? '부계정 게임 닉네임' : '대표 게임 닉네임' })
       nick.oninput = () => { r.nick = nick.value; sync() }
-      const tier = h('select', { name: 'tier', 'aria-label': '티어' },
-        h('option', { value: '', disabled: true }, '티어 선택'), cfg.tiers.map(t => h('option', { value: t }, t)))
+      const tier = h('select', { name: 'tier', 'aria-label': '티어 (선택)' },
+        h('option', { value: '' }, '티어 (선택)'), cfg.tiers.map(t => h('option', { value: t }, t)))
       tier.value = r.tier
       tier.onchange = () => { r.tier = tier.value; sync() }
       li.append(nick, tier)
@@ -469,7 +469,6 @@ function personForm(el) {
       if (r.kind !== 'same') {
         const m = nameErr(a.nick, 20, '게임 닉네임을 입력하세요')
         if (m) flag($('[name=nick]', li), box, m)
-        if (!a.tier) flag($('[name=tier]', li), box, '티어를 선택하세요')
       }
       const key = `${a.nick}\n${r.char}`
       if (r.char && seen.has(key)) flag($('.rc-slot', li), box, '같은 계정에 같은 캐릭터가 이미 있어요')
@@ -580,37 +579,6 @@ async function renderLinks() {
   box.hidden = auth !== 'in' || !user
 }
 
-/** 마스터만: 사이트 접근 비밀번호 보기 · 바꾸기(GET /api/me 의 master · gate). 「바꾸기」 는 프로필 저장과 따로 바로 저장한다 */
-function renderGateAdmin() {
-  const box = $('#profile-gate'), err = $('.rc-err', box), input = $('#gate-code')
-  box.hidden = !(auth === 'in' && me?.master)
-  if (box.hidden) return
-  const g = me.gate, when = g && new Date(g.changedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-  $('#gate-now').replaceChildren(...g
-    ? ['지금 비밀번호 ', h('b', { className: 'rc-gate-code' }, g.code), ' ', h('button', { type: 'button', onclick: e => copyLink(e.currentTarget, g.code) }, '복사'), h('small', {}, ` · ${when} 바꿈`)]
-    : ['꺼져 있어요 — 누구나 들어와요. 비밀번호를 정하면 켜져요.'])
-  err.hidden = true
-  input.oninput = () => { err.hidden = true }
-  // 숫자 6자리 — 카톡으로 알려 주고 휴대폰으로 치기 쉽게. 직접 정한 글자도 된다
-  $('#gate-random').onclick = () => { input.value = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1e6).padStart(6, '0'); err.hidden = true }
-  $('#gate-save').onclick = async e => {
-    const code = input.value.trim(), btn = e.currentTarget
-    if (!code) return input.focus()
-    if (!confirm(`사이트 접근 비밀번호를 「${code}」(으)로 바꿀까요?\n다른 사람은 새 비밀번호를 다시 입력해야 해요.`)) return
-    btn.disabled = true
-    try {
-      const r = await api('/gate', { method: 'PUT', body: { code }, withToken: true })
-      saveGate(r.token)
-      me.gate = { code: r.code, changedAt: r.changedAt }
-      input.value = ''
-      renderGateAdmin()
-    } catch (e) {
-      err.textContent = e.message
-      err.hidden = false
-    } finally { btn.disabled = false }
-  }
-}
-
 /** 프로필 폼을 연다 — 로그인했으면 계정 프로필, 아니면 이 기기의 비회원 프로필. after = 저장하면 이어서 부를 함수, why = 왜 열렸는지 한 줄 */
 function openProfile(after = null, why = '') {
   const guest = guestMode()
@@ -624,7 +592,6 @@ function openProfile(after = null, why = '') {
   $('#guest-pw').value = guest ? prof?.password || '' : ''
   $('#profile-link').hidden = true
   if (!guest) renderLinks()
-  renderGateAdmin()
   $('#profile-why').textContent = why
   $('#profile-why').hidden = !why
   $('.rc-form-err', form).hidden = true
@@ -652,7 +619,7 @@ function teamCard(t) {
     h('div', { className: 'rc-faces' },
       t.members.map(m => { const p = P(m.entries[0].char); return h('img', { src: faceOf(p), alt: p.name, title: `${m.entries[0].nick} · ${p.name}`, loading: 'lazy' }) }),
       Array.from({ length: holes }, () => h('span', { className: 'rc-hole', title: '빈 자리' }))),
-    lead && h('p', {}, '팀장 ', h('b', {}, lead.nick), ` · ${lead.tier}`),
+    lead && h('p', {}, '팀장 ', h('b', {}, lead.nick), lead.tier && ` · ${lead.tier}`),
     h('p', {}, t.voice && h('span', { className: 'rc-vc', title: '음성채널' }, t.voice.name), t.voice && ' · ', remain(t.expiresAt)))
 }
 
@@ -1132,7 +1099,7 @@ async function showTeam(id) {
       // 같은 닉네임이 여러 줄이면 첫 줄만 — datalist 는 값이 같으면 고른 줄을 구분하지 못한다
       const seen = new Set()
       $('#add-names').replaceChildren(...found.flatMap(p => p.entries.map(e => [p, e])).filter(([, e]) => !seen.has(e.nick) && seen.add(e.nick))
-        .map(([p, e]) => h('option', { value: e.nick, label: `${p.name} · ${e.tier} · ${P(e.char).name}` })))
+        .map(([p, e]) => h('option', { value: e.nick, label: [p.name, e.tier, P(e.char).name].filter(Boolean).join(' · ') })))
     }, 250)
   }
   addForm.onsubmit = async e => {

@@ -178,12 +178,12 @@ export function pickMenu(p, title, items) {
   d.focus()   // 첫 항목에 포커스 테두리가 생기면 이미 고른 것처럼 보인다
 }
 
-/** 상단 네비게이션 + 데이터 갱신일 표시. */
+/** 상단 네비게이션 + 데이터 갱신일 표시. 머리 메뉴는 data-group(전략·공략 = 전술판 · 티어표 · 조합표 · 잠재력추천)에 든 페이지에서도 켜진다 */
 export function mountTop(current, updatedAt) {
   const el = document.querySelector('.stamp')   // 홈 맨 아래
   if (el && updatedAt) el.textContent = `선수 데이터 ${updatedAt} 기준`
-  document.querySelectorAll('.top nav a').forEach(a => {
-    if (a.getAttribute('href') === current) a.setAttribute('aria-current', 'page')
+  document.querySelectorAll('.top nav a, .subnav a').forEach(a => {
+    if (a.getAttribute('href') === current || a.dataset.group?.split(' ').includes(current)) a.setAttribute('aria-current', 'page')
   })
   // 좁은 화면에서는 메뉴를 햄버거 버튼 뒤로 접는다(보이고 말고는 CSS 가 정한다).
   const top = document.querySelector('.top')

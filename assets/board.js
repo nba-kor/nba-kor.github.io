@@ -1,5 +1,5 @@
 // 게시판 공용 — 잠재력추천 · 영상이 같이 쓴다: 로그인 표시, 캐릭터 고르기, 목록 카드 틀, 글 머리(추천 · 공유 · 수정 · 삭제), 댓글
-import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=850e30c8'
+import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=c4085f32'
 import { api, initAuth, chooseLogin, logout, session, showWho, IN_KAKAO } from './auth.js?v=e2ffcda1'
 
 export const $ = (s, root = document) => root.querySelector(s)
@@ -31,7 +31,7 @@ export const faces = ids => h('div', { className: 'rc-faces' }, ids.map(id => h(
 
 // ---------------------------------------------------------------- 로그인
 
-export let auth = 'loading', me = null   // me = { id, name } — 로그인했을 때
+export let auth = 'loading', me = null   // me = { id, name, profile, admin, master, gate } — 로그인했을 때(GET /api/me). profile 은 저장하면 바꿔 둔다
 let authReady, needText, onChange
 export const authFirst = new Promise(r => { authReady = r })
 
@@ -39,7 +39,7 @@ async function loadMe() {
   if (!await session()) return setAuth('out')
   try {
     const v = await api('/me', { withToken: true })
-    setAuth('in', { id: v.user.id, name: v.profile?.name || v.user.name })
+    setAuth('in', { id: v.user.id, name: v.profile?.name || v.user.name, user: v.user, profile: v.profile, admin: !!v.admin, master: !!v.master, gate: v.gate })
   } catch (e) { setAuth(e.status === 401 ? 'out' : 'error') }
 }
 
