@@ -1323,3 +1323,7 @@ label.ac-pick { cursor: pointer; }
 .ac-dialog { width: 100%; max-width: 100%; height: 100vh; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
 .ac-dialog :is(header, .ac-body, .ac-foot) { padding-inline: max(16px, calc((100% - 820px) / 2 + 16px)); }
 .ac-dialog .ac-foot { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+
+/* 모달이 떠 있는 동안 뒤 페이지는 스크롤하지 않는다 — 모달 안 스크롤이 끝에 닿아도 뒤로 넘어가지 않게 */
+html:has(dialog:modal) { overflow: hidden; scrollbar-gutter: stable; }
+dialog, .ac-body { overscroll-behavior: contain; }
