@@ -317,7 +317,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 
 /* ---------- 팀원모집 ---------- */
 .recruit { max-width: 1120px; margin: 0 auto; padding: 24px 16px 64px; }
-.recruit [hidden] { display: none !important; }   /* display 를 준 요소도 hidden 속성으로 숨긴다 */
+:is(.recruit, .rc-dialog) [hidden] { display: none !important; }   /* display 를 준 요소도 hidden 속성으로 숨긴다 — 창(dialog)은 body 에 붙어 .recruit 밖이다(계정 수정 창의 캐릭터 포지션 필터) */
 .recruit h1 { margin: 0; font-size: clamp(22px, 3.4vw, 30px); line-height: 1.25; letter-spacing: -.03em; overflow-wrap: anywhere; }
 .recruit h2 { margin: 0 0 14px; font-size: 17px; letter-spacing: -.02em; }
 .recruit fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
