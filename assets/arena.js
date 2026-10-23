@@ -503,10 +503,12 @@ function menu(a, from) {
   for (const s of SLOTS) {
     const teams = teamsOf(s.id), applied = a.slots.includes(s.id) || a.slots.includes('flex')
     if (SLOTS.some(o => clash(s.id, o.id) && teamsOf(o.id).some((tm, ti) => tm.some(x => x.u === a.u && !(from?.slot === o.id && from.ti === ti && x.n === a.n))))) continue   // 겹치는 시간대에 이미 있다
+    // 색 = 시간대(늘 칠한다). 이 사람이 신청하지 않은 시간대(FA 도 아니면)는 줄마다 「신청 안 함」
+    const note = applied ? '' : ' · 신청 안 함'
     teams.forEach((tm, ti) => {
-      if (tm.length < A.teamSize && !(from?.slot === s.id && from.ti === ti)) items.push({ label: `${s.short} · ${ti + 1}팀 (${tm.length}/${A.teamSize})`, color: applied ? colorOf(s.id) : '', pick: () => move(a, from, `${s.id}:${ti}`) })
+      if (tm.length < A.teamSize && !(from?.slot === s.id && from.ti === ti)) items.push({ label: `${s.short} · ${ti + 1}팀 (${tm.length}/${A.teamSize})${note}`, color: colorOf(s.id), pick: () => move(a, from, `${s.id}:${ti}`) })
     })
-    items.push({ label: `${s.short} · 새 팀${applied ? '' : ' (신청 안 함)'}`, color: applied ? colorOf(s.id) : '', pick: () => move(a, from, `${s.id}:new`) })
+    items.push({ label: `${s.short} · 새 팀${note}`, color: colorOf(s.id), pick: () => move(a, from, `${s.id}:new`) })
   }
   // 메뉴 머리 아래에 포지션 · 캐릭터 — 어느 캐릭터로 뛸 수 있는지 보고 고른다
   pickMenu({ name: a.n, img: faceOf(P(a.chars[0])) }, `${a.owner === a.n ? '본계정' : `본계 ${a.owner}`} · 신청 ${a.slots.map(s => TAG[s] || LABEL[s]).join(' ')}`, items,
