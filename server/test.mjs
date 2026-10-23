@@ -1804,6 +1804,66 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   await rest(`/site_admins?user_id=eq.${boss.id}`, { method: 'DELETE' })
 })
 
+dbTest('멤버 관리: 관리자만 · 목록(등급 · 본계정 · 계정 수 · 마지막 신청 주) · 임명 · 해제 · 탈퇴(프로필 · 신청 · 권한 · 이끌던 팀) · 슈퍼관리자와 본인은 못 바꾼다', async () => {
+  const { arenaWeek } = await import('./index.mjs')
+  const clock = futureBase()
+  const { api } = start({ now: () => clock })
+  const boss = await person(api, { name: `멤버보스${RUN}`, entries: [entry({ nick: `보스${RUN}`, roles: ['scorer'] })] })
+  const adm = await person(api, { name: `멤버관리${RUN}`, entries: [entry({ nick: `관리${RUN}`, roles: ['mid'] })] })
+  const m1 = await person(api, { name: `멤버1${RUN}`, entries: [entry({ nick: `일${RUN}`, roles: ['center'] }), entry({ nick: `일부${RUN}`, char: 'sga' })] })
+  const m2 = await person(api, { name: `멤버2${RUN}`, entries: [entry({ nick: `이${RUN}`, roles: ['scorer'] })] })
+  const post = body => ({ method: 'POST', body: JSON.stringify(body) })
+  assert.equal((await rest('/site_masters', post({ user_id: boss.id, note: 'test' }))).status, 201)
+  assert.equal((await rest('/site_admins', post({ user_id: adm.id, note: 'test' }))).status, 201)
+  const list = who => api('GET', '/api/members', undefined, { as: who.as })
+  const setRole = (who, id, role) => api('PUT', `/api/members/${id}`, { role }, { as: who.as })
+  const kick = (who, id) => api('DELETE', `/api/members/${id}`, undefined, { as: who.as })
+
+  assert.equal((await api('GET', '/api/members')).status, 401)
+  assert.equal((await list(m1)).status, 403, '일반 멤버는 못 본다')
+  assert.equal((await setRole(m1, m2.id, 'admin')).status, 403)
+  assert.equal((await kick(m1, m2.id)).status, 403)
+
+  assert.equal((await api('PUT', '/api/arena/signup', { slots: ['sat1'], nicks: [`일${RUN}`] }, { as: m1.as })).status, 200)
+  const team = await create(api, m1)   // 팀원모집 팀장 — 탈퇴하면 팀도 해제
+  assert.equal(team.status, 201)
+  let l = (await list(adm)).body.members
+  const at = id => l.findIndex(m => m.userId === id)
+  assert.deepEqual(l[at(m1.id)], { userId: m1.id, name: m1.name, main: `일${RUN}`, accounts: 2, role: 'member', lastWeek: arenaWeek(clock), updatedAt: clock })
+  assert.deepEqual([l[at(boss.id)].role, l[at(adm.id)].role, l[at(m2.id)].lastWeek], ['master', 'admin', null])
+  assert.ok(at(boss.id) < at(adm.id) && at(adm.id) < at(m1.id), '슈퍼관리자 → 관리자 → 멤버 순')
+
+  // 임명 · 해제 — 관리자가 된 사람은 바로 관리할 수 있다
+  assert.deepEqual((await setRole(adm, m2.id, 'admin')).body, { userId: m2.id, role: 'admin' })
+  assert.equal((await list(m2)).status, 200)
+  assert.equal((await api('GET', '/api/me', undefined, { as: m2.as })).body.admin, true)
+  assert.equal((await setRole(m2, m2.id, 'member')).status, 400, '본인은 못 바꾼다')
+  assert.deepEqual((await setRole(adm, m2.id, 'member')).body, { userId: m2.id, role: 'member' })
+  assert.equal((await list(m2)).status, 403)
+
+  // 슈퍼관리자 · 본인 · 형식
+  for (const [r, status, why] of [
+    [await setRole(adm, boss.id, 'member'), 403, '슈퍼관리자 등급'], [await kick(adm, boss.id), 403, '슈퍼관리자 탈퇴'],
+    [await kick(adm, adm.id), 400, '본인 탈퇴'], [await setRole(adm, m2.id, 'master'), 400, '없는 등급'],
+    [await setRole(adm, '123456789012345678', 'admin'), 404, '없는 멤버'], [await kick(adm, 'nope'), 404, 'ID 형식'],
+  ]) assert.equal(r.status, status, why)
+
+  // 탈퇴 — 프로필 · 아레나 신청 · 이끌던 팀이 없어진다. 관리자를 탈퇴시키면 권한도 빠진다
+  assert.deepEqual((await kick(adm, m1.id)).body, { ok: true })
+  assert.deepEqual(await rows(`/recruit_profiles?select=discord_user_id&discord_user_id=eq.${m1.id}`), [])
+  assert.deepEqual(await rows(`/arena_signups?select=user_id&user_id=eq.${m1.id}`), [])
+  assert.equal((await api('GET', `/api/teams/${team.body.team.id}`)).status, 404)
+  assert.equal((await api('GET', '/api/me', undefined, { as: m1.as })).body.profile, null, '다시 들어오면 새로 가입')
+  await setRole(adm, m2.id, 'admin')
+  assert.equal((await kick(boss, m2.id)).status, 200)
+  assert.deepEqual(await rows(`/site_admins?select=user_id&user_id=eq.${m2.id}`), [])
+  l = (await list(boss)).body.members
+  assert.ok(at(m1.id) < 0 && at(m2.id) < 0)
+
+  await rest(`/site_masters?user_id=eq.${boss.id}`, { method: 'DELETE' })
+  await rest(`/site_admins?user_id=eq.${adm.id}`, { method: 'DELETE' })
+})
+
 dbTest('잠재력추천: 글 · 검증 · 필터 · 추천 · 댓글 · 권한', async () => {
   const { api } = start({ potentials: CAT })
   const a = { id: uid() }, b = { id: uid() }

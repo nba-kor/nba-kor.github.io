@@ -62,6 +62,7 @@ const CHOICES = [...SLOTS, ...ARENA.extra.map(c => c.id)]
 const WEEK = /^\d{4}-\d{2}-\d{2}$/
 const PLAN_LIMIT = { max: 300, windowMs: 10 * 60_000 }   // 관리자 편성표 저장 — 끌어다 놓을 때마다 저장한다
 const STALE_PLAN = '그새 신청이나 편성표가 바뀌었어요 — 새로 불러올게요'
+const MEMBER_ID = /^(\d{17,20}|k\d{1,20})$/   // 멤버(프로필) ID — 디스코드 ID · k<카카오 회원번호>
 // 받는 요청 — 메서드 + 경로 조각. 예: 'POST team members' = 가입, 'DELETE team members member' = 방출 · 나가기
 const ACTIONS = new Set([
   'GET me', 'PUT me profile', 'GET', 'POST', 'POST quick', 'GET team', 'DELETE team', 'POST team members', 'DELETE team members member', 'POST team extend',
@@ -901,6 +902,56 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     }
   }
 
+  // ------------------------------------------------ 멤버 관리(관리자) — 멤버 = 프로필이 있는 사람. 관리자 임명 · 해제 · 탈퇴.
+  // 마스터(site_masters = 슈퍼관리자)는 바꾸거나 탈퇴시킬 수 없고, 본인도 못 바꾼다(실수로 자기 권한을 잃지 않게)
+
+  async function members(request, id) {
+    const action = [request.method, id && 'member'].filter(Boolean).join(' ')
+    if (!['GET', 'PUT member', 'DELETE member'].includes(action)) fail(404, '없는 주소예요')
+    const user = await identity(request)
+    if (!await isAdmin(user)) fail(403, '관리자만 멤버를 관리할 수 있어요')
+
+    if (action === 'GET') {   // 슈퍼관리자 → 관리자 → 멤버, 각각 본계정 닉네임 순. lastWeek = 마지막으로 아레나 신청한 주
+      const [profiles, masters, admins, weeks] = await Promise.all([
+        db('/recruit_profiles?select=discord_user_id,discord_name,entries,updated_at&order=updated_at.desc&limit=1000'),
+        db('/site_masters?select=user_id'), db('/site_admins?select=user_id'),
+        db('/arena_signups?select=user_id,week&order=week.desc&limit=10000'),
+      ])
+      const role = new Map([...admins.map(a => [a.user_id, 'admin']), ...masters.map(m => [m.user_id, 'master'])])
+      const last = new Map()
+      for (const w of weeks) if (!last.has(w.user_id)) last.set(w.user_id, w.week)
+      const ORDER = { master: 0, admin: 1, member: 2 }
+      return [200, {
+        members: profiles.map(p => ({
+          userId: p.discord_user_id, name: p.discord_name, main: p.entries[0]?.nick ?? p.discord_name, accounts: new Set(p.entries.map(e => e.nick)).size,
+          role: role.get(p.discord_user_id) || 'member', lastWeek: last.get(p.discord_user_id) ?? null, updatedAt: p.updated_at,
+        })).sort((a, b) => ORDER[a.role] - ORDER[b.role] || a.main.localeCompare(b.main, 'ko')),
+      }]
+    }
+
+    if (await hit(`w ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
+    if (!MEMBER_ID.test(id)) fail(404, '멤버를 찾을 수 없어요')
+    if (id === user.id) fail(400, '본인의 등급은 바꾸거나 탈퇴시킬 수 없어요')
+    const [[target], master] = await Promise.all([db(`/recruit_profiles?select=discord_name&discord_user_id=eq.${id}`), isMaster({ id })])
+    if (master) fail(403, '슈퍼관리자는 등급을 바꾸거나 탈퇴시킬 수 없어요')
+    if (!target) fail(404, '멤버를 찾을 수 없어요')
+
+    if (action === 'PUT member') {   // { role: 'admin' | 'member' }
+      const body = await readJson(request)
+      if (!isObj(body) || !['admin', 'member'].includes(body.role)) fail(400, '관리자 · 멤버 중에 골라 주세요')
+      if (body.role === 'admin') await db('/site_admins?on_conflict=user_id', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { user_id: id, note: `${target.discord_name} · ${user.id} 임명` } })
+      else await db(`/site_admins?user_id=eq.${id}`, { method: 'DELETE' })
+      return [200, { userId: id, role: body.role }]
+    }
+    // 탈퇴 = 관리자 권한 · 프로필을 지운다(게임 계정 · 아레나 신청 · 팀원모집 자리는 프로필에 cascade). 팀장이던 모집 팀은 해제한다.
+    // ponytail: 다시 로그인하면 새로 가입할 수 있다 — 막아야 하면 차단 목록을 둔다
+    const [led] = await db(`/recruit_members?select=team_id&discord_user_id=eq.${id}&leader=is.true`)
+    if (led) await disband(led.team_id)
+    await db(`/site_admins?user_id=eq.${id}`, { method: 'DELETE' })
+    await db(`/recruit_profiles?discord_user_id=eq.${id}`, { method: 'DELETE' })
+    return [200, { ok: true }]
+  }
+
   async function route(request) {
     const { pathname } = new URL(request.url)
     const method = request.method
@@ -913,6 +964,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (b) return board(request, b, now())
     const a = pathname.match(/^\/api\/arena(?:\/(signup|plan|mine))?$/)
     if (a) return arena(request, a[1], now())
+    const mb = pathname.match(/^\/api\/members(?:\/([^/]+))?$/)
+    if (mb) return members(request, mb[1])
     const me = pathname.match(/^\/api\/me(\/profile)?$/)
     const m = pathname.match(/^\/api\/teams(?:\/([^/]+)(?:\/(members|extend)(?:\/([^/]+))?)?)?$/)
     const [, id, sub, userId] = m || []

@@ -197,7 +197,10 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
 4. **카톡 공유** — 편성표를 캔버스로 그려(`drawPlan`) `Kakao.Share.uploadImage` 로 카카오에 올리고, 그 그림을 넣은 피드 카드(「편성표 보기」 버튼)를 보낸다.
    올리는 데 시간이 걸려 PC 는 버튼을 한 번 더 눌러 보낸다(기다린 뒤 열면 팝업이 막힌다). 「이미지 저장」(휴대폰은 「이미지 공유」 — 공유창에서 카카오톡을 고르면 사진으로 간다)도 있다.
 
-**관리자** = `site_admins` 에 있는 계정 + 마스터(`site_masters`). 화면은 없다 — SQL Editor 에서 표시 이름으로 넣고 뺀다:
+**관리자** = `site_admins` 에 있는 계정 + 마스터(`site_masters` = **슈퍼관리자**, 갓보노). 관리자는 마이페이지의 **멤버 관리**에서
+멤버(프로필을 등록한 사람)를 **관리자로 임명 · 일반 멤버로 변경 · 탈퇴**시킨다. 슈퍼관리자는 등급을 바꾸거나 탈퇴시킬 수 없고, 본인도 못 바꾼다(서버가 막는다).
+탈퇴 = 관리자 권한 · 프로필(게임 계정 · 아레나 신청 · 팀원모집 자리는 cascade)을 지우고 팀장이던 모집 팀은 해제 — 다시 로그인하면 새로 가입할 수 있다(차단은 없다).
+슈퍼관리자는 화면이 없다 — `site_masters` 를 SQL 로. 관리자도 SQL Editor 에서 표시 이름으로 넣고 뺄 수 있다:
 
 ```sql
 insert into public.site_admins (user_id, note) select discord_user_id, discord_name from public.recruit_profiles where discord_name = '<표시 이름>';
@@ -215,6 +218,9 @@ delete from public.site_admins where user_id = '<디스코드 ID 또는 k카카�
 | `DELETE /api/arena/signup` | 로그인 | 이번 주 신청 취소 |
 | `PUT /api/arena/plan` | 관리자 | `{ week, version: 읽어 온 planAt, plan }` → `{ plan, planAt }`. 이번 주만 · 버전이 다르거나 신청 안 한 계정이면 409 · 겹치는 시간대에 같은 사람이면 400. 10분에 300번(끌 때마다 저장) |
 | `GET /api/arena/mine` | 로그인 | 최근 10주 내 신청 + 배정 `{ history: [{ week, slots, nicks, memo, assigned: [{ slot, team, nick }] }] }` |
+| `GET /api/members` | 관리자 | `{ members: [{ userId, name, main(본계정), accounts, role: master\|admin\|member, lastWeek, updatedAt }] }` — 슈퍼관리자 → 관리자 → 멤버, 각각 본계정 순(최근에 고친 1000명) |
+| `PUT /api/members/:id` | 관리자 | `{ role: admin\|member }` 임명 · 해제. 슈퍼관리자 403 · 본인 400 |
+| `DELETE /api/members/:id` | 관리자 | 탈퇴(위). 슈퍼관리자 403 · 본인 400 |
 
 `GET /api/me` 는 `admin`(관리자 여부)을 같이 준다.
 

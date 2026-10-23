@@ -23,7 +23,7 @@ function render() {
   if (auth !== 'in') return box.replaceChildren(card('마이페이지',
     h('p', { className: 'rc-note' }, '로그인하면 내 프로필 · 게임 계정 · 보유 캐릭터를 등록하고 아레나전에 신청할 수 있어요.'),
     h('div', { className: 'rc-actions' }, h('button', { type: 'button', className: 'primary rc-big', onclick: chooseLogin }, '로그인'))))
-  box.replaceChildren(...[profileCard(), historyCard(), linkCard(), me.admin && adminCard(), me.master && gateCard()].filter(Boolean))   // replaceChildren 은 false 를 글자로 찍는다
+  box.replaceChildren(...[profileCard(), historyCard(), linkCard(), me.admin && adminCard(), me.admin && membersCard(), me.master && gateCard()].filter(Boolean))   // replaceChildren 은 false 를 글자로 찍는다
 }
 
 // ------------------------------------------------ 프로필 + 계정
@@ -118,7 +118,51 @@ function linkCard() {
 const adminCard = () => card('관리자 메뉴',
   h('ul', { className: 'mp-admin' },
     h('li', {}, h('a', { href: '/arena/#plan' }, '아레나 편성'), h('small', {}, '신청한 계정을 끌어서 시간대별 팀에 배치')),
+    h('li', {}, h('a', { href: '#members' }, '멤버 관리'), h('small', {}, '관리자 임명 · 해제 · 탈퇴 — 아래')),
     h('li', {}, h('a', { href: '/recruit/' }, '팀원모집'), h('small', {}, '당분간 메뉴에서 숨겨 둔 기능 — 주소로는 누구나 들어올 수 있어요'))))
+
+// ------------------------------------------------ 관리자 — 멤버 관리(프로필이 있는 사람). 슈퍼관리자(마스터) · 본인은 못 바꾼다 — 서버도 막는다
+
+const ROLE_KO = { master: '슈퍼관리자', admin: '관리자', member: '멤버' }
+function membersCard() {
+  let list = []
+  const q = h('input', { type: 'search', placeholder: '본계정 닉네임 · 이름 검색', 'aria-label': '멤버 검색', oninput: () => paint() })
+  const head = h('small', { className: 'rc-muted' })
+  const box = h('div', {}, h('p', { className: 'rc-muted' }, '불러오는 중…'))
+  async function act(m, method, body, ask) {
+    if (!confirm(ask)) return
+    try { await api(`/members/${m.userId}`, { method, withToken: true, body }); await load() }
+    catch (e) { alert(e.message) }
+  }
+  const buttons = m => m.role === 'master' ? h('span', { className: 'rc-muted' }, '-')
+    : m.userId === me.id ? h('span', { className: 'rc-muted' }, '나')
+    : h('span', { className: 'mp-acts' },
+      m.role === 'admin'
+        ? h('button', { type: 'button', onclick: () => act(m, 'PUT', { role: 'member' }, `「${m.main}」 님을 일반 멤버로 바꿀까요?`) }, '멤버로')
+        : h('button', { type: 'button', onclick: () => act(m, 'PUT', { role: 'admin' }, `「${m.main}」 님을 관리자로 임명할까요?\n아레나 편성 · 멤버 관리를 할 수 있게 돼요.`) }, '관리자로'),
+      h('button', { type: 'button', className: 'danger', onclick: () => act(m, 'DELETE', undefined, `「${m.main}」 님을 탈퇴시킬까요?\n프로필 · 게임 계정 · 아레나 신청이 지워져요. 다시 로그인하면 새로 가입할 수 있어요.`) }, '탈퇴'))
+  function paint() {
+    const k = q.value.trim().toLowerCase()
+    const rows = list.filter(m => !k || `${m.main} ${m.name}`.toLowerCase().includes(k))
+    head.textContent = `${list.length}명 · 관리자 ${list.filter(m => m.role !== 'member').length}명`
+    box.replaceChildren(rows.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table mp-members' },
+      h('thead', {}, h('tr', {}, ['#', '본계정', '등급', '계정', '최근 신청', ''].map(t => h('th', {}, t)))),
+      h('tbody', {}, rows.map((m, i) => h('tr', {},
+        h('td', {}, i + 1),
+        h('td', { className: 'ar-nick' }, h('b', {}, m.main), m.name !== m.main && h('small', {}, m.name)),
+        h('td', {}, h('span', { className: `mp-role is-${m.role}` }, ROLE_KO[m.role])),
+        h('td', {}, `${m.accounts}개`),
+        h('td', {}, m.lastWeek ? weekLabel(m.lastWeek).split(' ~ ')[0] : '-'),
+        h('td', {}, buttons(m)))))))
+      : h('p', { className: 'rc-muted' }, k ? '찾는 멤버가 없어요' : '아직 멤버가 없어요'))
+  }
+  async function load() { list = (await api('/members', { withToken: true })).members; paint() }
+  load().catch(e => box.replaceChildren(h('p', { className: 'rc-bad' }, e.message)))
+  const el = card('멤버 관리', h('div', { className: 'mp-members-head' }, q, head), box,
+    h('p', { className: 'rc-muted' }, '멤버 = 프로필(게임 계정)을 등록한 사람. 슈퍼관리자는 바꾸거나 탈퇴시킬 수 없어요. 탈퇴하면 프로필 · 게임 계정 · 아레나 신청 · 관리자 권한이 지워져요.'))
+  el.id = 'members'
+  return el
+}
 
 // ------------------------------------------------ 마스터 — 사이트 접근 비밀번호 보기 · 바꾸기
 

@@ -1187,3 +1187,18 @@ label.ac-pick { cursor: pointer; }
 .ar-chars em { font-style: normal; font-size: 10.5px; color: var(--muted); align-self: center; }
 .ar-tally .ac-roles { margin: 0; }
 .ar-absent { margin: 0 0 4px; padding-left: 14px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+
+/* 마이페이지 — 멤버 관리(관리자) */
+.mp-members-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 10px; }
+.mp-members-head input { flex: 1 1 220px; max-width: 320px; }
+.mp-members .ar-nick small { margin-left: 6px; color: var(--muted); font-size: 11px; }
+.mp-role { padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.mp-role.is-master { color: #1a1200; background: var(--accent); border-color: transparent; }
+.mp-role.is-admin { color: #35c6a7; border-color: #35c6a766; }
+.mp-acts { display: inline-flex; gap: 4px; }
+.mp-acts button { padding: 3px 10px; font-size: 12px; white-space: nowrap; }
+#members { scroll-margin-top: 110px; }
+@media (max-width: 560px) {   /* 좁으면 계정 · 최근 신청을 빼고 버튼을 세로로 — 버튼이 화면 밖으로 밀리지 않게 */
+  .mp-members :is(th, td):is(:nth-child(4), :nth-child(5)) { display: none; }
+  .mp-acts { flex-direction: column; }
+}
