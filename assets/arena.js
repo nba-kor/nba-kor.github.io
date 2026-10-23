@@ -39,7 +39,7 @@ let week = PLAN_PAGE ? '' : new URLSearchParams(location.search).get('w') || '' 
 let data = null      // GET /api/arena — { week, current, signups, plan, planAt, missing }
 let plan = {}        // 편성표 사본 { 시간대: [[{ u, n }]] } — 관리자가 고친다
 let accts = new Map()   // 신청한 계정 key → { u, n, owner(본계 닉네임), roles, chars, bt, slots, count(소유자의 참가 계정 수) }
-let tab = 'all', poolTab = 'all'
+let tab = 'all', poolTab = 'all', roleTab = 'all'   // roleTab = 편성 대기 목록의 포지션 필터
 // 편성의 「자세히 보기」 — 칩마다 캐릭터(돌파)가 펼쳐진다. 처음엔 켜져 있고, 끄면 이 브라우저에 기억한다
 const DETAIL_KEY = 'dc.arena.detail'
 let detail = (() => { try { return localStorage.getItem(DETAIL_KEY) !== '0' } catch { return true } })()
@@ -453,8 +453,17 @@ function editor() {
   const busy = (slot, u) => SLOTS.some(s => clash(slot, s.id) && teamsOf(s.id).some(tm => tm.some(x => x.u === u)))   // 겹치는 시간대에 이미 있다
   const at = placements()
   const all = [...accts.values()].sort(byTally)
-  const pool = poolTab === 'all' ? all.filter(a => !at.has(key(a.u, a.n)))
+  const bySlot = poolTab === 'all' ? all.filter(a => !at.has(key(a.u, a.n)))
     : all.filter(a => (a.slots.includes(poolTab) || a.slots.includes('flex')) && !busy(poolTab, a.u))
+  // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정, 1순위인 계정이 먼저
+  const pool = roleTab === 'all' ? bySlot
+    : bySlot.filter(a => a.roles.includes(roleTab)).sort((x, y) => (x.roles[0] !== roleTab) - (y.roles[0] !== roleTab) || byTally(x, y))
+  const roleTabs = h('div', { className: 'ar-tabs ar-role-tabs' }, [{ id: 'all', label: '전체' }, ...ROLES].map(r => {
+    const n = r.id === 'all' ? bySlot.length : bySlot.filter(a => a.roles.includes(r.id)).length
+    const b = h('button', { type: 'button', 'aria-selected': roleTab === r.id, onclick: () => { roleTab = r.id; renderPlan() } }, `${r.label} ${n}`)
+    if (ROLE_COLOR[r.id]) b.style.setProperty('--sc', ROLE_COLOR[r.id])
+    return b
+  }))
   const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '미배정' }, ...SLOTS].map(s => {
     const b = h('button', { type: 'button', 'aria-selected': poolTab === s.id, onclick: () => { poolTab = s.id; renderPlan() } }, s.short)
     if (s.id !== 'all') b.style.setProperty('--sc', colorOf(s.id))
@@ -468,6 +477,7 @@ function editor() {
         renderPlan()
       } }, detail ? '간단히 보기' : '자세히 보기')),
     poolTabs,
+    roleTabs,
     h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름)' : `${LABEL[poolTab]} 신청(+ FA) 중 겹치는 시간대에 아직 없는 사람`),
     h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요')),
     h('div', { className: 'ar-legend' }, '칩 색 = 1순위 포지션 ', ROLES.map(r => { const s = h('span', {}, r.label); s.style.setProperty('--pc', ROLE_COLOR[r.id]); return s }),
@@ -506,7 +516,7 @@ function chip(a, from) {
   // 부계정이면 본계정 닉네임을 따로 한 줄 — 누구 계정인지 먼저 보이게. 「자세히 보기」 면 캐릭터(돌파)까지
   const el = h('div', { className: `ar-chip${detail ? ' is-detail' : ''}`, tabIndex: 0, title: `${a.owner} · ${a.roles.map(r => ROLES.find(x => x.id === r)?.label).join(' / ')} · ${charNames(a.chars, a.bt)}` },
     h('img', { src: faceOf(P(a.chars[0])), alt: '', draggable: false }),
-    h('span', { className: 'ar-chip-body' }, nickEl(a),
+    h('span', { className: 'ar-chip-body' }, h('span', { className: 'ar-chip-top' }, nickEl(a), roleTags(a.roles)),   // 주력 포지션 1 · 2순위
       a.owner !== a.n && h('span', { className: 'ar-owner' }, '본계 ', h('b', {}, a.owner)),
       h('small', {}, a.slots.map(s => TAG[s]).filter(Boolean).join(' ')),
       detail && charTags(a)))

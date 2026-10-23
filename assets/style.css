@@ -1271,3 +1271,9 @@ label.ac-pick { cursor: pointer; }
 .ar-memos li p { flex: 1 1 260px; margin: 0; overflow-wrap: anywhere; }
 .ar-memo-slots { display: inline-flex; flex-wrap: wrap; gap: 3px; }
 .ar-memo-slots span { --sc: var(--muted); padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 800; color: var(--sc); border: 1px solid color-mix(in srgb, var(--sc) 55%, transparent); }
+
+/* 아레나 편성 — 포지션 필터 · 칩 첫 줄(계정 + 주력 포지션) */
+.ar-role-tabs { margin-top: -4px; }
+.ar-role-tabs button { padding: 4px 11px; font-size: 12.5px; }
+.ar-chip-top { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 0; }
+.ar-chip-top .ac-roles { margin-left: 5px; }
