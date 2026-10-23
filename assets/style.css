@@ -1111,9 +1111,10 @@ label.ac-pick { cursor: pointer; }
 .ar-poll li { display: grid; grid-template-columns: 9.5em 3em 1fr; align-items: baseline; gap: 8px; padding: 6px 0; border-bottom: 1px solid #2b344466; font-size: 13.5px; }
 .ar-poll b { font-variant-numeric: tabular-nums; }
 .ar-poll small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.ar-missing { margin-top: 10px; font-size: 13px; }
-.ar-missing summary { cursor: pointer; color: var(--muted); font-weight: 700; }
-.ar-missing p { margin: 6px 0 0; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+/* 이번 주 미신청 — 번호 붙은 칸 */
+.ar-missing { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: decimal inside; font-size: 13px; }
+.ar-missing li { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); overflow-wrap: anywhere; }
+.ar-missing li::marker { color: var(--muted); font-size: 12px; }
 
 /* 편성(관리자) — 칩을 끌어서 팀에 놓는다. 칩 색 = 첫 캐릭터 포지션 */
 .ar-pool { padding: 14px 16px; position: sticky; top: var(--top-h, 64px); z-index: 5; max-height: 42vh; overflow-y: auto; box-shadow: 0 10px 24px -12px #000; }   /* 아래 시간대로 스크롤해도 대기 목록이 보여 끌어다 놓을 수 있다 */
@@ -1174,5 +1175,12 @@ label.ac-pick { cursor: pointer; }
 .ac-top .ac-head { margin: 0; flex: none; }
 .ac-top select { padding: 7px 9px; }
 .ar-tally td { white-space: nowrap; }
+.ar-tally .ar-chars-cell { max-width: 320px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 12px; text-align: left; }
+.ar-tally .ar-nick small { margin-left: 6px; color: var(--muted); font-size: 11px; }
+.ar-more { padding: 2px 9px; font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.ar-more[aria-expanded="true"] { color: var(--text); border-color: var(--muted); }
+.ar-tally .ar-sub td { background: #ffffff06; font-size: 12.5px; }
+.ar-tally .ar-sub .ac-kind { margin-right: 2px; }
+.ar-chars em { font-style: normal; font-size: 10.5px; color: var(--muted); align-self: center; }
 .ar-tally .ac-roles { margin: 0; }
 .ar-absent { margin: 0 0 4px; padding-left: 14px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }

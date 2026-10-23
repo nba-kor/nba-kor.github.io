@@ -4,7 +4,6 @@
   "maxTeams": 20,
   "closeAt": "21:30",
   "memo": 50,
-  "maxChars": 3,
   "breakthrough": 7,
   "roles": [
     { "id": "scorer", "label": "스코어러" },

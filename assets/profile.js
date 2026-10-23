@@ -10,7 +10,7 @@ const json = p => fetch(p, { cache: 'no-cache' }).then(r => r.json())
 let recruitP, arenaP
 export const recruitCfg = () => recruitP ||= json('/data/recruit.json')   // maxEntries — 서버와 같은 값
 export const arenaCfg = () => arenaP ||= json('/data/arena.json')
-const A = await arenaCfg()   // 주력 포지션 · 계정당 주력 캐릭터 수 · 돌파 단계
+const A = await arenaCfg()   // 주력 포지션 · 돌파 단계
 
 export const POS_COLOR = ['#8b97a8', '#4d9eff', '#35c6a7', '#f5a623', '#d980ff', '#ff7a59']
 export const posColor = id => POS_COLOR[P(id).pos] || POS_COLOR[0]
@@ -65,12 +65,12 @@ export function accountRow(a, i, { checked, onCheck, onEdit } = {}) {
 }
 
 /**
- * 계정 하나 고치기 · 추가(acct = null) — 닉네임 · 본계정 · 주력 포지션 1 · 2순위 · 주력 캐릭터(maxChars 개, 돌파).
+ * 계정 하나 고치기 · 추가(acct = null) — 닉네임 · 본계정 · 주력 포지션 1 · 2순위 · 보유 캐릭터(계정마다 제한 없음, 프로필 전체 maxEntries 개) · 돌파.
  * accounts = 지금 목록 — 닉네임 겹침 · 전체 캐릭터 수를 본다. 돌려주는 값: { acct, main } (main = 본계정으로) | 'delete' | null(취소)
  */
 export async function editAccount(acct, accounts) {
   const { maxEntries } = await recruitCfg()
-  const others = accounts.filter(a => a !== acct), room = Math.min(A.maxChars, maxEntries - countChars(others))
+  const others = accounts.filter(a => a !== acct), room = maxEntries - countChars(others)
   const isMain = acct ? accounts[0] === acct : !accounts.length
   let chars = acct ? [...acct.chars] : []
   const bt = { ...acct?.bt }
@@ -88,7 +88,7 @@ export async function editAccount(acct, accounts) {
   const count = h('small', {})
   const say = msg => { err.textContent = msg; err.hidden = false }
   const paint = () => {
-    count.textContent = `${chars.length}/${room} · 누르면 대표(맨 앞)로 · 돌파는 선택`
+    count.textContent = `${chars.length}개 · 앞 캐릭터가 대표(누르면 맨 앞으로) · 돌파는 선택`
     picked.replaceChildren(...chars.length ? chars.map((id, k) => {
       const lv = h('select', { 'aria-label': `${P(id).name} 돌파`, onchange: () => { bt[id] = +lv.value || undefined } },
         h('option', { value: '' }, '돌파 -'), Array.from({ length: A.breakthrough }, (_, n) => h('option', { value: n + 1 }, `${n + 1}돌`)))
@@ -97,13 +97,13 @@ export async function editAccount(acct, accounts) {
         h('button', { type: 'button', title: k ? '눌러서 대표(맨 앞)로' : '대표 캐릭터', onclick: () => { chars = [id, ...chars.filter(c => c !== id)]; paint() } },
           h('img', { src: faceOf(P(id)), alt: '' }), h('span', {}, P(id).short || P(id).name), !k && h('em', {}, '대표')),
         lv)
-    }) : [h('span', { className: 'rc-muted' }, `아래에서 이 계정의 주력 캐릭터를 ${A.maxChars}개까지 눌러 주세요`)])
+    }) : [h('span', { className: 'rc-muted' }, '아래에서 이 계정이 가진 캐릭터를 모두 눌러 주세요')])
   }
   const grid = charGrid({
     isOn: id => chars.includes(id),
     pick: id => {
       if (chars.includes(id)) chars = chars.filter(c => c !== id)
-      else if (chars.length >= room) return say(room < A.maxChars ? `캐릭터는 프로필 전체에 ${maxEntries}개까지예요` : `주력 캐릭터는 계정마다 ${A.maxChars}개까지예요 — 하나를 빼고 골라 주세요`)
+      else if (chars.length >= room) return say(`캐릭터는 프로필 전체에 ${maxEntries}개까지예요`)
       else chars = [...chars, id]
       err.hidden = true
       paint()
@@ -119,7 +119,7 @@ export async function editAccount(acct, accounts) {
     h('div', { className: 'ac-body' },
       h('div', { className: 'ac-top' }, nick, h('label', { className: 'check' }, main, '본계정')),
       h('div', { className: 'ac-top' }, h('span', { className: 'ac-head' }, '주력 포지션'), role1, role2),
-      h('p', { className: 'ac-head' }, '주력 캐릭터 ', count),
+      h('p', { className: 'ac-head' }, '보유 캐릭터 ', count),
       picked, grid, err),
     h('footer', { className: 'ac-foot' },
       acct && accounts.length > 1 && h('button', { type: 'button', className: 'danger', onclick: () => confirm(`「${acct.nick}」 계정을 지울까요?`) && done('delete') }, '계정 삭제'),
@@ -133,8 +133,7 @@ export async function editAccount(acct, accounts) {
       : others.some(a => a.nick === n) ? '같은 닉네임의 계정이 이미 있어요' : ''
     if (bad) { say(bad); return nick.focus() }
     if (!role1.value) { say('주력 포지션 1순위를 골라 주세요'); return role1.focus() }
-    if (!chars.length) return say('주력 캐릭터를 하나 이상 골라 주세요')
-    if (chars.length > A.maxChars) return say(`주력 캐릭터는 계정마다 ${A.maxChars}개까지예요 — 빼 주세요`)   // 팀원모집에서 넣은 옛 계정
+    if (!chars.length) return say('캐릭터를 하나 이상 골라 주세요')
     const roles = [role1.value, ...role2.value && role2.value !== role1.value ? [role2.value] : []]
     done({ acct: { nick: n, tier: acct?.tier || '', roles, chars, bt: Object.fromEntries(chars.filter(c => bt[c]).map(c => [c, bt[c]])) }, main: main.checked })
   }

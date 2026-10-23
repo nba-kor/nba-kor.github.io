@@ -2,7 +2,7 @@
 import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=c4085f32'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=e2ffcda1'
 import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=6ff260c0'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, posColor, charNames, roleTags, roleColor, ROLES, ROLE_COLOR } from './profile.js?v=a27b93e0'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, posColor, charNames, roleTags, roleColor, ROLES, ROLE_COLOR } from './profile.js?v=0ce01e56'
 
 await loadData()
 mountTop('/arena/')
@@ -208,51 +208,75 @@ function renderPlan() {
     stat('대기', players.filter(s => !placedUsers.has(s.userId)).length, '명', 'is-wait'),
     stat('참가 계정', accts.size, '개'))
 
-  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), teamsCard(), membersCard(at)])
+  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), teamsCard(), membersCard(at)].filter(Boolean))
   if (edit) document.documentElement.style.setProperty('--top-h', `${$('.top').offsetHeight}px`)   // 대기 목록이 머리 바로 아래에 붙는다(머리 높이는 로그인 줄에 따라 다르다)
   if (nTeams && !edit) queueShot()
 }
 
-/** 집계표(관리자 매뉴얼) — 신청 시간대별로 계정을 집계 순서(byTally)대로. 사유불참은 사유, 이번 주 미신청은 접어 둔다 */
+/** 집계표(관리자 매뉴얼) — 신청 시간대별로 사람마다 한 줄(본계정), 집계 순서(계정 수 → 1순위 포지션 → 본계정 닉네임).
+ *  부계정은 「상세」 로 펼친다 — 최종 명단은 팀별 편성 명단이다. 사유불참은 사유 */
 let tallyTab = 'all'
+const opened = new Set()   // 상세를 펼친 사람(userId) — 모든 시간대에서 같이 펼친다
+// 사람의 대표 계정 = 신청한 계정 중 프로필 순서가 가장 앞(대개 본계정)
+const lead = s => accts.get(key(s.userId, s.accounts[0].nick))
+const byOwner = (x, y) => byTally({ ...lead(x), n: x.owner }, { ...lead(y), n: y.owner })
 function tallyCard() {
   const groups = [...SLOTS, ...A.extra].map(c => {
     const who = data.signups.filter(s => s.slots.includes(c.id))
-    return { c, who, rows: who.flatMap(s => s.accounts.map(a => accts.get(key(s.userId, a.nick)))).sort(byTally) }
+    return { c, who, rows: who.filter(s => s.accounts.length).sort(byOwner) }
   })
   const tabs = h('div', { className: 'ar-tabs', role: 'tablist' }, [{ id: 'all', short: '전체' }, ...SLOTS, ...A.extra].map(c => {
     const g = groups.find(x => x.c.id === c.id)
     const b = h('button', { type: 'button', role: 'tab', 'aria-selected': tallyTab === c.id, onclick: () => { tallyTab = c.id; renderPlan() } },
-      g ? `${c.short} (${c.id === 'absent' ? g.who.length : g.rows.length})` : '전체')
+      g ? `${c.short} (${g.who.length})` : '전체')
     if (SLOT_COLOR[c.id]) b.style.setProperty('--sc', colorOf(c.id))
     return b
   }))
+  const acctCells = a => [h('td', {}, roleTags(a.roles)), h('td', { className: 'ar-chars-cell', title: charNames(a.chars, a.bt) }, charNames(a.chars, a.bt))]
+  const personRows = (s, i) => {
+    const a = lead(s), more = s.accounts.length > 1, open = more && opened.has(s.userId)
+    const toggle = more && h('button', { type: 'button', className: 'ar-more', 'aria-expanded': open, onclick: () => { open ? opened.delete(s.userId) : opened.add(s.userId); renderPlan() } },
+      open ? '접기' : `상세 +${s.accounts.length - 1}`)
+    const owner = h('b', { className: 'ar-cnt' }, s.owner)
+    owner.style.setProperty('--cc', countColor(a.count))
+    const count = h('span', { className: 'ar-cnt' }, `${a.count}개`)
+    count.style.setProperty('--cc', countColor(a.count))
+    return [
+      h('tr', {}, h('td', {}, i + 1), h('td', { className: 'ar-nick' }, owner, a.n !== s.owner && h('small', {}, `참가 ${a.n}`)), ...acctCells(a), h('td', {}, count), h('td', {}, toggle)),
+      ...open ? s.accounts.slice(1).map(x => {
+        const sub = accts.get(key(s.userId, x.nick))
+        return h('tr', { className: 'ar-sub' }, h('td', {}), h('td', { className: 'ar-nick' }, h('span', { className: 'ac-kind' }, '부계정'), ` ${sub.n}`), ...acctCells(sub), h('td', {}), h('td', {}))
+      }) : [],
+    ]
+  }
   const sections = groups.filter(g => tallyTab === 'all' || tallyTab === g.c.id).map(({ c, who, rows }) => {
     const sec = h('div', { className: 'ar-slot' },
-      h('div', { className: 'ar-slot-head' }, h('b', {}, c.short), h('span', {}, c.id === 'absent' ? `${who.length}명` : `${who.length}명 · ${rows.length}계정`),
+      h('div', { className: 'ar-slot-head' }, h('b', {}, c.short), h('span', {}, c.id === 'absent' ? `${who.length}명` : `${who.length}명 · ${who.reduce((n, s) => n + s.accounts.length, 0)}계정`),
         SLOT[c.id] && h('small', {}, slotWhen(week, SLOT[c.id]))),
       c.id === 'absent'
         ? h('p', { className: 'ar-absent' }, who.map(s => s.memo ? `${s.owner}(${s.memo})` : s.owner).join(', ') || '-')
         : rows.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table ar-tally' },
-          h('thead', {}, h('tr', {}, ['#', '계정', '소유자', '포지션', '주력 캐릭터', '계정 수'].map(t => h('th', {}, t)))),
-          h('tbody', {}, rows.map((a, i) => {
-            const tr = h('tr', {}, h('td', {}, i + 1), h('td', { className: 'ar-nick' }, nickEl(a)), h('td', {}, a.owner), h('td', {}, roleTags(a.roles)),
-              h('td', { className: 'ar-nick' }, h('small', {}, charNames(a.chars, a.bt))), h('td', {}, h('span', { className: 'ar-cnt' }, `${a.count}개`)))
-            tr.lastChild.firstChild.style.setProperty('--cc', countColor(a.count))
-            return tr
-          }))))
+          h('thead', {}, h('tr', {}, ['#', '본계정', '포지션', '보유 캐릭터', '계정 수', ''].map(t => h('th', {}, t)))),
+          h('tbody', {}, rows.flatMap(personRows))))   // 사람마다 [본계정 줄, 펼친 부계정 줄들]
           : h('p', { className: 'rc-muted ar-none' }, '아직 없어요'))
     if (SLOT_COLOR[c.id]) sec.style.setProperty('--sc', colorOf(c.id))
     return sec
   })
-  const missing = week === data.current && data.missing.length > 0 && h('details', { className: 'ar-missing' },
-    h('summary', {}, `이번 주 미신청 ${data.missing.length}명`), h('p', {}, [...data.missing].sort((a, b) => a.localeCompare(b, 'ko')).join(', ')))
-  const legend = h('p', { className: 'ar-legend' }, '계정 글자색 = 소유자의 참가 계정 수 ', [1, 2, 3, 4].map(n => {
+  const legend = h('p', { className: 'ar-legend' }, '본계정 글자색 = 참가 계정 수 ', [1, 2, 3, 4].map(n => {
     const t = h('span', { className: 'ar-cnt' }, n < 4 ? `${n}개` : '4개~')
     t.style.setProperty('--cc', countColor(n))
     return t
   }))
-  return h('section', { className: 'card ar-card' }, h('h3', {}, '집계표'), legend, tabs, sections, missing)
+  return h('section', { className: 'card ar-card' }, h('h3', {}, '집계표'), legend, tabs, sections)
+}
+
+/** 이번 주 미신청 — 프로필(게임 계정)은 있는데 이번 주 신청이 없는 사람의 본계정 닉네임 */
+function missingCard() {
+  if (week !== data.current) return null
+  const names = [...data.missing].sort((a, b) => a.localeCompare(b, 'ko'))
+  return h('section', { className: 'card ar-card' },
+    h('h3', {}, `이번 주 미신청 ${names.length}명`),
+    names.length ? h('ol', { className: 'ar-missing' }, names.map(n => h('li', {}, n))) : h('p', { className: 'rc-muted' }, '모두 신청했어요'))
 }
 
 /** 멤버(계정)별 배치 현황 — 행 = 계정, 칸 = 시간대마다 몇 팀 */
@@ -311,7 +335,7 @@ function memberCard(a) {
       const t = h('span', {}, `${P(id).short || P(id).name}${a.bt?.[id] ? ` ${a.bt[id]}돌` : ''}`)
       t.style.setProperty('--pc', posColor(id))
       return t
-    })))
+    }), a.chars.length > 3 && h('em', { title: charNames(a.chars.slice(3), a.bt) }, `+${a.chars.length - 3}`)))   // 캐릭터가 많으면 앞 3개 + 나머지 수
   return el
 }
 
