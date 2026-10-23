@@ -290,7 +290,7 @@ function renderPlan() {
 /** 집계표(관리자 매뉴얼) — 신청 시간대별로 사람마다 한 줄(본계정), 집계 순서(계정 수 → 1순위 포지션 → 본계정 닉네임).
  *  부계정은 「상세」 로 펼친다 — 최종 명단은 팀별 편성 명단이다. 사유불참은 사유 */
 let tallyTab = 'all'
-const opened = new Set()   // 상세를 펼친 사람(userId) — 모든 시간대에서 같이 펼친다
+const opened = new Set()   // 상세를 펼친 줄 '<시간대>:<userId>' — 누른 시간대의 그 사람만 펼친다
 // 사람의 대표 계정 = 신청한 계정 중 프로필 순서가 가장 앞(대개 본계정)
 const lead = s => accts.get(key(s.userId, s.accounts[0].nick))
 const byOwner = (x, y) => byTally({ ...lead(x), n: x.owner }, { ...lead(y), n: y.owner })
@@ -307,9 +307,9 @@ function tallyCard() {
     return b
   }))
   const acctCells = a => [h('td', {}, roleTags(a.roles)), h('td', { className: 'ar-chars-cell', title: charNames(a.chars, a.bt) }, charNames(a.chars, a.bt))]
-  const personRows = (s, i) => {
-    const a = lead(s), more = s.accounts.length > 1, open = more && opened.has(s.userId)
-    const toggle = more && h('button', { type: 'button', className: 'ar-more', 'aria-expanded': open, onclick: () => { open ? opened.delete(s.userId) : opened.add(s.userId); renderPlan() } },
+  const personRows = (s, i, slot) => {
+    const a = lead(s), more = s.accounts.length > 1, id = `${slot}:${s.userId}`, open = more && opened.has(id)
+    const toggle = more && h('button', { type: 'button', className: 'ar-more', 'aria-expanded': open, onclick: () => { open ? opened.delete(id) : opened.add(id); renderPlan() } },
       open ? '접기' : `상세 +${s.accounts.length - 1}`)
     const owner = h('b', { className: 'ar-cnt' }, s.owner)
     owner.style.setProperty('--cc', countColor(a.count))
@@ -331,7 +331,7 @@ function tallyCard() {
         ? h('p', { className: 'ar-absent' }, who.map(s => s.memo ? `${s.owner}(${s.memo})` : s.owner).join(', ') || '-')
         : rows.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table ar-tally' },
           h('thead', {}, h('tr', {}, ['#', '본계정', '포지션', '보유 캐릭터', '계정 수', ''].map(t => h('th', {}, t)))),
-          h('tbody', {}, rows.flatMap(personRows))))   // 사람마다 [본계정 줄, 펼친 부계정 줄들]
+          h('tbody', {}, rows.flatMap((x, i) => personRows(x, i, c.id)))))   // 사람마다 [본계정 줄, 펼친 부계정 줄들]
           : h('p', { className: 'rc-muted ar-none' }, '아직 없어요'))
     if (SLOT_COLOR[c.id]) sec.style.setProperty('--sc', colorOf(c.id))
     return sec
