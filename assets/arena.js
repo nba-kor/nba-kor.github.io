@@ -310,16 +310,16 @@ function tallyCard() {
   const personRows = (s, i, slot) => {
     const a = lead(s), more = s.accounts.length > 1, id = `${slot}:${s.userId}`, open = more && opened.has(id)
     const toggle = more && h('button', { type: 'button', className: 'ar-more', 'aria-expanded': open, onclick: () => { open ? opened.delete(id) : opened.add(id); renderPlan() } },
-      open ? '접기' : `상세 +${s.accounts.length - 1}`)
+      open ? '접기' : [h('span', { className: 'ar-long' }, '상세 '), `+${s.accounts.length - 1}`])   // 휴대폰은 「+3」 만
     const owner = h('b', { className: 'ar-cnt' }, s.owner)
     owner.style.setProperty('--cc', countColor(a.count))
     const count = h('span', { className: 'ar-cnt' }, `${a.count}개`)
     count.style.setProperty('--cc', countColor(a.count))
     return [
-      h('tr', {}, h('td', {}, i + 1), h('td', { className: 'ar-nick' }, owner, a.n !== s.owner && h('small', {}, `참가 ${a.n}`)), ...acctCells(a), h('td', {}, count), h('td', {}, toggle)),
+      h('tr', {}, h('td', {}, i + 1), h('td', { className: 'ar-nick' }, owner, a.n !== s.owner && h('small', {}, `참가 ${a.n}`), h('small', { className: 'ar-inline-chars' }, charNames(a.chars, a.bt))), ...acctCells(a), h('td', {}, count), h('td', {}, toggle)),
       ...open ? s.accounts.slice(1).map(x => {
         const sub = accts.get(key(s.userId, x.nick))
-        return h('tr', { className: 'ar-sub' }, h('td', {}), h('td', { className: 'ar-nick' }, h('span', { className: 'ac-kind' }, '부계정'), ` ${sub.n}`), ...acctCells(sub), h('td', {}), h('td', {}))
+        return h('tr', { className: 'ar-sub' }, h('td', {}), h('td', { className: 'ar-nick' }, h('span', { className: 'ac-kind' }, '부계정'), ` ${sub.n}`, h('small', { className: 'ar-inline-chars' }, charNames(sub.chars, sub.bt))), ...acctCells(sub), h('td', {}), h('td', {}))
       }) : [],
     ]
   }
@@ -364,7 +364,8 @@ function membersCard(at) {
     SLOTS.map(s => {
       const w = where.find(x => x.slot === s.id)
       const applied = a.slots.includes(s.id) || a.slots.includes('flex')
-      const td = h('td', {}, w ? h('span', { className: 'ar-badge' }, `${w.team}팀`) : h('span', { className: applied ? 'ar-want' : 'ar-dash' }, applied ? '신청' : '-'))
+      const td = h('td', {}, w ? h('span', { className: 'ar-badge' }, `${w.team}팀`)
+        : applied ? h('span', { className: 'ar-want', title: '신청' }, h('span', { className: 'ar-long' }, '신청'), h('span', { className: 'ar-short' }, '○')) : h('span', { className: 'ar-dash' }, '-'))   // 휴대폰은 ○
       td.style.setProperty('--sc', colorOf(s.id))
       return td
     }),
@@ -372,7 +373,7 @@ function membersCard(at) {
   return h('section', { className: 'card ar-card' },
     h('h3', {}, '멤버별 배치 현황'),
     body.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table' },
-      h('thead', {}, h('tr', {}, h('th', {}, '#'), h('th', {}, '닉네임'), SLOTS.map(s => h('th', {}, s.short)), h('th', {}, '상태'))),
+      h('thead', {}, h('tr', {}, h('th', {}, '#'), h('th', {}, '닉네임'), SLOTS.map(s => h('th', {}, h('span', { className: 'ar-long' }, s.short), h('span', { className: 'ar-short' }, TAG[s.id]))), h('th', {}, '상태'))),
       h('tbody', {}, body)))
       : h('p', { className: 'rc-muted' }, '아직 신청한 계정이 없어요.'))
 }

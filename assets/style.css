@@ -993,6 +993,7 @@ label.ac-pick { cursor: pointer; }
 .ac-empty { padding: 14px; text-align: center; color: var(--muted); font-size: 13px; border: 1px dashed var(--line); border-radius: 12px; }
 .ac-dialog form { display: flex; flex-direction: column; height: 100%; }
 .ac-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+.ac-body > * { flex-shrink: 0; }   /* 줄어들면 고른 캐릭터 줄이 아래 포지션 탭과 겹친다 */
 .ac-top { display: flex; align-items: center; gap: 12px; }
 .ac-top input[type="text"] { flex: 1; min-width: 0; padding: 9px 11px; }
 .ac-top .check input { width: 18px; height: 18px; accent-color: var(--accent); }
@@ -1081,7 +1082,8 @@ label.ac-pick { cursor: pointer; }
 .ar-tabs [aria-selected="true"] { color: #06121f; background: var(--sc); border-color: var(--sc); }
 .ar-slot { --sc: var(--accent); margin-top: 6px; }
 .ar-slot + .ar-slot { margin-top: 16px; }
-.ar-slot-head { display: flex; align-items: baseline; gap: 6px; padding-left: 10px; margin-bottom: 8px; border-left: 4px solid var(--sc); }
+.ar-slot-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 6px; padding-left: 10px; margin-bottom: 8px; border-left: 4px solid var(--sc); }
+.ar-slot-head :is(b, span) { white-space: nowrap; }
 .ar-slot-head b { font-size: 17px; color: var(--sc); }
 .ar-slot-head small { margin-left: auto; color: var(--muted); font-size: 12px; }
 .ar-none { padding: 6px 14px; }
@@ -1246,7 +1248,7 @@ label.ac-pick { cursor: pointer; }
 @media (max-width: 860px) { .ar-chart { grid-template-columns: 1fr; } }
 
 /* 아레나 참가 신청 모달 — ✕ · 신청 완료로만 닫힌다 */
-.ar-signup-dialog { width: min(820px, calc(100vw - 32px)); }
+@media (min-width: 561px) { .ar-signup-dialog { width: min(820px, calc(100vw - 32px)); } }
 .ar-signup-dialog .ar-dlg-body { max-width: none; margin: 0; padding: 14px 18px 22px; }
 .ar-signup-dialog .ar-memo input { width: 100%; }
 
@@ -1277,3 +1279,40 @@ label.ac-pick { cursor: pointer; }
 .ar-role-tabs button { padding: 4px 11px; font-size: 12.5px; }
 .ar-chip-top { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 0; }
 .ar-chip-top .ac-roles { margin-left: 5px; }
+
+/* ---------- 휴대폰 정리(360~560px) ---------- */
+.ar-short, .ar-inline-chars { display: none; }
+.ar-tally .ar-more .ar-long { display: inline; }
+@media (max-width: 560px) {
+  /* 홈 프로필 카드 — 「마이페이지」 버튼이 이름을 한 글자씩 밀어내지 않게 아랫줄로 */
+  .me-main > div { flex: 1 1 calc(100% - 70px); }
+  .me-main > .btn { flex: 1 1 100%; text-align: center; }
+  /* 집계표 — 가로 스크롤 없이: # · 보유 캐릭터 열을 빼고 캐릭터는 이름 아래 작은 줄로 */
+  .ar-tally { min-width: 0; }
+  .ar-tally :is(th, td):is(:nth-child(1), :nth-child(4)) { display: none; }
+  .ar-tally th:nth-child(2) { width: auto; }
+  .ar-tally th:nth-child(3) { width: 96px; }
+  .ar-tally th:nth-child(5) { width: 40px; }
+  .ar-tally th:nth-child(6) { width: 50px; }
+  .ar-tally :is(th, td) { padding-left: 4px; padding-right: 4px; }
+  .ar-tally .ar-more { white-space: nowrap; }
+  .ar-tally td { white-space: normal; }
+  .ar-tally .ar-nick { text-align: left; }
+  .ar-tally .ar-nick > :is(b, small) { display: block; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ar-tally .ar-inline-chars { display: block; color: var(--muted); font-size: 11px; }
+  .ar-tally .ac-roles { justify-content: center; }
+  .ar-more { padding: 2px 6px; font-size: 11px; }
+  /* 멤버별 배치 현황 — 시간대 머리는 토1 · 토1.5, 칸을 좁게 */
+  .ar-long, .ar-tally .ar-more .ar-long { display: none; }
+  .ar-short { display: inline; }
+  .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally) :is(th, td) { padding: 6px 2px; font-size: 11.5px; white-space: nowrap; }
+  .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally) .ar-nick { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
+  .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally) :is(th, td):is(:first-child, :last-child) { display: none; }   /* # · 상태(배정은 뱃지로 보인다) */
+  .ar-badge { min-width: 34px; padding: 2px 4px; font-size: 11px; }
+  .ar-nick small { display: block; margin: 0 !important; }
+  /* 편성 대기 목록 — 휴대폰은 눌러서 팀을 고르니 머리에 붙여 둘 필요가 없다(붙이면 화면 절반을 가린다) */
+  .ar-pool { position: static; max-height: none; overflow: visible; box-shadow: none; }
+  /* 출석 현황 — 「3주 연속」 이 두 줄로 접히지 않게, # 는 뺀다 */
+  .mp-attend :is(th, td) { padding: 6px 4px; white-space: nowrap; }
+  .mp-attend :is(th, td):first-child { display: none; }
+}
