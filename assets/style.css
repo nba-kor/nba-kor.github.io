@@ -1249,3 +1249,18 @@ label.ac-pick { cursor: pointer; }
 .ar-signup-dialog { width: min(820px, calc(100vw - 32px)); }
 .ar-signup-dialog .ar-dlg-body { max-width: none; margin: 0; padding: 14px 18px 22px; }
 .ar-signup-dialog .ar-memo input { width: 100%; }
+
+/* 아레나 신청 요약 — 내 배정(시간대 · 팀 · 내 계정 · 같은 팀) */
+.ar-mine { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.ar-mine-title { margin: 0 0 8px; font-weight: 800; font-size: 13.5px; }
+.ar-mine ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ar-mine li { --sc: var(--accent); display: flex; flex-direction: column; gap: 5px; padding: 10px 12px; border-radius: 12px; border-left: 4px solid var(--sc); background: color-mix(in srgb, var(--sc) 8%, var(--panel-2)); font-size: 13px; }
+.ar-mine-slot { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.ar-mine-slot b { color: var(--sc); font-size: 14.5px; }
+.ar-mine-slot small, .ar-mine li small { color: var(--muted); font-size: 11.5px; }
+.ar-mine-me, .ar-mine-mates { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.ar-mine-k { flex: none; min-width: 3.6em; color: var(--muted); font-size: 12px; }
+.ar-mine .ac-roles { margin-left: 2px; }
+.ar-mate { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+/* 편성 대기 목록 머리 — 휴대폰에서 줄이 접혀도 「자세히 보기」 와 아래 탭 사이를 띄운다 */
+.ar-pool-head { margin-bottom: 10px; }

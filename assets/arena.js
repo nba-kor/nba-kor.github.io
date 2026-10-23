@@ -40,9 +40,9 @@ let data = null      // GET /api/arena — { week, current, signups, plan, planA
 let plan = {}        // 편성표 사본 { 시간대: [[{ u, n }]] } — 관리자가 고친다
 let accts = new Map()   // 신청한 계정 key → { u, n, owner(본계 닉네임), roles, chars, bt, slots, count(소유자의 참가 계정 수) }
 let tab = 'all', poolTab = 'all'
-// 편성의 「자세히 보기」 — 켜면 칩마다 캐릭터(돌파)가 펼쳐진다. 이 브라우저에 기억한다
+// 편성의 「자세히 보기」 — 칩마다 캐릭터(돌파)가 펼쳐진다. 처음엔 켜져 있고, 끄면 이 브라우저에 기억한다
 const DETAIL_KEY = 'dc.arena.detail'
-let detail = (() => { try { return localStorage.getItem(DETAIL_KEY) === '1' } catch { return false } })()
+let detail = (() => { try { return localStorage.getItem(DETAIL_KEY) !== '0' } catch { return true } })()
 let draft = null     // 신청 폼 상태 — 다시 그려도 남는다. 신청 · 취소하면 서버 값으로 다시 채운다
 
 async function load() {
@@ -89,10 +89,31 @@ function renderSignup() {
     h('p', { className: 'rc-note' }, !mine ? '아직 이번 주 신청을 안 했어요. 참석할 시간과 계정을 골라 신청해 주세요.'
       : absent ? `사유불참${mine.memo ? ` · ${mine.memo}` : ''}`
       : `계정 ${mine.accounts.map(a => a.nick).join(', ')}${mine.memo ? ` · 메모 ${mine.memo}` : ''}`),
+    mine && !absent && myTeams(),
     h('div', { className: 'rc-actions' },
       mine && h('button', { type: 'button', className: 'danger', onclick: cancel }, '신청 취소'),
       h('button', { type: 'button', className: 'primary rc-big', onclick: openSignup }, mine ? '신청 수정' : '신청하기')))
   renderForm()   // 모달이 열려 있으면 새로 읽은 값으로(적던 것은 draft 에 남아 있다)
+}
+
+/** 내 배정 — 시간대마다 어느 팀에 어느 계정으로, 같은 팀은 누구(참가 계정 · 본계정 · 포지션). 편성표는 누구나 보니 여기서도 그대로 보여 준다 */
+function myTeams() {
+  const who = a => a.owner === a.n ? [h('b', {}, a.n), h('small', {}, ' 본계정')] : [h('b', {}, a.n), h('small', {}, ` 본계 ${a.owner}`)]
+  const rows = SLOTS.flatMap(s => teamsOf(s.id).flatMap((tm, ti) => {
+    const self = tm.find(x => x.u === me.id)
+    if (!self) return []
+    const a = accts.get(key(self.u, self.n)) || { n: self.n, owner: self.n, roles: [] }
+    const mates = tm.filter(x => x !== self).map(x => accts.get(key(x.u, x.n))).filter(Boolean)
+    const row = h('li', {},
+      h('div', { className: 'ar-mine-slot' }, h('b', {}, `${s.label} ${ti + 1}팀`), h('small', {}, slotWhen(week, s))),
+      h('div', { className: 'ar-mine-me' }, h('span', { className: 'ar-mine-k' }, '내 계정'), ...who(a), roleTags(a.roles)),
+      h('div', { className: 'ar-mine-mates' }, h('span', { className: 'ar-mine-k' }, '같은 팀'),
+        mates.length ? mates.map(m => h('span', { className: 'ar-mate' }, ...who(m), roleTags(m.roles))) : h('span', { className: 'rc-muted' }, '아직 혼자예요')))
+    row.style.setProperty('--sc', colorOf(s.id))
+    return [row]
+  }))
+  return h('div', { className: 'ar-mine' }, h('p', { className: 'ar-mine-title' }, '내 배정'),
+    rows.length ? h('ul', {}, rows) : h('p', { className: 'rc-muted' }, '아직 배정 전이에요 — 운영진이 편성하면 여기에 팀과 팀원이 보여요'))
 }
 
 // 신청 모달 — ✕ · 신청 완료로만 닫는다. 바깥을 누르거나 Esc 로는 안 닫혀 적던 것이 날아가지 않는다.
