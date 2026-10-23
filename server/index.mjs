@@ -905,26 +905,43 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   // ------------------------------------------------ 멤버 관리(관리자) — 멤버 = 프로필이 있는 사람. 관리자 임명 · 해제 · 탈퇴.
   // 마스터(site_masters = 슈퍼관리자)는 바꾸거나 탈퇴시킬 수 없고, 본인도 못 바꾼다(실수로 자기 권한을 잃지 않게)
 
-  async function members(request, id) {
+  async function members(request, id, t) {
     const action = [request.method, id && 'member'].filter(Boolean).join(' ')
     if (!['GET', 'PUT member', 'DELETE member'].includes(action)) fail(404, '없는 주소예요')
     const user = await identity(request)
     if (!await isAdmin(user)) fail(403, '관리자만 멤버를 관리할 수 있어요')
 
-    if (action === 'GET') {   // 슈퍼관리자 → 관리자 → 멤버, 각각 본계정 닉네임 순. lastWeek = 마지막으로 아레나 신청한 주
+    if (action === 'GET') {   // 슈퍼관리자 → 관리자 → 멤버, 각각 본계정 닉네임 순. lastWeek = 마지막으로 아레나 신청한 주, attend = 출석(아래)
       const [profiles, masters, admins, weeks] = await Promise.all([
-        db('/recruit_profiles?select=discord_user_id,discord_name,entries,updated_at&order=updated_at.desc&limit=1000'),
+        db('/recruit_profiles?select=discord_user_id,discord_name,entries,created_at,updated_at&order=updated_at.desc&limit=1000'),
         db('/site_masters?select=user_id'), db('/site_admins?select=user_id'),
-        db('/arena_signups?select=user_id,week&order=week.desc&limit=10000'),
+        db('/arena_signups?select=user_id,week,slots&order=week.desc&limit=10000'),
       ])
       const role = new Map([...admins.map(a => [a.user_id, 'admin']), ...masters.map(m => [m.user_id, 'master'])])
       const last = new Map()
       for (const w of weeks) if (!last.has(w.user_id)) last.set(w.user_id, w.week)
+      // 출석 = 그 주에 신청(사유불참 빼고). 이번 주에 신청했으면 이번 주부터, 아직이면 지난주부터 거꾸로 센다 —
+      // streak = 연속 참석 주, missed = 연속 미참석 주(가입한 주 · 아레나 신청을 받기 시작한 주 앞은 안 센다)
+      const cur = arenaWeek(t), back = w => new Date(Date.parse(`${w}T00:00:00Z`) - 7 * 86_400_000).toISOString().slice(0, 10)
+      const first = weeks.reduce((m, w) => w.week < m ? w.week : m, cur)
+      const went = new Map(), now = new Map()
+      for (const w of weeks) {
+        const absent = w.slots.includes('absent')
+        if (w.week === cur) now.set(w.user_id, absent ? 'absent' : 'in')
+        if (!absent) went.set(w.user_id, (went.get(w.user_id) || new Set()).add(w.week))
+      }
+      const attend = p => {
+        const set = went.get(p.discord_user_id) || new Set(), start = [first, arenaWeek(p.created_at)].sort().at(-1)
+        let w = now.get(p.discord_user_id) === 'in' ? cur : back(cur), streak = 0, missed = 0
+        if (set.has(w)) for (; set.has(w); w = back(w)) streak++
+        else for (; w >= start && !set.has(w); w = back(w)) missed++
+        return { now: now.get(p.discord_user_id) ?? null, streak, missed, total: set.size }
+      }
       const ORDER = { master: 0, admin: 1, member: 2 }
       return [200, {
         members: profiles.map(p => ({
           userId: p.discord_user_id, name: p.discord_name, main: p.entries[0]?.nick ?? p.discord_name, accounts: new Set(p.entries.map(e => e.nick)).size,
-          role: role.get(p.discord_user_id) || 'member', lastWeek: last.get(p.discord_user_id) ?? null, updatedAt: p.updated_at,
+          role: role.get(p.discord_user_id) || 'member', lastWeek: last.get(p.discord_user_id) ?? null, attend: attend(p), updatedAt: p.updated_at,
         })).sort((a, b) => ORDER[a.role] - ORDER[b.role] || a.main.localeCompare(b.main, 'ko')),
       }]
     }
@@ -965,7 +982,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const a = pathname.match(/^\/api\/arena(?:\/(signup|plan|mine))?$/)
     if (a) return arena(request, a[1], now())
     const mb = pathname.match(/^\/api\/members(?:\/([^/]+))?$/)
-    if (mb) return members(request, mb[1])
+    if (mb) return members(request, mb[1], now())
     const me = pathname.match(/^\/api\/me(\/profile)?$/)
     const m = pathname.match(/^\/api\/teams(?:\/([^/]+)(?:\/(members|extend)(?:\/([^/]+))?)?)?$/)
     const [, id, sub, userId] = m || []

@@ -7,8 +7,9 @@
 | URL | 파일 | 설명 |
 | --- | --- | --- |
 | `/` | `index.html` | 홈 — 맨 위에 **내 프로필**(본계정 · 캐릭터 · 이번 주 아레나 신청 · 배정), 메뉴 카드 네 개(아레나 운영 · 전략·공략 · 영상 자료실 · 마이페이지), 최신 강의, 선수 현황 |
-| `/arena/` | `arena/index.html` | **아레나 운영** — 주간 아레나전 참가 신청(시간대 + 내 프로필 계정) · 편성 결과(누구나) · 편성(관리자, 끌어서 배치) · 편성표 그림 카톡 공유([아레나 운영](#아레나-운영)) |
-| `/me/` | `me/index.html` | **마이페이지** — 표시 이름 · 마이크 · 게임 계정(본계정 · 부계정)마다 보유 캐릭터 여러 개 · 아레나 신청 이력 · 카카오 연결 · (관리자) 숨긴 메뉴 · (마스터) 사이트 접근 비밀번호 |
+| `/arena/` | `arena/index.html` | **아레나 운영** — 주간 아레나전 참가 신청(시간대 + 내 프로필 계정) · 편성 결과(누구나) · 요일 · 시간대별 참여 그래프 · 편성표 그림 카톡 공유([아레나 운영](#아레나-운영)) |
+| `/arena/plan/` | `arena/plan/index.html` | **아레나 편성**(관리자, `noindex`) — 신청한 계정을 시간대별 팀에 끌어서 · 눌러서 배치. `assets/arena.js` 가 주소를 보고 편성만 그린다 |
+| `/me/` | `me/index.html` | **마이페이지** — 표시 이름 · 마이크 · 게임 계정(본계정 · 부계정)마다 보유 캐릭터 여러 개 · 아레나 신청 이력 · 카카오 연결 · (관리자) 숨긴 메뉴 · 아레나 출석 현황 · 멤버 관리 · (마스터) 사이트 접근 비밀번호 |
 | `/tactics/` | `tactics/index.html` | **전술판** — 하프코트 3:3 배치, 동선 드로잉, 기본 전술 프리셋 14종 + 커스텀 전술(등록 · 좋아요), 재생, 링크 · 카톡 공유 |
 | `/tiers/` | `tiers/index.html` | **티어표** — S~D 프리셋에 선수를 드래그, 티어 추가/이름 변경, 링크 공유. 올리면 「모두의 티어표」(`?list`, 최신순 · 추천순) 게시판에 뜨고 추천 · 댓글 · 가져오기([티어표 게시판](#티어표-게시판)) |
 | `/combos/` | `combos/index.html` | **조합표** — 선수 3명 조합 게시판. 선수마다 잠재력추천 빌드를 참고로 붙이고, 상대하기 편한/힘든 캐릭터와 조합(3명 세트)을 고른다. 추천 · 댓글([조합표](#조합표)) |
@@ -187,13 +188,17 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
 
 1. **신청**(로그인) — 참석 가능한 시간을 여럿 고르고(사유불참은 혼자), 이번 주에 낼 계정을 **내 프로필의 계정 목록**에서 고른다. 여기서 계정을 더하거나 고치면 프로필에 바로 저장된다(마이페이지와 같은 목록).
    처음이면 신청할 때 표시 이름 · 마이크와 함께 프로필도 만든다. 처음 신청할 때 계정 기본값은 지난번에 낸 계정.
-2. **편성**(관리자) — 「편성하기」 를 누르면 대기 목록과 시간대 넷이 뜬다. 계정 칩(색 = 첫 캐릭터 포지션)을 팀 칸에 끌어다 놓거나, 눌러서 팀을 고른다. 빈 칸에 놓으면 새 팀.
+2. **편성**(관리자) — 「편성하기」 가 **`/arena/plan/`** 으로 간다(신청 · 결과와 페이지를 나눴다). 계정 칩(색 = 1순위 포지션, 부계정이면 「본계 ○○」 줄)을 팀 칸에 끌어다 놓거나,
+   눌러서 팀을 고른다(메뉴 위에 포지션 · 캐릭터(돌파)). 「자세히 보기」 를 켜면 칩마다 캐릭터가 펼쳐진다(이 브라우저에 기억). 빈 칸에 놓으면 새 팀.
    **한 사람은 겹치는 시간대에 한 번만**(동시에 두 계정을 못 하니까) — 1.5차는 같은 날 1차 · 2차와 겹치고, 1차와 2차는 안 겹친다(서버 · 화면이 `data/arena.json` 의 시각으로 같이 판단). 팀은 3명까지.
    바꿀 때마다 저장하고, 그새 다른 관리자가 저장했거나 신청이 바뀌었으면(409) 새로 불러온다. 대기 목록은 위에 붙어 있어(sticky) 아래 시간대로 스크롤하며 끌 수 있다.
 3. **결과**(누구나) — 요약(참가 신청 · 배정 완료 · 대기 · 참가 계정) · **집계표** · 팀별 편성 명단(시간대 탭) · 멤버별 배치 현황(계정 × 시간대).
    집계표는 신청 시간대별로 **사람마다 한 줄(본계정)** — **참가 계정 수 많은 순 → 1순위 포지션(스코어러 > 중열 > 센터) → 본계정 닉네임(가나다 · 영문)**(`byOwner` · `byTally`, 편성의 대기 목록은 계정 단위로 같은 순서).
    부계정은 「상세」 로 펼친다 — 최종 명단은 팀별 편성 명단이다. 사유불참은 사유. **이번 주 미신청**(프로필은 있는데 신청이 없는 사람의 본계정 닉네임)은 따로 번호 붙은 표로.
+   맨 아래 **요일 · 시간대별 참여** 막대 — 참가 신청한 사람(사유불참 빼고) 중 그 시간대를 고른 비율 · 사람 수 · 계정 수, 요일마다 그날 하나라도 고른 비율.
    지난 주는 ◀ 로 본다(보기만). 마이페이지에는 내 신청 이력과 배정이 남는다.
+   관리자는 마이페이지 **아레나 출석 현황**에서 멤버마다 **N주 연속 참석 · N주째 미참석**을 본다 — 출석 = 그 주 참가 신청(사유불참 빼고), 이번 주에 아직 신청 전이면 지난주까지로,
+   가입한 주 · 아레나 신청을 받기 시작한 주 앞은 미참석으로 세지 않는다(`GET /api/members` 의 `attend`).
 4. **카톡 공유** — 편성표를 캔버스로 그려(`drawPlan`) `Kakao.Share.uploadImage` 로 카카오에 올리고, 그 그림을 넣은 피드 카드(「편성표 보기」 버튼)를 보낸다.
    올리는 데 시간이 걸려 PC 는 버튼을 한 번 더 눌러 보낸다(기다린 뒤 열면 팝업이 막힌다). 「이미지 저장」(휴대폰은 「이미지 공유」 — 공유창에서 카카오톡을 고르면 사진으로 간다)도 있다.
 
@@ -218,7 +223,7 @@ delete from public.site_admins where user_id = '<디스코드 ID 또는 k카카�
 | `DELETE /api/arena/signup` | 로그인 | 이번 주 신청 취소 |
 | `PUT /api/arena/plan` | 관리자 | `{ week, version: 읽어 온 planAt, plan }` → `{ plan, planAt }`. 이번 주만 · 버전이 다르거나 신청 안 한 계정이면 409 · 겹치는 시간대에 같은 사람이면 400. 10분에 300번(끌 때마다 저장) |
 | `GET /api/arena/mine` | 로그인 | 최근 10주 내 신청 + 배정 `{ history: [{ week, slots, nicks, memo, assigned: [{ slot, team, nick }] }] }` |
-| `GET /api/members` | 관리자 | `{ members: [{ userId, name, main(본계정), accounts, role: master\|admin\|member, lastWeek, updatedAt }] }` — 슈퍼관리자 → 관리자 → 멤버, 각각 본계정 순(최근에 고친 1000명) |
+| `GET /api/members` | 관리자 | `{ members: [{ userId, name, main(본계정), accounts, role: master\|admin\|member, lastWeek, attend: { now: in\|absent\|null, streak, missed, total }, updatedAt }] }` — 슈퍼관리자 → 관리자 → 멤버, 각각 본계정 순(최근에 고친 1000명) |
 | `PUT /api/members/:id` | 관리자 | `{ role: admin\|member }` 임명 · 해제. 슈퍼관리자 403 · 본인 400 |
 | `DELETE /api/members/:id` | 관리자 | 탈퇴(위). 슈퍼관리자 403 · 본인 400 |
 
@@ -227,7 +232,7 @@ delete from public.site_admins where user_id = '<디스코드 ID 또는 k카카�
 **처음 운영에 올릴 때** (순서대로 — 함수가 `site_admins` 를 읽고, 새 화면은 티어 없는 프로필을 보낸다)
 
 1. `20261023000000_arena.sql` 을 SQL Editor 에 붙여 넣어 Run → 위 SQL 로 관리자를 넣는다.
-2. Supabase **Authentication > URL Configuration > Redirect URLs** 에 `https://nba-kor.github.io/` · `https://nba-kor.github.io/arena/` · `https://nba-kor.github.io/me/` 추가(로그인은 누른 페이지로 돌아온다).
+2. Supabase **Authentication > URL Configuration > Redirect URLs** 에 `https://nba-kor.github.io/` · `https://nba-kor.github.io/arena/` · `https://nba-kor.github.io/arena/plan/` · `https://nba-kor.github.io/me/` 추가(로그인은 누른 페이지로 돌아온다).
 3. `sh tools/deploy-api.sh` → `node tools/stamp-assets.mjs` → main 푸시.
 
 ## 팀원모집
@@ -758,7 +763,7 @@ GitHub Pages 는 모든 파일에 `Cache-Control: max-age=600` 만 준다. 그�
 
 | 대상 | 파일 |
 | --- | --- |
-| 페이지 | `index.html`, `tactics/index.html`, `tiers/index.html`, `recruit/index.html`, `potentials/index.html`, `videos/index.html`, `combos/index.html`, `me/index.html`, `arena/index.html` |
+| 페이지 | `index.html`, `tactics/index.html`, `tiers/index.html`, `recruit/index.html`, `potentials/index.html`, `videos/index.html`, `combos/index.html`, `me/index.html`, `arena/index.html`, `arena/plan/index.html` |
 | 자원 | `assets/style.css`, `app.js`, `auth.js`, `board.js`, `profile.js`, `court.js`, `tactics.js`, `tiers.js`, `recruit.js`, `potentials.js`, `videos.js`, `combos.js`, `me.js`, `arena.js` |
 
 다른 스크립트가 import 하는 모듈은 import 구문에도 버전이 박히고, 그걸 박은 결과로 다시 해시를 낸다.

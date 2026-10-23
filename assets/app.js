@@ -151,14 +151,15 @@ export function startDrag(ev, source, { onDrop, onMove }) {
 
 /**
  * 선수를 눌렀을 때 뜨는 선택 메뉴(모바일에선 아래에서 올라오는 시트). 드래그가 어려운 터치 화면용.
- * items: [{ label, color?, img?, on?, pick() }] — label 은 사용자 글자일 수 있어 textContent 로만 넣는다
+ * items: [{ label, color?, img?, on?, pick() }] — label 은 사용자 글자일 수 있어 textContent 로만 넣는다. detail = 머리 아래에 붙일 노드(아레나 편성의 캐릭터 목록)
  */
-export function pickMenu(p, title, items) {
+export function pickMenu(p, title, items, detail) {
   const d = document.createElement('dialog')
   d.className = 'pick-menu'
   d.innerHTML = `<div class="pm-head"><img src="${faceOf(p)}" alt=""><div><b></b><small></small></div></div><div class="pm-items"></div><button type="button" class="pm-cancel">취소</button>`
   d.querySelector('.pm-head b').textContent = p.name
   d.querySelector('.pm-head small').textContent = title
+  if (detail) d.querySelector('.pm-head').after(detail)
   for (const it of items) {
     const b = document.createElement('button')
     b.type = 'button'

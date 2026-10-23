@@ -1,8 +1,9 @@
-// 아레나 운영 — 이번 주 참가 신청(시간대 + 내 프로필 계정) · 편성 결과(누구나) · 편성(관리자: 끌어서 · 눌러서 배치) · 카카오 공유(편성표 이미지)
-import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=c4085f32'
+// 아레나 운영(/arena/) — 이번 주 참가 신청 · 편성 결과(누구나) · 참여 그래프 · 카카오 공유(편성표 이미지)
+// 아레나 편성(/arena/plan/) — 관리자가 끌어서 · 눌러서 배치. 같은 모듈이 주소를 보고 둘 중 하나를 그린다
+import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=915be0c5'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=e2ffcda1'
-import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=6ff260c0'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, posColor, charNames, roleTags, roleColor, ROLES, ROLE_COLOR } from './profile.js?v=0ce01e56'
+import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=3a1e630f'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, posColor, charNames, roleTags, roleColor, ROLES, ROLE_COLOR } from './profile.js?v=784e0a2a'
 
 await loadData()
 mountTop('/arena/')
@@ -33,11 +34,15 @@ const slotWhen = (week, s) => `${weekLabel(week).split(' ~ ')[s.day]} ${s.time} 
 const errBox = () => h('p', { className: 'rc-form-err', role: 'alert', hidden: true })
 const show = (box, msg) => { box.textContent = msg; box.hidden = !msg }
 
-let week = new URLSearchParams(location.search).get('w') || ''   // '' = 이번 주(서버가 정한다)
+const PLAN_PAGE = location.pathname.startsWith('/arena/plan')   // 편성 페이지 — 이번 주만
+let week = PLAN_PAGE ? '' : new URLSearchParams(location.search).get('w') || ''   // '' = 이번 주(서버가 정한다)
 let data = null      // GET /api/arena — { week, current, signups, plan, planAt, missing }
 let plan = {}        // 편성표 사본 { 시간대: [[{ u, n }]] } — 관리자가 고친다
 let accts = new Map()   // 신청한 계정 key → { u, n, owner(본계 닉네임), roles, chars, bt, slots, count(소유자의 참가 계정 수) }
-let editing = false, tab = 'all', poolTab = 'all'
+let tab = 'all', poolTab = 'all'
+// 편성의 「자세히 보기」 — 켜면 칩마다 캐릭터(돌파)가 펼쳐진다. 이 브라우저에 기억한다
+const DETAIL_KEY = 'dc.arena.detail'
+let detail = (() => { try { return localStorage.getItem(DETAIL_KEY) === '1' } catch { return false } })()
 let draft = null     // 신청 폼 상태 — 다시 그려도 남는다. 신청 · 취소하면 서버 값으로 다시 채운다
 
 async function load() {
@@ -54,11 +59,13 @@ const canEdit = () => auth === 'in' && me?.admin && data?.week === data?.current
 function render() {
   if (!data) return
   $('#week-label').textContent = `${weekLabel(week)}${week === data.current ? ' · 이번 주' : ''}`
-  const prev = $('#week-prev'), next = $('#week-next')
-  prev.href = `?w=${addDays(week, -7)}`
-  next.href = `?w=${addDays(week, 7)}`
-  next.hidden = week >= data.current
-  renderSignup()
+  const prev = $('#week-prev'), next = $('#week-next')   // 편성 페이지에는 없다
+  if (prev) {
+    prev.href = `?w=${addDays(week, -7)}`
+    next.href = `?w=${addDays(week, 7)}`
+    next.hidden = week >= data.current
+  }
+  if (!PLAN_PAGE) renderSignup()
   renderPlan()
 }
 
@@ -196,14 +203,15 @@ function renderPlan() {
   const at = placements()
   const players = data.signups.filter(s => !s.slots.includes('absent'))
   const placedUsers = new Set([...at.keys()].map(k => k.split('\n')[0]))
-  const nTeams = SLOTS.reduce((n, s) => n + teamsOf(s.id).length, 0), edit = editing && canEdit()
+  const nTeams = SLOTS.reduce((n, s) => n + teamsOf(s.id).length, 0), edit = PLAN_PAGE && canEdit()
   const stat = (label, n, unit, cls = '') => h('div', { className: `ar-stat ${cls}` }, h('small', {}, label), h('b', {}, n, h('span', {}, unit)))
 
   const head = h('div', { className: 'ar-plan-head' },
-    h('div', {}, h('h2', {}, '아레나전 편성 결과'), h('p', { className: 'rc-muted' }, `${weekLabel(week)} · 총 ${nTeams}팀 · 팀당 ${A.teamSize}명`)),
+    h('div', {}, !PLAN_PAGE && h('h2', {}, '아레나전 편성 결과'), h('p', { className: 'rc-muted' }, `${PLAN_PAGE ? '' : `${weekLabel(week)} · `}총 ${nTeams}팀 · 팀당 ${A.teamSize}명`)),   // 편성 페이지는 제목 · 주가 위에 있다
     h('div', { className: 'ar-tools' },
-      nTeams > 0 && shareButtons(),
-      canEdit() && h('button', { type: 'button', className: edit ? '' : 'primary', onclick: () => { editing = !edit; history.replaceState(null, '', editing ? '#plan' : location.pathname + location.search); renderPlan() } }, edit ? '편성 끝내기' : '편성하기')))
+      !PLAN_PAGE && nTeams > 0 && shareButtons(),
+      PLAN_PAGE ? h('a', { className: 'btn', href: '/arena/' }, '← 신청 · 결과 보기')
+        : canEdit() && h('a', { className: 'btn primary', href: '/arena/plan/' }, '편성하기')))
 
   const stats = h('div', { className: 'ar-stats' },
     stat('참가 신청', players.length, '명'),
@@ -211,7 +219,10 @@ function renderPlan() {
     stat('대기', players.filter(s => !placedUsers.has(s.userId)).length, '명', 'is-wait'),
     stat('참가 계정', accts.size, '개'))
 
-  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), teamsCard(), membersCard(at)].filter(Boolean))
+  // 편성 페이지인데 관리자가 아니면(로그인 확인 중 · 일반 멤버) 안내만
+  if (PLAN_PAGE && !edit) return sec.replaceChildren(head, h('p', { className: 'card rc-note' },
+    auth === 'loading' ? '로그인 확인 중…' : auth !== 'in' ? '관리자로 로그인해야 편성할 수 있어요.' : '관리자만 편성할 수 있어요.'))
+  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), teamsCard(), membersCard(at), chartCard()].filter(Boolean))
   if (edit) document.documentElement.style.setProperty('--top-h', `${$('.top').offsetHeight}px`)   // 대기 목록이 머리 바로 아래에 붙는다(머리 높이는 로그인 줄에 따라 다르다)
   if (nTeams && !edit) queueShot()
 }
@@ -334,12 +345,43 @@ function memberCard(a) {
   const el = h('div', { className: `ar-member${mine ? ' is-me' : ''}` },
     a.chars[0] ? h('img', { src: faceOf(P(a.chars[0])), alt: '' }) : h('span', { className: 'rc-hole' }),
     h('div', { className: 'ar-who' }, a.count ? nickEl(a) : h('b', {}, a.n), h('small', {}, a.owner && a.owner !== a.n ? a.owner : ''), a.roles && roleTags(a.roles)),
-    h('div', { className: 'ar-chars' }, a.chars.slice(0, 3).map(id => {
-      const t = h('span', {}, `${P(id).short || P(id).name}${a.bt?.[id] ? ` ${a.bt[id]}돌` : ''}`)
-      t.style.setProperty('--pc', posColor(id))
-      return t
-    }), a.chars.length > 3 && h('em', { title: charNames(a.chars.slice(3), a.bt) }, `+${a.chars.length - 3}`)))   // 캐릭터가 많으면 앞 3개 + 나머지 수
+    charTags(a, 3))   // 캐릭터가 많으면 앞 3개 + 나머지 수
   return el
+}
+
+/** 캐릭터 뱃지(돌파, 테두리 색 = NBA 포지션). max 를 주면 앞 max 개 + 나머지 수 */
+function charTags(a, max = Infinity) {
+  return h('div', { className: 'ar-chars' }, a.chars.slice(0, max).map(id => {
+    const t = h('span', {}, `${P(id).short || P(id).name}${a.bt?.[id] ? ` ${a.bt[id]}돌` : ''}`)
+    t.style.setProperty('--pc', posColor(id))
+    return t
+  }), a.chars.length > max && h('em', { title: charNames(a.chars.slice(max), a.bt) }, `+${a.chars.length - max}`))
+}
+
+/** 요일 · 시간대별 참여 — 이번 주 신청한 사람(사유불참 빼고) 중 그 시간대를 고른 비율. 막대는 CSS 로만 그린다 */
+function chartCard() {
+  const players = data.signups.filter(s => !s.slots.includes('absent')), n = players.length
+  const pct = k => n ? Math.round(k / n * 100) : 0
+  const bar = (id, label) => {
+    const who = players.filter(s => s.slots.includes(id)), accounts = who.reduce((k, s) => k + s.accounts.length, 0)
+    const fill = h('i', {})
+    fill.style.width = `${pct(who.length)}%`
+    const el = h('div', { className: 'ar-bar' }, h('span', { className: 'ar-bar-label' }, label), h('span', { className: 'ar-bar-track' }, fill),
+      h('span', { className: 'ar-bar-val' }, h('b', {}, `${pct(who.length)}%`), ` ${who.length}명 · ${accounts}계정`))
+    el.style.setProperty('--sc', colorOf(id))
+    return el
+  }
+  const days = ['토요일', '일요일'].map((name, day) => {
+    const ids = SLOTS.filter(s => s.day === day).map(s => s.id), any = players.filter(p => p.slots.some(x => ids.includes(x))).length
+    return h('div', { className: 'ar-chart-day' },
+      h('div', { className: 'ar-chart-head' }, h('b', {}, name), h('small', {}, `${any}명 참여 · ${pct(any)}%`)),
+      SLOTS.filter(s => s.day === day).map(s => bar(s.id, `${s.short.split(' ')[1]} ${s.time}`)))
+  })
+  const absent = data.signups.length - n
+  return h('section', { className: 'card ar-card' },
+    h('h3', {}, '요일 · 시간대별 참여'),
+    h('p', { className: 'rc-muted' }, n ? `참가 신청 ${n}명 기준(한 사람이 여러 시간대를 고를 수 있어 합이 100% 를 넘어요)${absent ? ` · 사유불참 ${absent}명 제외` : ''}` : '아직 참가 신청이 없어요'),
+    n > 0 && h('div', { className: 'ar-chart' }, days, h('div', { className: 'ar-chart-day' }, h('div', { className: 'ar-chart-head' }, h('b', {}, 'Free Agent')), bar('flex', '시간 미정'))))
 }
 
 // ================================================================ 편성(관리자) — 끌어다 놓거나, 눌러서 고른다. 바꿀 때마다 저장
@@ -359,7 +401,12 @@ function editor() {
     return b
   }))
   const poolBox = h('section', { className: 'card ar-pool', 'data-drop': 'pool' },
-    h('div', { className: 'ar-pool-head' }, h('h3', {}, '배치할 계정'), h('small', { className: 'rc-muted' }, '끌어서 배치하거나, 눌러서 팀을 고르세요')),
+    h('div', { className: 'ar-pool-head' }, h('h3', {}, '배치할 계정'), h('small', { className: 'rc-muted' }, '끌어서 배치하거나, 눌러서 팀을 고르세요'),
+      h('button', { type: 'button', className: 'ar-detail-btn', 'aria-pressed': detail, onclick: () => {
+        detail = !detail
+        try { localStorage.setItem(DETAIL_KEY, detail ? '1' : '0') } catch {}
+        renderPlan()
+      } }, detail ? '간단히 보기' : '자세히 보기')),
     poolTabs,
     h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름)' : `${LABEL[poolTab]} 신청(+ FA) 중 겹치는 시간대에 아직 없는 사람`),
     h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요')),
@@ -380,9 +427,13 @@ function editor() {
 }
 
 function chip(a, from) {
-  const el = h('div', { className: 'ar-chip', tabIndex: 0, title: `${a.owner} · ${a.roles.map(r => ROLES.find(x => x.id === r)?.label).join(' / ')} · ${charNames(a.chars, a.bt)}` },
+  // 부계정이면 본계정 닉네임을 따로 한 줄 — 누구 계정인지 먼저 보이게. 「자세히 보기」 면 캐릭터(돌파)까지
+  const el = h('div', { className: `ar-chip${detail ? ' is-detail' : ''}`, tabIndex: 0, title: `${a.owner} · ${a.roles.map(r => ROLES.find(x => x.id === r)?.label).join(' / ')} · ${charNames(a.chars, a.bt)}` },
     h('img', { src: faceOf(P(a.chars[0])), alt: '', draggable: false }),
-    h('span', {}, nickEl(a), h('small', {}, a.owner !== a.n ? `${a.owner} · ` : '', a.slots.map(s => TAG[s]).filter(Boolean).join(' '))))
+    h('span', { className: 'ar-chip-body' }, nickEl(a),
+      a.owner !== a.n && h('span', { className: 'ar-owner' }, '본계 ', h('b', {}, a.owner)),
+      h('small', {}, a.slots.map(s => TAG[s]).filter(Boolean).join(' ')),
+      detail && charTags(a)))
   el.style.setProperty('--pc', roleColor(a.roles))
   el.onpointerdown = e => startDrag(e, el, { onDrop: (x, y, target) => move(a, from, target?.closest('[data-drop]')?.dataset.drop) })
   el.onclick = () => menu(a, from)
@@ -418,7 +469,9 @@ function menu(a, from) {
     })
     items.push({ label: `${s.short} · 새 팀${applied ? '' : ' (신청 안 함)'}`, color: applied ? colorOf(s.id) : '', pick: () => move(a, from, `${s.id}:new`) })
   }
-  pickMenu({ name: a.n, img: faceOf(P(a.chars[0])) }, `${a.owner} · 신청 ${a.slots.map(s => TAG[s] || LABEL[s]).join(' ')}`, items)
+  // 메뉴 머리 아래에 포지션 · 캐릭터 — 어느 캐릭터로 뛸 수 있는지 보고 고른다
+  pickMenu({ name: a.n, img: faceOf(P(a.chars[0])) }, `${a.owner === a.n ? '본계정' : `본계 ${a.owner}`} · 신청 ${a.slots.map(s => TAG[s] || LABEL[s]).join(' ')}`, items,
+    h('div', { className: 'pm-detail' }, roleTags(a.roles), charTags(a)))
 }
 
 // 저장은 한 번에 하나 — 그 사이에 또 바꾸면 끝난 뒤 한 번 더. 그새 다른 관리자가 저장했거나 신청이 바뀌었으면(409) 새로 불러온다
@@ -578,8 +631,8 @@ async function drawPlan() {
 
 // ================================================================ 시작
 
-editing = location.hash === '#plan'   // 마이페이지 「관리자 메뉴」 에서 바로 편성으로
+if (location.hash === '#plan' && !PLAN_PAGE) location.replace('/arena/plan/')   // 예전 주소(편성이 같은 페이지에 있던 때)
 startAuth('', () => { draft = null; render() })   // 로그인 상태가 정해지거나 바뀌면 신청 폼 · 편성 버튼을 다시
 await load()
-// 탭으로 돌아오면 다시 읽는다 — 다른 관리자의 편성 · 새 신청. 편성 중에는 내 저장과 겹치지 않게 건너뛴다
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !(editing && canEdit()) && !saving) load() })
+// 탭으로 돌아오면 다시 읽는다 — 다른 관리자의 편성 · 새 신청. 편성 페이지는 내 저장과 겹치지 않게 건너뛴다
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !PLAN_PAGE && !saving) load() })

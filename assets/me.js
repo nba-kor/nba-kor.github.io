@@ -1,8 +1,8 @@
 // 마이페이지 — 프로필(표시 이름 · 마이크) · 게임 계정 · 보유 캐릭터 · 아레나 신청 이력 · 로그인 연결 · (관리자) 숨긴 메뉴 · (마스터) 사이트 접근 비밀번호
-import { mountTop, copyLink } from './app.js?v=c4085f32'
+import { mountTop, copyLink } from './app.js?v=915be0c5'
 import { api, session, hasProvider, linkKakao, saveGate, chooseLogin, KAKAO_SVG } from './auth.js?v=e2ffcda1'
-import { $, h, loadData, startAuth, auth, me } from './board.js?v=6ff260c0'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=0ce01e56'
+import { $, h, loadData, startAuth, auth, me } from './board.js?v=3a1e630f'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=784e0a2a'
 
 await loadData()
 mountTop('/me/')
@@ -23,7 +23,8 @@ function render() {
   if (auth !== 'in') return box.replaceChildren(card('마이페이지',
     h('p', { className: 'rc-note' }, '로그인하면 내 프로필 · 게임 계정 · 보유 캐릭터를 등록하고 아레나전에 신청할 수 있어요.'),
     h('div', { className: 'rc-actions' }, h('button', { type: 'button', className: 'primary rc-big', onclick: chooseLogin }, '로그인'))))
-  box.replaceChildren(...[profileCard(), historyCard(), linkCard(), me.admin && adminCard(), me.admin && membersCard(), me.master && gateCard()].filter(Boolean))   // replaceChildren 은 false 를 글자로 찍는다
+  if (me.admin) memberStore.load()
+  box.replaceChildren(...[profileCard(), historyCard(), linkCard(), me.admin && adminCard(), me.admin && attendanceCard(), me.admin && membersCard(), me.master && gateCard()].filter(Boolean))   // replaceChildren 은 false 를 글자로 찍는다
 }
 
 // ------------------------------------------------ 프로필 + 계정
@@ -117,13 +118,58 @@ function linkCard() {
 
 const adminCard = () => card('관리자 메뉴',
   h('ul', { className: 'mp-admin' },
-    h('li', {}, h('a', { href: '/arena/#plan' }, '아레나 편성'), h('small', {}, '신청한 계정을 끌어서 시간대별 팀에 배치')),
+    h('li', {}, h('a', { href: '/arena/plan/' }, '아레나 편성'), h('small', {}, '신청한 계정을 끌어서 시간대별 팀에 배치')),
+    h('li', {}, h('a', { href: '#attendance' }, '아레나 출석 현황'), h('small', {}, '몇 주 연속 참석 · 몇 주째 미참석 — 아래')),
     h('li', {}, h('a', { href: '#members' }, '멤버 관리'), h('small', {}, '관리자 임명 · 해제 · 탈퇴 — 아래')),
     h('li', {}, h('a', { href: '/recruit/' }, '팀원모집'), h('small', {}, '당분간 메뉴에서 숨겨 둔 기능 — 주소로는 누구나 들어올 수 있어요'))))
 
 // ------------------------------------------------ 관리자 — 멤버 관리(프로필이 있는 사람). 슈퍼관리자(마스터) · 본인은 못 바꾼다 — 서버도 막는다
 
 const ROLE_KO = { master: '슈퍼관리자', admin: '관리자', member: '멤버' }
+// 멤버 목록(GET /api/members) — 출석 현황 · 멤버 관리가 같이 쓴다. 바꾸면 다시 읽어 두 카드를 다시 그린다
+const memberStore = {
+  list: null, error: '', subs: new Set(),
+  async load() {
+    try { this.list = (await api('/members', { withToken: true })).members; this.error = '' }
+    catch (e) { this.error = e.message }
+    for (const f of this.subs) f()
+  },
+}
+/** 목록이 오면(또는 바뀌면) paint() — 아직이면 「불러오는 중」, 실패하면 문구 */
+const watchMembers = (box, paint) => {
+  const draw = () => memberStore.error ? box.replaceChildren(h('p', { className: 'rc-bad' }, memberStore.error))
+    : memberStore.list ? paint(memberStore.list) : box.replaceChildren(h('p', { className: 'rc-muted' }, '불러오는 중…'))
+  const f = () => box.isConnected ? draw() : memberStore.subs.delete(f)   // 다시 그려 떨어져 나간 카드는 구독을 푼다
+  memberStore.subs.add(f)
+  draw()
+}
+
+// ------------------------------------------------ 관리자 — 아레나 출석 현황. 출석 = 그 주에 참가 신청(사유불참 빼고). 이번 주에 아직 안 했으면 지난주까지로 센다
+
+function attendanceCard() {
+  const box = h('div', {})
+  const table = (rows, cols) => h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table mp-attend' },
+    h('thead', {}, h('tr', {}, ['#', '본계정', '이번 주', ...cols.map(c => c[0])].map(t => h('th', {}, t)))),
+    h('tbody', {}, rows.map((m, i) => h('tr', {}, h('td', {}, i + 1),
+      h('td', { className: 'ar-nick' }, h('b', {}, m.main), m.name !== m.main && h('small', {}, m.name)),
+      h('td', {}, h('span', { className: `mp-now is-${m.attend.now || 'none'}` }, { in: '신청', absent: '사유불참' }[m.attend.now] || '미신청')),
+      ...cols.map(c => h('td', {}, c[1](m))))))))
+  watchMembers(box, list => {
+    const going = list.filter(m => m.attend.streak).sort((a, b) => b.attend.streak - a.attend.streak || a.main.localeCompare(b.main, 'ko'))
+    const away = list.filter(m => !m.attend.streak).sort((a, b) => b.attend.missed - a.attend.missed || a.main.localeCompare(b.main, 'ko'))
+    const last = m => m.lastWeek ? weekLabel(m.lastWeek).split(' ~ ')[0] : '-'
+    box.replaceChildren(
+      h('h3', { className: 'mp-sub' }, `참석 중 ${going.length}명`),
+      going.length ? table(going, [['연속', m => h('b', { className: 'mp-streak' }, `${m.attend.streak}주 연속`)], ['총 참석', m => `${m.attend.total}회`]]) : h('p', { className: 'rc-muted' }, '없어요'),
+      h('h3', { className: 'mp-sub' }, `미참석 ${away.length}명`),
+      away.length ? table(away, [['미참석', m => m.attend.missed ? h('b', { className: 'mp-missed' }, `${m.attend.missed}주째`) : '-'], ['총 참석', m => `${m.attend.total}회`], ['최근 신청', last]]) : h('p', { className: 'rc-muted' }, '없어요'))
+  })
+  const el = card('아레나 출석 현황', box,
+    h('p', { className: 'rc-muted' }, '출석 = 그 주에 참가 신청(사유불참 빼고). 이번 주에 아직 신청하지 않았으면 지난주까지로 세요. 가입하기 전 주는 미참석으로 세지 않아요. 관리자만 보여요.'))
+  el.id = 'attendance'
+  return el
+}
+
 function membersCard() {
   let list = []
   const q = h('input', { type: 'search', placeholder: '본계정 닉네임 · 이름 검색', 'aria-label': '멤버 검색', oninput: () => paint() })
@@ -131,7 +177,7 @@ function membersCard() {
   const box = h('div', {}, h('p', { className: 'rc-muted' }, '불러오는 중…'))
   async function act(m, method, body, ask) {
     if (!confirm(ask)) return
-    try { await api(`/members/${m.userId}`, { method, withToken: true, body }); await load() }
+    try { await api(`/members/${m.userId}`, { method, withToken: true, body }); await memberStore.load() }
     catch (e) { alert(e.message) }
   }
   const buttons = m => m.role === 'master' ? h('span', { className: 'rc-muted' }, '-')
@@ -156,8 +202,7 @@ function membersCard() {
         h('td', {}, buttons(m)))))))
       : h('p', { className: 'rc-muted' }, k ? '찾는 멤버가 없어요' : '아직 멤버가 없어요'))
   }
-  async function load() { list = (await api('/members', { withToken: true })).members; paint() }
-  load().catch(e => box.replaceChildren(h('p', { className: 'rc-bad' }, e.message)))
+  watchMembers(box, l => { list = l; paint() })
   const el = card('멤버 관리', h('div', { className: 'mp-members-head' }, q, head), box,
     h('p', { className: 'rc-muted' }, '멤버 = 프로필(게임 계정)을 등록한 사람. 슈퍼관리자는 바꾸거나 탈퇴시킬 수 없어요. 탈퇴하면 프로필 · 게임 계정 · 아레나 신청 · 관리자 권한이 지워져요.'))
   el.id = 'members'

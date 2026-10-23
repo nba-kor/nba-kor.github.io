@@ -1209,3 +1209,38 @@ label.ac-pick { cursor: pointer; }
   .mp-members :is(th, td):is(:nth-child(4), :nth-child(5)) { display: none; }
   .mp-acts { flex-direction: column; }
 }
+
+/* 마이페이지 — 아레나 출석 현황(관리자) */
+.mp-sub { margin: 4px 0 8px !important; font-size: 13.5px !important; color: var(--text) !important; }
+.mp-sub ~ .mp-sub { margin-top: 16px !important; }
+.mp-attend .ar-nick small { margin-left: 6px; color: var(--muted); font-size: 11px; }
+.mp-now { padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: var(--muted); background: var(--panel-2); white-space: nowrap; }
+.mp-now.is-in { color: #35c6a7; background: #35c6a71f; }
+.mp-now.is-absent { color: var(--def); background: #ff5d5d1a; }
+.mp-streak { color: #51cf66; }
+.mp-missed { color: #ffa94d; }
+#attendance { scroll-margin-top: 110px; }
+
+/* 아레나 편성 — 칩: 부계정이면 본계정 닉네임 줄, 「자세히 보기」 면 캐릭터 */
+.ar-chip-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.ar-owner { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.ar-owner b { color: var(--text); font-weight: 800; }
+.ar-chip.is-detail { align-items: flex-start; border-radius: 14px; padding: 6px 10px 6px 6px; }
+.ar-chip .ar-chars { margin-top: 3px; max-width: 260px; }
+.ar-pool-head .ar-detail-btn { margin-left: auto; padding: 4px 12px; font-size: 12.5px; font-weight: 700; }
+.ar-detail-btn[aria-pressed="true"] { color: #06121f; background: var(--accent-2); border-color: transparent; }
+.pm-detail { display: flex; flex-direction: column; gap: 6px; margin: -4px 0 12px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); }
+.pm-detail .ac-roles { margin: 0; }
+
+/* 아레나 운영 — 요일 · 시간대별 참여 막대 */
+.ar-chart { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.ar-chart-day { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.ar-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ar-chart-head small { color: var(--muted); font-size: 12px; }
+.ar-bar { --sc: var(--accent); display: grid; grid-template-columns: 6.5em minmax(0, 1fr); grid-template-areas: "label val" "track track"; gap: 3px 8px; font-size: 12.5px; }
+.ar-bar-label { grid-area: label; color: var(--sc); font-weight: 800; }
+.ar-bar-val { grid-area: val; justify-self: end; color: var(--muted); font-size: 12px; }
+.ar-bar-val b { color: var(--text); }
+.ar-bar-track { grid-area: track; height: 10px; border-radius: 999px; background: #ffffff0d; overflow: hidden; }
+.ar-bar-track i { display: block; height: 100%; border-radius: 999px; background: var(--sc); transition: width .3s; }
+@media (max-width: 860px) { .ar-chart { grid-template-columns: 1fr; } }
