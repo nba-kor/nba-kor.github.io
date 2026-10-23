@@ -122,8 +122,11 @@ function renderSignup() {
   const list = h('ul', { className: `ac-list${absent ? ' is-off' : ''}` }, d.accounts.length
     ? d.accounts.map((a, i) => accountRow(a, i, { checked: d.nicks.has(a.nick), onCheck: on => { on ? d.nicks.add(a.nick) : d.nicks.delete(a.nick); renderSignup() }, onEdit: () => edit(a) }))
     : h('li', { className: 'ac-empty' }, '등록된 계정이 없어요 — 「+ 계정 추가」 로 게임 닉네임과 캐릭터를 넣어 주세요'))
-  const picked = d.accounts.filter(a => d.nicks.has(a.nick)).length
-  const memo = h('input', { type: 'text', maxLength: A.memo, value: d.memo, placeholder: absent ? '불참 사유 (선택)' : '예) 2팟은 늦게 들어가요', oninput: () => { d.memo = memo.value } })
+  const picked = d.accounts.filter(a => d.nicks.has(a.nick)).length, allOn = picked === d.accounts.length
+  // 계정이 둘 이상이면 한 번에 고르거나 빼기
+  const toggleAll = d.accounts.length > 1 && h('button', { type: 'button', className: 'ar-all', disabled: absent,
+    onclick: () => { d.nicks = new Set(allOn ? [] : d.accounts.map(a => a.nick)); renderSignup() } }, allOn ? '전체 해제' : '전체 선택')
+  const memo = h('input', { type: 'text', maxLength: A.memo, value: d.memo, placeholder: absent ? '불참 사유 (선택)' : '예) 2차는 늦게 들어가요', oninput: () => { d.memo = memo.value } })
 
   const submit = h('button', { type: 'submit', className: 'primary rc-big' }, mine ? '신청 수정' : '신청하기')
   const form = h('form', { className: 'ar-form', novalidate: true },
@@ -133,7 +136,7 @@ function renderSignup() {
     h('div', { className: 'ar-opts' }, SLOTS.map(s => opt(s, `${s.time} ~ ${s.end === A.closeAt ? '종료' : s.end}`))),
     h('div', { className: 'ar-opts is-extra' }, A.extra.map(c => opt(c))),
     h('p', { className: 'rc-muted' }, '여러 개 선택 가능 · 1.5차는 20:00 부터 종료까지 · 실제 배정은 운영진이 진행해요'),
-    h('h3', {}, '2. 이번 주 참가 계정 ', h('small', { className: 'ar-count' }, absent ? '불참' : `${picked}개 계정`)),
+    h('div', { className: 'ar-acc-head' }, h('h3', {}, '2. 이번 주 참가 계정 ', h('small', { className: 'ar-count' }, absent ? '불참' : `${picked}개 계정`)), toggleAll),
     person && h('div', { className: 'ar-first' }, h('p', { className: 'rc-muted' }, '처음이에요 — 프로필에 쓸 이름과 마이크도 한 번 정해 주세요'), person.el),
     list,
     h('div', { className: 'rc-add' }, h('button', { type: 'button', onclick: () => edit(null) }, '+ 계정 추가')),
