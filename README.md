@@ -765,7 +765,7 @@ GitHub Pages 는 모든 파일에 `Cache-Control: max-age=600` 만 준다. 그�
 
 | 대상 | 파일 |
 | --- | --- |
-| 페이지 | `index.html`, `tactics/index.html`, `tiers/index.html`, `recruit/index.html`, `potentials/index.html`, `videos/index.html`, `combos/index.html`, `me/index.html`, `arena/index.html`, `arena/plan/index.html` |
+| 페이지 | `index.html`, `tactics/index.html`, `tiers/index.html`, `recruit/index.html`, `potentials/index.html`, `videos/index.html`, `combos/index.html`, `me/index.html`, `arena/index.html`, `arena/plan/index.html`, `discord/index.html` |
 | 자원 | `assets/style.css`, `app.js`, `auth.js`, `board.js`, `profile.js`, `court.js`, `tactics.js`, `tiers.js`, `recruit.js`, `potentials.js`, `videos.js`, `combos.js`, `me.js`, `arena.js` |
 
 다른 스크립트가 import 하는 모듈은 import 구문에도 버전이 박히고, 그걸 박은 결과로 다시 해시를 낸다.

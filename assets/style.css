@@ -1318,3 +1318,8 @@ label.ac-pick { cursor: pointer; }
   .mp-attend :is(th, td) { padding: 6px 4px; white-space: nowrap; }
   .mp-attend :is(th, td):first-child { display: none; }
 }
+
+/* 계정 수정 창도 전체 화면 — 휴대폰 · PC. 내용은 가운데 820px 까지 */
+.ac-dialog { width: 100%; max-width: 100%; height: 100vh; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+.ac-dialog :is(header, .ac-body, .ac-foot) { padding-inline: max(16px, calc((100% - 820px) / 2 + 16px)); }
+.ac-dialog .ac-foot { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
