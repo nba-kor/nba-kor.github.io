@@ -3,7 +3,7 @@
 import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=915be0c5'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=e2ffcda1'
 import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=3a1e630f'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, posColor, charNames, roleTags, roleColor, ROLES, ROLE_COLOR } from './profile.js?v=784e0a2a'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, posColor, charNames, roleTags, roleColor, ROLES, ROLE_COLOR } from './profile.js?v=df837796'
 
 await loadData()
 mountTop('/arena/')
@@ -65,12 +65,13 @@ function render() {
     next.href = `?w=${addDays(week, 7)}`
     next.hidden = week >= data.current
   }
-  if (!PLAN_PAGE) renderSignup()
+  if (!PLAN_PAGE) { renderSignup(); openFromLink() }
   renderPlan()
 }
 
 // ================================================================ 참가 신청
 
+/** 페이지에는 신청 상태 요약 + 「신청하기 / 신청 수정」 — 폼은 모달(openSignup) */
 function renderSignup() {
   const sec = $('#signup')
   sec.hidden = week !== data.current
@@ -81,7 +82,46 @@ function renderSignup() {
     h('p', { className: 'rc-note' }, '로그인하면 내 프로필의 게임 계정으로 이번 주 아레나전에 신청할 수 있어요.'),
     h('div', { className: 'rc-actions' }, h('button', { type: 'button', className: 'primary rc-big', onclick: chooseLogin }, '로그인')))
 
-  const mine = data.signups.find(s => s.userId === me.id)
+  const mine = mineOf(), absent = mine?.slots.includes('absent')
+  sec.replaceChildren(
+    h('div', { className: 'ar-form-head' }, h('h2', {}, '참가 신청'),
+      h('span', { className: `ar-state${mine ? ' is-on' : ''}` }, mine ? `신청 완료 · ${mine.slots.map(s => TAG[s] || LABEL[s]).join(' ')}` : '미신청')),
+    h('p', { className: 'rc-note' }, !mine ? '아직 이번 주 신청을 안 했어요. 참석할 시간과 계정을 골라 신청해 주세요.'
+      : absent ? `사유불참${mine.memo ? ` · ${mine.memo}` : ''}`
+      : `계정 ${mine.accounts.map(a => a.nick).join(', ')}${mine.memo ? ` · 메모 ${mine.memo}` : ''}`),
+    h('div', { className: 'rc-actions' },
+      mine && h('button', { type: 'button', className: 'danger', onclick: cancel }, '신청 취소'),
+      h('button', { type: 'button', className: 'primary rc-big', onclick: openSignup }, mine ? '신청 수정' : '신청하기')))
+  renderForm()   // 모달이 열려 있으면 새로 읽은 값으로(적던 것은 draft 에 남아 있다)
+}
+
+// 신청 모달 — ✕ · 신청 완료로만 닫는다. 바깥을 누르거나 Esc 로는 안 닫혀 적던 것이 날아가지 않는다.
+// 머리 · 몸통은 한 번만 만들고 폼만 바꿔 끼운다 — 체크할 때마다 다시 그려도 모달 스크롤이 맨 위로 튀지 않게
+let dlg = null, dlgBody = null
+function openSignup() {
+  if (!dlg) {
+    dlgBody = h('div', { className: 'ar-dlg-body recruit ar' })   // body 에 붙어 main(.recruit) 밖이라 폼 스타일을 같이 받게
+    dlg = h('dialog', { className: 'rc-dialog ar-signup-dialog', 'aria-labelledby': 'signup-title' },
+      h('header', {}, h('h2', { id: 'signup-title' }, '이번 주 참가 신청'), h('button', { type: 'button', 'aria-label': '닫기', onclick: () => dlg.close() }, '✕')),
+      dlgBody)
+    dlg.addEventListener('cancel', e => e.preventDefault())   // Esc
+    document.body.append(dlg)
+  }
+  draft = null   // 열 때마다 서버에 저장된 신청에서 시작
+  dlg.showModal()
+  dlg.scrollTop = 0
+  renderForm()
+}
+// 홈 · 마이페이지의 「신청하기」(/arena/#signup) — 로그인이 확인되면 한 번 연다
+function openFromLink() {
+  if (location.hash !== '#signup' || auth !== 'in' || !data || week !== data.current || PLAN_PAGE) return
+  history.replaceState(null, '', location.pathname + location.search)
+  openSignup()
+}
+
+function renderForm() {
+  if (!dlg?.open) return
+  const mine = mineOf()
   if (!draft) {
     const accounts = accountsOf(me.profile?.entries)
     draft = { accounts, slots: new Set(mine?.slots), nicks: new Set(mine ? mine.accounts.map(a => a.nick) : accounts.slice(0, 1).map(a => a.nick)), memo: mine?.memo || '' }
@@ -90,7 +130,7 @@ function renderSignup() {
       const last = r.history.find(x => x.week !== week && x.nicks.length)
       if (!last || mineOf() || !draft) return
       const have = new Set(draft.accounts.map(a => a.nick)), pick = last.nicks.filter(n => have.has(n))
-      if (pick.length) { draft.nicks = new Set(pick); renderSignup() }
+      if (pick.length) { draft.nicks = new Set(pick); renderForm() }
     }).catch(() => {})
   }
   const d = draft, absent = d.slots.has('absent'), err = errBox()
@@ -102,7 +142,7 @@ function renderSignup() {
         else d.slots.delete('absent')
         d.slots.add(c.id)
       } else d.slots.delete(c.id)
-      renderSignup()
+      renderForm()
     } })
     const el = h('label', { className: `ar-opt${c.id === 'absent' ? ' is-absent' : ''}` }, box, h('span', {}, c.label), sub && h('small', {}, sub))
     if (SLOT_COLOR[c.id]) el.style.setProperty('--sc', colorOf(c.id))
@@ -124,21 +164,19 @@ function renderSignup() {
       if (a && a.nick !== r.acct.nick && d.nicks.delete(a.nick)) d.nicks.add(r.acct.nick)   // 닉네임을 바꿔도 고른 채로
       if (!a) d.nicks.add(r.acct.nick)   // 새 계정은 바로 고른다
     }
-    renderSignup()
+    renderForm()
   }
   const list = h('ul', { className: `ac-list${absent ? ' is-off' : ''}` }, d.accounts.length
-    ? d.accounts.map((a, i) => accountRow(a, i, { checked: d.nicks.has(a.nick), onCheck: on => { on ? d.nicks.add(a.nick) : d.nicks.delete(a.nick); renderSignup() }, onEdit: () => edit(a) }))
+    ? d.accounts.map((a, i) => accountRow(a, i, { checked: d.nicks.has(a.nick), onCheck: on => { on ? d.nicks.add(a.nick) : d.nicks.delete(a.nick); renderForm() }, onEdit: () => edit(a) }))
     : h('li', { className: 'ac-empty' }, '등록된 계정이 없어요 — 「+ 계정 추가」 로 게임 닉네임과 캐릭터를 넣어 주세요'))
   const picked = d.accounts.filter(a => d.nicks.has(a.nick)).length, allOn = picked === d.accounts.length
   // 계정이 둘 이상이면 한 번에 고르거나 빼기
   const toggleAll = d.accounts.length > 1 && h('button', { type: 'button', className: 'ar-all', disabled: absent,
-    onclick: () => { d.nicks = new Set(allOn ? [] : d.accounts.map(a => a.nick)); renderSignup() } }, allOn ? '전체 해제' : '전체 선택')
+    onclick: () => { d.nicks = new Set(allOn ? [] : d.accounts.map(a => a.nick)); renderForm() } }, allOn ? '전체 해제' : '전체 선택')
   const memo = h('input', { type: 'text', maxLength: A.memo, value: d.memo, placeholder: absent ? '불참 사유 (선택)' : '예) 2차는 늦게 들어가요', oninput: () => { d.memo = memo.value } })
 
   const submit = h('button', { type: 'submit', className: 'primary rc-big' }, mine ? '신청 수정' : '신청하기')
   const form = h('form', { className: 'ar-form', novalidate: true },
-    h('div', { className: 'ar-form-head' }, h('h2', {}, '참가 신청'),
-      h('span', { className: `ar-state${mine ? ' is-on' : ''}` }, mine ? `신청 완료 · ${mine.slots.map(s => TAG[s] || LABEL[s]).join(' ')}` : '미신청')),
     h('h3', {}, '1. 참석 가능한 시간'),
     h('div', { className: 'ar-opts' }, SLOTS.map(s => opt(s, `${s.time} ~ ${s.end === A.closeAt ? '종료' : s.end}`))),
     h('div', { className: 'ar-opts is-extra' }, A.extra.map(c => opt(c))),
@@ -167,12 +205,12 @@ function renderSignup() {
       if (p) await saveProfile({ ...p, accounts: d.accounts })
       await api('/arena/signup', { method: 'PUT', withToken: true, body: { slots, nicks: absent ? [] : nicks, memo: d.memo } })
       draft = null
+      dlg.close()
       await load()
-      $('#signup').scrollIntoView({ block: 'start' })
     } catch (e) { show(err, e.message) }
     finally { submit.disabled = false }
   }
-  sec.replaceChildren(form)
+  dlgBody.replaceChildren(form)
 }
 const mineOf = () => data?.signups.find(s => s.userId === me?.id)
 
@@ -181,6 +219,7 @@ async function cancel() {
   try { await api('/arena/signup', { method: 'DELETE', withToken: true }) }
   catch (e) { return alert(e.message) }
   draft = null
+  dlg?.close()
   load()
 }
 

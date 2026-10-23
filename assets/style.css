@@ -1244,3 +1244,8 @@ label.ac-pick { cursor: pointer; }
 .ar-bar-track { grid-area: track; height: 10px; border-radius: 999px; background: #ffffff0d; overflow: hidden; }
 .ar-bar-track i { display: block; height: 100%; border-radius: 999px; background: var(--sc); transition: width .3s; }
 @media (max-width: 860px) { .ar-chart { grid-template-columns: 1fr; } }
+
+/* 아레나 참가 신청 모달 — ✕ · 신청 완료로만 닫힌다 */
+.ar-signup-dialog { width: min(820px, calc(100vw - 32px)); }
+.ar-signup-dialog .ar-dlg-body { max-width: none; margin: 0; padding: 14px 18px 22px; }
+.ar-signup-dialog .ar-memo input { width: 100%; }

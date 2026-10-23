@@ -138,7 +138,7 @@ export async function editAccount(acct, accounts) {
     done({ acct: { nick: n, tier: acct?.tier || '', roles, chars, bt: Object.fromEntries(chars.filter(c => bt[c]).map(c => [c, bt[c]])) }, main: main.checked })
   }
   dlg.append(form)
-  dlg.addEventListener('click', e => { if (e.target === dlg) done(null) })   // 바깥(backdrop) 누르면 닫기
+  dlg.addEventListener('cancel', e => e.preventDefault())   // ✕ · 취소 · 완료로만 닫는다 — 바깥을 누르거나 Esc 로 고치던 것이 날아가지 않게
   document.body.append(dlg)
   dlg.showModal()
   if (!acct) nick.focus()

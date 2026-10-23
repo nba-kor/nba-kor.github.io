@@ -22,7 +22,7 @@
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=c867ddbe">
+<link rel="stylesheet" href="/assets/style.css?v=b4a9a735">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -97,7 +97,7 @@
 import { faceOf, mountTop } from '/assets/app.js?v=915be0c5'
 import { api, chooseLogin } from '/assets/auth.js?v=e2ffcda1'
 import { h, P, loadData, data, startAuth, auth, me } from '/assets/board.js?v=3a1e630f'
-import { accountsOf, charFaces, arenaCfg, weekLabel } from '/assets/profile.js?v=784e0a2a'
+import { accountsOf, charFaces, arenaCfg, weekLabel } from '/assets/profile.js?v=df837796'
 await loadData()
 mountTop('/', data.updatedAt)
 const kr = data.players.filter(p => p.server === 'kr')
@@ -129,7 +129,7 @@ async function paint() {
       h('span', {}, h('b', {}, '이번 주 아레나'), ` ${weekLabel(a.week)}`),
       h('span', { className: `ar-state${mine ? ' is-on' : ''}` }, !mine ? '미신청' : mine.slots.includes('absent') ? '사유불참' : `신청 완료 · ${mine.slots.map(s => TAG[s]).join(' · ')}`),
       at?.length > 0 && h('span', { className: 'me-at' }, `배정 ${at.join(' · ')}`),
-      go('/arena/', mine ? '신청 · 편성 보기' : '신청하기', mine ? '' : 'primary')))
+      go(mine ? '/arena/' : '/arena/#signup', mine ? '신청 · 편성 보기' : '신청하기', mine ? '' : 'primary')))
 }
 startAuth('', paint)   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
 

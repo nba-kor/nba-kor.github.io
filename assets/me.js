@@ -2,7 +2,7 @@
 import { mountTop, copyLink } from './app.js?v=915be0c5'
 import { api, session, hasProvider, linkKakao, saveGate, chooseLogin, KAKAO_SVG } from './auth.js?v=e2ffcda1'
 import { $, h, loadData, startAuth, auth, me } from './board.js?v=3a1e630f'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=784e0a2a'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=df837796'
 
 await loadData()
 mountTop('/me/')
@@ -98,7 +98,7 @@ function historyCard() {
         ? `배정 ${r.assigned.map(a => `${CHOICE[a.slot] || a.slot} ${a.team}팀(${a.nick})`).join(' · ')}` : '배정 없음')))
       : [h('li', { className: 'rc-muted' }, '아직 신청한 적이 없어요.')])
   }).catch(e => list.replaceChildren(h('li', { className: 'rc-bad' }, e.message)))
-  return card('아레나 신청 이력', list, h('div', { className: 'rc-actions' }, h('a', { className: 'btn primary', href: '/arena/' }, '이번 주 신청하기')))
+  return card('아레나 신청 이력', list, h('div', { className: 'rc-actions' }, h('a', { className: 'btn primary', href: '/arena/#signup' }, '이번 주 신청하기')))
 }
 
 // ------------------------------------------------ 로그인 연결 — 디스코드 계정에 카카오를 붙이면 카카오로도 같은 계정에 들어온다
