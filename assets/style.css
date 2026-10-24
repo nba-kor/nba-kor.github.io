@@ -1029,9 +1029,9 @@ label.ac-pick { cursor: pointer; }
 
 /* ---------- 아레나 운영 ---------- */
 .ar { --sc: var(--accent); --ok: var(--accent); --wait: var(--muted); }   /* 색은 강조색 하나 + 회색 */
-/* 카드(팀 · 편성 칸 · 계정 칩 · 내 배정 · 고른 시간대)는 흰 바탕 · 검은 글자 — 안의 글자 · 뱃지 · 칸도 이 값을 따른다 */
+/* 카드(팀 · 편성 칸 · 계정 칩 · 내 배정 · 고른 시간대)는 밝은 회색 바탕 · 검은 글자 — 안의 글자 · 뱃지 · 칸도 이 값을 따른다 */
 :is(.ar-team, .ar-drop:not(.is-new), .ar-chip, .ar-mine li, .ar-opt:has(input:checked)) {
-  --bg: #fff; --panel: #fff; --panel-2: #f1f3f5; --line: #dee2e6; --text: #16181d; --muted: #6b7280;
+  --bg: #dfe3e8; --panel: #dfe3e8; --panel-2: #cfd5dc; --line: #bcc4ce; --text: #16181d; --muted: #586272;
   color: var(--text);
 }
 .ar-head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }

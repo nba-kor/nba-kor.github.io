@@ -12,7 +12,7 @@ const A = await arenaCfg()
 const SLOTS = A.slots
 const LABEL = Object.fromEntries([...SLOTS.map(s => [s.id, s.label]), ...A.extra.map(c => [c.id, c.label])])
 const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replace(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short])])   // 토1 · 토1.5 · FA
-// 색은 강조색(주황) 하나 + 회색 — 시간대 · 포지션 · 계정 수는 글자로 구분한다. 카톡 이미지도 같은 색(팀 줄은 화면 카드처럼 흰 바탕 · 검은 글자)
+// 색은 강조색(주황) 하나 + 회색 — 시간대 · 포지션 · 계정 수는 글자로 구분한다. 카톡 이미지도 같은 색(팀 줄은 화면 카드처럼 밝은 회색 바탕 · 검은 글자)
 const ACCENT = '#f5a623'
 // 같은 날 시간이 겹치는 두 시간대(서버와 같은 규칙) — 1.5차는 1차 · 2차와 겹친다
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
@@ -652,18 +652,18 @@ async function drawPlan() {
       if (!teams.length) text('편성 전', x + 14, y + HEAD + 30, 14, '#8b97a8')
       teams.forEach((tm, ti) => {
         const ty = y + HEAD + ti * (ROW + 6)
-        box(x + 8, ty, COL - 16, ROW, 9, '#ffffff')
+        box(x + 8, ty, COL - 16, ROW, 9, '#dfe3e8')
         text(`${ti + 1}팀`, x + 30, ty + ROW / 2 + 5, 14, '#16181d', 800, 40, 'center')
         const cw = (COL - 16 - 44) / A.teamSize
         tm.forEach((m, mi) => {
           const a = accts.get(key(m.u, m.n)), cx = x + 8 + 44 + mi * cw, img = faces.get(a?.chars[0])
           g.save()
-          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15, 0, Math.PI * 2); g.fillStyle = '#f1f3f5'; g.fill(); g.clip()
+          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15, 0, Math.PI * 2); g.fillStyle = '#cfd5dc'; g.fill(); g.clip()
           if (img) g.drawImage(img, cx, ty + ROW / 2 - 15, 30, 30)
           g.restore()
-          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15.5, 0, Math.PI * 2); g.strokeStyle = '#dee2e6'; g.lineWidth = 2; g.stroke()
+          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15.5, 0, Math.PI * 2); g.strokeStyle = '#bcc4ce'; g.lineWidth = 2; g.stroke()
           text(m.n, cx + 36, ty + 25, 13.5, '#16181d', 700, cw - 40)
-          text(a ? charNames(a.chars, a.bt) : '', cx + 36, ty + 43, 11, '#6b7280', 400, cw - 40)
+          text(a ? charNames(a.chars, a.bt) : '', cx + 36, ty + 43, 11, '#586272', 400, cw - 40)
         })
       })
     })
