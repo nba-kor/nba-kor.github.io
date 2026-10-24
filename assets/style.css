@@ -1243,13 +1243,20 @@ label.ac-pick { cursor: pointer; }
 .ar-chart-day { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
 .ar-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .ar-chart-head small { color: var(--muted); font-size: 12px; }
-.ar-bar { --sc: var(--accent); display: grid; grid-template-columns: 6.5em minmax(0, 1fr); grid-template-areas: "label val" "track track"; gap: 3px 8px; font-size: 12.5px; }
+.ar-bar { --sc: var(--accent); display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label val" "track track"; gap: 3px 8px; font-size: 12.5px; }
 .ar-bar-label { grid-area: label; color: var(--sc); font-weight: 800; }
 .ar-bar-val { grid-area: val; justify-self: end; color: var(--muted); font-size: 12px; }
 .ar-bar-val b { color: var(--text); }
 .ar-bar-track { grid-area: track; height: 10px; border-radius: 999px; background: #ffffff0d; overflow: hidden; }
 .ar-bar-track i { display: block; height: 100%; border-radius: 999px; background: var(--sc); transition: width .3s; }
+/* 포지션 · 캐릭터 비율 — 캐릭터 칸이 넓고(막대 두 줄), 이름 앞에 얼굴 */
+.ar-mix { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start; }
+.ar-mix-chars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+.ar-mix .ar-bar-label { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ar-mix .ar-bar-label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ar-mix .ar-bar-label img { width: 24px; height: 24px; border-radius: 50%; background: var(--panel); flex: none; }
 @media (max-width: 860px) { .ar-chart { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .ar-mix-chars { grid-template-columns: 1fr; } }
 
 /* 아레나 참가 신청 모달 — ✕ · 신청 완료로만 닫힌다 */
 /* 전체 화면 — 휴대폰 · PC 모두. 내용은 가운데 820px 까지(PC 에서 너무 퍼지지 않게) */

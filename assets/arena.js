@@ -279,7 +279,7 @@ function renderPlan() {
   // 편성 페이지인데 관리자가 아니면(로그인 확인 중 · 일반 멤버) 안내만
   if (PLAN_PAGE && !edit) return sec.replaceChildren(head, h('p', { className: 'card rc-note' },
     auth === 'loading' ? '로그인 확인 중…' : auth !== 'in' ? '관리자로 로그인해야 편성할 수 있어요.' : '관리자만 편성할 수 있어요.'))
-  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), teamsCard(), membersCard(at), chartCard()].filter(Boolean))
+  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), teamsCard(), membersCard(at), chartCard(), mixCard()].filter(Boolean))
   if (edit) document.documentElement.style.setProperty('--top-h', `${$('.top').offsetHeight}px`)   // 대기 목록이 머리 바로 아래에 붙는다(머리 높이는 로그인 줄에 따라 다르다)
   if (nTeams && !edit) queueShot()
 }
@@ -398,16 +398,21 @@ function charTags(a, max = Infinity) {
   return h('div', { className: 'ar-chars' }, a.chars.slice(0, max).map(id => h('span', {}, `${P(id).short || P(id).name}${a.bt?.[id] ? ` ${a.bt[id]}돌` : ''}`)), a.chars.length > max && h('em', { title: charNames(a.chars.slice(max), a.bt) }, `+${a.chars.length - max}`))
 }
 
-/** 요일 · 시간대별 참여 — 이번 주 신청한 사람(사유불참 빼고) 중 그 시간대를 고른 비율. 막대는 CSS 로만 그린다 */
+/** 막대 한 줄 — 이름 · 비율(0~1) · 뒤에 붙는 수. 막대는 CSS 로만 그린다 */
+function barRow(label, ratio, rest) {
+  const pct = `${Math.round(ratio * 100)}%`, fill = h('i', {})
+  fill.style.width = pct
+  return h('div', { className: 'ar-bar' }, h('span', { className: 'ar-bar-label' }, label), h('span', { className: 'ar-bar-track' }, fill),
+    h('span', { className: 'ar-bar-val' }, h('b', {}, pct), ` ${rest}`))
+}
+
+/** 요일 · 시간대별 참여 — 이번 주 신청한 사람(사유불참 빼고) 중 그 시간대를 고른 비율 */
 function chartCard() {
   const players = data.signups.filter(s => !s.slots.includes('absent')), n = players.length
   const pct = k => n ? Math.round(k / n * 100) : 0
   const bar = (id, label) => {
     const who = players.filter(s => s.slots.includes(id)), accounts = who.reduce((k, s) => k + s.accounts.length, 0)
-    const fill = h('i', {})
-    fill.style.width = `${pct(who.length)}%`
-    return h('div', { className: 'ar-bar' }, h('span', { className: 'ar-bar-label' }, label), h('span', { className: 'ar-bar-track' }, fill),
-      h('span', { className: 'ar-bar-val' }, h('b', {}, `${pct(who.length)}%`), ` ${who.length}명 · ${accounts}계정`))
+    return barRow(label, n && who.length / n, `${who.length}명 · ${accounts}계정`)
   }
   const days = ['토요일', '일요일'].map((name, day) => {
     const ids = SLOTS.filter(s => s.day === day).map(s => s.id), any = players.filter(p => p.slots.some(x => ids.includes(x))).length
@@ -420,6 +425,25 @@ function chartCard() {
     h('h3', {}, '요일 · 시간대별 참여'),
     h('p', { className: 'rc-muted' }, n ? `참가 신청 ${n}명 기준(한 사람이 여러 시간대를 고를 수 있어 합이 100% 를 넘어요)${absent ? ` · 사유불참 ${absent}명 제외` : ''}` : '아직 참가 신청이 없어요'),
     n > 0 && h('div', { className: 'ar-chart' }, days, h('div', { className: 'ar-chart-day' }, h('div', { className: 'ar-chart-head' }, h('b', {}, 'Free Agent')), bar('flex', '시간 미정'))))
+}
+
+/** 포지션 · 캐릭터 비율 — 이번 주 참가 계정(사유불참은 계정이 없다) 기준. 포지션은 1순위, 캐릭터는 계정마다 고른 주력 캐릭터 */
+function mixCard() {
+  const list = [...accts.values()], n = list.length
+  if (!n) return null
+  const roles = [...ROLES, { id: undefined, label: '미정' }].map(r => [r.label, list.filter(a => a.roles[0] === r.id).length]).filter(([, k]) => k)
+  const count = new Map()
+  for (const a of list) for (const id of a.chars) count.set(id, (count.get(id) || 0) + 1)
+  const name = id => P(id).short || P(id).name
+  const chars = [...count].sort((x, y) => y[1] - x[1] || name(x[0]).localeCompare(name(y[0]), 'ko'))
+  const head = (title, sub) => h('div', { className: 'ar-chart-head' }, h('b', {}, title), h('small', {}, sub))
+  return h('section', { className: 'card ar-card' },
+    h('h3', {}, '포지션 · 캐릭터 비율'),
+    h('p', { className: 'rc-muted' }, `참가 계정 ${n}개 기준 · 캐릭터는 한 계정이 여럿 고를 수 있어 합이 100% 를 넘어요`),
+    h('div', { className: 'ar-chart ar-mix' },
+      h('div', { className: 'ar-chart-day' }, head('포지션', '1순위'), roles.map(([label, k]) => barRow(label, k / n, `${k}계정`))),
+      h('div', { className: 'ar-chart-day' }, head('캐릭터', `${chars.length}종`),
+        h('div', { className: 'ar-mix-chars' }, chars.map(([id, k]) => barRow([h('img', { src: faceOf(P(id)), alt: '' }), h('span', {}, name(id))], k / n, `${k}계정`))))))
 }
 
 // ================================================================ 편성(관리자) — 끌어다 놓거나, 눌러서 고른다. 바꿀 때마다 저장
