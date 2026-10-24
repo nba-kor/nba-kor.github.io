@@ -325,6 +325,7 @@ function arenaSignup(v, nicks) {
   if (!listOf(v.slots, CHOICES.length, 1) || v.slots.some(s => !CHOICES.includes(s)) || new Set(v.slots).size !== v.slots.length) fail(400, '참석할 시간을 골라 주세요')
   const absent = v.slots.includes('absent')
   if (absent && v.slots.length > 1) fail(400, '사유불참은 다른 시간과 같이 고를 수 없어요')
+  for (const s of v.slots) for (const b of SLOT_AT.get(s)?.blocks || []) if (v.slots.includes(b)) fail(400, `${SLOT_AT.get(s).label}를 고르면 ${SLOT_AT.get(b).label}는 같이 고를 수 없어요`)
   const picked = absent ? [] : v.nicks
   if (!absent && (!listOf(picked, nicks.size, 1) || picked.some(n => !nicks.has(n)) || new Set(picked).size !== picked.length)) fail(400, '참가할 계정을 내 프로필에서 골라 주세요')
   const noRole = picked.find(n => !nicks.get(n)?.length)

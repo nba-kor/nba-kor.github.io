@@ -11,7 +11,7 @@ loadKakao()
 const A = await arenaCfg()
 const SLOTS = A.slots
 const LABEL = Object.fromEntries([...SLOTS.map(s => [s.id, s.label]), ...A.extra.map(c => [c.id, c.label])])
-const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replace(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short])])   // 토1 · 토1.5 · FA
+const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replaceAll(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short])])   // 토1 · 토1올포 · 토1.5 · FA
 // 색은 강조색(주황) 하나 + 회색 — 시간대 · 포지션 · 계정 수는 글자로 구분한다. 카톡 이미지도 같은 색(팀 줄은 화면 카드처럼 밝은 회색 바탕 · 검은 글자)
 const ACCENT = '#f5a623'
 // 같은 날 시간이 겹치는 두 시간대(서버와 같은 규칙) — 1.5차는 1차 · 2차와 겹친다
@@ -153,15 +153,17 @@ function renderForm() {
   const d = draft, absent = d.slots.has('absent'), err = errBox()
 
   const opt = (c, sub) => {
-    const box = h('input', { type: 'checkbox', checked: d.slots.has(c.id), onchange: () => {
+    const off = SLOTS.find(o => o.blocks?.includes(c.id) && d.slots.has(o.id))   // 1차 올포를 고르면 같은 날 2차는 못 고른다
+    const box = h('input', { type: 'checkbox', checked: d.slots.has(c.id), disabled: !!off, onchange: () => {
       if (box.checked) {
         if (c.id === 'absent') d.slots.clear()
         else d.slots.delete('absent')
         d.slots.add(c.id)
+        c.blocks?.forEach(b => d.slots.delete(b))
       } else d.slots.delete(c.id)
       renderForm()
     } })
-    return h('label', { className: 'ar-opt' }, box, h('span', {}, c.label), sub && h('small', {}, sub))
+    return h('label', { className: `ar-opt${off ? ' is-off' : ''}` }, box, h('span', {}, c.label), (off || sub) && h('small', {}, off ? `${off.short}와 같이 못 골라요` : sub))
   }
 
   // 계정 — 프로필이 있으면 고칠 때마다 프로필에 바로 저장한다(마이페이지와 같은 계정). 없으면 신청할 때 프로필도 같이 만든다
@@ -195,7 +197,7 @@ function renderForm() {
     h('h3', {}, '1. 참석 가능한 시간'),
     h('div', { className: 'ar-opts' }, SLOTS.map(s => opt(s, `${s.time} ~ ${s.end === A.closeAt ? '종료' : s.end}`))),
     h('div', { className: 'ar-opts is-extra' }, A.extra.map(c => opt(c))),
-    h('p', { className: 'rc-muted' }, '여러 개 선택 가능 · 1.5차는 20:00 부터 종료까지 · 실제 배정은 운영진이 진행해요'),
+    h('p', { className: 'rc-muted' }, '여러 개 선택 가능 · 1차 올포는 1차부터 종료까지(같은 날 2차는 같이 못 골라요) · 1.5차는 20:00 부터 종료까지 · 실제 배정은 운영진이 진행해요'),
     h('div', { className: 'ar-acc-head' }, h('h3', {}, '2. 이번 주 참가 계정 ', h('small', { className: 'ar-count' }, absent ? '불참' : `${picked}개 계정`)), toggleAll),
     person && h('div', { className: 'ar-first' }, h('p', { className: 'rc-muted' }, '처음이에요 — 프로필에 쓸 이름과 마이크도 한 번 정해 주세요'), person.el),
     list,
@@ -264,7 +266,7 @@ function renderPlan() {
     h('div', {}, !PLAN_PAGE && h('h2', {}, '아레나전 편성 결과'), h('p', { className: 'rc-muted' }, `${PLAN_PAGE ? '' : `${weekLabel(week)} · `}총 ${nTeams}팀 · 팀당 ${A.teamSize}명`)),   // 편성 페이지는 제목 · 주가 위에 있다
     h('div', { className: 'ar-tools' },
       !PLAN_PAGE && nTeams > 0 && shareButtons(),
-      nTeams > 0 && h('button', { type: 'button', onclick: saveExcel }, '엑셀 저장'),
+      edit && nTeams > 0 && h('button', { type: 'button', onclick: saveExcel }, '엑셀 저장'),   // 편성 페이지 · 관리자만
       PLAN_PAGE ? h('a', { className: 'btn', href: '/arena/' }, '← 신청 · 결과 보기')
         : canEdit() && h('a', { className: 'btn primary', href: '/arena/plan/' }, '편성하기')))
 
@@ -411,7 +413,7 @@ function chartCard() {
     const ids = SLOTS.filter(s => s.day === day).map(s => s.id), any = players.filter(p => p.slots.some(x => ids.includes(x))).length
     return h('div', { className: 'ar-chart-day' },
       h('div', { className: 'ar-chart-head' }, h('b', {}, name), h('small', {}, `${any}명 참여 · ${pct(any)}%`)),
-      SLOTS.filter(s => s.day === day).map(s => bar(s.id, `${s.short.split(' ')[1]} ${s.time}`)))
+      SLOTS.filter(s => s.day === day).map(s => bar(s.id, `${s.short.split(' ').slice(1).join(' ')} ${s.time}`)))
   })
   const absent = data.signups.length - n
   return h('section', { className: 'card ar-card' },
@@ -630,12 +632,12 @@ function saveExcel() {
   download(new Blob(['\ufeff' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv' }), `vipers-arena-${week}.csv`)
 }
 
-/** 편성표 그림 — 2열(토 · 일 × 1팟 · 2팟). 팀 한 줄에 3명(얼굴 · 닉네임 · 캐릭터) */
+/** 편성표 그림 — 한 줄에 하루(1차 · 1차 올포 · 1.5차 · 2차). 팀 한 줄에 3명(얼굴 · 닉네임 · 캐릭터) */
 async function drawPlan() {
-  const PER = 3, W = 1400, PAD = 28, GAP = 16, COL = (W - PAD * 2 - GAP * (PER - 1)) / PER, ROW = 58, HEAD = 40, Z = 2
+  const rows = [...new Set(SLOTS.map(s => s.day))].map(d => SLOTS.filter(s => s.day === d))
+  const PER = Math.max(...rows.map(r => r.length)), PAD = 28, GAP = 16, COL = 437, W = PAD * 2 + PER * COL + GAP * (PER - 1), ROW = 58, HEAD = 40, Z = 2
   const FONT = '"Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif'
   const blockH = s => HEAD + Math.max(1, teamsOf(s.id).length) * (ROW + 6) + 8
-  const rows = Array.from({ length: Math.ceil(SLOTS.length / PER) }, (_, i) => SLOTS.slice(i * PER, i * PER + PER))   // 한 줄에 하루(1차 · 1.5차 · 2차)
   const H = 112 + rows.reduce((n, r) => n + Math.max(...r.map(blockH)) + GAP, 0) + 30
 
   // 얼굴은 같은 도메인 그림이라 캔버스가 더럽혀지지 않는다

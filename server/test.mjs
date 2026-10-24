@@ -1745,6 +1745,7 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   const okA = await signup(a, { slots: ['sun2', 'sat1', 'flex'], nicks: ['A부', 'A본'], memo: ' 늦을 수도 ' })
   assert.deepEqual([okA.status, okA.body], [200, { week, signup: { slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'], memo: '늦을 수도', updatedAt: clock } }], '시간대는 정해진 순서로')
   clock += MIN
+  assert.equal((await signup(b, { slots: ['sat1all', 'sat2'], nicks: [`B${RUN}`] })).status, 400, '1차 올포를 고르면 같은 날 2차는 못 고른다')
   assert.equal((await signup(b, { slots: ['sat1', 'sat2'], nicks: [`B${RUN}`] })).status, 200)
   assert.equal((await signup(c, { slots: ['absent'], nicks: ['무시된다'], memo: '출장' })).status, 200, '사유불참은 계정을 안 본다')
 
@@ -1769,6 +1770,7 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
     [{ sat1: [[{ u: a.id, n: 'A본' }], [{ u: a.id, n: 'A부' }]] }, 400, '같은 시간대에 한 사람 두 계정'],
     [{ sat1: [[{ u: a.id, n: 'A본' }]], sat15: [[{ u: a.id, n: 'A부' }]] }, 400, '1차와 1.5차는 겹친다'],
     [{ sat15: [[{ u: a.id, n: 'A본' }]], sat2: [[{ u: a.id, n: 'A본' }]] }, 400, '1.5차와 2차도 겹친다(같은 계정이어도)'],
+    [{ sat1all: [[{ u: a.id, n: 'A본' }]], sat2: [[{ u: a.id, n: 'A부' }]] }, 400, '1차 올포(종료까지)는 2차와도 겹친다'],
     [{ sat1: [[{ u: a.id, n: 'A본' }, { u: boss.id, n: `관리${RUN}` }]] }, 409, '신청 안 한 계정'],
     [{ sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: `B${RUN}` }, { u: a.id, n: 'A부' }, { u: b.id, n: `B${RUN}` }]] }, 400, '4명'],
     [{ mon1: [] }, 400, '없는 시간대'], [{ sat1: [{ u: a.id, n: 'A본' }] }, 400, '팀이 배열 아님'], [[], 400, '배열 편성표'],
