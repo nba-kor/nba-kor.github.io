@@ -3,7 +3,7 @@
 import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=915be0c5'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=e2ffcda1'
 import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=3a1e630f'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, ROLES } from './profile.js?v=4896bfb5'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES } from './profile.js?v=4896bfb5'
 
 await loadData()
 mountTop('/arena/')
@@ -263,6 +263,7 @@ function renderPlan() {
     h('div', {}, !PLAN_PAGE && h('h2', {}, '아레나전 편성 결과'), h('p', { className: 'rc-muted' }, `${PLAN_PAGE ? '' : `${weekLabel(week)} · `}총 ${nTeams}팀 · 팀당 ${A.teamSize}명`)),   // 편성 페이지는 제목 · 주가 위에 있다
     h('div', { className: 'ar-tools' },
       !PLAN_PAGE && nTeams > 0 && shareButtons(),
+      nTeams > 0 && h('button', { type: 'button', onclick: saveExcel }, '엑셀 저장'),
       PLAN_PAGE ? h('a', { className: 'btn', href: '/arena/' }, '← 신청 · 결과 보기')
         : canEdit() && h('a', { className: 'btn primary', href: '/arena/plan/' }, '편성하기')))
 
@@ -601,10 +602,26 @@ async function saveImage(btn) {
       try { return await navigator.share({ files: [file], title: 'VIPERS 아레나전 편성 결과' }) }
       catch (e) { if (e.name === 'AbortError') return }
     }
-    const a = h('a', { href: URL.createObjectURL(file), download: file.name })
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+    download(file, file.name)
   } finally { btn.disabled = false }
+}
+
+const download = (blob, name) => {
+  const a = h('a', { href: URL.createObjectURL(blob), download: name })
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+}
+
+/** 편성 명단 엑셀(CSV) — 계정 한 줄. BOM 을 붙여야 엑셀이 한글을 읽는다.
+ *  = + - @ 로 시작하는 닉네임은 엑셀이 수식으로 실행하므로 앞에 ' 를 붙인다 */
+function saveExcel() {
+  const cell = v => `"${String(v ?? '').replace(/^[=+\-@\t\r]/, "'$&").replace(/"/g, '""')}"`
+  const rows = [['시간대', '일시', '팀', '닉네임', '본계정', '포지션', '캐릭터']]
+  for (const s of SLOTS) teamsOf(s.id).forEach((tm, i) => tm.forEach(x => {
+    const a = accts.get(key(x.u, x.n))
+    rows.push([s.short, slotWhen(week, s), `${i + 1}팀`, x.n, a?.owner, a?.roles.map(roleLabel).join(' · '), a && charNames(a.chars, a.bt)])
+  }))
+  download(new Blob(['\ufeff' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv' }), `vipers-arena-${week}.csv`)
 }
 
 /** 편성표 그림 — 2열(토 · 일 × 1팟 · 2팟). 팀 한 줄에 3명(얼굴 · 닉네임 · 캐릭터) */
