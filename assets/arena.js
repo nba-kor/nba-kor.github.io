@@ -100,11 +100,12 @@ function myTeams() {
     if (!self) return []
     const a = accts.get(key(self.u, self.n)) || { n: self.n, owner: self.n, roles: [] }
     const mates = tm.filter(x => x !== self).map(x => accts.get(key(x.u, x.n))).filter(Boolean)
+    const lead = m => m.u === tm[0].u && m.n === tm[0].n && leadTag()
     const row = h('li', {},
       h('div', { className: 'ar-mine-slot' }, h('b', {}, `${s.label} ${ti + 1}팀`), h('small', {}, slotWhen(week, s))),
-      h('div', { className: 'ar-mine-me' }, h('span', { className: 'ar-mine-k' }, '내 계정'), ...who(a), roleTags(a.roles)),
+      h('div', { className: 'ar-mine-me' }, h('span', { className: 'ar-mine-k' }, '내 계정'), ...who(a), roleTags(a.roles), lead(self)),
       h('div', { className: 'ar-mine-mates' }, h('span', { className: 'ar-mine-k' }, '같은 팀'),
-        mates.length ? mates.map(m => h('span', { className: 'ar-mate' }, ...who(m), roleTags(m.roles))) : h('span', { className: 'rc-muted' }, '아직 혼자예요')))
+        mates.length ? mates.map(m => h('span', { className: 'ar-mate' }, ...who(m), roleTags(m.roles), lead(m))) : h('span', { className: 'rc-muted' }, '아직 혼자예요')))
     return [row]
   }))
   return h('div', { className: 'ar-mine' }, h('p', { className: 'ar-mine-title' }, '내 배정'),
@@ -370,16 +371,20 @@ function teamsCard() {
       h('div', { className: 'ar-slot-head' }, h('b', {}, s.short), h('span', {}, `(${teams.length}팀)`), h('small', {}, slotWhen(week, s))),
       teams.length ? h('div', { className: 'ar-teams' }, teams.map((tm, i) => h('div', { className: 'ar-team' },
         h('div', { className: 'ar-team-head' }, `${s.short} - ${i + 1}팀`),
-        h('div', { className: 'ar-members' }, tm.map(x => memberCard(accts.get(key(x.u, x.n)) || { u: x.u, n: x.n, owner: '', chars: [] }))))))
+        h('div', { className: 'ar-members' }, tm.map((x, j) => memberCard(accts.get(key(x.u, x.n)) || { u: x.u, n: x.n, owner: '', chars: [] }, j === 0))))))
         : h('p', { className: 'rc-muted ar-none' }, '아직 편성 전이에요'))
     return el
   })
   return h('section', { className: 'card ar-card' }, h('h3', {}, '팀별 편성 명단'), tabs, blocks)
 }
 
-function memberCard(a) {
+// 팀장 = 그 팀에 처음 넣은 계정(팀 배열의 맨 앞). 팀장을 빼면 다음 사람이 팀장이 된다
+const leadTag = () => h('span', { className: 'ar-lead' }, '팀장')
+
+function memberCard(a, lead) {
   const mine = auth === 'in' && a.u === me?.id
-  const el = h('div', { className: `ar-member${mine ? ' is-me' : ''}` },
+  const el = h('div', { className: `ar-member${mine ? ' is-me' : ''}${lead ? ' is-lead' : ''}` },
+    lead && leadTag(),
     a.chars[0] ? h('img', { src: faceOf(P(a.chars[0])), alt: '' }) : h('span', { className: 'rc-hole' }),
     h('div', { className: 'ar-who' }, a.count ? nickEl(a) : h('b', {}, a.n), h('small', {}, a.owner && a.owner !== a.n ? a.owner : ''), a.roles && roleTags(a.roles)),
     charTags(a, 3))   // 캐릭터가 많으면 앞 3개 + 나머지 수
@@ -452,7 +457,7 @@ function editor() {
       h('div', { className: 'ar-slot-head' }, h('b', {}, s.label), h('small', {}, `${s.time} · ${teams.length}팀`)),
       teams.map((tm, i) => h('div', { className: `ar-drop${tm.length >= A.teamSize ? ' is-full' : ''}`, 'data-drop': `${s.id}:${i}` },
         h('div', { className: 'ar-drop-head' }, `${i + 1}팀`, h('small', {}, `${tm.length}/${A.teamSize}`)),
-        tm.map(x => chip(accts.get(key(x.u, x.n)), { slot: s.id, ti: i })))),
+        tm.map((x, j) => chip(accts.get(key(x.u, x.n)), { slot: s.id, ti: i }, j === 0)))),
       h('div', { className: 'ar-drop is-new', 'data-drop': `${s.id}:new` }, '+ 새 팀 — 여기에 놓기'))
     return box
   }))
@@ -471,9 +476,10 @@ function memoCard() {
       : h('p', { className: 'rc-muted' }, '메모를 남긴 신청이 없어요'))
 }
 
-function chip(a, from) {
+function chip(a, from, lead = false) {
   // 부계정이면 본계정 닉네임을 따로 한 줄 — 누구 계정인지 먼저 보이게. 「자세히 보기」 면 캐릭터(돌파)까지
-  const el = h('div', { className: `ar-chip${detail ? ' is-detail' : ''}`, tabIndex: 0, title: `${a.owner} · ${a.roles.map(r => ROLES.find(x => x.id === r)?.label).join(' / ')} · ${charNames(a.chars, a.bt)}` },
+  const el = h('div', { className: `ar-chip${detail ? ' is-detail' : ''}${lead ? ' is-lead' : ''}`, tabIndex: 0, title: `${a.owner} · ${a.roles.map(r => ROLES.find(x => x.id === r)?.label).join(' / ')} · ${charNames(a.chars, a.bt)}` },
+    lead && leadTag(),
     h('img', { src: faceOf(P(a.chars[0])), alt: '', draggable: false }),
     h('span', { className: 'ar-chip-body' }, h('span', { className: 'ar-chip-top' }, nickEl(a), roleTags(a.roles)),   // 주력 포지션 1 · 2순위
       a.owner !== a.n && h('span', { className: 'ar-owner' }, '본계 ', h('b', {}, a.owner)),
@@ -616,10 +622,10 @@ const download = (blob, name) => {
  *  = + - @ 로 시작하는 닉네임은 엑셀이 수식으로 실행하므로 앞에 ' 를 붙인다 */
 function saveExcel() {
   const cell = v => `"${String(v ?? '').replace(/^[=+\-@\t\r]/, "'$&").replace(/"/g, '""')}"`
-  const rows = [['시간대', '일시', '팀', '닉네임', '본계정', '포지션', '캐릭터']]
-  for (const s of SLOTS) teamsOf(s.id).forEach((tm, i) => tm.forEach(x => {
+  const rows = [['시간대', '일시', '팀', '팀장', '닉네임', '본계정', '포지션', '캐릭터']]
+  for (const s of SLOTS) teamsOf(s.id).forEach((tm, i) => tm.forEach((x, j) => {
     const a = accts.get(key(x.u, x.n))
-    rows.push([s.short, slotWhen(week, s), `${i + 1}팀`, x.n, a?.owner, a?.roles.map(roleLabel).join(' · '), a && charNames(a.chars, a.bt)])
+    rows.push([s.short, slotWhen(week, s), `${i + 1}팀`, j ? '' : '팀장', x.n, a?.owner, a?.roles.map(roleLabel).join(' · '), a && charNames(a.chars, a.bt)])
   }))
   download(new Blob(['\ufeff' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv' }), `vipers-arena-${week}.csv`)
 }
@@ -679,6 +685,7 @@ async function drawPlan() {
           if (img) g.drawImage(img, cx, ty + ROW / 2 - 15, 30, 30)
           g.restore()
           g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15.5, 0, Math.PI * 2); g.strokeStyle = '#bcc4ce'; g.lineWidth = 2; g.stroke()
+          if (mi === 0) { box(cx + 1, ty + ROW / 2 + 9, 28, 14, 7, ACCENT); text('팀장', cx + 15, ty + ROW / 2 + 20, 10, '#1a1200', 800, 40, 'center') }   // 팀장은 얼굴 아래 뱃지
           text(m.n, cx + 36, ty + 25, 13.5, '#16181d', 700, cw - 40)
           text(a ? charNames(a.chars, a.bt) : '', cx + 36, ty + 43, 11, '#586272', 400, cw - 40)
         })
