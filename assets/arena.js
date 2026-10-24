@@ -12,8 +12,8 @@ const A = await arenaCfg()
 const SLOTS = A.slots
 const LABEL = Object.fromEntries([...SLOTS.map(s => [s.id, s.label]), ...A.extra.map(c => [c.id, c.label])])
 const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replace(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short])])   // 토1 · 토1.5 · FA
-// 색은 강조색(주황) 하나 + 회색 — 시간대 · 포지션 · 계정 수는 글자로 구분한다. 카톡 이미지도 사이트처럼 흰 바탕 · 검은 글자
-const ACCENT = '#e8590c', INK = '#16181d', MUTED = '#6b7280'
+// 색은 강조색(주황) 하나 + 회색 — 시간대 · 포지션 · 계정 수는 글자로 구분한다. 카톡 이미지도 같은 색(팀 줄은 화면 카드처럼 흰 바탕 · 검은 글자)
+const ACCENT = '#f5a623'
 // 같은 날 시간이 겹치는 두 시간대(서버와 같은 규칙) — 1.5차는 1차 · 2차와 겹친다
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT = Object.fromEntries(SLOTS.map(s => [s.id, s]))
@@ -635,42 +635,42 @@ async function drawPlan() {
     g.fillText(t, x, y)
   }
 
-  box(0, 0, W, H, 0, '#ffffff')
+  box(0, 0, W, H, 0, '#0d1117')
   text('VIPERS ARENA', PAD, 50, 30, ACCENT, 800)
-  text('아레나전 편성 결과', PAD + g.measureText('VIPERS ARENA').width + 14, 50, 22, INK, 700)
+  text('아레나전 편성 결과', PAD + g.measureText('VIPERS ARENA').width + 14, 50, 22, '#e6edf3', 700)
   const nTeams = SLOTS.reduce((n, s) => n + teamsOf(s.id).length, 0)
-  text(`${weekLabel(week)} · 총 ${nTeams}팀 · 팀당 ${A.teamSize}명`, PAD, 82, 15, MUTED)
+  text(`${weekLabel(week)} · 총 ${nTeams}팀 · 팀당 ${A.teamSize}명`, PAD, 82, 15, '#8b97a8')
 
   let y = 104
   for (const r of rows) {
     r.forEach((s, ci) => {
       const x = PAD + ci * (COL + GAP), color = ACCENT, teams = teamsOf(s.id)
-      box(x, y, COL, blockH(s), 12, '#f4f5f7')
+      box(x, y, COL, blockH(s), 12, '#161b22')
       box(x, y + 10, 4, 22, 2, color)
       text(s.short, x + 14, y + 28, 18, color, 800)
-      text(`${s.time} ~ ${s.end} · ${teams.length}팀`, x + COL - 14, y + 28, 13, MUTED, 400, 200, 'right')
-      if (!teams.length) text('편성 전', x + 14, y + HEAD + 30, 14, MUTED)
+      text(`${s.time} ~ ${s.end} · ${teams.length}팀`, x + COL - 14, y + 28, 13, '#8b97a8', 400, 200, 'right')
+      if (!teams.length) text('편성 전', x + 14, y + HEAD + 30, 14, '#8b97a8')
       teams.forEach((tm, ti) => {
         const ty = y + HEAD + ti * (ROW + 6)
         box(x + 8, ty, COL - 16, ROW, 9, '#ffffff')
-        text(`${ti + 1}팀`, x + 30, ty + ROW / 2 + 5, 14, color, 800, 40, 'center')
+        text(`${ti + 1}팀`, x + 30, ty + ROW / 2 + 5, 14, '#16181d', 800, 40, 'center')
         const cw = (COL - 16 - 44) / A.teamSize
         tm.forEach((m, mi) => {
           const a = accts.get(key(m.u, m.n)), cx = x + 8 + 44 + mi * cw, img = faces.get(a?.chars[0])
           g.save()
-          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15, 0, Math.PI * 2); g.fillStyle = '#e9ecef'; g.fill(); g.clip()
+          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15, 0, Math.PI * 2); g.fillStyle = '#f1f3f5'; g.fill(); g.clip()
           if (img) g.drawImage(img, cx, ty + ROW / 2 - 15, 30, 30)
           g.restore()
-          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15.5, 0, Math.PI * 2); g.strokeStyle = '#e2e5ea'; g.lineWidth = 2; g.stroke()
-          text(m.n, cx + 36, ty + 25, 13.5, INK, 700, cw - 40)
-          text(a ? charNames(a.chars, a.bt) : '', cx + 36, ty + 43, 11, MUTED, 400, cw - 40)
+          g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15.5, 0, Math.PI * 2); g.strokeStyle = '#dee2e6'; g.lineWidth = 2; g.stroke()
+          text(m.n, cx + 36, ty + 25, 13.5, '#16181d', 700, cw - 40)
+          text(a ? charNames(a.chars, a.bt) : '', cx + 36, ty + 43, 11, '#6b7280', 400, cw - 40)
         })
       })
     })
     y += Math.max(...r.map(blockH)) + GAP
   }
-  text('nba-kor.github.io/arena', PAD, H - 18, 12, MUTED)
-  text('TNAB Vipers', W - PAD, H - 18, 12, MUTED, 700, 200, 'right')
+  text('nba-kor.github.io/arena', PAD, H - 18, 12, '#8b97a8')
+  text('TNAB Vipers', W - PAD, H - 18, 12, '#8b97a8', 700, 200, 'right')
   return c
 }
 

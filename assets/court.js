@@ -6,7 +6,7 @@ export const W = 500, H = 470     // 1 unit = 0.1ft, 하프코트 50ft x 47ft
 const HOOP = [250, 52.5]
 const R3 = 237.5                  // 3점 라인 반지름
 const R_TOKEN = 21
-const COLOR = { off: '#4d9eff', def: '#ff5d5d', screen: 'var(--accent)' }   // 스크린 = 범례와 같은 강조색
+const COLOR = { off: '#4d9eff', def: '#ff5d5d', screen: '#f5a623' }
 
 const mk = (tag, attrs = {}) => {
   const n = document.createElementNS(NS, tag)
@@ -102,7 +102,7 @@ export function renderTokens(svg, tokens, byId, selected = null) {
     const [x, y] = toSvg([t.x, t.y])
     const g = mk('g', { class: 'token' + (selected === t.key ? ' sel' : ''), transform: `translate(${x},${y})` })
     g.dataset.key = t.key
-    g.appendChild(mk('circle', { r: R_TOKEN, fill: '#dee2e6' }))
+    g.appendChild(mk('circle', { r: R_TOKEN, fill: '#0b0f16' }))
     const p = t.playerId && byId.get(t.playerId)
     if (p) g.appendChild(mk('image', { href: faceOf(p), x: -R_TOKEN, y: -R_TOKEN, width: R_TOKEN * 2, height: R_TOKEN * 2, 'clip-path': 'url(#tclip)' }))
     g.appendChild(mk('circle', { class: 'ring', r: R_TOKEN - 1.5, fill: 'none', stroke: COLOR[t.side], 'stroke-width': 3 }))
@@ -115,7 +115,7 @@ export function renderTokens(svg, tokens, byId, selected = null) {
 
     const cap = mk('text', {
       x: clamp(x, 46, W - 46), y: y + R_TOKEN + 16, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': 600,
-      fill: '#16181d', 'paint-order': 'stroke', stroke: '#fff', 'stroke-width': 5, 'stroke-linejoin': 'round',
+      fill: '#e6edf3', 'paint-order': 'stroke', stroke: '#0d1117', 'stroke-width': 5, 'stroke-linejoin': 'round',
     })
     cap.textContent = p ? (p.short || p.name) : t.label
     lg.appendChild(cap)
