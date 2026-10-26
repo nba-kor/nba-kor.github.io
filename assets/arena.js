@@ -18,7 +18,7 @@ const ACCENT = '#f5a623'
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT = Object.fromEntries(SLOTS.map(s => [s.id, s]))
 // 그날 FA(시간 미정 · 용병)를 골랐으면 그날 모든 시간대를 신청한 셈이다
-const FA_DAY = Object.fromEntries(A.extra.filter(c => c.day != null).map(c => [c.id, c.day]))
+const FAS = A.extra.filter(c => c.day != null), FA_DAY = Object.fromEntries(FAS.map(c => [c.id, c.day]))
 const wants = (slots, s) => slots.includes(s.id) || slots.some(x => FA_DAY[x] === s.day)
 const clash = (x, y) => { const a = SLOT[x], b = SLOT[y]; return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
 // 집계 순서(관리자 매뉴얼): 소유자의 참가 계정 수 많은 순 → 1순위 포지션(스코어러 > 중열 > 센터) → 계정 이름(가나다 · 영문)
@@ -472,6 +472,7 @@ function editor() {
   const at = placements()
   const all = [...accts.values()].sort(byTally)
   const bySlot = poolTab === 'all' ? all.filter(a => !at.has(key(a.u, a.n)))
+    : poolTab in FA_DAY ? all.filter(a => a.slots.includes(poolTab) && SLOTS.some(s => s.day === FA_DAY[poolTab] && !busy(s.id, a.u)))   // 그날 FA 중 아직 넣을 시간대가 남은 사람 — 1차 · 2차 둘 다(또는 1.5차) 뛰면 빠진다
     : all.filter(a => wants(a.slots, SLOT[poolTab]) && !busy(poolTab, a.u))
   // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션), 1순위인 계정이 먼저
   const plays = (a, r) => a.roles.includes(r) || a.roles[0] === ALLPOS
@@ -481,7 +482,7 @@ function editor() {
     const n = r.id === 'all' ? bySlot.length : bySlot.filter(a => plays(a, r.id)).length
     return h('button', { type: 'button', 'aria-selected': roleTab === r.id, onclick: () => { roleTab = r.id; renderPlan() } }, `${r.label} ${n}`)
   }))
-  const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '미배정' }, ...SLOTS].map(s =>
+  const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '미배정' }, ...SLOTS, ...FAS].map(s =>
     h('button', { type: 'button', 'aria-selected': poolTab === s.id, onclick: () => { poolTab = s.id; renderPlan() } }, s.short)))
   const poolBox = h('section', { className: 'card ar-pool', 'data-drop': 'pool' },
     h('div', { className: 'ar-pool-head' }, h('h3', {}, '배치할 계정'), h('small', { className: 'rc-muted' }, '끌어서 배치하거나, 눌러서 팀을 고르세요'),
@@ -492,7 +493,8 @@ function editor() {
       } }, detail ? '간단히 보기' : '자세히 보기')),
     poolTabs,
     roleTabs,
-    h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름)' : `${LABEL[poolTab]} 신청(+ 그날 FA) 중 겹치는 시간대에 아직 없는 사람`),
+    h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름)'
+      : poolTab in FA_DAY ? `${LABEL[poolTab].split(' (')[0]} 신청 중 그날 안 겹치는 시간대가 아직 남은 사람 · 그날 1차 · 2차(또는 1.5차)를 다 뛰면 빠져요` : `${LABEL[poolTab]} 신청(+ 그날 FA) 중 겹치는 시간대에 아직 없는 사람`),
     h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요')))
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
