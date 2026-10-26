@@ -39,10 +39,14 @@ const svg = (tag, attrs = {}, ...kids) => {
 
 /** 판 하나. sel = { color, i } 고른 칸(글쓰기), onNode(color, i) = 칸을 눌렀을 때 */
 function boardView(slots, { sel, onNode } = {}) {
-  const C = [312, 345]
+  const C = [312, 345], R = 298
   return svg('svg', { viewBox: '12 44 600 600', class: 'pt-board', role: 'img', 'aria-label': '잠재력 판' },
-    svg('circle', { cx: C[0], cy: C[1], r: 298, class: 'pt-b-blob' }),
-    [[40, 210], [585, 210], [312, 645]].map(([x, y]) => svg('line', { x1: C[0], y1: C[1], x2: x, y2: y, class: 'pt-b-div' })),
+    svg('circle', { cx: C[0], cy: C[1], r: R, class: 'pt-b-blob' }),
+    // 판을 셋으로 나누는 선 — 둥근 끝(굵기 12)까지 원 안에 들어오게 끝을 가장자리에서 14 안쪽에 둔다
+    [[40, 210], [585, 210], [312, 645]].map(([x, y]) => {
+      const k = (R - 14) / Math.hypot(x - C[0], y - C[1])
+      return svg('line', { x1: C[0], y1: C[1], x2: C[0] + (x - C[0]) * k, y2: C[1] + (y - C[1]) * k, class: 'pt-b-div' })
+    }),
     svg('circle', { cx: C[0], cy: C[1] - 5, r: 50, class: 'pt-b-logo' }),
     svg('path', { d: `M${C[0] - 14},${C[1] - 18} v22 M${C[0] + 14},${C[1] - 18} v22`, class: 'pt-b-logo' }),
     cat.colors.map(({ id: color, name }) => svg('g', { class: `pt-b-${color}` },
