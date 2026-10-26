@@ -2,9 +2,9 @@
 // 프로필은 캐릭터 줄 목록(entries: [{ nick, tier, char, roles?, breakthrough? }]) 그대로 저장한다 — 같은 게임 닉네임 줄들이 한 계정, 첫 줄의 계정이 본계정.
 // 계정의 주력 포지션(roles: 1 · 2순위)은 그 계정의 줄마다 같은 값을 넣고 첫 줄 것을 읽는다. 돌파(breakthrough 1~7)는 캐릭터 줄마다.
 // 팀원모집(숨김) · 디스코드 알림도 이 줄을 읽으므로 모양을 바꾸지 않았다. 티어는 더 받지 않는다(예전에 적은 값은 계정에 남겨 둔다)
-import { faceOf } from './app.js?v=915be0c5'
+import { faceOf } from './app.js?v=d496cab6'
 import { api } from './auth.js?v=e2ffcda1'
-import { h, P, me, charGrid } from './board.js?v=3a1e630f'
+import { h, P, me, charGrid } from './board.js?v=39f60afc'
 
 const json = p => fetch(p, { cache: 'no-cache' }).then(r => r.json())
 let recruitP, arenaP

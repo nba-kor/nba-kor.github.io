@@ -54,6 +54,7 @@ tools/cn-faces/.venv/bin/python tools/og-image.py   # 로고를 바꿨으면 이
 ## 선수 데이터
 
 선수 정보와 얼굴 이미지는 **한 곳에서만** 관리하고 모든 페이지가 같이 쓴다.
+목록 순서도 모든 페이지가 같다 — 포지션(PG → C) → 화면에 보이는 이름 가나다(`assets/app.js` 의 `loadPlayers`). 파일 안 순서는 상관없다.
 
 ```
 data/players.json     한국 서버 출시 선수 39명 (자동 생성 — 직접 수정 금지)

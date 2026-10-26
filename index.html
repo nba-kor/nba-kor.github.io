@@ -94,10 +94,10 @@
 </main>
 
 <script type="module">
-import { faceOf, mountTop } from '/assets/app.js?v=915be0c5'
+import { faceOf, mountTop } from '/assets/app.js?v=d496cab6'
 import { api, chooseLogin } from '/assets/auth.js?v=e2ffcda1'
-import { h, P, loadData, data, startAuth, auth, me } from '/assets/board.js?v=3a1e630f'
-import { accountsOf, charFaces, arenaCfg, weekLabel } from '/assets/profile.js?v=a3cc1cc4'
+import { h, P, loadData, data, startAuth, auth, me } from '/assets/board.js?v=39f60afc'
+import { accountsOf, charFaces, arenaCfg, weekLabel } from '/assets/profile.js?v=75a34167'
 await loadData()
 mountTop('/', data.updatedAt)
 const kr = data.players.filter(p => p.server === 'kr')

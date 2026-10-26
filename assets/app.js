@@ -12,14 +12,16 @@ export const POS_KO = ['', '포인트가드', '슈팅가드', '스몰포워드',
 
 const FILTER_KEY = 'dc.filter'
 
-/** data/players.json(한국 출시) + data/upcoming.json(미출시)을 합쳐서 반환. */
+/** data/players.json(한국 출시) + data/upcoming.json(미출시)을 합쳐서 반환. 모든 페이지가 같은 순서 — 포지션(PG → C) → 이름(화면에 보이는 짧은 이름) 가나다 */
 export async function loadPlayers() {
   const j = async (p, fallback) => fetch(p, { cache: 'no-cache' }).then(r => r.json()).catch(() => fallback)
   const [kr, up] = await Promise.all([
     j('/data/players.json', { players: [], updatedAt: '' }),
     j('/data/upcoming.json', { players: [] }),
   ])
+  const name = p => p.short || p.name
   const players = [...kr.players, ...up.players.map(p => ({ ...p, server: p.server || 'cn' }))]
+    .sort((a, b) => a.pos - b.pos || name(a).localeCompare(name(b), 'ko'))
   return { updatedAt: kr.updatedAt, players, byId: new Map(players.map(p => [p.id, p])) }
 }
 

@@ -1,5 +1,5 @@
 // 게시판 공용 — 잠재력추천 · 영상이 같이 쓴다: 로그인 표시, 캐릭터 고르기, 목록 카드 틀, 글 머리(추천 · 공유 · 수정 · 삭제), 댓글
-import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=915be0c5'
+import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=d496cab6'
 import { api, initAuth, chooseLogin, logout, session, showWho, IN_KAKAO } from './auth.js?v=e2ffcda1'
 
 export const $ = (s, root = document) => root.querySelector(s)
@@ -21,11 +21,11 @@ export const ago = ms => {
 
 // ---------------------------------------------------------------- 선수
 
-export let data, kr   // kr = 한국 서버 출시 선수, 포지션 순
+export let data, kr   // kr = 한국 서버 출시 선수, 포지션 → 가나다 순(loadPlayers)
 export const P = id => data.byId.get(id) || { id, name: id, short: id, pos: 0 }
 export async function loadData() {
   data = await loadPlayers()
-  kr = data.players.filter(p => p.server === 'kr').sort((a, b) => a.pos - b.pos)
+  kr = data.players.filter(p => p.server === 'kr')
 }
 export const faces = ids => h('div', { className: 'rc-faces' }, ids.map(id => h('img', { src: faceOf(P(id)), alt: P(id).name, title: P(id).name })))
 
