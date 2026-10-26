@@ -620,7 +620,7 @@ test('검증: 프로필(마이크 O/X · 계정 1~maxEntries 줄) 이 잘못되�
   await bad({ ...ok, mic: null }, '마이크 null')
   await bad({ ...ok, entries: [entry({ tier: '마스터' })] }, '없는 티어(티어는 안 적어도 되지만 적으면 목록 안에서)')
   await bad({ ...ok, entries: [entry({ char: 'nope' })] }, '없는 캐릭터')
-  for (const [roles, why] of [[['x'], '없는 포지션'], [['scorer', 'mid', 'center'], '포지션 3개'], [['mid', 'mid'], '같은 포지션 두 번'], ['scorer', '포지션이 배열 아님']]) await bad({ ...ok, entries: [entry({ roles })] }, why)
+  for (const [roles, why] of [[['x'], '없는 포지션'], [['scorer', 'mid', 'center'], '포지션 3개'], [['mid', 'mid'], '같은 포지션 두 번'], [['allpos', 'mid'], '올포는 2순위 없이'], [['mid', 'allpos'], '올포는 1순위로만'], ['scorer', '포지션이 배열 아님']]) await bad({ ...ok, entries: [entry({ roles })] }, why)
   for (const breakthrough of [0, 8, 2.5, '3']) await bad({ ...ok, entries: [entry({ breakthrough })] }, `돌파 ${breakthrough}`)
   await bad({ ...ok, entries: [entry({ char: UPCOMING })] }, '미출시 캐릭터')
   await bad({ ...ok, entries: Array.from({ length: CFG.maxEntries + 1 }, (_, i) => entry({ nick: `n${i}` })) }, `${CFG.maxEntries + 1}개`)
@@ -1745,7 +1745,6 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   const okA = await signup(a, { slots: ['sun2', 'sat1', 'flex'], nicks: ['A부', 'A본'], memo: ' 늦을 수도 ' })
   assert.deepEqual([okA.status, okA.body], [200, { week, signup: { slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'], memo: '늦을 수도', updatedAt: clock } }], '시간대는 정해진 순서로')
   clock += MIN
-  assert.equal((await signup(b, { slots: ['sat1all', 'sat2'], nicks: [`B${RUN}`] })).status, 400, '1차 올포를 고르면 같은 날 2차는 못 고른다')
   assert.equal((await signup(b, { slots: ['sat1', 'sat2'], nicks: [`B${RUN}`] })).status, 200)
   assert.equal((await signup(c, { slots: ['absent'], nicks: ['무시된다'], memo: '출장' })).status, 200, '사유불참은 계정을 안 본다')
 
@@ -1770,7 +1769,6 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
     [{ sat1: [[{ u: a.id, n: 'A본' }], [{ u: a.id, n: 'A부' }]] }, 400, '같은 시간대에 한 사람 두 계정'],
     [{ sat1: [[{ u: a.id, n: 'A본' }]], sat15: [[{ u: a.id, n: 'A부' }]] }, 400, '1차와 1.5차는 겹친다'],
     [{ sat15: [[{ u: a.id, n: 'A본' }]], sat2: [[{ u: a.id, n: 'A본' }]] }, 400, '1.5차와 2차도 겹친다(같은 계정이어도)'],
-    [{ sat1all: [[{ u: a.id, n: 'A본' }]] }, 400, '1차 올포는 편성 칸이 따로 없다(1차 팀에 섞는다)'],
     [{ sat1: [[{ u: a.id, n: 'A본' }, { u: boss.id, n: `관리${RUN}` }]] }, 409, '신청 안 한 계정'],
     [{ sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: `B${RUN}` }, { u: a.id, n: 'A부' }, { u: b.id, n: `B${RUN}` }]] }, 400, '4명'],
     [{ mon1: [] }, 400, '없는 시간대'], [{ sat1: [{ u: a.id, n: 'A본' }] }, 400, '팀이 배열 아님'], [[], 400, '배열 편성표'],
@@ -1784,9 +1782,9 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
 
   // 프로필에서 계정을 빼면 신청 · 편성표에서도 안 보인다
   clock += MIN
-  await api('PUT', '/api/me/profile', { mic: true, entries: [entry({ nick: 'A본', char: 'sga', tier: '', roles: ['mid', 'scorer'] })] }, { as: a.as })
+  await api('PUT', '/api/me/profile', { mic: true, entries: [entry({ nick: 'A본', char: 'sga', tier: '', roles: ['allpos'] })] }, { as: a.as })   // 올포는 1순위 하나로
   v = await view()
-  assert.deepEqual(v.signups[0].accounts, [{ nick: 'A본', roles: ['mid', 'scorer'], chars: ['sga'], bt: {} }])
+  assert.deepEqual(v.signups[0].accounts, [{ nick: 'A본', roles: ['allpos'], chars: ['sga'], bt: {} }])
   assert.deepEqual(v.plan.sat2, [[]], 'A부 가 빠졌다')
   // 신청 취소 → 편성표에서도 빠진다
   assert.equal((await api('DELETE', '/api/arena/signup', undefined, { as: b.as })).status, 200)

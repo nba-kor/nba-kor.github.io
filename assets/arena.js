@@ -3,21 +3,20 @@
 import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=915be0c5'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=e2ffcda1'
 import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=3a1e630f'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES } from './profile.js?v=4896bfb5'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES, ALLPOS } from './profile.js?v=a3cc1cc4'
 
 await loadData()
 mountTop('/arena/')
 loadKakao()
 const A = await arenaCfg()
-const SLOTS = A.slots.filter(s => !s.in)   // 편성 시간대 — 1차 올포(in)는 신청만 따로, 팀은 1차에 섞는다
-const LABEL = Object.fromEntries([...A.slots.map(s => [s.id, s.label]), ...A.extra.map(c => [c.id, c.label])])
-const TAG = Object.fromEntries([...A.slots.map(s => [s.id, s.short.replaceAll(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short])])   // 토1 · 토1올포 · 토1.5 · FA
+const SLOTS = A.slots
+const LABEL = Object.fromEntries([...SLOTS.map(s => [s.id, s.label]), ...A.extra.map(c => [c.id, c.label])])
+const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replaceAll(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short])])   // 토1 · 토1.5 · FA
 // 색은 강조색(주황) 하나 + 회색 — 시간대 · 포지션 · 계정 수는 글자로 구분한다. 카톡 이미지도 같은 색(팀 줄은 화면 카드처럼 밝은 회색 바탕 · 검은 글자)
 const ACCENT = '#f5a623'
 // 같은 날 시간이 겹치는 두 시간대(서버와 같은 규칙) — 1.5차는 1차 · 2차와 겹친다
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
-const SLOT = Object.fromEntries(A.slots.map(s => [s.id, s]))
-const signed = (slots, id) => slots.some(c => c === id || SLOT[c]?.in === id)   // 그 편성 시간대를 신청했다(1차 올포는 1차)
+const SLOT = Object.fromEntries(SLOTS.map(s => [s.id, s]))
 const clash = (x, y) => { const a = SLOT[x], b = SLOT[y]; return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
 // 집계 순서(관리자 매뉴얼): 소유자의 참가 계정 수 많은 순 → 1순위 포지션(스코어러 > 중열 > 센터) → 계정 이름(가나다 · 영문)
 const roleRank = a => { const i = ROLES.findIndex(r => r.id === a.roles[0]); return i < 0 ? ROLES.length : i }
@@ -142,7 +141,7 @@ function renderForm() {
   const mine = mineOf()
   if (!draft) {
     const accounts = accountsOf(me.profile?.entries)
-    draft = { accounts, slots: new Set(mine?.slots), nicks: new Set(mine ? mine.accounts.map(a => a.nick) : accounts.slice(0, 1).map(a => a.nick)), memo: mine?.memo || '' }
+    draft = { accounts, slots: new Set(mine?.slots.filter(s => LABEL[s])), nicks: new Set(mine ? mine.accounts.map(a => a.nick) : accounts.slice(0, 1).map(a => a.nick)), memo: mine?.memo || '' }   // 없어진 시간대(잠깐 있던 1차 올포)는 빼야 다시 저장된다
     // 처음 신청이면 지난번에 낸 계정을 기본으로
     if (!mine) api('/arena/mine', { withToken: true }).then(r => {
       const last = r.history.find(x => x.week !== week && x.nicks.length)
@@ -154,17 +153,15 @@ function renderForm() {
   const d = draft, absent = d.slots.has('absent'), err = errBox()
 
   const opt = (c, sub) => {
-    const off = A.slots.find(o => o.blocks?.includes(c.id) && d.slots.has(o.id))   // 1차 올포를 고르면 같은 날 1차 · 2차는 못 고른다
-    const box = h('input', { type: 'checkbox', checked: d.slots.has(c.id), disabled: !!off, onchange: () => {
+    const box = h('input', { type: 'checkbox', checked: d.slots.has(c.id), onchange: () => {
       if (box.checked) {
         if (c.id === 'absent') d.slots.clear()
         else d.slots.delete('absent')
         d.slots.add(c.id)
-        c.blocks?.forEach(b => d.slots.delete(b))
       } else d.slots.delete(c.id)
       renderForm()
     } })
-    return h('label', { className: `ar-opt${off ? ' is-off' : ''}` }, box, h('span', {}, c.label), (off || sub) && h('small', {}, off ? `${off.short}와 같이 못 골라요` : sub))
+    return h('label', { className: 'ar-opt' }, box, h('span', {}, c.label), sub && h('small', {}, sub))
   }
 
   // 계정 — 프로필이 있으면 고칠 때마다 프로필에 바로 저장한다(마이페이지와 같은 계정). 없으면 신청할 때 프로필도 같이 만든다
@@ -196,9 +193,9 @@ function renderForm() {
   const submit = h('button', { type: 'submit', className: 'primary rc-big' }, mine ? '신청 수정' : '신청하기')
   const form = h('form', { className: 'ar-form', novalidate: true },
     h('h3', {}, '1. 참석 가능한 시간'),
-    h('div', { className: 'ar-opts' }, A.slots.map(s => opt(s, `${s.time} ~ ${s.end === A.closeAt ? '종료' : s.end}`))),
+    h('div', { className: 'ar-opts' }, SLOTS.map(s => opt(s, `${s.time} ~ ${s.end === A.closeAt ? '종료' : s.end}`))),
     h('div', { className: 'ar-opts is-extra' }, A.extra.map(c => opt(c))),
-    h('p', { className: 'rc-muted' }, '여러 개 선택 가능 · 1차 올포 = 1차를 스코어러 · 중열 · 센터 다 가능(1차 대신 고르고, 같은 날 2차는 같이 못 골라요) · 1.5차는 20:00 부터 종료까지 · 실제 배정은 운영진이 진행해요'),
+    h('p', { className: 'rc-muted' }, '여러 개 선택 가능 · 1.5차는 20:00 부터 종료까지 · 실제 배정은 운영진이 진행해요'),
     h('div', { className: 'ar-acc-head' }, h('h3', {}, '2. 이번 주 참가 계정 ', h('small', { className: 'ar-count' }, absent ? '불참' : `${picked}개 계정`)), toggleAll),
     person && h('div', { className: 'ar-first' }, h('p', { className: 'rc-muted' }, '처음이에요 — 프로필에 쓸 이름과 마이크도 한 번 정해 주세요'), person.el),
     list,
@@ -293,11 +290,11 @@ const opened = new Set()   // 상세를 펼친 줄 '<시간대>:<userId>' — �
 const lead = s => accts.get(key(s.userId, s.accounts[0].nick))
 const byOwner = (x, y) => byTally({ ...lead(x), n: x.owner }, { ...lead(y), n: y.owner })
 function tallyCard() {
-  const groups = [...A.slots, ...A.extra].map(c => {
+  const groups = [...SLOTS, ...A.extra].map(c => {
     const who = data.signups.filter(s => s.slots.includes(c.id))
     return { c, who, rows: who.filter(s => s.accounts.length).sort(byOwner) }
   })
-  const tabs = h('div', { className: 'ar-tabs', role: 'tablist' }, [{ id: 'all', short: '전체' }, ...A.slots, ...A.extra].map(c => {
+  const tabs = h('div', { className: 'ar-tabs', role: 'tablist' }, [{ id: 'all', short: '전체' }, ...SLOTS, ...A.extra].map(c => {
     const g = groups.find(x => x.c.id === c.id)
     return h('button', { type: 'button', role: 'tab', 'aria-selected': tallyTab === c.id, onclick: () => { tallyTab = c.id; renderPlan() } },
       g ? `${c.short} (${g.who.length})` : '전체')
@@ -350,7 +347,7 @@ function membersCard(at) {
     h('td', { className: 'ar-nick' }, nickEl(a), a.owner !== a.n && h('small', {}, a.owner)),
     SLOTS.map(s => {
       const w = where.find(x => x.slot === s.id)
-      const applied = signed(a.slots, s.id) || a.slots.includes('flex')
+      const applied = a.slots.includes(s.id) || a.slots.includes('flex')
       return h('td', {}, w ? h('span', { className: 'ar-badge' }, `${w.team}팀`)
         : applied ? h('span', { className: 'ar-want', title: '신청' }, h('span', { className: 'ar-long' }, '신청'), h('span', { className: 'ar-short' }, '○')) : h('span', { className: 'ar-dash' }, '-'))   // 휴대폰은 ○
     }),
@@ -412,7 +409,7 @@ function chartCard() {
   const players = data.signups.filter(s => !s.slots.includes('absent')), n = players.length
   const pct = k => n ? Math.round(k / n * 100) : 0
   const bar = (id, label) => {
-    const who = players.filter(s => signed(s.slots, id)), accounts = who.reduce((k, s) => k + s.accounts.length, 0)
+    const who = players.filter(s => s.slots.includes(id)), accounts = who.reduce((k, s) => k + s.accounts.length, 0)
     return barRow(label, n && who.length / n, `${who.length}명 · ${accounts}계정`)
   }
   const days = ['토요일', '일요일'].map((name, day) => {
@@ -457,9 +454,9 @@ function editor() {
   const at = placements()
   const all = [...accts.values()].sort(byTally)
   const bySlot = poolTab === 'all' ? all.filter(a => !at.has(key(a.u, a.n)))
-    : all.filter(a => (signed(a.slots, poolTab) || a.slots.includes('flex')) && !busy(poolTab, a.u))
-  // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(그 시간대 올포는 모든 포지션), 1순위인 계정이 먼저
-  const plays = (a, r) => a.roles.includes(r) || a.slots.some(c => SLOT[c]?.in === poolTab)
+    : all.filter(a => (a.slots.includes(poolTab) || a.slots.includes('flex')) && !busy(poolTab, a.u))
+  // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션), 1순위인 계정이 먼저
+  const plays = (a, r) => a.roles.includes(r) || a.roles[0] === ALLPOS
   const pool = roleTab === 'all' ? bySlot
     : bySlot.filter(a => plays(a, roleTab)).sort((x, y) => (x.roles[0] !== roleTab) - (y.roles[0] !== roleTab) || byTally(x, y))
   const roleTabs = h('div', { className: 'ar-tabs ar-role-tabs' }, [{ id: 'all', label: '전체' }, ...ROLES].map(r => {
@@ -540,7 +537,7 @@ function menu(a, from) {
   const items = []
   if (from) items.push({ label: '빼기 (대기로)', pick: () => move(a, from, 'pool') })
   for (const s of SLOTS) {
-    const teams = teamsOf(s.id), applied = signed(a.slots, s.id) || a.slots.includes('flex')
+    const teams = teamsOf(s.id), applied = a.slots.includes(s.id) || a.slots.includes('flex')
     if (SLOTS.some(o => clash(s.id, o.id) && teamsOf(o.id).some((tm, ti) => tm.some(x => x.u === a.u && !(from?.slot === o.id && from.ti === ti && x.n === a.n))))) continue   // 겹치는 시간대에 이미 있다
     // 이 사람이 신청하지 않은 시간대(FA 도 아니면)는 줄마다 「신청 안 함」
     const note = applied ? '' : ' · 신청 안 함'
