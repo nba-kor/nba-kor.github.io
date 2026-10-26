@@ -368,9 +368,9 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .rc-tcard p b { color: var(--text); }
 .rc-faces { display: flex; gap: 6px; }
 .rc-tcard .rc-faces { margin-top: auto; }   /* 제목이 두 줄로 접혀도 같은 줄 카드끼리 얼굴 줄을 맞춘다 */
-.rc-faces img, .rc-faces .rc-hole { width: 46px; height: 46px; }
-.rc-hole { display: block; flex: none; border-radius: 50%; border: 2px dashed #3b4657; }
-.rc-faces img { border-radius: 50%; background: #0b0f16; flex: none; }
+.rc-faces img, .rc-faces .rc-hole { flex: 0 1 46px; min-width: 0; height: auto; aspect-ratio: 1; }   /* 카드가 좁으면 얼굴이 같이 작아진다(글마다 최대 5명) */
+.rc-hole { display: block; border-radius: 50%; border: 2px dashed #3b4657; }
+.rc-faces img { border-radius: 50%; background: #0b0f16; }
 
 .rc-status {
   flex: none; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
