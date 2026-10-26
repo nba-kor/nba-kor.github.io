@@ -224,6 +224,20 @@ export async function linkKakao() {
   if (error) alert(`카카오를 연결하지 못했어요: ${error.message}`)
 }
 
+/** 카카오 연결 해제(디스코드 계정에 붙인 카카오만) — 서버가 Auth 신원 · 카카오 쪽 연결을 끊는다. 새 토큰을 받아 identities 를 맞춘다 */
+export async function unlinkKakao() {
+  await api('/me/kakao', { method: 'DELETE', withToken: true })
+  await sb.auth.refreshSession()
+}
+
+/** 본인 탈퇴 — 서버가 사이트 데이터 · 카카오 연결 · 로그인 정보까지 지운다. 계정이 없어졌으니 이 브라우저에서만 로그아웃하고 홈으로 */
+export async function withdraw() {
+  await api('/me', { method: 'DELETE', withToken: true })
+  store.del(AUTHORIZED)
+  await sb.auth.signOut({ scope: 'local' })
+  location.assign('/')
+}
+
 /** 머리 아래 줄에 지금 누구로 들어와 있는지. 버튼 옆에 두면 좁은 화면에서 이름이 잘려서 줄을 따로 둔다. name 이 없으면 줄을 뺀다 */
 export function showWho(name, { guest = false } = {}) {
   const top = document.querySelector('.top')

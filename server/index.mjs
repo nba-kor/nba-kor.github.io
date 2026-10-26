@@ -66,7 +66,7 @@ const STALE_PLAN = '그새 신청이나 편성표가 바뀌었어요 — 새로 
 const MEMBER_ID = /^(\d{17,20}|k\d{1,20})$/   // 멤버(프로필) ID — 디스코드 ID · k<카카오 회원번호>
 // 받는 요청 — 메서드 + 경로 조각. 예: 'POST team members' = 가입, 'DELETE team members member' = 방출 · 나가기
 const ACTIONS = new Set([
-  'GET me', 'PUT me profile', 'GET', 'POST', 'POST quick', 'GET team', 'DELETE team', 'POST team members', 'DELETE team members member', 'POST team extend',
+  'GET me', 'PUT me profile', 'DELETE me', 'DELETE me kakao', 'GET', 'POST', 'POST quick', 'GET team', 'DELETE team', 'POST team members', 'DELETE team members member', 'POST team extend',
   'PUT team', 'PUT team members member',   // 팀 정보 수정(팀장) · 참가 캐릭터 바꾸기(본인)
   'GET profiles',   // 팀장이 팀원을 직접 넣을 때 자동완성
 ])
@@ -314,7 +314,7 @@ function added(v) {
 
 const BOARD_KO = { builds: '잠재력추천', videos: '영상', tactics: '커스텀 전술', tiers: '티어표', combos: '조합표' }
 const AUDIT_LABEL = {
-  'PUT /api/gate': '접근 비밀번호 변경', 'PUT /api/me/profile': '프로필 저장',
+  'PUT /api/gate': '접근 비밀번호 변경', 'PUT /api/me/profile': '프로필 저장', 'DELETE /api/me': '본인 탈퇴', 'DELETE /api/me/kakao': '카카오 연결 해제',
   'PUT /api/arena/signup': '아레나 신청', 'DELETE /api/arena/signup': '아레나 신청 취소', 'PUT /api/arena/plan': '아레나 편성 저장',
   'PUT /api/members/:id': '멤버 등급 변경', 'DELETE /api/members/:id': '멤버 탈퇴 처리',
   'POST /api/teams': '모집 팀 만들기', 'POST /api/teams/quick': '모집 빠른 참가', 'PUT /api/teams/:id': '모집 팀 정보 수정', 'DELETE /api/teams/:id': '모집 팀 해제',
@@ -579,6 +579,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const ids = Array.isArray(body.identities) ? body.identities : []
     const discord = ids.find(i => i?.provider === 'discord'), kakao = ids.find(i => i?.provider === 'kakao')
     const clean = s => typeof s === 'string' ? s.replace(/[\x00-\x1f\x7f]/g, '').trim() : ''
+    // 연결된 카카오 — id = 카카오 회원번호(카카오 연결 끊기), identity = Supabase 의 신원 줄(연결 해제)
+    const kakaoOf = k => matches(/^\d{1,20}$/, k?.id) ? { id: k.id, identity: matches(UUID, k.identity_id) ? k.identity_id : null } : null
     const authUserId = matches(UUID, body.id) ? body.id : null
     let user
     if (matches(SNOWFLAKE, discord?.id)) {
@@ -586,11 +588,11 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       const name = [d.custom_claims?.global_name, d.full_name, d.name].map(clean).find(Boolean) || 'Discord 사용자'
       // 같은 서버 사람들은 별명으로 서로를 안다 — 별명이 있으면 그것을 이름으로 쓴다(봇은 이미 별명을 보낸다)
       const nick = await guildNick({ botToken: env.DISCORD_BOT_TOKEN, guildId: env.DISCORD_GUILD_ID, userId: discord.id, fetch, now, log })
-      user = { id: discord.id, name: nick || [...name].slice(0, 80).join(''), authUserId, admin: false }
+      user = { id: discord.id, name: nick || [...name].slice(0, 80).join(''), authUserId, admin: false, kakao: kakaoOf(kakao) }
     } else if (matches(/^\d{1,20}$/, kakao?.id)) {
       // 카카오 닉네임은 대개 실명이라 쓰지 않는다 — 처음 로그인할 때 화면이 받아 user_metadata.nickname 에 둔 이름
       const nick = [...clean(isObj(body.user_metadata) ? body.user_metadata.nickname : '')].slice(0, 32).join('')
-      user = { id: `k${kakao.id}`, name: nick && !LINK.test(nick) ? nick : '카카오 사용자', authUserId, admin: false }
+      user = { id: `k${kakao.id}`, name: nick && !LINK.test(nick) ? nick : '카카오 사용자', authUserId, admin: false, kakao: kakaoOf(kakao) }
     } else fail(401, LOGIN)   // 디스코드 · 카카오가 아닌 계정(또는 연결을 끊은 계정)
     if (authMemo.size >= AUTH_MEMO.max) authMemo.clear()   // 오래된 것부터 고르는 대신 통째로 — 다음 요청이 Auth 를 한 번 더 부를 뿐
     authMemo.set(key, { user, until: now() + AUTH_MEMO.ms })
@@ -1098,15 +1100,46 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       note(request, target.discord_name, [`등급: ${wasAdmin ? '관리자' : '멤버'} → ${body.role === 'admin' ? '관리자' : '멤버'}`])
       return [200, { userId: id, role: body.role }]
     }
-    // 탈퇴 = 관리자 권한 · 프로필을 지운다(게임 계정 · 아레나 신청 · 팀원모집 자리는 프로필에 cascade). 팀장이던 모집 팀은 해제한다.
-    // ponytail: 다시 로그인하면 새로 가입할 수 있다 — 막아야 하면 차단 목록을 둔다
-    const [led] = await db(`/recruit_members?select=team_id&discord_user_id=eq.${id}&leader=is.true`)
-    if (led) await disband(led.team_id)
-    await db(`/site_admins?user_id=eq.${id}`, { method: 'DELETE' })
-    await db(`/recruit_profiles?discord_user_id=eq.${id}`, { method: 'DELETE' })
+    // ponytail: 다시 로그인하면 새로 가입할 수 있다 — 막아야 하면 차단 목록을 둔다. 로그인 정보(Supabase Auth)는 본인 탈퇴만 지운다
+    const led = await wipe(id)
     note(request, target.discord_name, [`프로필 · 게임 계정 · 아레나 신청${wasAdmin ? ' · 관리자 권한' : ''} 삭제`, led && '이끌던 모집 팀 해제'])
     return [200, { ok: true }]
   }
+
+  /** 탈퇴의 사이트 데이터 — 관리자 권한 · 프로필을 지운다(게임 계정 · 아레나 신청 · 팀원모집 자리는 프로필에 cascade). 팀장이던 모집 팀은 해제한다.
+   *  게시판 글 · 댓글 · 추천은 남긴다(쓴 이름 그대로). 이끌던 팀이 있었으면 true */
+  async function wipe(id) {
+    const [led] = await db(`/recruit_members?select=team_id&discord_user_id=eq.${enc(id)}&leader=is.true`)
+    if (led) await disband(led.team_id)
+    await db(`/site_admins?user_id=eq.${enc(id)}`, { method: 'DELETE' })
+    await db(`/recruit_profiles?discord_user_id=eq.${enc(id)}`, { method: 'DELETE' })
+    return !!led
+  }
+
+  // ------------------------------------------------ 로그인 정보 — 본인 탈퇴 · 카카오 연결 해제. Supabase Auth 와 카카오에 직접 묻는다
+  const authBase = () => (env.SUPABASE_AUTH_URL || env.SUPABASE_URL || '').replace(/\/+$/, '')
+  async function authCall(path, headers, what) {
+    let res
+    try { res = await fetch(`${authBase()}/auth/v1${path}`, { method: 'DELETE', headers, signal: AbortSignal.timeout(8000) }) }
+    catch (e) { log(`${what} 실패: ${errText(e)}`); fail(503, AUTH_DOWN) }
+    if (!res.ok && res.status !== 404) {   // 404 = 이미 없다(다시 누른 탈퇴 · 해제)
+      log(`${what} ${res.status}: ${(await res.text()).slice(0, 200)}`)
+      fail(503, `${what}에 실패했어요. 잠시 뒤에 다시 시도해 주세요`)
+    }
+  }
+  /** 카카오 「연결 끊기」 — 우리 서비스와 그 카카오계정의 연결을 카카오 쪽에서도 끊는다(카카오 로그인 서비스는 탈퇴 때 하게 돼 있다).
+   *  어드민 키(KAKAO_ADMIN_KEY)로 회원번호를 지정한다. 키가 없거나 실패해도 탈퇴 · 해제는 진행한다(함수 로그만) */
+  async function kakaoUnlink(kakaoId) {
+    if (!env.KAKAO_ADMIN_KEY) return log('KAKAO_ADMIN_KEY 가 없어 카카오 연결 끊기를 건너뜁니다')
+    try {
+      const res = await fetch('https://kapi.kakao.com/v1/user/unlink', {
+        method: 'POST', body: new URLSearchParams({ target_id_type: 'user_id', target_id: kakaoId }),
+        headers: { authorization: `KakaoAK ${env.KAKAO_ADMIN_KEY}` }, signal: AbortSignal.timeout(5000),
+      })
+      if (!res.ok) log(`카카오 연결 끊기 ${res.status}: ${(await res.text()).slice(0, 200)}`)
+    } catch (e) { log(`카카오 연결 끊기 실패: ${errText(e)}`) }
+  }
+  const tokenOf = request => (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
 
   /** 감사 로그 보기 — 마스터만. ?before=<id>(더 보기) · ?who=<사용자 ID>(그 사람만) · 최근 것부터 50줄 */
   async function auditLog(request) {
@@ -1139,10 +1172,10 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (a) return arena(request, a[1], now())
     const mb = pathname.match(/^\/api\/members(?:\/([^/]+))?$/)
     if (mb) return members(request, mb[1], now())
-    const me = pathname.match(/^\/api\/me(\/profile)?$/)
+    const me = pathname.match(/^\/api\/me(?:\/(profile|kakao))?$/)
     const m = pathname.match(/^\/api\/teams(?:\/([^/]+)(?:\/(members|extend)(?:\/([^/]+))?)?)?$/)
     const [, id, sub, userId] = m || []
-    const action = me ? `${method} me${me[1] ? ' profile' : ''}`
+    const action = me ? [method, 'me', me[1]].filter(Boolean).join(' ')
       : pathname === '/api/profiles' ? `${method} profiles`
       : m && (id === 'quick' && !sub ? `${method} quick` : [method, id && 'team', sub, userId && 'member'].filter(Boolean).join(' '))
     if (!ACTIONS.has(action)) fail(404, '없는 주소예요')
@@ -1195,6 +1228,33 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         })
         note(request, name, profileChanges(old, { name, mic: p.mic, entries: p.entries }))
         return [200, { profile: { userId: user.id, name, mic: p.mic, entries: p.entries, updatedAt: t } }]
+      }
+
+      // 본인 탈퇴 — 사이트 데이터(위 wipe) → 카카오 연결 끊기 → 로그인 정보(Supabase Auth 사용자, 디스코드 · 카카오 신원 같이)를 지운다.
+      // 로그인 정보는 마지막 — 중간에 실패하면 아직 로그인된 채로 다시 누르면 된다. 슈퍼관리자는 못 한다(DB 에서 먼저 빼야 한다)
+      case 'DELETE me': {
+        if (!user.authUserId) fail(400, '사이트에서 로그인한 계정만 탈퇴할 수 있어요')
+        if (await isMaster(user)) fail(403, '슈퍼관리자는 탈퇴할 수 없어요')
+        const [old, wasAdmin] = await Promise.all([mine(user), inAdmins(user)])
+        const led = await wipe(user.id)
+        if (user.kakao) await kakaoUnlink(user.kakao.id)
+        await authCall(`/admin/users/${user.authUserId}`, { apikey: keyOf(env, 'SUPABASE_SECRET_KEY') }, '로그인 정보 삭제')
+        authMemo.delete(sha256(tokenOf(request)))
+        note(request, old?.discord_name ?? user.name, [old && `프로필 · 게임 계정 · 아레나 신청${wasAdmin ? ' · 관리자 권한' : ''} 삭제`, led && '이끌던 모집 팀 해제',
+          `로그인 정보 삭제(${user.id.startsWith('k') ? '카카오' : user.kakao ? '디스코드 · 카카오' : '디스코드'})`])
+        return [200, { ok: true }]
+      }
+
+      // 카카오 연결 해제 — 디스코드 계정에 붙인 카카오만 뗀다. 카카오로만 로그인한 계정은 카카오가 곧 계정이라 탈퇴로.
+      // 디스코드는 떼지 않는다 — 계정 ID 가 디스코드 ID 라 떼면 프로필 · 글과 끊긴다
+      case 'DELETE me kakao': {
+        if (!user.authUserId || !user.kakao?.identity) fail(400, '연결된 카카오 로그인이 없어요')
+        if (user.id.startsWith('k')) fail(400, '카카오로만 로그인한 계정은 카카오 연결을 끊을 수 없어요 — 탈퇴를 이용해 주세요')
+        await authCall(`/user/identities/${user.kakao.identity}`, { apikey: publishable, authorization: `Bearer ${tokenOf(request)}` }, '카카오 연결 해제')
+        await kakaoUnlink(user.kakao.id)
+        authMemo.delete(sha256(tokenOf(request)))
+        note(request, user.name, ['카카오 로그인 연결 해제'])
+        return [200, { ok: true }]
       }
 
       case 'POST': {

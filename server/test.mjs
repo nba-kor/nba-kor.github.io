@@ -112,7 +112,7 @@ const BOT = { DISCORD_BOT_TOKEN: 'bot-token', DISCORD_VOICE_CATEGORY_ID: '1' }
  */
 function fakeNet({ channels = CHANNELS, db } = {}) {
   const net = {
-    hooks: [], discord: [], auth: [], reply: () => [204],
+    hooks: [], discord: [], auth: [], out: [], reply: () => [204], outReply: () => [204],
     authReply: token => {
       const [kind, id, name] = token.split('.')
       return kind === 'web' && id ? json(200, authUser(id, name ? { name: decodeURIComponent(name) } : {})) : json(403, { code: 403, error_code: 'bad_jwt', msg: 'invalid JWT' })
@@ -123,6 +123,12 @@ function fakeNet({ channels = CHANNELS, db } = {}) {
     if (u.pathname === '/auth/v1/user') {
       net.auth.push({ url: String(url), headers: init.headers, signal: init.signal })
       return net.authReply(init.headers.authorization.replace(/^Bearer /, ''))
+    }
+    // 탈퇴 · 카카오 연결 해제 — Auth 관리 API(사용자 삭제) · 신원 삭제 · 카카오 연결 끊기. outReply 로 응답을 바꾼다
+    if (u.pathname.startsWith('/auth/v1/') || u.origin === 'https://kapi.kakao.com') {
+      net.out.push({ method: init.method, url: String(url), headers: init.headers, body: init.body && String(init.body) })
+      const [status, body] = net.outReply(u)
+      return json(status, body)
     }
     if (u.origin === 'https://hook.test') {
       net.hooks.push({ url: u.pathname + u.search, headers: init.headers, body: JSON.parse(init.body) })
@@ -502,6 +508,44 @@ test('웹 신원: 카카오만 있으면 k<회원번호> · 이름은 user_metad
   both.identities.push(kakao('4321').identities[0])
   assert.equal((await user(both)).body.user.id, '12345678901234567', '디스코드에 카카오를 연결해도 디스코드 ID')
   for (const id of ['abc', 4321, '1'.repeat(21)]) assert.equal((await user(kakao(id, {}))).status, 401, String(id))
+})
+
+test('카카오 연결 해제: 디스코드에 붙인 카카오만 · Auth 신원 삭제(본인 토큰) → 카카오 연결 끊기(어드민 키) · 토큰 기억을 지운다', async () => {
+  const { api, net } = start({ db: FAKE_DB, env: { KAKAO_ADMIN_KEY: 'kakao-admin' } })
+  const id = uid(), KI = '20000000-0000-4000-8000-000000000000', kakao = { identity_id: KI, id: '4321', provider: 'kakao', identity_data: {} }
+  let n = 0
+  // 같은 토큰은 60초 기억하니 응답을 바꿀 때마다 토큰도 바꾼다
+  const unlink = async (body, extra) => { net.authReply = () => json(200, body); return api('DELETE', '/api/me/kakao', undefined, { as: web(id, `t${++n}`), ...extra }) }
+  const both = () => { const u = authUser(id); u.identities.push(kakao); return u }
+
+  assert.deepEqual((await unlink(authUser(id))).body, { error: '연결된 카카오 로그인이 없어요' })
+  assert.equal((await unlink({ id: fakeUuid(id), user_metadata: {}, identities: [kakao] })).status, 400, '카카오로만 로그인한 계정은 탈퇴로')
+  assert.equal((await api('DELETE', '/api/me/kakao', undefined, { as: bot(id) })).status, 400, '봇은 로그인 정보가 없다')
+  assert.equal(net.out.length, 0)
+
+  const r = await unlink(both())
+  assert.deepEqual([r.status, r.body], [200, { ok: true }])
+  const [gone, kak] = net.out
+  assert.deepEqual([gone.method, gone.url, gone.headers], ['DELETE', `http://db.test/auth/v1/user/identities/${KI}`, { apikey: PUB, authorization: `Bearer web.${id}.t${n}` }])
+  assert.deepEqual([kak.method, kak.url, kak.headers, kak.body], ['POST', 'https://kapi.kakao.com/v1/user/unlink', { authorization: 'KakaoAK kakao-admin' }, 'target_id_type=user_id&target_id=4321'])
+  const calls = net.auth.length
+  await api('GET', '/api/me', undefined, { as: web(id, `t${n}`) })
+  assert.equal(net.auth.length, calls + 1, '해제한 토큰은 기억에서 지워 다음 요청이 Auth 에 다시 묻는다')
+
+  // Auth 가 거절하면 503 이고 카카오 쪽은 안 끊는다 · 이미 없으면(404) 그대로 성공
+  net.out.length = 0
+  net.outReply = () => [422, { msg: 'single_identity_not_deletable' }]
+  assert.deepEqual((await unlink(both())).body, { error: '카카오 연결 해제에 실패했어요. 잠시 뒤에 다시 시도해 주세요' })
+  assert.equal(net.out.length, 1)
+  net.outReply = () => [404, {}]
+  assert.equal((await unlink(both())).status, 200)
+
+  // 어드민 키가 없으면 카카오 연결 끊기는 건너뛰고(로그) 해제는 된다
+  const other = start({ db: FAKE_DB })
+  other.net.authReply = () => json(200, both())
+  assert.equal((await other.api('DELETE', '/api/me/kakao', undefined, { as: web(id) })).status, 200)
+  assert.deepEqual(other.net.out.map(c => c.url), [`http://db.test/auth/v1/user/identities/${KI}`])
+  assert.ok(logs.includes('KAKAO_ADMIN_KEY 가 없어 카카오 연결 끊기를 건너뜁니다'))
 })
 
 test('웹 신원: 서버 별명이 있으면 그것을 이름으로(없거나 서버 밖이면 계정 이름) · 10분 기억 · 봇은 안 부른다', async () => {
@@ -1937,6 +1981,56 @@ dbTest('멤버 관리: 관리자만 · 목록(등급 · 본계정 · 계정 수 
 
   await rest(`/site_masters?user_id=eq.${boss.id}`, { method: 'DELETE' })
   await rest(`/site_admins?user_id=eq.${adm.id}`, { method: 'DELETE' })
+})
+
+dbTest('본인 탈퇴: 프로필 · 신청 · 이끌던 팀 · 관리자 권한 → 카카오 연결 끊기 → 로그인 정보(Auth 관리 API, secret key) · 슈퍼관리자 · 봇은 못 한다', async () => {
+  const clock = futureBase()
+  const { api, net, idle } = start({ now: () => clock, env: { KAKAO_ADMIN_KEY: 'kakao-admin' } })
+  const post = body => ({ method: 'POST', body: JSON.stringify(body) })
+  const withKakao = new Set(), plain = net.authReply
+  net.authReply = token => {
+    const id = token.split('.')[1]
+    if (!withKakao.has(id)) return plain(token)
+    const u = authUser(id)
+    u.identities.push({ identity_id: '20000000-0000-4000-8000-000000000000', id: '4321', user_id: u.id, provider: 'kakao', identity_data: {} })
+    return json(200, u)
+  }
+  const quit = who => api('DELETE', '/api/me', undefined, { as: who.as })
+  const a = await person(api, { name: `탈퇴${RUN}`, entries: [entry({ nick: `탈${RUN}`, roles: ['scorer'] })] })
+  withKakao.add(a.id)
+  a.as = web(a.id, 'kakao')   // 새 토큰 — 같은 토큰은 60초 기억해서 카카오를 붙이기 전 신원이 남아 있다
+  assert.equal((await rest('/site_admins', post({ user_id: a.id, note: 'test' }))).status, 201)
+  assert.equal((await api('PUT', '/api/arena/signup', { slots: ['sat1'], nicks: [`탈${RUN}`] }, { as: a.as })).status, 200)
+  const team = await create(api, a)
+  assert.equal(team.status, 201)
+
+  assert.deepEqual((await quit(a)).body, { ok: true })
+  assert.deepEqual(await rows(`/recruit_profiles?select=discord_user_id&discord_user_id=eq.${a.id}`), [])
+  assert.deepEqual(await rows(`/arena_signups?select=user_id&user_id=eq.${a.id}`), [])
+  assert.deepEqual(await rows(`/site_admins?select=user_id&user_id=eq.${a.id}`), [])
+  assert.equal((await api('GET', `/api/teams/${team.body.team.id}`)).status, 404, '이끌던 팀은 해제')
+  const [kak, del] = net.out
+  assert.deepEqual([kak.url, kak.headers, kak.body], ['https://kapi.kakao.com/v1/user/unlink', { authorization: 'KakaoAK kakao-admin' }, 'target_id_type=user_id&target_id=4321'])
+  assert.deepEqual([del.method, del.url, del.headers], ['DELETE', `${SUPA}/auth/v1/admin/users/${fakeUuid(a.id)}`, { apikey: KEY }], 'secret key 는 apikey 에만(Authorization 에 못 싣는다)')
+  await idle()
+  const [log] = await rows(`/audit_log?select=label,target,detail&user_id=eq.${a.id}&action=eq.DELETE%20%2Fapi%2Fme`)
+  assert.deepEqual(log, { label: '본인 탈퇴', target: `탈퇴${RUN}`, detail: ['프로필 · 게임 계정 · 아레나 신청 · 관리자 권한 삭제', '이끌던 모집 팀 해제', '로그인 정보 삭제(디스코드 · 카카오)'] })
+
+  // 로그인 정보를 못 지우면 503 — 사이트 데이터는 이미 지웠고, 아직 로그인돼 있으니 다시 누르면 된다(이미 없으면 404 도 성공)
+  const b = await person(api, { name: `탈퇴2${RUN}` })
+  net.outReply = () => [500, {}]
+  assert.deepEqual((await quit(b)).body, { error: '로그인 정보 삭제에 실패했어요. 잠시 뒤에 다시 시도해 주세요' })
+  assert.deepEqual(await rows(`/recruit_profiles?select=discord_user_id&discord_user_id=eq.${b.id}`), [])
+  net.outReply = () => [404, {}]
+  assert.equal((await quit(b)).status, 200)
+
+  // 슈퍼관리자 · 봇은 못 한다(아무것도 안 지운다)
+  net.out.length = 0
+  const boss = await person(api, { name: `탈퇴보스${RUN}` }), robot = await person(api, { kind: 'bot', name: `탈퇴봇${RUN}` })
+  assert.equal((await rest('/site_masters', post({ user_id: boss.id, note: 'test' }))).status, 201)
+  assert.deepEqual([(await quit(boss)).status, (await quit(robot)).status], [403, 400])
+  assert.equal((await rows(`/recruit_profiles?select=discord_user_id&discord_user_id=in.(${boss.id},${robot.id})`)).length, 2)
+  assert.equal(net.out.length, 0)
 })
 
 dbTest('잠재력추천: 글 · 검증 · 필터 · 추천 · 댓글 · 권한', async () => {

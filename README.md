@@ -311,6 +311,8 @@ delete from public.site_admins where user_id = '<디스코드 ID 또는 k카카�
 | `GET /api/teams` | – | 만료 전 방, 모집 중 → 다 찬 순, 각각 오래된 순, 최대 100개 |
 | `GET /api/teams/:id` | – | 팀. 없거나 만료 → 404 |
 | `GET /api/me` | 로그인 | `{ user: { id, name }, profile \| null, teamId \| null }` |
+| `DELETE /api/me` | 로그인 | 본인 탈퇴 → `{ ok }`. 사이트 데이터(멤버 관리의 탈퇴와 같다) → 카카오 연결 끊기 → Supabase Auth 사용자 삭제(관리 API, secret key). 슈퍼관리자 403 · 봇 400 · Auth 실패 503(다시 누르면 된다) |
+| `DELETE /api/me/kakao` | 로그인 | 디스코드 계정에 붙인 카카오 떼기 → `{ ok }`. Auth 신원 삭제(본인 토큰) → 카카오 연결 끊기. 카카오만 있는 계정 · 카카오가 없으면 400 |
 | `PUT /api/me/profile` | 로그인 | `{ mic, entries, name? }` → `{ profile }`. `name` 은 표시 이름(1~32자). 안 보내면 저장된 이름을 그대로 두고, 프로필이 없으면 디스코드 이름으로 채운다 |
 | `POST /api/teams` | 로그인 · 비회원 | `{ room: { title?, mic, mode, memo? }, tactic }` → 201 `{ team, left }`. 프로필이 없으면 428. 비회원은 인증 헤더 없이 `guest: { name, mic, entries }` · `password`(4~32자)를 더 보내고 `member`(`g<번호>`)를 받는다 |
 | `POST /api/teams/quick` | 로그인 | 가장 오래된 모집 중 팀(내 팀 제외)에 가입 → 201 `{ team, left }`. 없으면 404 |
@@ -395,6 +397,7 @@ publishable key 나 로그인 토큰으로는 표를 읽거나 쓸 수 없다. �
 | `DISCORD_BOT_TOKEN` | 음성채널 목록과 **서버 별명**을 읽을 봇 토큰 |
 | `DISCORD_GUILD_ID` | 디스코드 서버 ID. 봇 토큰과 둘 다 있어야 음성채널을 배정한다 |
 | `DISCORD_VOICE_CATEGORY_ID` | 이 카테고리 안의 음성채널만 배정. 비우면 서버의 모든 음성채널 |
+| `KAKAO_ADMIN_KEY` | 카카오 앱의 **어드민 키**(카카오 디벨로퍼스 > 앱 > 앱 키). 탈퇴 · 카카오 연결 해제 때 카카오 쪽 「연결 끊기」에 쓴다. 비우면 그 단계만 건너뛴다(함수 로그). 서버에만 — 화면 · 저장소에 두지 않는다 |
 
 `SUPABASE_URL` · `SUPABASE_SECRET_KEYS` · `SUPABASE_PUBLISHABLE_KEYS`(키들의 JSON, 그중 `default` 를 쓴다)는 Supabase 가 함수에 직접 넣어 준다 —
 `SUPABASE_` 로 시작하는 이름은 비밀값으로 올릴 수도 없다. 로컬 docker compose 는 `SUPABASE_URL` · `SUPABASE_SECRET_KEY`(로컬 전용 키) · 로컬 전용 `TNAB_BOT_KEY` 를 `compose.yaml` 에 적어 둔다.
@@ -625,6 +628,11 @@ API 가 팀을 보여 줄 때 그 줄을 `entries` 맨 앞으로 옮기므로 �
 **카카오 연결** — 디스코드로 로그인한 사람은 마이페이지(또는 팀원모집 「내 프로필」)의 「카카오 로그인 연결」 로 같은 계정에 카카오를 붙인다(`linkIdentity`). 그 뒤로는 카카오로 들어와도
 디스코드 ID 그대로라 프로필 · 파티 · 글 · 봇이 이어진다. 그 카카오로 따로 로그인해 만든 계정이 이미 있으면 Supabase 가 거절하고 이유가 뜬다.
 반대(카카오 계정에 디스코드 붙이기)는 화면에 없다 — ID 가 디스코드로 바뀌어 카카오 때의 프로필 · 글과 끊기기 때문이다.
+마이페이지 「로그인 연결」 의 **카카오 연결 해제** 로 붙인 카카오를 뗀다(`DELETE /api/me/kakao`) — 그 뒤 카카오로 로그인하면 따로 새 계정이다. 디스코드는 같은 이유로 못 떼고, 카카오로만 쓰는 계정은 탈퇴로.
+
+**탈퇴** — 마이페이지 맨 아래 「회원 탈퇴」(「탈퇴」 를 쳐야 한다, `DELETE /api/me`). 프로필 · 게임 계정 · 아레나 신청 · 팀원모집 자리 · 관리자 권한을 지우고 이끌던 팀은 해제,
+카카오가 있으면 카카오 「연결 끊기」(`KAKAO_ADMIN_KEY`), 마지막으로 Supabase Auth 사용자(디스코드 · 카카오 신원 · 이메일)를 지운다. 게시판 글 · 댓글 · 추천은 남는다(화면에 적어 둔다).
+슈퍼관리자는 못 한다 — `site_masters` 에서 먼저 뺀다. 감사 로그는 남는다(누가 탈퇴했는지).
 
 **비회원** — 로그인하지 않으면(로그인 모듈을 못 불러왔을 때도) 「비회원 프로필」 을 쓴다: 표시 이름 · 마이크 · 캐릭터 줄 · **관리 비밀번호(4~32자)** 를 이 브라우저 localStorage(`dc.recruit.guest`)에만 둔다.
 만들기 · 가입 때 서버로 보내 팀원 행(`recruit_members.guest`)에 복사하고 비밀번호는 scrypt 해시(`pw_hash`)만 남긴다. 응답의 `g<번호>` 와 비밀번호를 `dc.recruit.guestTeams` 에 팀마다 두어

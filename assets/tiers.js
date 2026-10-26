@@ -1,7 +1,7 @@
 // 티어표 — 드래그로 선수를 티어에 올리고 링크로 공유. 올리면 게시판(?list 목록 · ?t=<id> 글 · ?edit=<id> 고치기)에 뜬다. 게시판 공용 부분은 board.js
 import { mountFilters, chipEl, startDrag, pickMenu, mountTop, decodeState, share, faceOf, loadKakao, kakaoList, shareFace } from './app.js?v=fb02b445'
-import { api } from './auth.js?v=e2ffcda1'
-import { h, P, data, loadData, startAuth, loggedIn, listView, card, itemView, showItem } from './board.js?v=21051c27'
+import { api } from './auth.js?v=24081841'
+import { h, P, data, loadData, startAuth, loggedIn, listView, card, itemView, showItem } from './board.js?v=34b01a95'
 
 const STORE = 'dc.tiers'
 const DEFAULT = () => ({

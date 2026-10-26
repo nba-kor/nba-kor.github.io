@@ -1,8 +1,8 @@
-// 마이페이지 — 프로필(표시 이름 · 마이크) · 게임 계정 · 보유 캐릭터 · 아레나 신청 이력 · 로그인 연결 · (관리자) 숨긴 메뉴 · (마스터) 사이트 접근 비밀번호 · 변경 기록
+// 마이페이지 — 프로필(표시 이름 · 마이크) · 게임 계정 · 보유 캐릭터 · 아레나 신청 이력 · 로그인 연결(카카오 연결 · 해제) · 탈퇴 · (관리자) 숨긴 메뉴 · (마스터) 사이트 접근 비밀번호 · 변경 기록
 import { mountTop, copyLink } from './app.js?v=fb02b445'
-import { api, session, hasProvider, linkKakao, saveGate, chooseLogin, KAKAO_SVG } from './auth.js?v=e2ffcda1'
-import { $, h, loadData, startAuth, auth, me } from './board.js?v=21051c27'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=2eef14a5'
+import { api, session, hasProvider, linkKakao, unlinkKakao, withdraw, saveGate, chooseLogin, KAKAO_SVG } from './auth.js?v=24081841'
+import { $, h, loadData, startAuth, auth, me } from './board.js?v=34b01a95'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=192d6ad0'
 
 await loadData()
 mountTop('/me/')
@@ -24,7 +24,7 @@ function render() {
     h('p', { className: 'rc-note' }, '로그인하면 내 프로필 · 게임 계정 · 보유 캐릭터를 등록하고 아레나전에 신청할 수 있어요.'),
     h('div', { className: 'rc-actions' }, h('button', { type: 'button', className: 'primary rc-big', onclick: chooseLogin }, '로그인'))))
   if (me.admin) memberStore.load()
-  box.replaceChildren(...[profileCard(), historyCard(), linkCard(), me.admin && adminCard(), me.admin && attendanceCard(), me.admin && membersCard(), me.master && gateCard(), me.master && auditCard()].filter(Boolean))   // replaceChildren 은 false 를 글자로 찍는다
+  box.replaceChildren(...[profileCard(), historyCard(), linkCard(), me.admin && adminCard(), me.admin && attendanceCard(), me.admin && membersCard(), me.master && gateCard(), me.master && auditCard(), quitCard()].filter(Boolean))   // replaceChildren 은 false 를 글자로 찍는다
 }
 
 // ------------------------------------------------ 프로필 + 계정
@@ -101,17 +101,40 @@ function historyCard() {
   return card('아레나 신청 이력', list, h('div', { className: 'rc-actions' }, h('a', { className: 'btn primary', href: '/arena/#signup' }, '이번 주 신청하기')))
 }
 
-// ------------------------------------------------ 로그인 연결 — 디스코드 계정에 카카오를 붙이면 카카오로도 같은 계정에 들어온다
+// ------------------------------------------------ 로그인 연결 — 디스코드 계정에 카카오를 붙이면 카카오로도 같은 계정에 들어온다. 붙인 카카오는 뗄 수 있다
+// 디스코드는 못 뗀다 — 계정 ID 가 디스코드 ID 라 떼면 프로필 · 글과 끊긴다. 카카오로만 로그인한 계정은 카카오가 곧 계정이라 탈퇴로
 
 function linkCard() {
-  const p = h('p', { className: 'rc-note rc-links' }, '확인 중…')
-  session().then(s => {
-    const user = s?.user, discord = hasProvider(user, 'discord'), kakao = hasProvider(user, 'kakao')
-    p.replaceChildren(...!discord ? ['카카오로 로그인 중이에요.']
-      : kakao ? ['디스코드 · 카카오 어느 쪽으로 로그인해도 이 계정이에요.']
+  const p = h('p', { className: 'rc-note rc-links' }, '확인 중…'), err = errBox()
+  const paint = async () => {
+    const user = (await session())?.user, discord = hasProvider(user, 'discord'), kakao = hasProvider(user, 'kakao')
+    const off = h('button', { type: 'button', className: 'danger', onclick: async () => {
+      if (!confirm('카카오 로그인 연결을 끊을까요?\n다음부터는 디스코드로만 이 계정에 들어올 수 있어요. 카카오로 로그인하면 따로 새 계정이 돼요.')) return
+      off.disabled = true; show(err, '')
+      try { await unlinkKakao(); paint() } catch (e) { show(err, e.message); off.disabled = false }
+    } }, '카카오 연결 해제')
+    p.replaceChildren(...!discord ? ['카카오로 로그인 중이에요. 카카오로만 들어오는 계정이라 연결을 끊으려면 탈퇴해야 해요.']
+      : kakao ? ['디스코드 · 카카오 어느 쪽으로 로그인해도 이 계정이에요. ', off]
       : ['카카오를 연결하면 카카오톡 안에서도 바로 로그인돼요. ', h('button', { type: 'button', className: 'rc-sso is-kakao is-sm', onclick: linkKakao, innerHTML: `${KAKAO_SVG}카카오 로그인 연결` })])
-  })
-  return card('로그인 연결', p)
+  }
+  paint()
+  return card('로그인 연결', p, err)
+}
+
+// ------------------------------------------------ 탈퇴 — 되돌릴 수 없어서 「탈퇴」 를 직접 쳐야 한다. 슈퍼관리자는 못 한다(서버도 막는다)
+
+function quitCard() {
+  const err = errBox()
+  const btn = h('button', { type: 'button', className: 'danger', disabled: !!me.master, onclick: async () => {
+    if (prompt('탈퇴하면 되돌릴 수 없어요. 계속하려면 「탈퇴」 라고 입력해 주세요')?.trim() !== '탈퇴') return
+    btn.disabled = true; show(err, '')
+    try { await withdraw() } catch (e) { show(err, e.message); btn.disabled = false }
+  } }, '탈퇴하기')
+  return card('회원 탈퇴',
+    h('p', { className: 'rc-note' }, '프로필 · 게임 계정 · 아레나 신청 · 팀원모집 자리 · 로그인 정보(디스코드 · 카카오 연결)가 지워지고 되돌릴 수 없어요. 이끌던 모집 팀은 해제돼요.'),
+    h('p', { className: 'rc-muted' }, '작성한 글 · 댓글은 지워지지 않아요 — 지우려면 탈퇴 전에 직접 지워 주세요. 다시 로그인하면 새 계정으로 시작해요.'),
+    me.master && h('p', { className: 'rc-muted' }, '슈퍼관리자는 탈퇴할 수 없어요.'),
+    err, h('div', { className: 'rc-actions' }, btn))
 }
 
 // ------------------------------------------------ 관리자 — 숨긴 메뉴
