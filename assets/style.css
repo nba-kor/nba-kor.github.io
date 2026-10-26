@@ -1026,6 +1026,17 @@ label.ac-pick { cursor: pointer; }
 .mp-admin small { color: var(--muted); font-size: 12px; }
 .mp .rc-links { margin: 0; }
 .mp .rc-gate-admin { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+/* 변경 기록(감사 로그) — 머리 줄: 시각 · 누가(누르면 그 사람만) · 무슨 일 · 무엇에, 아래에 바뀐 내용 */
+.mp-audit { display: flex; flex-direction: column; gap: 6px; }
+.mp-log { padding: 9px 12px; border-radius: 10px; background: var(--panel-2); font-size: 13.5px; }
+.mp-log-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.mp-log-head time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.mp-log-who { padding: 0; border: 0; background: none; color: var(--accent); font-weight: 700; }
+.mp-log-who:hover { text-decoration: underline; }
+.mp-log-target { min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
+.mp-log ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; overflow-wrap: anywhere; }
+.mp-audit-who { margin: 0 0 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.mp-audit-who:empty { display: none; }
 
 /* ---------- 아레나 운영 ---------- */
 .ar { --sc: var(--accent); --ok: var(--accent); --wait: var(--muted); }   /* 색은 강조색 하나 + 회색 */
@@ -1257,12 +1268,15 @@ label.ac-pick { cursor: pointer; }
 @media (max-width: 860px) { .ar-chart { grid-template-columns: 1fr; } }
 @media (max-width: 520px) { .ar-mix-chars { grid-template-columns: 1fr; } }
 
-/* 아레나 참가 신청 모달 — ✕ · 신청 완료로만 닫힌다 */
-/* 전체 화면 — 휴대폰 · PC 모두. 내용은 가운데 820px 까지(PC 에서 너무 퍼지지 않게) */
-.ar-signup-dialog { width: 100%; max-width: 100%; height: 100vh; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
-.ar-signup-dialog header { padding-inline: max(16px, calc((100% - 820px) / 2 + 18px)); }
-.ar-signup-dialog .ar-dlg-body { max-width: 820px; margin: 0 auto; padding: 14px 18px max(28px, env(safe-area-inset-bottom)); }
+/* 아레나 참가 신청 모달 — ✕ · 신청 완료로만 닫힌다.
+   PC 는 가운데 창(내용만큼 높이, 넘치면 창 안에서 스크롤), 휴대폰(640px 이하)은 전체 화면 */
+.ar-signup-dialog { width: min(820px, calc(100vw - 48px)); height: fit-content; max-height: min(90dvh, 980px); }   /* auto 면 위아래(inset)에 붙어 늘어난다 */
+.ar-signup-dialog .ar-dlg-body { padding: 14px 18px 24px; }
 .ar-signup-dialog .ar-memo input { width: 100%; }
+@media (max-width: 640px) {
+  .ar-signup-dialog { width: 100%; max-width: 100%; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+  .ar-signup-dialog .ar-dlg-body { padding-bottom: max(28px, env(safe-area-inset-bottom)); }
+}
 
 /* 아레나 신청 요약 — 내 배정(시간대 · 팀 · 내 계정 · 같은 팀) */
 .ar-mine { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
@@ -1329,10 +1343,13 @@ label.ac-pick { cursor: pointer; }
   .mp-attend :is(th, td):first-child { display: none; }
 }
 
-/* 계정 수정 창도 전체 화면 — 휴대폰 · PC. 내용은 가운데 820px 까지 */
-.ac-dialog { width: 100%; max-width: 100%; height: 100vh; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
-.ac-dialog :is(header, .ac-body, .ac-foot) { padding-inline: max(16px, calc((100% - 820px) / 2 + 16px)); }
-.ac-dialog .ac-foot { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+/* 계정 수정 창 — PC 는 가운데 창(높이 고정: 포지션 필터로 캐릭터 칸이 줄어도 창이 안 줄게, 캐릭터 칸 안에서 스크롤),
+   휴대폰(640px 이하)은 전체 화면 */
+.ac-dialog { width: min(760px, calc(100vw - 48px)); height: min(88dvh, 860px); max-height: min(88dvh, 860px); }
+@media (max-width: 640px) {
+  .ac-dialog { width: 100%; max-width: 100%; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+  .ac-dialog .ac-foot { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+}
 
 /* 모달이 떠 있는 동안 뒤 페이지는 스크롤하지 않는다 — 모달 안 스크롤이 끝에 닿아도 뒤로 넘어가지 않게 */
 html:has(dialog:modal) { overflow: hidden; scrollbar-gutter: stable; }

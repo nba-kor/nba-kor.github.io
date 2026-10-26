@@ -665,22 +665,30 @@ API 가 팀을 보여 줄 때 그 줄을 `entries` 맨 앞으로 옮기므로 �
 
 ### 감사 로그
 
-사이트에서 무언가를 바꾼 요청(GET 이 아니고 성공한 것)은 함수가 응답한 뒤 `audit_log` 표에 한 줄씩 남긴다 —
-**누가**(`user_id` 디스코드 ID · `k`카카오 · `g`비회원 팀원, `user_name` 그때 이름) · **언제**(`at`, ms) · **무엇**(`action` = `메서드 경로`, 예 `PUT /api/arena/plan` · `DELETE /api/builds/12` · `PUT /api/members/<ID>`) · `status`.
-프로필 저장 · 아레나 신청 · 편성 · 멤버 관리 · 접근 비밀번호 바꾸기 · 게시판 글 · 추천 · 댓글 · 팀원모집이 모두 들어간다(`server/index.mjs` 의 `audit` 한 곳).
+사이트에서 무언가를 바꾼 요청(GET 이 아니고 성공한 것)은 함수가 응답한 뒤 `audit_log` 표에 한 줄씩 남긴다(`server/index.mjs` 의 `audit` 한 곳).
 
-- 본문은 남기지 않는다 — 비회원 비밀번호 · 접근 비밀번호를 싣는 요청이 있다. 접근 비밀번호 **입력**(`POST /api/gate`)과 실패한 요청은 남기지 않는다.
-  로그인 없이 하는 비회원 팀 만들기 · 가입은 누가가 비어 있다.
+| 칸 | 내용 |
+| --- | --- |
+| 누가 | `user_id`(디스코드 ID · `k`카카오 · `g`비회원 팀원) · `user_name`(그때 이름). 로그인 없이 하는 비회원 팀 만들기 · 가입은 비어 있다 |
+| 언제 | `at`(ms) |
+| 무슨 일 | `label` 한글 이름(예 「아레나 편성 저장」 · 「잠재력추천 댓글 삭제」, `auditLabel`) · `action` 메서드 경로(예 `PUT /api/arena/plan`) |
+| 무엇에 | `target` — 글은 `#번호 제목`, 멤버 관리는 그 사람 이름, 아레나는 `2026-10-31 주`, 프로필은 표시 이름 |
+| 바뀐 내용 | `detail` 줄 목록(60줄까지) — 프로필: 표시 이름 · 마이크 · 본계정 · 계정 추가 · 삭제 · 계정마다 포지션 · 캐릭터 +/− · 대표 캐릭터 · 돌파(`profileChanges`). 아레나 신청: 시간 · 계정 · 메모 전 → 후(`signupChanges`). 편성: 계정마다 「토 1차 1팀 → 토 1.5차 2팀」 · 「+넣음」 · 「−뺌」(`planChanges`). 멤버 등급: 「멤버 → 관리자」. 글 수정: 제목 · 캐릭터 · 내용 · 그 밖의 칸, 남의 글이면 「○○ 님의 글」. 댓글: 내용 앞부분. 추천: 추천 · 추천 취소 |
+
+- 요청 본문을 통째로 남기지 않는다 — 비회원 비밀번호 · 접근 비밀번호를 싣는 요청이 있다. 접근 비밀번호를 바꾼 일은 남지만 비밀번호는 안 남는다.
+  접근 비밀번호 **입력**(`POST /api/gate`)과 실패한 요청은 남기지 않는다.
 - 함수는 넣고 읽기만 한다(고치거나 지울 권한이 없다). 남기다 실패해도 요청은 그대로 되고 함수 로그에 `감사 로그 실패` 만 찍힌다.
-- **보기**: 화면은 없다. 대시보드 **Table Editor > audit_log**, 또는 SQL Editor 에서
+- **보기**: 슈퍼관리자(마스터)로 로그인 → 마이페이지 맨 아래 **변경 기록**. 최근 것부터 50줄씩(「더 보기」), 이름을 누르면 그 사람 기록만(`GET /api/audit?before=&who=`, 마스터만).
+  대시보드 **Table Editor > audit_log** 나 SQL Editor 로도 본다:
 
   ```sql
-  select to_timestamp(at / 1000.0) at time zone 'Asia/Seoul' as kst, user_name, user_id, action, status
+  select to_timestamp(at / 1000.0) at time zone 'Asia/Seoul' as kst, user_name, label, target, detail
   from public.audit_log order by at desc limit 200;
   ```
 
-- 지우지 않고 쌓인다(한 줄 100바이트 남짓). DB 가 500MB 에 가까워지면 SQL Editor 에서 오래된 줄을 지운다.
-- 처음 운영에 올릴 때: `20261026000000_audit_log.sql` 을 SQL Editor 에서 Run → `sh tools/deploy-api.sh`. 순서가 바뀌어도 요청은 되지만 그 사이 로그는 남지 않는다.
+- 지우지 않고 쌓인다(한 줄 수백 바이트). DB 가 500MB 에 가까워지면 SQL Editor 에서 오래된 줄을 지운다.
+- 처음 운영에 올릴 때: `20261026000000_audit_log.sql` → `20261026100000_audit_detail.sql` 을 SQL Editor 에서 Run → `sh tools/deploy-api.sh`.
+  함수를 먼저 올리면 그 사이 로그는 남지 않는다(요청은 된다).
 
 ## 잠재력추천
 

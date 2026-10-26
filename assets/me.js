@@ -1,4 +1,4 @@
-// 마이페이지 — 프로필(표시 이름 · 마이크) · 게임 계정 · 보유 캐릭터 · 아레나 신청 이력 · 로그인 연결 · (관리자) 숨긴 메뉴 · (마스터) 사이트 접근 비밀번호
+// 마이페이지 — 프로필(표시 이름 · 마이크) · 게임 계정 · 보유 캐릭터 · 아레나 신청 이력 · 로그인 연결 · (관리자) 숨긴 메뉴 · (마스터) 사이트 접근 비밀번호 · 변경 기록
 import { mountTop, copyLink } from './app.js?v=d496cab6'
 import { api, session, hasProvider, linkKakao, saveGate, chooseLogin, KAKAO_SVG } from './auth.js?v=e2ffcda1'
 import { $, h, loadData, startAuth, auth, me } from './board.js?v=39f60afc'
@@ -24,7 +24,7 @@ function render() {
     h('p', { className: 'rc-note' }, '로그인하면 내 프로필 · 게임 계정 · 보유 캐릭터를 등록하고 아레나전에 신청할 수 있어요.'),
     h('div', { className: 'rc-actions' }, h('button', { type: 'button', className: 'primary rc-big', onclick: chooseLogin }, '로그인'))))
   if (me.admin) memberStore.load()
-  box.replaceChildren(...[profileCard(), historyCard(), linkCard(), me.admin && adminCard(), me.admin && attendanceCard(), me.admin && membersCard(), me.master && gateCard()].filter(Boolean))   // replaceChildren 은 false 를 글자로 찍는다
+  box.replaceChildren(...[profileCard(), historyCard(), linkCard(), me.admin && adminCard(), me.admin && attendanceCard(), me.admin && membersCard(), me.master && gateCard(), me.master && auditCard()].filter(Boolean))   // replaceChildren 은 false 를 글자로 찍는다
 }
 
 // ------------------------------------------------ 프로필 + 계정
@@ -121,7 +121,8 @@ const adminCard = () => card('관리자 메뉴',
     h('li', {}, h('a', { href: '/arena/plan/' }, '아레나 편성'), h('small', {}, '신청한 계정을 끌어서 시간대별 팀에 배치')),
     h('li', {}, h('a', { href: '#attendance' }, '아레나 출석 현황'), h('small', {}, '몇 주 연속 참석 · 몇 주째 미참석 — 아래')),
     h('li', {}, h('a', { href: '#members' }, '멤버 관리'), h('small', {}, '관리자 임명 · 해제 · 탈퇴 — 아래')),
-    h('li', {}, h('a', { href: '/recruit/' }, '팀원모집'), h('small', {}, '당분간 메뉴에서 숨겨 둔 기능 — 주소로는 누구나 들어올 수 있어요'))))
+    h('li', {}, h('a', { href: '/recruit/' }, '팀원모집'), h('small', {}, '당분간 메뉴에서 숨겨 둔 기능 — 주소로는 누구나 들어올 수 있어요')),
+    me.master && h('li', {}, h('a', { href: '#audit' }, '변경 기록'), h('small', {}, '누가 언제 무엇을 바꿨는지 — 아래(슈퍼관리자만)'))))
 
 // ------------------------------------------------ 관리자 — 멤버 관리(프로필이 있는 사람). 슈퍼관리자(마스터) · 본인은 못 바꾼다 — 서버도 막는다
 
@@ -244,6 +245,46 @@ function gateCard() {
       h('div', { className: 'rc-gate-row' }, input, h('button', { type: 'button', onclick: random }, '랜덤 생성'), h('button', { type: 'button', className: 'primary', onclick: save }, '바꾸기')),
       h('small', { className: 'rc-hint' }, '4~32자. 바꾸면 다른 사람은 새 비밀번호를 한 번 다시 입력해야 해요(이 기기는 그대로 들어와 있어요). 마스터만 보여요.'),
       err))
+}
+
+// ------------------------------------------------ 마스터 — 변경 기록(감사 로그). 사이트에서 무언가를 바꾼 일마다 누가 · 언제 · 무엇을 · 바뀐 내용, 최근 것부터
+
+function auditCard() {
+  let logs = [], next = null, who = null   // who = { id, name } — 그 사람 기록만
+  const box = h('div', { className: 'mp-audit' }, h('p', { className: 'rc-muted' }, '불러오는 중…'))
+  const filter = h('p', { className: 'mp-audit-who' }), err = errBox()
+  const more = h('button', { type: 'button', hidden: true, onclick: () => load(true) }, '더 보기')
+  const when = ms => new Date(ms).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
+  const only = l => { who = { id: l.userId, name: l.userName || l.userId }; load() }
+  async function load(append = false) {
+    more.disabled = true
+    try {
+      const q = new URLSearchParams({ ...(append && { before: next }), ...(who && { who: who.id }) })
+      const r = await api(`/audit?${q}`, { withToken: true })
+      logs = append ? [...logs, ...r.logs] : r.logs
+      next = r.next
+      show(err, '')
+    } catch (e) { show(err, e.message) }
+    more.disabled = false
+    paint()
+  }
+  function paint() {
+    filter.replaceChildren(...who ? [h('b', {}, who.name), ' 님 기록만 보는 중 ', h('button', { type: 'button', onclick: () => { who = null; load() } }, '전체 보기')] : [])
+    box.replaceChildren(...logs.length ? logs.map(l => h('article', { className: 'mp-log' },
+      h('div', { className: 'mp-log-head' },
+        h('time', {}, when(l.at)),
+        l.userId ? h('button', { type: 'button', className: 'mp-log-who', title: '이 사람 기록만 보기', onclick: () => only(l) }, l.userName || l.userId) : h('span', { className: 'rc-muted' }, '비회원'),
+        h('b', { title: l.action }, l.label || l.action),
+        l.target && h('span', { className: 'mp-log-target' }, l.target)),
+      l.detail.length > 0 && h('ul', {}, l.detail.map(d => h('li', {}, d)))))
+      : [h('p', { className: 'rc-muted' }, '기록이 없어요')])
+    more.hidden = !next
+  }
+  load()
+  const el = card('변경 기록', filter, box, err, h('div', { className: 'rc-actions' }, more),
+    h('p', { className: 'rc-muted' }, '프로필 · 아레나 신청 · 편성 · 멤버 관리 · 게시판 · 접근 비밀번호 등 사이트에서 무언가를 바꾼 일이 최근 것부터 나와요. 이름을 누르면 그 사람 기록만 봐요. 슈퍼관리자만 보여요.'))
+  el.id = 'audit'
+  return el
 }
 
 startAuth('', render)

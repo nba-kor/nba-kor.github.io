@@ -29,6 +29,7 @@ const TTL = CFG.ttlHours * 3_600_000
 const L = CFG.limits
 const MAX_BODY = 32 * 1024
 const MAX_LIST = 100
+const AUDIT_PAGE = 50   // 감사 로그 한 번에 보여 주는 줄
 const LIMIT = { max: 30, windowMs: 10 * 60_000 }   // 한 사람(계정 · 비회원 팀원) 당 쓰기 요청. 비회원 만들기 · 가입은 IP 당
 const PW_LIMIT = { max: 5, memberMax: 20, windowMs: 10 * 60_000 }   // 틀린 비회원 비밀번호: 한 IP 가 한 팀원에 · 그 팀원 전체
 const PW_LEN = [4, 32]
@@ -309,6 +310,103 @@ function added(v) {
   return { name: nick, mic: null, entries: [{ nick, tier, char: v.char }], added: true }
 }
 
+// ---------------------------------------------------------------- 감사 로그 — 무슨 일(label) · 바뀐 내용 줄(detail)
+
+const BOARD_KO = { builds: '잠재력추천', videos: '영상', tactics: '커스텀 전술', tiers: '티어표', combos: '조합표' }
+const AUDIT_LABEL = {
+  'PUT /api/gate': '접근 비밀번호 변경', 'PUT /api/me/profile': '프로필 저장',
+  'PUT /api/arena/signup': '아레나 신청', 'DELETE /api/arena/signup': '아레나 신청 취소', 'PUT /api/arena/plan': '아레나 편성 저장',
+  'PUT /api/members/:id': '멤버 등급 변경', 'DELETE /api/members/:id': '멤버 탈퇴 처리',
+  'POST /api/teams': '모집 팀 만들기', 'POST /api/teams/quick': '모집 빠른 참가', 'PUT /api/teams/:id': '모집 팀 정보 수정', 'DELETE /api/teams/:id': '모집 팀 해제',
+  'POST /api/teams/:id/extend': '모집 팀 연장', 'POST /api/teams/:id/members': '모집 팀 가입', 'PUT /api/teams/:id/members/:id': '모집 참가 캐릭터 변경',
+  'DELETE /api/teams/:id/members/:id': '모집 팀 나가기 · 내보내기',
+  ...Object.fromEntries(Object.entries(BOARD_KO).flatMap(([k, ko]) => [
+    [`POST /api/${k}`, `${ko} 글 쓰기`], [`PUT /api/${k}/:id`, `${ko} 글 수정`], [`DELETE /api/${k}/:id`, `${ko} 글 삭제`],
+    [`POST /api/${k}/:id/like`, `${ko} 추천`], [`POST /api/${k}/:id/comments`, `${ko} 댓글 쓰기`], [`DELETE /api/${k}/:id/comments/:id`, `${ko} 댓글 삭제`],
+  ])),
+}
+/** 'DELETE /api/builds/12/comments/5' → '잠재력추천 댓글 삭제' (모르는 요청은 null — 화면은 메서드 · 경로를 보여 준다) */
+export const auditLabel = action => AUDIT_LABEL[action
+  .replace(/^(\S+ \/api\/(?:teams|members|builds|videos|tactics|tiers|combos))\/(?!quick$)[^/]+/, '$1/:id')
+  .replace(/\/(members|comments)\/[^/]+$/, '/$1/:id')] ?? null
+
+const charKo = id => PLAYERS.get(id)?.short || PLAYERS.get(id)?.name || id
+const roleKo = id => ARENA.roles.find(r => r.id === id)?.label ?? id
+const rolesKo = roles => roles.map(roleKo).join(' · ') || '없음'
+const CHOICE_KO = Object.fromEntries([...ARENA.slots, ...ARENA.extra].map(c => [c.id, c.short]))
+const SLOT_KO = Object.fromEntries(ARENA.slots.map(s => [s.id, s.short]))
+/** 두 목록 차이 「+새것 −빠진것」 — 같으면 '' */
+const plusMinus = (a, b, name = String) => [...b.filter(x => !a.includes(x)).map(x => `+${name(x)}`), ...a.filter(x => !b.includes(x)).map(x => `−${name(x)}`)].join(' ')
+/** 감사 로그에 남기는 사용자 글(제목 · 댓글)은 앞부분만 */
+const clip = (t, n = 80) => [...t].length > n ? `${[...t].slice(0, n).join('')}…` : t
+
+/** 프로필 저장 전(old: { discord_name, mic, entries } | null) · 후 → 바뀐 내용 줄. 계정 = 같은 닉네임 줄들, 첫 계정이 본계정 */
+export function profileChanges(old, now) {
+  const accts = entries => {
+    const m = new Map()
+    for (const e of entries) {
+      const a = m.get(e.nick) || m.set(e.nick, { roles: e.roles ?? [], chars: [], bt: {} }).get(e.nick)
+      a.chars.push(e.char)
+      if (e.breakthrough) a.bt[e.char] = e.breakthrough
+    }
+    return m
+  }
+  const desc = a => `포지션 ${rolesKo(a.roles)} · ${a.chars.map(charKo).join(', ')}`
+  const mic = on => on ? '사용' : '안 함'
+  const after = accts(now.entries)
+  if (!old) return [`프로필 만듦 — 이름 ${now.name} · 마이크 ${mic(now.mic)}`, ...[...after].map(([n, a]) => `계정 ${n}: ${desc(a)}`)]
+  const before = accts(old.entries), out = []
+  if (old.discord_name !== now.name) out.push(`표시 이름: ${old.discord_name} → ${now.name}`)
+  if (old.mic !== now.mic) out.push(`마이크: ${mic(old.mic)} → ${mic(now.mic)}`)
+  if (old.entries[0]?.nick !== now.entries[0]?.nick) out.push(`본계정: ${old.entries[0]?.nick ?? '-'} → ${now.entries[0]?.nick ?? '-'}`)
+  for (const [n, a] of after) {
+    const b = before.get(n)
+    if (!b) { out.push(`계정 추가 ${n}: ${desc(a)}`); continue }
+    if (b.roles.join() !== a.roles.join()) out.push(`${n} 포지션: ${rolesKo(b.roles)} → ${rolesKo(a.roles)}`)
+    const pm = plusMinus(b.chars, a.chars, charKo)
+    if (pm) out.push(`${n} 캐릭터 ${pm}`)
+    else if (b.chars[0] !== a.chars[0]) out.push(`${n} 대표 캐릭터: ${charKo(b.chars[0])} → ${charKo(a.chars[0])}`)
+    for (const c of a.chars) if (b.chars.includes(c) && (b.bt[c] ?? 0) !== (a.bt[c] ?? 0)) out.push(`${n} ${charKo(c)} 돌파: ${b.bt[c] ?? '-'} → ${a.bt[c] ?? '-'}`)
+  }
+  for (const n of before.keys()) if (!after.has(n)) out.push(`계정 삭제 ${n}`)
+  return out
+}
+
+/** 아레나 신청 전(old | null) · 후({ slots, nicks, memo }) → 바뀐 내용 줄. 처음 신청이면 그대로 */
+export function signupChanges(old, now) {
+  const slots = s => s.map(c => CHOICE_KO[c] ?? c).join(' · ') || '-', nicks = n => n.join(', ') || '-'
+  if (!old) return [`시간: ${slots(now.slots)}`, `계정: ${nicks(now.nicks)}`, now.memo && `메모: ${now.memo}`].filter(Boolean)
+  return [
+    old.slots.join() !== now.slots.join() && `시간: ${slots(old.slots)} → ${slots(now.slots)}`,
+    old.nicks.join() !== now.nicks.join() && `계정: ${nicks(old.nicks)} → ${nicks(now.nicks)}`,
+    old.memo !== now.memo && `메모: ${old.memo || '-'} → ${now.memo || '-'}`,
+  ].filter(Boolean)
+}
+
+/**
+ * 편성표 저장 전 · 후 → 계정마다 「닉네임: 토 1차 1팀 → 2팀」 · 「+닉네임: 토 2차 1팀」(넣음) · 「−닉네임: …」(뺌).
+ * 한 시간대에서 빠지고 다른 시간대에 들어갔으면 한 줄(「닉네임: 토 1차 1팀 → 토 1.5차 2팀」). 앞 팀이 비어 번호가 당겨진 것도 옮긴 것으로 나온다
+ */
+export function planChanges(old, now) {
+  const places = plan => {
+    const m = new Map()
+    for (const s of ARENA.slots) (plan?.[s.id] || []).forEach((tm, i) => tm.forEach(a => {
+      const k = `${a.u}\n${a.n}`
+      ;(m.get(k) || m.set(k, new Map()).get(k)).set(s.id, i + 1)
+    }))
+    return m
+  }
+  const before = places(old), after = places(now), out = [], at = (slot, team) => `${SLOT_KO[slot]} ${team}팀`
+  for (const k of new Set([...before.keys(), ...after.keys()])) {
+    const b = before.get(k) || new Map(), a = after.get(k) || new Map(), nick = k.split('\n')[1]
+    for (const [s, t] of a) if (b.has(s) && b.get(s) !== t) out.push(`${nick}: ${at(s, b.get(s))} → ${t}팀`)
+    const gone = [...b].filter(([s]) => !a.has(s)), added = [...a].filter(([s]) => !b.has(s))
+    if (gone.length === 1 && added.length === 1) out.push(`${nick}: ${at(...gone[0])} → ${at(...added[0])}`)
+    else out.push(...added.map(p => `+${nick}: ${at(...p)}`), ...gone.map(p => `−${nick}: ${at(...p)}`))
+  }
+  return out
+}
+
 /** 아레나 주 = 그 주 토요일 날짜(KST, 'YYYY-MM-DD'). 일요일 closeAt(21:30, 마지막 판이 끝나는 시각)이 지나면 다음 주 */
 export function arenaWeek(ms) {
   const d = new Date(ms + 9 * 3_600_000)   // KST 시각을 UTC 칸으로 읽는다(한국은 서머타임이 없다)
@@ -451,6 +549,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
 
   const authMemo = new Map()   // sha256(토큰) → { user, until }
   const actors = new WeakMap()   // 요청 → 확인한 신원 — 응답 뒤 감사 로그에 남길 사람
+  const notes = new WeakMap()    // 요청 → { target, detail } — 처리하는 쪽이 감사 로그에 붙이는 무엇에 · 바뀐 내용 줄
+  const note = (request, target, detail = []) => notes.set(request, { target, detail: detail.filter(Boolean) })
   /**
    * 웹: Supabase Auth 에 토큰을 보여 사용자를 받는다. ID 는 identities(디스코드 먼저, 없으면 카카오)에서만 꺼낸다 —
    * user_metadata 는 사용자가 updateUser 로 고칠 수 있어 ID 로는 믿지 않는다(본인이 고르는 표시 이름에만 쓴다).
@@ -548,14 +648,18 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   }
 
   /**
-   * 감사 로그(audit_log) — 바꾼 요청(GET 이 아니고 성공)마다 누가 · 무엇을(메서드 · 경로). 본문은 안 남긴다(비밀번호를 싣는 요청이 있다).
+   * 감사 로그(audit_log) — 바꾼 요청(GET 이 아니고 성공)마다 누가 · 무엇을(메서드 · 경로 · 한글 이름) · 무엇에(target) · 바뀐 내용 줄(detail, 60줄까지).
+   * 본문은 통째로 안 남긴다(비밀번호를 싣는 요청이 있다) — target · detail 은 처리하는 쪽이 note() 로 골라 붙인다.
    * 응답 뒤에 넣고, 실패해도 요청에는 영향이 없다(함수 로그만). 접근 비밀번호 입력(POST /api/gate)은 바꾸는 일이 아니라 뺀다
    */
   function audit(request, status) {
     const { pathname } = new URL(request.url), action = `${request.method} ${pathname}`
     if (request.method === 'GET' || status >= 300 || action === 'POST /api/gate') return
-    const user = actors.get(request)
-    waitUntil(db('/audit_log', { method: 'POST', body: { at: now(), user_id: user?.id ?? null, user_name: user?.name ?? null, action, status } })
+    const user = actors.get(request), { target = null, detail = [] } = notes.get(request) || {}
+    const lines = detail.length > 60 ? [...detail.slice(0, 59), `…외 ${detail.length - 59}줄`] : detail
+    waitUntil(db('/audit_log', { method: 'POST', body: {
+      at: now(), user_id: user?.id ?? null, user_name: user?.name ?? null, action, status, label: auditLabel(action), target, detail: lines.length ? lines : null,
+    } })
       .catch(e => log(`감사 로그 실패 ${action}: ${errText(e)}`)))
   }
 
@@ -803,33 +907,47 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         const [b] = await db(`/${B.table}`, {
           method: 'POST', prefer: 'return=representation', body: { ...v, author_id: user.id, author_name: await nameOf(user), created_at: t, updated_at: t },
         })
+        note(request, `#${b.id} ${clip(b.title)}`, [b.chars?.length && `캐릭터: ${b.chars.map(charKo).join(', ')}`])
         return [201, { [B.one]: view(b) }]
       }
       case 'PUT item': {
-        const v = B.validate(await readJson(request))
-        mineOrAdmin((await itemOf(id)).author_id, '글')
+        const v = B.validate(await readJson(request)), old = await itemOf(id)
+        mineOrAdmin(old.author_id, '글')
         await B.unique?.(v, id)
         await db(`/${B.table}?id=eq.${id}`, { method: 'PATCH', body: { ...v, author_name: await nameOf(user), updated_at: t } })
-        return [200, { [B.one]: view(await itemOf(id)) }]
+        const b = await itemOf(id), pm = plusMinus(old.chars || [], b.chars || [], charKo)
+        note(request, `#${id} ${clip(b.title)}`, [
+          old.author_id !== user.id && `${old.author_name} 님의 글`, old.title !== b.title && `제목: ${clip(old.title)} → ${clip(b.title)}`, pm && `캐릭터 ${pm}`,
+          old.body !== b.body && '내용 수정', JSON.stringify(B.extra(old)) !== JSON.stringify(B.extra(b)) && '그 밖의 칸 수정',
+        ])
+        return [200, { [B.one]: view(b) }]
       }
-      case 'DELETE item':
-        mineOrAdmin((await itemOf(id)).author_id, '글')
+      case 'DELETE item': {
+        const old = await itemOf(id)
+        mineOrAdmin(old.author_id, '글')
         await db(`/${B.table}?id=eq.${id}`, { method: 'DELETE' })   // 추천 · 댓글은 cascade
+        note(request, `#${id} ${clip(old.title)}`, [old.author_id !== user.id && `${old.author_name} 님의 글`])
         return [200, { ok: true }]
-      case 'POST item like':
-        await itemOf(id)   // 없는 글이면 여기서 404(RPC 의 PT404 는 팀 문구라 동시 삭제 때만 난다)
-        return [200, await db(`/rpc/${B.rpc[0]}`, { method: 'POST', body: { [B.rpc[1]]: +id, p_user: user.id } })]
+      }
+      case 'POST item like': {
+        const b = await itemOf(id)   // 없는 글이면 여기서 404(RPC 의 PT404 는 팀 문구라 동시 삭제 때만 난다)
+        const r = await db(`/rpc/${B.rpc[0]}`, { method: 'POST', body: { [B.rpc[1]]: +id, p_user: user.id } })
+        note(request, `#${id} ${clip(b.title)}`, [r?.liked === false ? '추천 취소' : '추천'])
+        return [200, r]
+      }
       case 'POST item comments': {
         const v = await readJson(request)
         const body = text(isObj(v) ? v.body : null, 500, '댓글', 1, true)
-        await itemOf(id)
+        const b = await itemOf(id)
         await db(`/${B.comments}`, { method: 'POST', body: { [B.fk]: +id, author_id: user.id, author_name: await nameOf(user), body, created_at: t } })
+        note(request, `#${id} ${clip(b.title)}`, [`「${clip(body)}」`])
         return [201, { ok: true }]
       }
       case 'DELETE item comments comment': {
-        const [c] = await db(`/${B.comments}?select=author_id&id=eq.${cid}&${B.fk}=eq.${id}`)
+        const [[c], b] = await Promise.all([db(`/${B.comments}?select=author_id,author_name,body&id=eq.${cid}&${B.fk}=eq.${id}`), itemOf(id)])
         mineOrAdmin((c || fail(404, '댓글을 찾을 수 없어요')).author_id, '댓글')
         await db(`/${B.comments}?id=eq.${cid}`, { method: 'DELETE' })
+        note(request, `#${id} ${clip(b.title)}`, [`「${clip(c.body)}」`, c.author_id !== user.id && `${c.author_name} 님의 댓글`])
         return [200, { ok: true }]
       }
     }
@@ -893,24 +1011,29 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     switch (action) {
       case 'PUT signup': {
         const body = await readJson(request)
-        const p = await mine(user) || fail(428, NO_PROFILE)
+        const [p, [old]] = await Promise.all([mine(user), db(`/arena_signups?select=slots,nicks,memo&week=eq.${cur}&user_id=eq.${enc(user.id)}`)])
+        if (!p) fail(428, NO_PROFILE)
         const v = arenaSignup(body, new Map([...p.entries].reverse().map(e => [e.nick, e.roles ?? []])))   // 뒤집어 넣어 계정의 첫 줄 값이 남는다
         // created_at 은 안 보낸다 — 처음 넣을 때만 DB 기본값, 다시 저장해도 신청 순서가 그대로다
         await db('/arena_signups?on_conflict=week,user_id', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { week: cur, user_id: user.id, ...v, updated_at: t } })
+        note(request, `${cur} 주`, signupChanges(old, v))
         return [200, { week: cur, signup: { ...v, updatedAt: t } }]
       }
-      case 'DELETE signup':
-        await db(`/arena_signups?week=eq.${cur}&user_id=eq.${enc(user.id)}`, { method: 'DELETE' })
+      case 'DELETE signup': {
+        const [old] = await db(`/arena_signups?week=eq.${cur}&user_id=eq.${enc(user.id)}`, { method: 'DELETE', prefer: 'return=representation' })
+        note(request, `${cur} 주`, old ? signupChanges(null, old) : ['신청이 없었어요'])
         return [200, { ok: true }]
+      }
       case 'PUT plan': {   // { week, version: 읽어 온 planAt, plan } — 통째로 바꾼다
         if (!await isAdmin(user)) fail(403, '관리자만 편성할 수 있어요')
         const body = await readJson(request)
         if (!isObj(body) || body.week !== cur) fail(409, STALE_PLAN)
-        const [[old], signups] = await Promise.all([db(`/arena_plans?select=updated_at&week=eq.${cur}`), signupsOf(cur)])
+        const [[old], signups] = await Promise.all([db(`/arena_plans?select=updated_at,plan&week=eq.${cur}`), signupsOf(cur)])
         // ponytail: 읽고 쓰는 사이에 다른 관리자가 저장하면(같은 순간) 늦게 쓴 쪽이 덮는다 — 관리자 몇 명이라 충분. 겹치면 updated_at 조건부 PATCH 로
         if ((old?.updated_at ?? null) !== (body.version ?? null)) fail(409, STALE_PLAN)
         const plan = arenaPlan(body.plan, signups)
         await db('/arena_plans?on_conflict=week', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { week: cur, plan, updated_at: t, updated_by: user.id } })
+        note(request, `${cur} 주`, planChanges(old?.plan, plan))
         return [200, { plan, planAt: t }]
       }
     }
@@ -963,7 +1086,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (await hit(`w ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
     if (!MEMBER_ID.test(id)) fail(404, '멤버를 찾을 수 없어요')
     if (id === user.id) fail(400, '본인의 등급은 바꾸거나 탈퇴시킬 수 없어요')
-    const [[target], master] = await Promise.all([db(`/recruit_profiles?select=discord_name&discord_user_id=eq.${id}`), isMaster({ id })])
+    const [[target], master, wasAdmin] = await Promise.all([db(`/recruit_profiles?select=discord_name&discord_user_id=eq.${id}`), isMaster({ id }), inAdmins({ id })])
     if (master) fail(403, '슈퍼관리자는 등급을 바꾸거나 탈퇴시킬 수 없어요')
     if (!target) fail(404, '멤버를 찾을 수 없어요')
 
@@ -972,6 +1095,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       if (!isObj(body) || !['admin', 'member'].includes(body.role)) fail(400, '관리자 · 멤버 중에 골라 주세요')
       if (body.role === 'admin') await db('/site_admins?on_conflict=user_id', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { user_id: id, note: `${target.discord_name} · ${user.id} 임명` } })
       else await db(`/site_admins?user_id=eq.${id}`, { method: 'DELETE' })
+      note(request, target.discord_name, [`등급: ${wasAdmin ? '관리자' : '멤버'} → ${body.role === 'admin' ? '관리자' : '멤버'}`])
       return [200, { userId: id, role: body.role }]
     }
     // 탈퇴 = 관리자 권한 · 프로필을 지운다(게임 계정 · 아레나 신청 · 팀원모집 자리는 프로필에 cascade). 팀장이던 모집 팀은 해제한다.
@@ -980,7 +1104,24 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (led) await disband(led.team_id)
     await db(`/site_admins?user_id=eq.${id}`, { method: 'DELETE' })
     await db(`/recruit_profiles?discord_user_id=eq.${id}`, { method: 'DELETE' })
+    note(request, target.discord_name, [`프로필 · 게임 계정 · 아레나 신청${wasAdmin ? ' · 관리자 권한' : ''} 삭제`, led && '이끌던 모집 팀 해제'])
     return [200, { ok: true }]
+  }
+
+  /** 감사 로그 보기 — 마스터만. ?before=<id>(더 보기) · ?who=<사용자 ID>(그 사람만) · 최근 것부터 50줄 */
+  async function auditLog(request) {
+    if (request.method !== 'GET') fail(404, '없는 주소예요')
+    const user = await identity(request)
+    if (!await isMaster(user)) fail(403, '슈퍼관리자만 볼 수 있어요')
+    const q = new URL(request.url).searchParams, before = q.get('before') || '', who = q.get('who') || ''
+    const rows = await db('/audit_log?select=id,at,user_id,user_name,action,label,target,detail'
+      + (/^\d{1,15}$/.test(before) ? `&id=lt.${before}` : '') + (/^[gk]?\d{1,20}$/.test(who) ? `&user_id=eq.${who}` : '')
+      + `&order=id.desc&limit=${AUDIT_PAGE + 1}`)
+    const page = rows.slice(0, AUDIT_PAGE)
+    return [200, {
+      logs: page.map(r => ({ id: r.id, at: r.at, userId: r.user_id, userName: r.user_name, action: r.action, label: r.label, target: r.target, detail: r.detail ?? [] })),
+      next: rows.length > AUDIT_PAGE ? page.at(-1).id : null,
+    }]
   }
 
   async function route(request) {
@@ -991,6 +1132,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     }
     if (pathname === '/api/gate') return gate(request)
     if (!await gatePass(request)) throw Object.assign(new Error(GATE), { status: 401, gate: true })
+    if (pathname === '/api/audit') return auditLog(request)
     const b = pathname.match(BOARD_PATH)
     if (b) return board(request, b, now())
     const a = pathname.match(/^\/api\/arena(?:\/(signup|plan|mine))?$/)
@@ -1045,12 +1187,13 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       }
 
       case 'PUT me profile': {
-        const p = profile(body)
+        const p = profile(body), old = await mine(user)
         // 이름을 안 보냈으면 저장돼 있던 이름을, 프로필이 아직 없으면 디스코드 이름을 쓴다
-        const name = p.name ?? (await mine(user))?.discord_name ?? user.name
+        const name = p.name ?? old?.discord_name ?? user.name
         await db('/rpc/recruit_upsert_profile', {
           method: 'POST', body: { p_user: user.id, p_auth: user.authUserId, p_name: name, p_mic: p.mic, p_entries: p.entries, p_now: t },
         })
+        note(request, name, profileChanges(old, { name, mic: p.mic, entries: p.entries }))
         return [200, { profile: { userId: user.id, name, mic: p.mic, entries: p.entries, updatedAt: t } }]
       }
 
@@ -1149,6 +1292,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         const before = view(await teamOf(id, t))
         const target = before.members.find(x => x.userId === userId) || fail(404, '팀원을 찾을 수 없어요')
         if (target.userId !== user.id && !isLeader(before, user)) fail(403, '팀장만 다른 팀원을 내보낼 수 있어요')
+        note(request, target.name, [target.userId === user.id ? '본인이 나감' : '팀장이 내보냄', target.leader && '팀장이라 팀 해제'])
         if (target.leader) {   // 팀장이 빠지면 팀이 없어진다
           await disband(id)
           notifier.teamDisbanded(before, 'leader')

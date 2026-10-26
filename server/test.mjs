@@ -1481,7 +1481,7 @@ test('Data API 오류 → HTTP: PT404 · PT409(full · already) · PT428 은 사
   assert.equal(call.headers.authorization, undefined, 'secret key 는 Authorization 에 싣지 않는다')
   assert.deepEqual([call.headers['content-type'], call.headers.accept], ['application/json', 'application/json'])
   assert.ok(seen.every(s => s.path.startsWith('/rest/v1/recruit_') || s.path.startsWith('/rest/v1/rpc/') || s.path === '/rest/v1/audit_log'), seen.map(s => s.path).join('\n'))
-  assert.deepEqual(seen.find(s => s.path === '/rest/v1/audit_log').body, { at: 0, user_id: id, user_name: '봇', action: 'POST /api/teams/AAAAAAAA/members', status: 201 }, '감사 로그 한 줄')
+  assert.deepEqual(seen.find(s => s.path === '/rest/v1/audit_log').body, { at: 0, user_id: id, user_name: '봇', action: 'POST /api/teams/AAAAAAAA/members', status: 201, label: '모집 팀 가입', target: null, detail: null }, '감사 로그 한 줄')
   assert.ok(!seen.some(s => s.method === 'PATCH'), '읽기만으로 프로필을 고치지 않는다')
   assert.ok(seen.every(s => !s.path.includes('auth_user_id')), 'auth_user_id 는 읽지 않는다')
 
@@ -1710,6 +1710,28 @@ const CAT = {
 const row = (...xs) => [...xs, ...Array(10 - xs.length).fill(null)]
 const BUILD = { title: '픽앤롤 빌드', chars: ['bl'], body: '스크린 받고\n들어갈 때', slots: { red: row('r1', 'r1'), green: row(), blue: row('b1') } }
 
+test('감사 로그 내용: 한글 이름 · 프로필 · 아레나 신청 · 편성표 바뀐 줄', async () => {
+  const { auditLabel, profileChanges, signupChanges, planChanges } = await import('./index.mjs')
+  assert.deepEqual(['DELETE /api/builds/12/comments/5', 'POST /api/teams/quick', 'DELETE /api/teams/AbC/members/g12', 'PUT /api/members/123', 'POST /api/tiers/3/like', 'PUT /api/x'].map(auditLabel),
+    ['잠재력추천 댓글 삭제', '모집 빠른 참가', '모집 팀 나가기 · 내보내기', '멤버 등급 변경', '티어표 추천', null])
+  assert.deepEqual(profileChanges(
+    { discord_name: '갑', mic: true, entries: [{ nick: '본', char: 'bl', roles: ['scorer'] }, { nick: '부', char: 'sga' }] },
+    { name: '을', mic: false, entries: [{ nick: '새', char: 'sga', roles: ['mid'] }, { nick: '본', char: 'bl', roles: ['allpos'], breakthrough: 3 }, { nick: '본', char: 'kl', roles: ['allpos'] }] }), [
+    '표시 이름: 갑 → 을', '마이크: 사용 → 안 함', '본계정: 본 → 새', '계정 추가 새: 포지션 중열 · 알렉산더',
+    '본 포지션: 스코어러 → 올포', '본 캐릭터 +탐슨', '본 라멜로 볼 돌파: - → 3', '계정 삭제 부'])
+  assert.deepEqual(profileChanges({ discord_name: '갑', mic: true, entries: [{ nick: '본', char: 'bl' }, { nick: '본', char: 'kl' }] },
+    { name: '갑', mic: true, entries: [{ nick: '본', char: 'kl' }, { nick: '본', char: 'bl' }] }), ['본 대표 캐릭터: 라멜로 볼 → 탐슨'])
+  assert.deepEqual(signupChanges(null, { slots: ['sat1', 'flex'], nicks: ['A', 'B'], memo: '' }), ['시간: 토 1차 · FA', '계정: A, B'])
+  assert.deepEqual(signupChanges({ slots: ['sat1'], nicks: ['A'], memo: '' }, { slots: ['sat1', 'sun2'], nicks: ['A'], memo: '늦어요' }), ['시간: 토 1차 → 토 1차 · 일 2차', '메모: - → 늦어요'])
+  const p = (u, n) => ({ u, n })
+  assert.deepEqual(planChanges(
+    { sat1: [[p('1', 'A'), p('2', 'B')], [p('3', 'C')]], sun1: [[p('5', 'E')]] },
+    { sat1: [[p('1', 'A')], [p('3', 'C'), p('4', 'D')]], sat15: [[p('2', 'B')]], sun2: [[p('1', 'A2')]] }),
+    ['B: 토 1차 1팀 → 토 1.5차 1팀', '−E: 일 1차 1팀', '+D: 토 1차 2팀', '+A2: 일 2차 1팀'])
+  assert.deepEqual(planChanges(undefined, { sat1: [[p('1', 'A')]] }), ['+A: 토 1차 1팀'], '처음 저장')
+  assert.deepEqual(planChanges({ sat1: [[p('9', 'Z')], [p('1', 'A')]] }, { sat1: [[p('1', 'A')]] }), ['−Z: 토 1차 1팀', 'A: 토 1차 2팀 → 1팀'], '앞 팀이 비어 번호가 당겨지면 옮긴 것으로')
+})
+
 test('아레나 주: 그 주 토요일(KST) · 일요일 21:30 이 지나면 다음 주 · 연말을 넘는다', async () => {
   const { arenaWeek } = await import('./index.mjs')
   for (const [at, week] of [
@@ -1807,25 +1829,42 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   await rest(`/site_admins?user_id=eq.${boss.id}`, { method: 'DELETE' })
 })
 
-dbTest('감사 로그: 바꾼 요청(성공)만 누가 · 무엇을(메서드 · 경로) — 읽기 · 실패는 안 남긴다 · 함수 키로도 고치거나 지울 수 없다', async () => {
+dbTest('감사 로그: 바꾼 요청(성공)만 누가 · 무엇을 · 무엇에 · 바뀐 내용 — 읽기 · 실패는 안 남긴다 · 함수 키로도 못 고친다 · 보기는 슈퍼관리자만(최근 것부터 · 사람별 · 더 보기)', async () => {
   const { api, idle } = start({ potentials: CAT })
-  const id = uid(), as = web(id, '감사')
-  const rows = async () => (await rest(`/audit_log?select=user_id,user_name,action,status&user_id=eq.${id}&order=id`)).json()
+  const id = uid(), as = web(id, '감사'), boss = uid(), bossAs = web(boss, '보스')
+  const rows = async () => (await rest(`/audit_log?select=user_id,user_name,action,status,label,target,detail&user_id=eq.${id}&order=id`)).json()
   assert.equal((await api('PUT', '/api/me/profile', { mic: true, entries: [entry()] }, { as })).status, 200)
+  assert.equal((await api('PUT', '/api/me/profile', { mic: false, entries: [entry({ roles: ['allpos'], breakthrough: 3 }), entry({ nick: '부캐', char: 'sga' })] }, { as })).status, 200)
   assert.equal((await api('GET', '/api/me', undefined, { as })).status, 200)
   assert.equal((await api('PUT', '/api/me/profile', { mic: 'x', entries: [entry()] }, { as })).status, 400)
-  const b = await api('POST', '/api/builds', BUILD, { as })
+  const b = await api('POST', '/api/builds', BUILD, { as }), bid = b.body.build.id
   assert.equal(b.status, 201)
-  assert.equal((await api('DELETE', `/api/builds/${b.body.build.id}`, undefined, { as })).status, 200)
+  assert.equal((await api('DELETE', `/api/builds/${bid}`, undefined, { as })).status, 200)
   await idle()
+  const me = { user_id: id, user_name: '감사' }
   assert.deepEqual(await rows(), [
-    { user_id: id, user_name: '감사', action: 'PUT /api/me/profile', status: 200 },
-    { user_id: id, user_name: '감사', action: 'POST /api/builds', status: 201 },
-    { user_id: id, user_name: '감사', action: `DELETE /api/builds/${b.body.build.id}`, status: 200 },
+    { ...me, action: 'PUT /api/me/profile', status: 200, label: '프로필 저장', target: '감사', detail: ['프로필 만듦 — 이름 감사 · 마이크 사용', '계정 보노: 포지션 없음 · 라멜로 볼'] },
+    { ...me, action: 'PUT /api/me/profile', status: 200, label: '프로필 저장', target: '감사', detail: ['마이크: 사용 → 안 함', '보노 포지션: 없음 → 올포', '보노 라멜로 볼 돌파: - → 3', '계정 추가 부캐: 포지션 없음 · 알렉산더'] },
+    { ...me, action: 'POST /api/builds', status: 201, label: '잠재력추천 글 쓰기', target: `#${bid} 픽앤롤 빌드`, detail: ['캐릭터: 라멜로 볼'] },
+    { ...me, action: `DELETE /api/builds/${bid}`, status: 200, label: '잠재력추천 글 삭제', target: `#${bid} 픽앤롤 빌드`, detail: null },
   ])
   assert.equal((await rest(`/audit_log?user_id=eq.${id}`, { method: 'DELETE' })).ok, false, '지울 수 없다')
   assert.equal((await rest(`/audit_log?user_id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ user_name: 'x' }) })).ok, false, '고칠 수 없다')
-  assert.equal((await rows()).length, 3)
+  assert.equal((await rows()).length, 4)
+
+  // 보기 — 슈퍼관리자만. 최근 것부터 · ?who= 그 사람만 · ?before= 더 보기
+  assert.equal((await api('GET', '/api/audit', undefined, { as })).status, 403)
+  assert.equal((await rest('/site_masters', { method: 'POST', body: JSON.stringify({ user_id: boss, note: 'test' }) })).status, 201)
+  try {
+    const all = await api('GET', `/api/audit?who=${id}`, undefined, { as: bossAs })
+    assert.equal(all.status, 200)
+    assert.deepEqual(all.body.logs.map(l => l.label), ['잠재력추천 글 삭제', '잠재력추천 글 쓰기', '프로필 저장', '프로필 저장'])
+    assert.deepEqual(Object.keys(all.body.logs[0]).sort(), ['action', 'at', 'detail', 'id', 'label', 'target', 'userId', 'userName'])
+    assert.deepEqual(all.body.logs[0].detail, [], '바뀐 내용 줄이 없으면 빈 배열')
+    const more = await api('GET', `/api/audit?who=${id}&before=${all.body.logs[1].id}`, undefined, { as: bossAs })
+    assert.deepEqual([more.body.logs.map(l => l.label), more.body.next], [['프로필 저장', '프로필 저장'], null])
+    assert.equal((await api('POST', '/api/audit', {}, { as: bossAs })).status, 404)
+  } finally { await rest(`/site_masters?user_id=eq.${boss}`, { method: 'DELETE' }) }
 })
 
 dbTest('멤버 관리: 관리자만 · 목록(등급 · 본계정 · 계정 수 · 마지막 신청 주) · 임명 · 해제 · 탈퇴(프로필 · 신청 · 권한 · 이끌던 팀) · 슈퍼관리자와 본인은 못 바꾼다', async () => {
