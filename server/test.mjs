@@ -1721,7 +1721,7 @@ test('감사 로그 내용: 한글 이름 · 프로필 · 아레나 신청 · �
     '본 포지션: 스코어러 → 올포', '본 캐릭터 +탐슨', '본 라멜로 볼 돌파: - → 3', '계정 삭제 부'])
   assert.deepEqual(profileChanges({ discord_name: '갑', mic: true, entries: [{ nick: '본', char: 'bl' }, { nick: '본', char: 'kl' }] },
     { name: '갑', mic: true, entries: [{ nick: '본', char: 'kl' }, { nick: '본', char: 'bl' }] }), ['본 대표 캐릭터: 라멜로 볼 → 탐슨'])
-  assert.deepEqual(signupChanges(null, { slots: ['sat1', 'flex'], nicks: ['A', 'B'], memo: '' }), ['시간: 토 1차 · FA', '계정: A, B'])
+  assert.deepEqual(signupChanges(null, { slots: ['sat1', 'sunfa'], nicks: ['A', 'B'], memo: '' }), ['시간: 토 1차 · 일 FA', '계정: A, B'])
   assert.deepEqual(signupChanges({ slots: ['sat1'], nicks: ['A'], memo: '' }, { slots: ['sat1', 'sun2'], nicks: ['A'], memo: '늦어요' }), ['시간: 토 1차 → 토 1차 · 일 2차', '메모: - → 늦어요'])
   const p = (u, n) => ({ u, n })
   assert.deepEqual(planChanges(
@@ -1767,8 +1767,8 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   assert.deepEqual([noRole.status, noRole.body.error], [400, `「관리${RUN}」 계정의 주력 포지션(1순위)을 정해 주세요`], '집계표가 1순위로 나눈다')
   assert.equal((await api('PUT', '/api/arena/signup', { slots: ['sat1'], nicks: ['x'] })).status, 401, '로그인 없음')
 
-  const okA = await signup(a, { slots: ['sun2', 'sat1', 'flex'], nicks: ['A부', 'A본'], memo: ' 늦을 수도 ' })
-  assert.deepEqual([okA.status, okA.body], [200, { week, signup: { slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'], memo: '늦을 수도', updatedAt: clock } }], '시간대는 정해진 순서로')
+  const okA = await signup(a, { slots: ['sunfa', 'sun2', 'sat1', 'satfa'], nicks: ['A부', 'A본'], memo: ' 늦을 수도 ' })
+  assert.deepEqual([okA.status, okA.body], [200, { week, signup: { slots: ['sat1', 'sun2', 'satfa', 'sunfa'], nicks: ['A부', 'A본'], memo: '늦을 수도', updatedAt: clock } }], '시간대는 정해진 순서로')
   clock += MIN
   assert.equal((await signup(b, { slots: ['sat1', 'sat2'], nicks: [`B${RUN}`] })).status, 200)
   assert.equal((await signup(c, { slots: ['absent'], nicks: ['무시된다'], memo: '출장' })).status, 200, '사유불참은 계정을 안 본다')
@@ -1776,13 +1776,13 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   let v = await view()
   assert.deepEqual([v.week, v.current, v.plan, v.planAt], [week, week, {}, null])
   assert.deepEqual(v.signups.map(s => [s.userId, s.owner, s.slots, s.accounts]), [
-    [a.id, 'A본', ['sat1', 'sun2', 'flex'], [{ nick: 'A부', roles: ['center', 'mid'], chars: ['klfd'], bt: {} }, { nick: 'A본', roles: ['scorer'], chars: ['bl', 'sga'], bt: { bl: 5 } }]],
+    [a.id, 'A본', ['sat1', 'sun2', 'satfa', 'sunfa'], [{ nick: 'A부', roles: ['center', 'mid'], chars: ['klfd'], bt: {} }, { nick: 'A본', roles: ['scorer'], chars: ['bl', 'sga'], bt: { bl: 5 } }]],
     [b.id, `B${RUN}`, ['sat1', 'sat2'], [{ nick: `B${RUN}`, roles: ['mid'], chars: ['bl'], bt: {} }]],
     [c.id, `C${RUN}`, ['absent'], []],
   ], '신청 순서 · 소유자 = 본계 닉네임 · 계정의 포지션 · 캐릭터 · 돌파는 프로필에서')
   assert.ok(v.missing.includes(`관리${RUN}`) && !v.missing.includes(`C${RUN}`), '미신청 = 프로필은 있는데 신청이 없는 사람(본계 닉네임) — 사유불참도 신청이다')
   clock += MIN
-  assert.equal((await signup(a, { slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'] })).status, 200)
+  assert.equal((await signup(a, { slots: ['sat1', 'sun2', 'satfa', 'sunfa'], nicks: ['A부', 'A본'] })).status, 200)
   assert.equal((await view()).signups[0].userId, a.id, '다시 저장해도 신청 순서 그대로')
 
   // 편성표 — 관리자만
@@ -1819,7 +1819,7 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
 
   // 이력 · 지난 주는 보기만
   const mine = await api('GET', '/api/arena/mine', undefined, { as: a.as })
-  assert.deepEqual(mine.body, { current: week, history: [{ week, slots: ['sat1', 'sun2', 'flex'], nicks: ['A부', 'A본'], memo: '', assigned: [{ slot: 'sat1', team: 1, nick: 'A본' }, { slot: 'sat2', team: 1, nick: 'A부' }] }] }, '이력은 저장된 편성표 그대로')
+  assert.deepEqual(mine.body, { current: week, history: [{ week, slots: ['sat1', 'sun2', 'satfa', 'sunfa'], nicks: ['A부', 'A본'], memo: '', assigned: [{ slot: 'sat1', team: 1, nick: 'A본' }, { slot: 'sat2', team: 1, nick: 'A부' }] }] }, '이력은 저장된 편성표 그대로')
   clock += 8 * 24 * HOUR
   assert.notEqual(arenaWeek(clock), week)
   const past = await view(`?w=${week}`)

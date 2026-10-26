@@ -1,5 +1,5 @@
 {
-  "note": "아레나전 설정 — 서버(server/index.mjs) · 화면(assets/arena.js · assets/profile.js · assets/me.js · index.html) 이 같이 읽는다. 고치면 함수도 다시 배포한다. 시간대 id 는 저장된 신청 · 편성표에 남으니 바꾸지 말고 더하기만 한다. roles 의 올포(allpos)는 스코어러 · 중열 · 센터 다 — 1순위로만 고르고 2순위는 없다",
+  "note": "아레나전 설정 — 서버(server/index.mjs) · 화면(assets/arena.js · assets/profile.js · assets/me.js · index.html) 이 같이 읽는다. 고치면 함수도 다시 배포한다. 시간대 id 는 저장된 신청 · 편성표에 남으니 바꾸지 말고 더하기만 한다. roles 의 올포(allpos)는 스코어러 · 중열 · 센터 다 — 1순위로만 고르고 2순위는 없다. extra 의 FA 는 요일(day)마다 — 그날 어느 시간대든 된다(예전 하나짜리 flex 는 마이그레이션에서 둘 다로 바꿨다)",
   "teamSize": 3,
   "maxTeams": 20,
   "closeAt": "21:30",
@@ -20,7 +20,8 @@
     { "id": "sun2", "day": 1, "label": "일요일 2차", "short": "일 2차", "time": "20:30", "end": "21:30" }
   ],
   "extra": [
-    { "id": "flex", "label": "Free Agent (시간 미정 · 용병)", "short": "FA" },
+    { "id": "satfa", "day": 0, "label": "토요일 FA (시간 미정 · 용병)", "short": "토 FA" },
+    { "id": "sunfa", "day": 1, "label": "일요일 FA (시간 미정 · 용병)", "short": "일 FA" },
     { "id": "absent", "label": "사유불참", "short": "불참" }
   ]
 }

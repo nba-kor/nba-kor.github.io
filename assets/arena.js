@@ -11,12 +11,15 @@ loadKakao()
 const A = await arenaCfg()
 const SLOTS = A.slots
 const LABEL = Object.fromEntries([...SLOTS.map(s => [s.id, s.label]), ...A.extra.map(c => [c.id, c.label])])
-const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replaceAll(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short])])   // 토1 · 토1.5 · FA
+const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replaceAll(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short.replaceAll(' ', '')])])   // 토1 · 토1.5 · 토FA
 // 색은 강조색(주황) 하나 + 회색 — 시간대 · 포지션 · 계정 수는 글자로 구분한다. 카톡 이미지도 같은 색(팀 줄은 화면 카드처럼 밝은 회색 바탕 · 검은 글자)
 const ACCENT = '#f5a623'
 // 같은 날 시간이 겹치는 두 시간대(서버와 같은 규칙) — 1.5차는 1차 · 2차와 겹친다
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT = Object.fromEntries(SLOTS.map(s => [s.id, s]))
+// 그날 FA(시간 미정 · 용병)를 골랐으면 그날 모든 시간대를 신청한 셈이다
+const FA_DAY = Object.fromEntries(A.extra.filter(c => c.day != null).map(c => [c.id, c.day]))
+const wants = (slots, s) => slots.includes(s.id) || slots.some(x => FA_DAY[x] === s.day)
 const clash = (x, y) => { const a = SLOT[x], b = SLOT[y]; return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
 // 집계 순서(관리자 매뉴얼): 소유자의 참가 계정 수 많은 순 → 1순위 포지션(스코어러 > 중열 > 센터) → 계정 이름(가나다 · 영문)
 const roleRank = a => { const i = ROLES.findIndex(r => r.id === a.roles[0]); return i < 0 ? ROLES.length : i }
@@ -347,7 +350,7 @@ function membersCard(at) {
     h('td', { className: 'ar-nick' }, nickEl(a), a.owner !== a.n && h('small', {}, a.owner)),
     SLOTS.map(s => {
       const w = where.find(x => x.slot === s.id)
-      const applied = a.slots.includes(s.id) || a.slots.includes('flex')
+      const applied = wants(a.slots, s)
       return h('td', {}, w ? h('span', { className: 'ar-badge' }, `${w.team}팀`)
         : applied ? h('span', { className: 'ar-want', title: '신청' }, h('span', { className: 'ar-long' }, '신청'), h('span', { className: 'ar-short' }, '○')) : h('span', { className: 'ar-dash' }, '-'))   // 휴대폰은 ○
     }),
@@ -413,16 +416,17 @@ function chartCard() {
     return barRow(label, n && who.length / n, `${who.length}명 · ${accounts}계정`)
   }
   const days = ['토요일', '일요일'].map((name, day) => {
-    const any = players.filter(p => p.slots.some(x => SLOT[x]?.day === day)).length
+    const any = players.filter(p => p.slots.some(x => (SLOT[x]?.day ?? FA_DAY[x]) === day)).length
     return h('div', { className: 'ar-chart-day' },
       h('div', { className: 'ar-chart-head' }, h('b', {}, name), h('small', {}, `${any}명 참여 · ${pct(any)}%`)),
-      SLOTS.filter(s => s.day === day).map(s => bar(s.id, `${s.short.split(' ').slice(1).join(' ')} ${s.time}`)))
+      SLOTS.filter(s => s.day === day).map(s => bar(s.id, `${s.short.split(' ').slice(1).join(' ')} ${s.time}`)),
+      A.extra.filter(c => c.day === day).map(c => bar(c.id, 'FA 시간 미정')))
   })
   const absent = data.signups.length - n
   return h('section', { className: 'card ar-card' },
     h('h3', {}, '요일 · 시간대별 참여'),
     h('p', { className: 'rc-muted' }, n ? `참가 신청 ${n}명 기준(한 사람이 여러 시간대를 고를 수 있어 합이 100% 를 넘어요)${absent ? ` · 사유불참 ${absent}명 제외` : ''}` : '아직 참가 신청이 없어요'),
-    n > 0 && h('div', { className: 'ar-chart' }, days, h('div', { className: 'ar-chart-day' }, h('div', { className: 'ar-chart-head' }, h('b', {}, 'Free Agent')), bar('flex', '시간 미정'))))
+    n > 0 && h('div', { className: 'ar-chart' }, days))
 }
 
 /** 포지션 · 캐릭터 비율 — 이번 주 참가 계정(사유불참은 계정이 없다) 기준. 포지션은 1순위, 캐릭터는 계정마다 고른 주력 캐릭터 */
@@ -454,7 +458,7 @@ function editor() {
   const at = placements()
   const all = [...accts.values()].sort(byTally)
   const bySlot = poolTab === 'all' ? all.filter(a => !at.has(key(a.u, a.n)))
-    : all.filter(a => (a.slots.includes(poolTab) || a.slots.includes('flex')) && !busy(poolTab, a.u))
+    : all.filter(a => wants(a.slots, SLOT[poolTab]) && !busy(poolTab, a.u))
   // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션), 1순위인 계정이 먼저
   const plays = (a, r) => a.roles.includes(r) || a.roles[0] === ALLPOS
   const pool = roleTab === 'all' ? bySlot
@@ -474,7 +478,7 @@ function editor() {
       } }, detail ? '간단히 보기' : '자세히 보기')),
     poolTabs,
     roleTabs,
-    h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름)' : `${LABEL[poolTab]} 신청(+ FA) 중 겹치는 시간대에 아직 없는 사람`),
+    h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름)' : `${LABEL[poolTab]} 신청(+ 그날 FA) 중 겹치는 시간대에 아직 없는 사람`),
     h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요')))
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
@@ -537,7 +541,7 @@ function menu(a, from) {
   const items = []
   if (from) items.push({ label: '빼기 (대기로)', pick: () => move(a, from, 'pool') })
   for (const s of SLOTS) {
-    const teams = teamsOf(s.id), applied = a.slots.includes(s.id) || a.slots.includes('flex')
+    const teams = teamsOf(s.id), applied = wants(a.slots, s)
     if (SLOTS.some(o => clash(s.id, o.id) && teamsOf(o.id).some((tm, ti) => tm.some(x => x.u === a.u && !(from?.slot === o.id && from.ti === ti && x.n === a.n))))) continue   // 겹치는 시간대에 이미 있다
     // 이 사람이 신청하지 않은 시간대(FA 도 아니면)는 줄마다 「신청 안 함」
     const note = applied ? '' : ' · 신청 안 함'

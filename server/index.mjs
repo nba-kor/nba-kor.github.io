@@ -52,7 +52,7 @@ const GUEST_ID = /^g(\d{1,15})$/   // 비회원 · 팀장이 넣은 팀원의 us
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const CONTROL = /[\x00-\x1f\x7f]/
 const JSON_TYPE = /^application\/json\b/i
-// 아레나전: 시간대(토 · 일 1팟 · 2팟) + 미정(당일 용병) · 사유불참. 주는 그 주 토요일 날짜
+// 아레나전: 시간대(토 · 일 1팟 · 2팟) + 토 · 일 FA(그날 시간 미정 · 용병) · 사유불참. 주는 그 주 토요일 날짜
 const SLOTS = new Set(ARENA.slots.map(s => s.id))
 const ROLES = new Set(ARENA.roles.map(r => r.id))   // 계정의 주력 포지션 1 · 2순위 — 스코어러 · 중열 · 센터 · 올포(allpos, 1순위로만 · 2순위 없이)
 // 같은 날 시간이 겹치는 두 시간대 — 1.5차(20:00~)는 1차 · 2차와 겹친다. 한 사람은 겹치는 시간대에 한 번만 들어간다(계정 둘을 동시에 못 한다)
