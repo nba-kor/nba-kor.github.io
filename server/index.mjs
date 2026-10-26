@@ -52,13 +52,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const CONTROL = /[\x00-\x1f\x7f]/
 const JSON_TYPE = /^application\/json\b/i
 // 아레나전: 시간대(토 · 일 1팟 · 2팟) + 미정(당일 용병) · 사유불참. 주는 그 주 토요일 날짜
-const SLOTS = new Set(ARENA.slots.map(s => s.id))
+const SLOTS = new Set(ARENA.slots.filter(s => !s.in).map(s => s.id))   // 편성 시간대 — 1차 올포(in)는 신청만 따로, 팀은 1차에 섞는다
 const ROLES = new Set(ARENA.roles.map(r => r.id))   // 계정의 주력 포지션 1 · 2순위 — 스코어러 · 중열 · 센터
 // 같은 날 시간이 겹치는 두 시간대 — 1.5차(20:00~)는 1차 · 2차와 겹친다. 한 사람은 겹치는 시간대에 한 번만 들어간다(계정 둘을 동시에 못 한다)
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT_AT = new Map(ARENA.slots.map(s => [s.id, s]))
 const clash = (x, y) => { const a = SLOT_AT.get(x), b = SLOT_AT.get(y); return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
-const CHOICES = [...SLOTS, ...ARENA.extra.map(c => c.id)]
+const CHOICES = [...ARENA.slots, ...ARENA.extra].map(c => c.id)
 const WEEK = /^\d{4}-\d{2}-\d{2}$/
 const PLAN_LIMIT = { max: 300, windowMs: 10 * 60_000 }   // 관리자 편성표 저장 — 끌어다 놓을 때마다 저장한다
 const STALE_PLAN = '그새 신청이나 편성표가 바뀌었어요 — 새로 불러올게요'
