@@ -46,6 +46,11 @@ tools/cn-faces/.venv/bin/python tools/og-image.py   # 로고를 바꿨으면 이
 같은 주소로 내용만 바꾸면 한동안 옛 그림이 나간다. 이미 퍼진 링크의 미리보기를 지금 갱신하려면
 [카카오 디버거](https://developers.kakao.com/tool/clear/og) 에 주소를 넣어 캐시를 지운다.
 
+**페이지 이동** — SPA 가 아니라 페이지마다 HTML 이다(위 미리보기 · 검색 때문). 대신 두 가지로 이동을 빠르고 부드럽게 한다(지원 안 하는 브라우저는 그냥 평소처럼 연다):
+같은 사이트 링크에 마우스를 올리면 다음 페이지를 미리 그려 두고(`assets/app.js` 의 speculation rules, 크롬 · 엣지. `/discord/` 제외),
+페이지 사이는 흰 화면 없이 0.18초 겹쳐 넘어간다(`style.css` 의 `@view-transition`, 움직임 줄이기를 켜면 끔).
+미리 그리기가 실제로 됐는지는 크롬 DevTools > Application > Speculative loads 에서 본다(자동화 브라우저 · DevTools 를 붙인 상태에서는 크롬이 끈다).
+
 주소에 `.html` 이 드러나지 않도록 디렉터리 + `index.html` 구조를 쓴다.
 그래서 페이지가 루트가 아닌 깊이에 있어도 되도록 정적 자원은 전부 **루트 절대경로**(`/assets/...`,
 `/data/...`)로 참조한다. `data/*.json` 의 `img` 값도 같은 이유로 `/assets/players/...` 형태다.

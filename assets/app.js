@@ -7,6 +7,16 @@ addEventListener('contextmenu', e => e.preventDefault())
 // 드래그는 전부 아래 startDrag(포인터 이벤트)로 한다
 addEventListener('dragstart', e => e.preventDefault())
 
+// 같은 사이트 링크는 마우스를 올리면(휴대폰은 누르기 시작하면) 다음 페이지를 미리 그려 둔다 — 누르면 바로 열린다(크롬 · 엣지. 다른 브라우저는 그대로).
+// /discord/ 는 디스코드로 넘기는 페이지라 뺀다. 페이지 사이 화면 전환은 style.css 의 @view-transition.
+// ponytail: 미리 그린 페이지도 처음 읽기(API GET)를 부른다 — 함수 호출 수가 눈에 띄게 늘면 eagerness 를 'conservative'(누를 때만)로
+if (HTMLScriptElement.supports?.('speculationrules')) {
+  document.head.append(Object.assign(document.createElement('script'), {
+    type: 'speculationrules',
+    textContent: JSON.stringify({ prerender: [{ where: { and: [{ href_matches: '/*' }, { not: { href_matches: '/discord/*' } }] }, eagerness: 'moderate' }] }),
+  }))
+}
+
 export const POS = ['', 'PG', 'SG', 'SF', 'PF', 'C']
 export const POS_KO = ['', '포인트가드', '슈팅가드', '스몰포워드', '파워포워드', '센터']
 

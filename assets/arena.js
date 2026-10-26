@@ -1,9 +1,9 @@
 // 아레나 운영(/arena/) — 이번 주 참가 신청 · 편성 결과(누구나) · 참여 그래프 · 카카오 공유(편성표 이미지)
 // 아레나 편성(/arena/plan/) — 관리자가 끌어서 · 눌러서 배치. 같은 모듈이 주소를 보고 둘 중 하나를 그린다
-import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=d496cab6'
+import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=fb02b445'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=e2ffcda1'
-import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=39f60afc'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES, ALLPOS } from './profile.js?v=75a34167'
+import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=21051c27'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES, ALLPOS } from './profile.js?v=2eef14a5'
 
 await loadData()
 mountTop('/arena/')

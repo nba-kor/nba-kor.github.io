@@ -1,5 +1,5 @@
 // 게시판 공용 — 잠재력추천 · 영상이 같이 쓴다: 로그인 표시, 캐릭터 고르기, 목록 카드 틀, 글 머리(추천 · 공유 · 수정 · 삭제), 댓글
-import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=d496cab6'
+import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=fb02b445'
 import { api, initAuth, chooseLogin, logout, session, showWho, IN_KAKAO } from './auth.js?v=e2ffcda1'
 
 export const $ = (s, root = document) => root.querySelector(s)
