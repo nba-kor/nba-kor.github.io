@@ -407,6 +407,20 @@ function barRow(label, ratio, rest) {
     h('span', { className: 'ar-bar-val' }, h('b', {}, pct), ` ${rest}`))
 }
 
+/** 도넛 — parts = [[이름, 수]], 합이 n(100%)일 때만 쓴다. 색은 강조색을 차례로 옅게, 「미정」은 회색 */
+function donut(parts, n, unit) {
+  const color = (i, label) => label === '미정' ? 'var(--muted)' : `color-mix(in srgb, var(--accent) ${100 - i * 24}%, var(--panel-2))`
+  const pct = k => `${Math.round(k / n * 100)}%`
+  let at = 0
+  const ring = h('div', { className: 'ar-donut', role: 'img', 'aria-label': parts.map(([label, k]) => `${label} ${pct(k)}`).join(', ') }, h('b', {}, n), h('small', {}, unit))
+  ring.style.background = `conic-gradient(${parts.map(([label, k], i) => `${color(i, label)} ${at}% ${at += k / n * 100}%`).join(', ')})`
+  return h('div', { className: 'ar-donut-wrap' }, ring, h('ul', { className: 'ar-donut-key' }, parts.map(([label, k], i) => {
+    const dot = h('i', {})
+    dot.style.background = color(i, label)
+    return h('li', {}, dot, h('span', {}, label), h('b', {}, pct(k)), h('small', {}, `${k}${unit}`))
+  })))
+}
+
 /** 요일 · 시간대별 참여 — 이번 주 신청한 사람(사유불참 빼고) 중 그 시간대를 고른 비율 */
 function chartCard() {
   const players = data.signups.filter(s => !s.slots.includes('absent')), n = players.length
@@ -443,7 +457,7 @@ function mixCard() {
     h('h3', {}, '포지션 · 캐릭터 비율'),
     h('p', { className: 'rc-muted' }, `참가 계정 ${n}개 기준 · 캐릭터는 한 계정이 여럿 고를 수 있어 합이 100% 를 넘어요`),
     h('div', { className: 'ar-chart ar-mix' },
-      h('div', { className: 'ar-chart-day' }, head('포지션', '1순위'), roles.map(([label, k]) => barRow(label, k / n, `${k}계정`))),
+      h('div', { className: 'ar-chart-day' }, head('포지션', '1순위'), donut(roles, n, '계정')),
       h('div', { className: 'ar-chart-day' }, head('캐릭터', `${chars.length}종`),
         h('div', { className: 'ar-mix-chars' }, chars.map(([id, k]) => barRow([h('img', { src: faceOf(P(id)), alt: '' }), h('span', {}, name(id))], k / n, `${k}계정`))))))
 }
