@@ -450,6 +450,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   // id = 디스코드 ID(디스코드를 연결한 계정 · 봇) · k<카카오 회원번호>(카카오로만 로그인한 계정) · g<팀원 행 번호>(비회원)
 
   const authMemo = new Map()   // sha256(토큰) → { user, until }
+  const actors = new WeakMap()   // 요청 → 확인한 신원 — 응답 뒤 감사 로그에 남길 사람
   /**
    * 웹: Supabase Auth 에 토큰을 보여 사용자를 받는다. ID 는 identities(디스코드 먼저, 없으면 카카오)에서만 꺼낸다 —
    * user_metadata 는 사용자가 updateUser 로 고칠 수 있어 ID 로는 믿지 않는다(본인이 고르는 표시 이름에만 쓴다).
@@ -541,8 +542,21 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const [, scheme, cred] = /^(Bearer|Bot|Guest)\s+(\S+)$/i.exec(request.headers.get('authorization') || '') || []
     if (!scheme) fail(401, LOGIN)
     const kind = scheme.toLowerCase()
-    if (kind === 'guest') return guestOk ? guestUser(request, cred) : fail(401, LOGIN)
-    return kind === 'bot' ? botUser(request, cred) : webUser(cred)
+    const user = kind === 'guest' ? guestOk ? await guestUser(request, cred) : fail(401, LOGIN) : kind === 'bot' ? botUser(request, cred) : await webUser(cred)
+    actors.set(request, user)
+    return user
+  }
+
+  /**
+   * 감사 로그(audit_log) — 바꾼 요청(GET 이 아니고 성공)마다 누가 · 무엇을(메서드 · 경로). 본문은 안 남긴다(비밀번호를 싣는 요청이 있다).
+   * 응답 뒤에 넣고, 실패해도 요청에는 영향이 없다(함수 로그만). 접근 비밀번호 입력(POST /api/gate)은 바꾸는 일이 아니라 뺀다
+   */
+  function audit(request, status) {
+    const { pathname } = new URL(request.url), action = `${request.method} ${pathname}`
+    if (request.method === 'GET' || status >= 300 || action === 'POST /api/gate') return
+    const user = actors.get(request)
+    waitUntil(db('/audit_log', { method: 'POST', body: { at: now(), user_id: user?.id ?? null, user_name: user?.name ?? null, action, status } })
+      .catch(e => log(`감사 로그 실패 ${action}: ${errText(e)}`)))
   }
 
   // ------------------------------------------------ 접근 비밀번호 (site_gate) · 마스터 (site_masters)
@@ -1158,6 +1172,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       if (!e.status) log(`API 오류 ${request.method} ${new URL(request.url).pathname}:`, e)
       return [e.status || 500, { error: e.status ? e.message : '서버 오류가 났어요', ...(e.gate && { gate: true }) }]
     })
+    audit(request, status)
     return new Response(JSON.stringify(body), {
       status,
       headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...cors },

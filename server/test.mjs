@@ -1293,6 +1293,8 @@ dbTest('Data API 권한: anon · authenticated 키나 키 없이는 팀원모집
       ['/site_admins?select=user_id&limit=1', {}],
       ['/site_admins', post({ user_id: someone })],
       ['/arena_signups?select=user_id&limit=1', {}],
+      ['/audit_log?select=action&limit=1', {}],
+      ['/audit_log', post({ at: 0, action: 'PUT /api/x', status: 200 })],
       ['/arena_plans?select=plan&limit=1', {}],
       ['/arena_plans', post({ week: '2100-01-02', plan: {}, updated_at: 0, updated_by: someone })],
       ['/site_gate', post({ id: 1, code: '1234', token: 'x', changed_at: 0, changed_by: someone })],
@@ -1478,7 +1480,8 @@ test('Data API 오류 → HTTP: PT404 · PT409(full · already) · PT428 은 사
   assert.equal(call.headers.apikey, 'sb_secret_from_keys', 'SUPABASE_SECRET_KEYS 의 default 가 먼저')
   assert.equal(call.headers.authorization, undefined, 'secret key 는 Authorization 에 싣지 않는다')
   assert.deepEqual([call.headers['content-type'], call.headers.accept], ['application/json', 'application/json'])
-  assert.ok(seen.every(s => s.path.startsWith('/rest/v1/recruit_') || s.path.startsWith('/rest/v1/rpc/')), seen.map(s => s.path).join('\n'))
+  assert.ok(seen.every(s => s.path.startsWith('/rest/v1/recruit_') || s.path.startsWith('/rest/v1/rpc/') || s.path === '/rest/v1/audit_log'), seen.map(s => s.path).join('\n'))
+  assert.deepEqual(seen.find(s => s.path === '/rest/v1/audit_log').body, { at: 0, user_id: id, user_name: '봇', action: 'POST /api/teams/AAAAAAAA/members', status: 201 }, '감사 로그 한 줄')
   assert.ok(!seen.some(s => s.method === 'PATCH'), '읽기만으로 프로필을 고치지 않는다')
   assert.ok(seen.every(s => !s.path.includes('auth_user_id')), 'auth_user_id 는 읽지 않는다')
 
@@ -1802,6 +1805,27 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   assert.equal((await plan(boss, p1, clock)).status, 409, '지난 주 편성표는 못 고친다')
   assert.deepEqual((await view()).signups, [], '이번 주는 새로')
   await rest(`/site_admins?user_id=eq.${boss.id}`, { method: 'DELETE' })
+})
+
+dbTest('감사 로그: 바꾼 요청(성공)만 누가 · 무엇을(메서드 · 경로) — 읽기 · 실패는 안 남긴다 · 함수 키로도 고치거나 지울 수 없다', async () => {
+  const { api, idle } = start({ potentials: CAT })
+  const id = uid(), as = web(id, '감사')
+  const rows = async () => (await rest(`/audit_log?select=user_id,user_name,action,status&user_id=eq.${id}&order=id`)).json()
+  assert.equal((await api('PUT', '/api/me/profile', { mic: true, entries: [entry()] }, { as })).status, 200)
+  assert.equal((await api('GET', '/api/me', undefined, { as })).status, 200)
+  assert.equal((await api('PUT', '/api/me/profile', { mic: 'x', entries: [entry()] }, { as })).status, 400)
+  const b = await api('POST', '/api/builds', BUILD, { as })
+  assert.equal(b.status, 201)
+  assert.equal((await api('DELETE', `/api/builds/${b.body.build.id}`, undefined, { as })).status, 200)
+  await idle()
+  assert.deepEqual(await rows(), [
+    { user_id: id, user_name: '감사', action: 'PUT /api/me/profile', status: 200 },
+    { user_id: id, user_name: '감사', action: 'POST /api/builds', status: 201 },
+    { user_id: id, user_name: '감사', action: `DELETE /api/builds/${b.body.build.id}`, status: 200 },
+  ])
+  assert.equal((await rest(`/audit_log?user_id=eq.${id}`, { method: 'DELETE' })).ok, false, '지울 수 없다')
+  assert.equal((await rest(`/audit_log?user_id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ user_name: 'x' }) })).ok, false, '고칠 수 없다')
+  assert.equal((await rows()).length, 3)
 })
 
 dbTest('멤버 관리: 관리자만 · 목록(등급 · 본계정 · 계정 수 · 마지막 신청 주) · 임명 · 해제 · 탈퇴(프로필 · 신청 · 권한 · 이끌던 팀) · 슈퍼관리자와 본인은 못 바꾼다', async () => {

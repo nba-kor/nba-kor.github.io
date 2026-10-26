@@ -1,0 +1,45 @@
+# 매일 자정(KST) Supabase DB 를 통째로(역할 · 스키마 · 데이터) 받아 암호화한 뒤 Actions 아티팩트로 30일 둔다. 복원은 README 「DB 백업」.
+# 저장소가 공개라 아티팩트는 GitHub 에 로그인한 누구나 받을 수 있다 — 그래서 암호화한 파일만 올린다(디스코드 ID · 닉네임이 들어 있다).
+# 저장소 Settings > Secrets and variables > Actions 에 비밀값 두 개를 넣어야 돈다:
+#   SUPABASE_DB_URL    대시보드 Connect > Session pooler 의 연결 문자열(postgresql://postgres.<ref>:<DB 비밀번호>@aws-….pooler.supabase.com:5432/postgres).
+#                      직접 연결(db.<ref>.supabase.co)은 IPv6 전용이라 GitHub 러너에서 붙지 않는다
+#   BACKUP_PASSPHRASE  백업을 잠그는 비밀번호. 저장소 밖(비밀번호 관리자)에도 적어 둔다 — 잃으면 백업을 풀 수 없다
+# 저장소에 60일 동안 활동이 없으면 GitHub 이 예약 실행을 끈다(keep-alive 와 같다 — Actions 탭에서 다시 켠다).
+name: db-backup
+on:
+  schedule:
+    - cron: '5 15 * * *'   # UTC 15:05 = KST 00:05. 정각은 밀리거나 빠질 수 있어 피한다
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - name: 덤프 (역할 · 스키마 · 데이터)
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          test -n "$DB_URL" || { echo '::error::SUPABASE_DB_URL 비밀값이 없어요'; exit 1; }
+          supabase db dump --db-url "$DB_URL" -f roles.sql --role-only
+          supabase db dump --db-url "$DB_URL" -f schema.sql
+          supabase db dump --db-url "$DB_URL" -f data.sql --use-copy --data-only
+      - name: 암호화
+        env:
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          test -n "$PASS" || { echo '::error::BACKUP_PASSPHRASE 비밀값이 없어요'; exit 1; }
+          name="db-$(TZ=Asia/Seoul date +%F)"
+          tar czf - roles.sql schema.sql data.sql | gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 --passphrase-file <(printf %s "$PASS") -o "$name.tar.gz.gpg"
+          rm roles.sql schema.sql data.sql
+          echo "NAME=$name" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}.tar.gz.gpg
+          retention-days: 30
+          if-no-files-found: error

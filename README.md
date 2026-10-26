@@ -358,6 +358,7 @@ supabase/config.toml                  함수 배포 설정 (verify_jwt = false)
 supabase/migrations/                  DB 스키마 (Supabase 클라우드와 로컬 docker compose 가 같은 파일을 쓴다)
 tools/edge-main/index.mjs             로컬 docker compose 에서 함수를 띄우는 edge-runtime 메인 서비스
 .github/workflows/keep-alive.yml      무료 프로젝트 일시정지 막기 (하루 두 번 목록 읽기)
+.github/workflows/db-backup.yml       매일 자정(KST) DB 전체 백업 — 암호화해 Actions 아티팩트로 30일
 ```
 
 배포 CLI 는 `supabase/functions/recruit/index.mjs` 에서 시작해 `import` 를 따라가며 `server/*.mjs` 와 `data/recruit.json` · `players.json` · `tactics.json` 까지 함수에 묶는다.
@@ -548,13 +549,33 @@ export SUPABASE_ACCESS_TOKEN=sbp_...
   `.github/workflows/keep-alive.yml` 이 하루 두 번(UTC 03:17 · 15:17) 모집 목록을 읽어 막는다. GitHub 은 **저장소에 60일 동안 활동이 없으면 예약 실행을 끈다** —
   Actions 탭에서 다시 켜거나 커밋을 하나 올린다. 정지 전에 Supabase 가 경고 메일을 보내고, 정지되면 대시보드에서 Restore 로 되살린다.
 - DB 는 500MB 까지다(넘으면 읽기 전용). 방 하나는 몇 KB 이고 만료된 방 · 요청 수 기록은 방을 만들 때마다 지우므로 쌓이지 않는다. 프로필은 사람마다 한 줄 남는다.
-- **자동 백업이 없다.** 직접 받아 둔다(`npx supabase link --project-ref lgchgqxjjlapszmxarun` 을 한 상태에서). 디스코드 ID · 이름 · 게임 닉네임이 들어 있으니 저장소 밖에 둔다 —
-  로컬 nginx 가 저장소 루트를 통째로 서비스한다.
+- **무료 플랜은 자동 백업이 없다** — 아래 [DB 백업](#db-백업) 워크플로가 매일 받아 둔다.
 
-  ```sh
-  npx supabase db dump --linked -f ../recruit-schema.sql               # 기본은 스키마만
-  npx supabase db dump --linked --data-only -f ../recruit-data.sql
-  ```
+### DB 백업
+
+`.github/workflows/db-backup.yml` 이 매일 자정(KST 00:05)에 DB 를 통째로(역할 `roles.sql` · 스키마 `schema.sql` · 데이터 `data.sql`, `supabase db dump`) 받아
+`db-<날짜>.tar.gz.gpg` 로 암호화해 **Actions 아티팩트로 30일** 둔다. Actions 탭 > db-backup > **Run workflow** 로 바로 한 번 돌릴 수도 있다.
+저장소가 공개라 아티팩트는 GitHub 에 로그인한 누구나 받을 수 있다 — 그래서 암호화한 파일만 올린다(디스코드 ID · 이름 · 게임 닉네임이 들어 있다).
+Storage 의 파일(그림 등)은 DB 가 아니라 들어가지 않는다.
+
+처음 한 번, 저장소 **Settings > Secrets and variables > Actions > New repository secret** 으로 두 개를 넣는다:
+
+| 이름 | 값 |
+| --- | --- |
+| `SUPABASE_DB_URL` | 대시보드 상단 **Connect** > **Session pooler** 의 연결 문자열(`postgresql://postgres.lgchgqxjjlapszmxarun:<DB 비밀번호>@aws-….pooler.supabase.com:5432/postgres`). 직접 연결(`db.….supabase.co`)은 IPv6 전용이라 GitHub 러너에서 안 붙는다. DB 비밀번호를 모르면 **Database > Settings** 에서 새로 정한다(함수는 DB 비밀번호를 안 쓰니 바꿔도 된다) |
+| `BACKUP_PASSPHRASE` | 백업을 잠그는 긴 비밀번호(`openssl rand -base64 24`). **저장소 밖(비밀번호 관리자)에도 적어 둔다 — 잃으면 백업을 못 푼다** |
+
+복원 — 실행 화면의 **Artifacts** 에서 받은 zip 을 풀고(저장소 밖에서. 로컬 nginx 가 저장소 루트를 통째로 서비스한다), 비밀번호를 넣어 연 뒤 새 프로젝트(또는 비운 DB)에 넣는다:
+
+```sh
+gpg -d db-2026-10-27.tar.gz.gpg | tar xz        # BACKUP_PASSPHRASE 를 묻는다 → roles.sql · schema.sql · data.sql
+psql --single-transaction --variable ON_ERROR_STOP=1 \
+  --file roles.sql --file schema.sql \
+  --command 'SET session_replication_role = replica' --file data.sql \
+  --dbname '<새 프로젝트의 Session pooler 연결 문자열>'
+```
+
+손으로 한 번 더 받아 두고 싶으면 이 PC 에서 같은 명령을 `--db-url '<연결 문자열>'` 로 돌린다(`npx supabase db dump --db-url … -f roles.sql --role-only` 등 워크플로의 세 줄).
 
 ### 테스트
 
@@ -641,6 +662,25 @@ API 가 팀을 보여 줄 때 그 줄을 `entries` 맨 앞으로 옮기므로 �
   서버에 닿지 않으면 화면은 연다(정적 화면은 서버 없이도 돈다).
 - 처음 운영에 올릴 때: `20261017000000_site_gate.sql` 을 SQL Editor 에서 Run(마스터 갓보노가 같이 들어간다) → `sh tools/deploy-api.sh` → main 푸시 →
   마스터가 「내 프로필」 에서 비밀번호를 정한다(그 전까지는 꺼져 있다). 함수를 먼저 올리면 `site_gate` 가 없어 모든 API 가 503 이다.
+
+### 감사 로그
+
+사이트에서 무언가를 바꾼 요청(GET 이 아니고 성공한 것)은 함수가 응답한 뒤 `audit_log` 표에 한 줄씩 남긴다 —
+**누가**(`user_id` 디스코드 ID · `k`카카오 · `g`비회원 팀원, `user_name` 그때 이름) · **언제**(`at`, ms) · **무엇**(`action` = `메서드 경로`, 예 `PUT /api/arena/plan` · `DELETE /api/builds/12` · `PUT /api/members/<ID>`) · `status`.
+프로필 저장 · 아레나 신청 · 편성 · 멤버 관리 · 접근 비밀번호 바꾸기 · 게시판 글 · 추천 · 댓글 · 팀원모집이 모두 들어간다(`server/index.mjs` 의 `audit` 한 곳).
+
+- 본문은 남기지 않는다 — 비회원 비밀번호 · 접근 비밀번호를 싣는 요청이 있다. 접근 비밀번호 **입력**(`POST /api/gate`)과 실패한 요청은 남기지 않는다.
+  로그인 없이 하는 비회원 팀 만들기 · 가입은 누가가 비어 있다.
+- 함수는 넣고 읽기만 한다(고치거나 지울 권한이 없다). 남기다 실패해도 요청은 그대로 되고 함수 로그에 `감사 로그 실패` 만 찍힌다.
+- **보기**: 화면은 없다. 대시보드 **Table Editor > audit_log**, 또는 SQL Editor 에서
+
+  ```sql
+  select to_timestamp(at / 1000.0) at time zone 'Asia/Seoul' as kst, user_name, user_id, action, status
+  from public.audit_log order by at desc limit 200;
+  ```
+
+- 지우지 않고 쌓인다(한 줄 100바이트 남짓). DB 가 500MB 에 가까워지면 SQL Editor 에서 오래된 줄을 지운다.
+- 처음 운영에 올릴 때: `20261026000000_audit_log.sql` 을 SQL Editor 에서 Run → `sh tools/deploy-api.sh`. 순서가 바뀌어도 요청은 되지만 그 사이 로그는 남지 않는다.
 
 ## 잠재력추천
 
