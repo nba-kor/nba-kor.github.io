@@ -1392,6 +1392,8 @@ dialog, .ac-body { overscroll-behavior: contain; }
 @keyframes slam-glow { to { box-shadow: 0 0 0 4px #ffd23f66, 0 0 22px #ffd23f; } }
 @media (prefers-reduced-motion: reduce) { #btn-ul.ready { animation: none; box-shadow: 0 0 0 4px #ffd23f66; } }
 .slam-help { margin: 10px 0 0; color: var(--muted); font-size: 13.5px; }
+.slam-help summary { cursor: pointer; color: var(--text); }
+.slam-skills { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; }
 .slam-help kbd { display: inline-block; min-width: 20px; padding: 0 5px; margin: 0 1px; border: 1px solid var(--muted); border-radius: 4px; font: 600 12px/18px ui-monospace, Menlo, Consolas, monospace; text-align: center; color: var(--text); }
 @media (pointer: coarse) {
   .slam-pad { display: flex; }

@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#0d1117">
 <meta name="robots" content="noindex">   <!-- 메뉴에서 숨긴 페이지(관리자 메뉴에서만) -->
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=8978f113">
+<link rel="stylesheet" href="/assets/style.css?v=43d8cbb8">
 </head>
 <body>
 
@@ -43,10 +43,11 @@
   <p class="slam-help keys">이동 <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd>(WASD) · 드리블 <kbd>Z</kbd>(J) · 패스 <kbd>X</kbd>(K) · 슛 <kbd>C</kbd>(L, 스페이스) · 궁극기 <kbd>V</kbd>(U)</p>
   <p class="slam-help">드리블은 짧게 치고 나가며 붙은 수비를 제쳐요(가끔 넘어뜨려요). 골대 가까이에서 슛을 누르면 덩크. 패스는 방향키를 누른 쪽 동료에게 가요.
     수비할 때는 드리블 = 스틸, 패스 = 공에 가까운 선수로 바꾸기, 슛 = 블록 점프예요.</p>
-  <p class="slam-help">궁극기는 포지션마다 달라요 — 1번 <b>앵클 브레이커</b>(주변 수비를 넘어뜨리고 빨라짐) · 2번 <b>딥 쓰리</b>(어디서든 꼭 들어가는 슛) · 3번 <b>에어 워크</b>(골대까지 날아가 덩크) · 4번 <b>불도저</b>(주변 수비를 밀쳐 냄) · 5번 <b>메가 슬램</b>(골밑에서 충격파 덩크).
-    화면 아래 얼굴 둘레 게이지가 차면 써요(득점 · 스틸 · 블록하면 더 빨리 차요). 수비할 때 궁극기는 공 가진 상대에게 날아가 뺏는 스틸 대시예요. 휴대폰은 가로로 돌리면 크게 보여요.</p>
+  <p class="slam-help">궁극기는 20명이 다 달라요(팀 선택 화면의 선수 이름 아래). 화면 아래 얼굴 둘레 게이지가 차면 공을 가진 선수가 써요 — 득점 · 스틸 · 블록하면 더 빨리 차요.
+    수비할 때 궁극기는 모두 같은 스틸 대시(공 가진 상대에게 날아가 뺏기)예요. 휴대폰은 가로로 돌리면 크게 보여요.</p>
+  <details class="slam-help"><summary>궁극기 20가지</summary><ul id="skills" class="slam-skills"></ul></details>
 </main>
 
-<script type="module" src="/assets/slam.js?v=828928cd"></script>
+<script type="module" src="/assets/slam.js?v=b4d3aca2"></script>
 </body>
 </html>
