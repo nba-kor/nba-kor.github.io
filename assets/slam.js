@@ -4,7 +4,7 @@
 // 키보드: 방향키 · WASD 이동, Z · J 패스/스틸, X · K · 스페이스 슛/블록. 휴대폰: 캔버스 아래 스틱 · 버튼.
 // ponytail: 파울 · 자유투 · 아웃 오브 바운즈 · 하프코트 바이얼레이션 · 소리 없음 — 공은 코트 끝에서 튕겨 나온다
 import { mountTop } from './app.js?v=fb02b445'
-import { loadData, data, startAuth } from './board.js?v=013e989f'
+import { loadData, data, startAuth } from './board.js?v=4233415a'
 
 mountTop('/slam/')
 startAuth('', () => {})   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다

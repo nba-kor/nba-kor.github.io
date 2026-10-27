@@ -36,8 +36,9 @@ export async function api(path, { method = 'GET', body, withToken, guest } = {})
   if (!j) throw new Error(NO_SERVER)
   // 접근 비밀번호에 막혔다 — 처음 온 브라우저가 비밀번호 창과 같이 쏜 첫 화면 요청이거나, 그새 마스터가 바꿨다.
   // 실패로 그리지 않고 비밀번호를 맞힐 때까지 기다렸다 다시 부른다(서버는 막을 때 아무것도 하지 않았다).
-  // 보낸 사이에 토큰이 바뀌었으면(그새 맞혔다) 그 토큰을 지우지 않고 바로 다시
-  if (j.gate) {
+  // 보낸 사이에 토큰이 바뀌었으면(그새 맞혔다) 그 토큰을 지우지 않고 바로 다시.
+  // 401 일 때만 — 마스터의 GET /me 는 200 안에 gate: { code, changedAt } 를 싣는다
+  if (r.status === 401 && j.gate) {
     if (gateToken() === g) { store.del(GATE); await showGate() }
     return api(path, { method, body, withToken, guest })
   }
