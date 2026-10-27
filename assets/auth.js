@@ -34,8 +34,14 @@ export async function api(path, { method = 'GET', body, withToken, guest } = {})
   const j = await r.json().catch(() => null)
   // 정적 호스팅이 대신 답한 404·502 HTML 등은 서버가 없는 것으로 본다
   if (!j) throw new Error(NO_SERVER)
+  // 접근 비밀번호에 막혔다 — 처음 온 브라우저가 비밀번호 창과 같이 쏜 첫 화면 요청이거나, 그새 마스터가 바꿨다.
+  // 실패로 그리지 않고 비밀번호를 맞힐 때까지 기다렸다 다시 부른다(서버는 막을 때 아무것도 하지 않았다).
+  // 보낸 사이에 토큰이 바뀌었으면(그새 맞혔다) 그 토큰을 지우지 않고 바로 다시
+  if (j.gate) {
+    if (gateToken() === g) { store.del(GATE); await showGate() }
+    return api(path, { method, body, withToken, guest })
+  }
   if (!r.ok) {
-    if (j.gate) { store.del(GATE); showGate() }   // 그새 마스터가 비밀번호를 바꿨다
     throw Object.assign(new Error(j.error || NO_SERVER), { status: r.status })
   }
   return j
@@ -58,11 +64,14 @@ const GATE = 'dc.gate', GATE_AT = 'dc.gate.at', DAY = 86_400_000   // 토큰(꺼
 const gateToken = () => { const v = store.get(GATE); return v && v !== 'off' ? v : '' }
 /** 비밀번호를 맞혔을 때 · 마스터가 바꾼 뒤(바꾼 사람의 브라우저는 새 토큰으로 그대로 들어와 있다) */
 export const saveGate = token => { store.set(GATE, token || 'off'); store.set(GATE_AT, String(Date.now())) }
-const unlock = () => { document.documentElement.classList.remove('gated'); document.querySelector('.gate')?.remove() }
+let gateOpen = null, gateDone   // 비밀번호 창이 떠 있는 동안 — 막힌 API 호출이 기다린다
+const unlock = () => { document.documentElement.classList.remove('gated'); document.querySelector('.gate')?.remove(); gateDone?.(); gateOpen = null }
 
+/** 비밀번호를 맞히면 풀리는 Promise */
 function showGate() {
   document.documentElement.classList.add('gated')
-  if (document.querySelector('.gate')) return
+  gateOpen ||= new Promise(r => { gateDone = r })
+  if (document.querySelector('.gate')) return gateOpen
   const box = Object.assign(document.createElement('div'), { className: 'gate' })
   box.innerHTML = `<form class="gate-card" novalidate>
     <img src="/assets/icon.png?v=2" alt="">
@@ -88,6 +97,7 @@ function showGate() {
   }
   document.body.append(box)
   form.code.focus()
+  return gateOpen
 }
 
 /** 하루에 한 번: 켜져 있는지 · 들고 있는 토큰이 아직 맞는지. 아무것도 없으면(처음 온 브라우저) 바로 */
