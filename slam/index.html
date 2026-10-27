@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#0d1117">
 <meta name="robots" content="noindex">   <!-- 메뉴에서 숨긴 페이지(관리자 메뉴에서만) -->
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=43d8cbb8">
+<link rel="stylesheet" href="/assets/style.css?v=c4b9b85e">
 </head>
 <body>
 
@@ -40,14 +40,25 @@
       </div>
     </div>
   </div>
-  <p class="slam-help keys">이동 <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd>(WASD) · 드리블 <kbd>Z</kbd>(J) · 패스 <kbd>X</kbd>(K) · 슛 <kbd>C</kbd>(L, 스페이스) · 궁극기 <kbd>V</kbd>(U)</p>
-  <p class="slam-help">드리블은 짧게 치고 나가며 붙은 수비를 제쳐요(가끔 넘어뜨려요). 골대 가까이에서 슛을 누르면 덩크. 패스는 방향키를 누른 쪽 동료에게 가요.
-    수비할 때는 드리블 = 스틸, 패스 = 공에 가까운 선수로 바꾸기, 슛 = 블록 점프예요.</p>
-  <p class="slam-help">궁극기는 20명이 다 달라요(팀 선택 화면의 선수 이름 아래). 화면 아래 얼굴 둘레 게이지가 차면 공을 가진 선수가 써요 — 득점 · 스틸 · 블록하면 더 빨리 차요.
-    수비할 때 궁극기는 모두 같은 스틸 대시(공 가진 상대에게 날아가 뺏기)예요. 휴대폰은 가로로 돌리면 크게 보여요.</p>
-  <details class="slam-help"><summary>궁극기 20가지</summary><ul id="skills" class="slam-skills"></ul></details>
+  <section class="slam-guide">
+    <h2>조작법</h2>
+    <table class="slam-keys">
+      <thead><tr><th>버튼</th><th class="kb">키보드</th><th>공격할 때</th><th>수비할 때</th></tr></thead>
+      <tbody>
+        <tr><th>이동</th><td class="kb"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> · WASD</td><td colspan="2">휴대폰은 왼쪽 스틱</td></tr>
+        <tr><th>드리블</th><td class="kb"><kbd>Z</kbd> · <kbd>J</kbd></td><td>짧게 치고 나가며 수비를 제쳐요(가끔 넘어뜨려요)</td><td>스틸</td></tr>
+        <tr><th>패스</th><td class="kb"><kbd>X</kbd> · <kbd>K</kbd></td><td>방향키를 누른 쪽 동료에게</td><td>공에 가까운 선수로 바꾸기</td></tr>
+        <tr><th>슛</th><td class="kb"><kbd>C</kbd> · <kbd>L</kbd> · 스페이스</td><td>슛 — 골대 가까이면 덩크</td><td>블록 점프</td></tr>
+        <tr><th>궁극기</th><td class="kb"><kbd>V</kbd> · <kbd>U</kbd></td><td>그 선수의 궁극기(아래 팀별 표)</td><td>스틸 대시 — 공 가진 상대에게 날아가 뺏어요</td></tr>
+      </tbody>
+    </table>
+    <p class="slam-help">궁극기 게이지는 화면 아래 얼굴 둘레예요. 32초면 차고, 득점 · 스틸 · 블록하면 더 빨리 차요. 휴대폰은 가로로 돌리면 크게 보여요.</p>
+    <h2>팀별 궁극기</h2>
+    <div class="slam-tabs" role="tablist" aria-label="팀" id="skill-tabs"></div>
+    <div class="slam-skills" role="tabpanel" id="skills"></div>
+  </section>
 </main>
 
-<script type="module" src="/assets/slam.js?v=b4d3aca2"></script>
+<script type="module" src="/assets/slam.js?v=b3ed9486"></script>
 </body>
 </html>

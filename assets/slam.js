@@ -3,7 +3,7 @@
 // 선수 얼굴은 덩크 시티 선수(data/players.json). 1P 는 오른쪽 골대를 공격한다. 궁극기는 20명이 다 다르다(SKILLS) — 게이지가 차면 쓴다.
 // 키: 방향키 · WASD 이동, 드리블 Z · J, 패스 X · K, 슛 C · L · 스페이스, 궁극기 V · U. 수비 때는 스틸 · 선수 바꾸기 · 블록 · 스틸 대시. 휴대폰은 캔버스 아래 스틱 · 버튼.
 // ponytail: 파울 · 자유투 · 아웃 오브 바운즈 · 하프코트 바이얼레이션 · 소리 없음 — 공은 코트 끝에서 튕겨 나온다
-import { mountTop } from './app.js?v=fb02b445'
+import { mountTop, POS } from './app.js?v=fb02b445'
 import { loadData, data, startAuth } from './board.js?v=4233415a'
 
 mountTop('/slam/')
@@ -106,10 +106,11 @@ for (const k of ['dr', 'pa', 'sh', 'ul']) document.getElementById(`btn-${k}`).ad
 function start() {
   const others = [0, 1, 2, 3].filter(i => i !== pick)
   sides = [pick, others[Math.floor(rnd() * others.length)]]
+  showTab(pick)
   ps = [0, 1].flatMap(t => TEAMS[sides[t]].five.map((f, i) => ({
     team: t, i, f, x: 0, z: 0, h: 0, vh: 0, dir: side(t), run: 0, mv: false, act: null, t: 0,
     cool: 0, stun: 0, fall: 0, think: 0, cut: 0, block: 0, reach: 0, ult: rnd() * 0.3, boost: 0, cdx: 0, dp: 0, hand: 1, sq: 0, kb: null, sure: false, trail: [], tt: 0,
-    ghost: 0, hot: 0, slow: 0, ice: 0, big: 0, conf: 0, mirror: 0, wt: 0, poster: false, four: false, hook: false,
+    ghost: 0, hot: 0, slow: 0, ice: 0, big: 0, conf: 0, mirror: 0, wt: 0, poster: false, four: false, hook: false, vx: 0, vz: 0, fd: side(t),
   })))
   score = [0, 0]; clock = GAME; shot = SHOT; offense = 0
   cut = null; parts = []; rings = []; shake = 0
@@ -164,7 +165,7 @@ function made(t, pts, text, by) {
 // 득점한 골대 밑에서 상대 1번이 공을 잡고 시작
 function inbound(t) {
   const h = goal(1 - t), pg = ps.find(p => p.team === t && p.i === 0)
-  Object.assign(pg, { x: h.x + side(1 - t) * 30, z: h.z + 70, h: 0, vh: 0, act: null, stun: 0, fall: 0, kb: null })
+  Object.assign(pg, { x: h.x + side(1 - t) * 30, z: h.z + 70, h: 0, vh: 0, vx: 0, vz: 0, act: null, stun: 0, fall: 0, kb: null })
   shot = SHOT; mode = 'play'
   grab(pg)
 }
@@ -272,20 +273,22 @@ function jump(p) { if (p.h === 0 && !p.act) p.vh = JUMP }
 const canMove = p => !p.act && p.h === 0 && p.stun <= 0 && !p.kb
 const speed = p => SPD * (ball.owner === p ? 0.92 : 1)
 
+/** 방향(dx, dz — 길이 1 이하)으로 달린다. 속도는 바로 붙지 않고 0.2초쯤에 걸쳐 붙고 줄어든다 — 출발 · 멈춤 · 방향 전환이 부드럽다 */
 function step(p, dx, dz, spd, dt) {
-  p.mv = !!(dx || dz)
-  if (!p.mv) return
   spd *= (p.boost > 0 ? 1.45 : 1) * (p.ghost > 0 ? 1.3 : 1) * (p.big > 0 ? 1.15 : 1) * (p.slow > 0 ? 0.45 : 1)   // 궁극기 효과
-  p.x += dx * spd * dt; p.z += dz * spd * dt * 0.85
+  const k = 1 - Math.exp(-dt * 11)
+  p.vx += (dx * spd - p.vx) * k; p.vz += (dz * spd * 0.85 - p.vz) * k
+  p.x += p.vx * dt; p.z += p.vz * dt
+  const v = Math.hypot(p.vx, p.vz)
+  p.mv = v > 20
   if (Math.abs(dx) > 0.15) p.dir = Math.sign(dx)
-  p.run += dt
+  p.run += dt * Math.min(1.3, v / SPD)   // 걸음 박자도 속도를 따라간다
 }
-function toward(p, tx, tz, spd, dt) {
-  const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz)
-  if (d < 5) return void (p.mv = false)
-  const k = Math.min(1, d / 30) / d
+function toward(p, tx, tz, spd, dt) {   // 가까워질수록 천천히 — 도착하면 선다
+  const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz), k = d < 4 ? 0 : Math.min(1, d / 40) / d
   step(p, dx * k, dz * k, spd, dt)
 }
+const stop = p => { p.vx = p.vz = 0; p.mv = false }
 
 function pass(p, m) {
   Object.assign(ball, { st: 'pass', owner: null, to: m, x: p.x + p.dir * 12, z: p.z, h: 40, tried: new Set([p]), oop: false, chain: null, safe: false })
@@ -307,12 +310,13 @@ function crossover(p, ax, az) {
   if (!dx && !dz) { const q = nearest(team(1 - p.team), p); dx = side(p.team) * 0.6; dz = p.z > q.z ? 1 : -1 }   // 방향이 없으면 가장 가까운 수비를 옆으로 제친다
   const d = Math.hypot(dx, dz)
   Object.assign(p, { act: 'cross', t: 0, cx: dx / d * SPD * 2.4, cz: dz / d * SPD * 2.4 * 0.85, cdx: 0.9, hand: -p.hand })
+  p.vx = p.cx; p.vz = p.cz   // 끝나면 이 속도에서 서서히 준다
   if (Math.abs(dx) > 0.15) p.dir = Math.sign(dx)
   for (const q of team(1 - p.team)) if (dist(q, p) < 45 && rnd() < 0.4) { knock(q, 0, 0, 0.9); say('ANKLES!', 0.7) }
 }
 
 function dunkFrom(p, mega) {
-  Object.assign(p, { act: 'dunk', t: 0, from: { x: p.x, z: p.z }, dur: mega ? 0.6 : 0.4, peak: mega ? 130 : 88 })
+  Object.assign(p, { act: 'dunk', t: 0, from: { x: p.x, z: p.z }, dur: mega ? 0.6 : 0.4, peak: mega ? 130 : 88, vx: 0, vz: 0 })
   p.dir = Math.sign(goal(p.team).x - p.x) || p.dir
 }
 function shoot(p) {
@@ -320,7 +324,7 @@ function shoot(p) {
   const h = goal(p.team)
   p.dir = Math.sign(h.x - p.x) || p.dir
   if (dist(p, h) < (p.big > 0 ? 200 : 90)) dunkFrom(p, false)   // 자이언트는 멀리서도 덩크
-  else Object.assign(p, { act: 'shot', t: 0, rel: false, vh: JUMP * (p.sure ? 1.15 : 1) })
+  else Object.assign(p, { act: 'shot', t: 0, rel: false, vh: JUMP * (p.sure ? 1.15 : 1), vx: 0, vz: 0 })
   // 가까운 수비는 조금 늦게 뛰어 막으러 온다(1P 가 움직이는 선수는 직접 뛴다)
   if (!p.sure) for (const q of ps) if (q.team !== p.team && q !== ctl && dist(q, p) < 60 && rnd() < 0.75) q.block = 0.05 + rnd() * 0.22
 }
@@ -382,14 +386,15 @@ function body(p, dt) {
   for (const k of ['cool', 'stun', 'fall', 'boost', 'cdx', 'sq', 'reach', 'ghost', 'hot', 'slow', 'ice', 'big', 'conf', 'mirror']) p[k] = Math.max(0, p[k] - dt)
   if (p.hot > 0 && rnd() < dt * 30) parts.push({ x: p.x + (rnd() - 0.5) * 16, z: p.z, h: 30 + rnd() * 50, vx: 0, vz: 0, vh: 260, t: 0.3, c: rnd() < 0.5 ? '#ff7a1a' : '#ffd23f' })   // 핫 핸드 — 불꽃
   p.ult = Math.min(1, p.ult + dt * ULT_FILL * (p.team ? 0.8 : 1))   // CPU 는 조금 느리게 찬다
-  if (ball.owner === p) p.dp += dt * (p.mv ? 11 : 7)
+  if (ball.owner === p) p.dp += dt * (7 + 4 * Math.min(1, Math.hypot(p.vx, p.vz) / SPD))
+  p.fd += (p.dir - p.fd) * (1 - Math.exp(-dt * 16))   // 몸 돌리기 — 방향이 바뀌면 0.1초쯤에 걸쳐 돈다
   if (p.act === 'cross' || p.act === 'air' || p.act === 'rush' || p.boost > 0 || p.kb) {   // 잔상
     if ((p.tt -= dt) <= 0) { p.tt = 0.035; p.trail.unshift({ x: p.x, z: p.z, h: p.h }); p.trail.length = Math.min(p.trail.length, 5) }
   } else p.trail.pop()
   if (p.kb) { p.x += p.kb.vx * dt; p.z += p.kb.vz * dt; if ((p.kb.t -= dt) <= 0) p.kb = null }
   const h = goal(p.team)
   if (p.act === 'cross') {
-    p.x += p.cx * dt; p.z += p.cz * dt; p.run += dt * 1.5
+    p.x += p.cx * dt; p.z += p.cz * dt; p.run += dt * 1.2
     if ((p.t += dt) >= 0.26) p.act = null
     return
   }
@@ -398,7 +403,8 @@ function body(p, dt) {
     const d = dist(p, h), v = 620 * dt
     if (p.poster) for (const q of team(1 - p.team)) if (!q.fall && dist(q, p) < 36) knock(q, 0, (q.z > p.z ? 1 : -1) * 320, 1.3)   // 길을 막는 수비는 옆으로 쓰러진다
     if (d < 80) return dunkFrom(p, false)
-    p.x += (h.x - p.x) / d * v; p.z += (h.z - p.z) / d * v; p.run += dt * 2
+    p.vx = (h.x - p.x) / d * 620; p.vz = (h.z - p.z) / d * 620
+    p.x += p.vx * dt; p.z += p.vz * dt; p.run += dt * 2; p.dir = Math.sign(p.vx) || p.dir
     return
   }
   if (p.act === 'rush') {  // 스틸 대시 — 공을 끝까지 쫓는다. 패스하면 날아가는 공을, 받으면 받은 사람을
@@ -406,7 +412,8 @@ function body(p, dt) {
     if (o ? o.team === p.team || o.sure || o.ghost > 0 : ball.st !== 'pass' && ball.st !== 'loose' || ball.safe) return void (p.act = null)
     if ((p.t += dt) > 1.5) return void (p.act = null)
     if (d < 22) { p.act = null; return grab(p, 'STEAL!') }
-    p.x += (tg.x - p.x) / d * v; p.z += (tg.z - p.z) / d * v; p.dir = Math.sign(tg.x - p.x) || p.dir; p.run += dt * 2
+    p.vx = (tg.x - p.x) / d * 700; p.vz = (tg.z - p.z) / d * 700
+    p.x += p.vx * dt; p.z += p.vz * dt; p.dir = Math.sign(tg.x - p.x) || p.dir; p.run += dt * 2
     return
   }
   if (p.act === 'dunk') {
@@ -433,7 +440,7 @@ function body(p, dt) {
 function user(dt) {
   const p = ctl, [x, z] = axis(), ax = p.conf > 0 ? -x : x, az = p.conf > 0 ? -z : z   // 미러 이미지에 걸리면 방향이 뒤집힌다
   if (canMove(p)) step(p, ax, az, speed(p), dt)
-  else p.mv = false
+  else if (!p.act) stop(p)   // 대시 · 덩크 같은 동작은 body() 가 속도를 맡는다
   if (cut || input.ul && ultimate(p)) return
   if (ball.owner === p) {
     if (input.dr) crossover(p, ax, az)
@@ -448,7 +455,7 @@ function user(dt) {
 
 function ai(p, dt) {
   if (p.block > 0 && (p.block -= dt) <= 0) jump(p)
-  if (!canMove(p)) return void (p.mv = false)
+  if (!canMove(p)) { if (!p.act) stop(p); return }
   if (ball.owner === p) return handle(p, dt)
   if (p.conf > 0) {   // 미러 이미지 — 분신을 쫓아 엉뚱한 데로 간다
     if ((p.wt -= dt) <= 0) { p.wt = 0.7; p.wx = rnd() * CL; p.wz = rnd() * CW }
@@ -496,8 +503,8 @@ function handle(p, dt) {
 
 /** 공 자리 — 들고 있으면 손, 움직이면 바닥까지 튕긴다(|cos| 라 바닥에서 꺾여 올라온다) */
 function hand(p) {
-  if (p.act === 'shot' || p.act === 'dunk') return [p.x + p.dir * 4, p.z, p.h + 78]
-  if (p.act === 'air') return [p.x + p.dir * 12, p.z, p.h + 44]
+  if (p.act === 'shot' || p.act === 'dunk') return [p.x + p.dir * 4, p.z, p.h + 94]   // 머리 위 — 두 손 위
+  if (p.act === 'air') return [p.x + p.dir * 12, p.z, p.h + 50]   // 가슴 앞에 두 손으로
   if (p.act === 'cross') return [p.x + p.dir * 10, p.z + p.hand * (16 * Math.min(1, p.t / 0.26) - 8), 6]   // 낮게 몸 앞을 가로지른다
   return [p.x + p.dir * 12, p.z + p.hand * 5, 2 + 32 * Math.abs(Math.cos(p.dp))]
 }
@@ -659,72 +666,106 @@ function drawHoop(h) {
   oval(x, y, 15 * u, 5 * u); g.stroke()
 }
 
+/** 두 마디 팔다리 — a 에서 b 로, 관절은 bend(±1) 쪽으로 꺾인다. 닿지 않으면 쭉 편다. [관절, 끝] */
+function limb(ax, ay, bx, by, l1, l2, bend) {
+  const dx = bx - ax, dy = by - ay, n = Math.hypot(dx, dy) || 1, d = Math.min(n, l1 + l2 - 0.01), ux = dx / n, uy = dy / n
+  const k = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - k * k))
+  return [[ax + ux * k - uy * h * bend, ay + uy * k + ux * h * bend], [ax + ux * d, ay + uy * d]]
+}
+function line(pts, w, c) { g.strokeStyle = c; g.lineWidth = w; g.beginPath(); pts.forEach(([a, b], i) => i ? g.lineTo(a, b) : g.moveTo(a, b)); g.stroke() }
+function shape(pts, c) { g.fillStyle = c; g.beginPath(); pts.forEach(([a, b], i) => i ? g.lineTo(a, b) : g.moveTo(a, b)); g.closePath(); g.fill() }
+
 function drawPlayer(p) {
-  const [x, y, u] = P(p.x, p.z, p.h), [fx, fy] = P(p.x, p.z), T = TEAMS[sides[p.team]]
+  const [x, y, u] = P(p.x, p.z, p.h), [fx, fy] = P(p.x, p.z), T = TEAMS[sides[p.team]], big = p.big > 0 ? 1.4 : 1
+  const skin = p.f.skin || SKIN, shade = p.f.shade || '#8f5f3e'
   p.trail.forEach((s, j) => {   // 잔상
     const [gx, gy, gu] = P(s.x, s.z, s.h)
-    g.globalAlpha = 0.32 * (1 - j / p.trail.length); g.fillStyle = T.color
-    g.fillRect(gx - 11 * gu, gy - 58 * gu, 22 * gu, 50 * gu); oval(gx, gy - 70 * gu, 11 * gu, 11 * gu); g.fill()
+    g.globalAlpha = 0.3 * (1 - j / p.trail.length); g.fillStyle = T.color
+    g.fillRect(gx - 9 * gu, gy - 62 * gu, 18 * gu, 56 * gu); oval(gx, gy - 74 * gu, 9 * gu, 10 * gu); g.fill()
   })
   g.globalAlpha = 1
   if (p.mirror > 0) for (const dz of [-38, 38]) {   // 미러 이미지 — 양옆의 분신
     const [mx, my, mu] = P(p.x + Math.sin(tnow * 6 + dz) * 8, p.z + dz, p.h)
-    g.globalAlpha = 0.45; g.fillStyle = T.color; g.fillRect(mx - 11 * mu, my - 58 * mu, 22 * mu, 50 * mu)
-    face(p.f, mx - 12 * mu, my - 82 * mu, 24 * mu); g.globalAlpha = 1
+    g.globalAlpha = 0.45; g.fillStyle = T.color; g.fillRect(mx - 9 * mu, my - 62 * mu, 18 * mu, 56 * mu)
+    if (p.f.head) g.drawImage(p.f.head, mx - 12 * mu, my - 88 * mu, 24.5 * mu, 26 * mu)
+    g.globalAlpha = 1
   }
   if (p.slow > 0) { g.strokeStyle = 'rgba(120,190,255,.85)'; g.lineWidth = 2; oval(fx, fy + 2, 18 * u, 6.5 * u); g.stroke() }
   if (p.hot > 0 || p.ghost > 0) { g.fillStyle = p.hot > 0 ? 'rgba(255,120,30,.35)' : 'rgba(90,230,200,.3)'; oval(fx, fy, 26 * u, 10 * u); g.fill() }
   if (p.ult >= 1) { g.fillStyle = `rgba(255,210,63,${0.3 + 0.2 * Math.sin(tnow * 9)})`; oval(fx, fy, 24 * u, 9 * u); g.fill() }   // 궁극기 준비
-  const sh = Math.max(0.5, 1 - p.h / 160)
-  g.fillStyle = 'rgba(0,0,0,.3)'; oval(fx, fy, 15 * u * sh, 5 * u * sh); g.fill()
-  if (p === ctl) { g.strokeStyle = '#ffd23f'; g.lineWidth = 3; oval(fx, fy, 19 * u, 7 * u); g.stroke() }
+  const sh = Math.max(0.5, 1 - p.h / 160) * big
+  g.fillStyle = 'rgba(0,0,0,.3)'; oval(fx, fy, 14 * u * sh, 4.6 * u * sh); g.fill()
+  if (p === ctl) { g.strokeStyle = '#ffd23f'; g.lineWidth = 3; oval(fx, fy, 19 * u * big, 7 * u * big); g.stroke() }
 
-  const running = (p.mv || p.act === 'cross' || p.act === 'air' || p.act === 'rush') && p.h === 0 && !p.fall, s = running ? Math.sin(p.run * 15) : 0
-  const dash = p.act === 'cross' || p.act === 'air' || p.act === 'rush' || p.boost > 0
-  const lean = p.fall || !running ? 0 : (dash ? 0.3 : 0.17) * p.dir, L = hh => lean * hh * u   // 달릴 때 윗몸을 앞으로 기울인다
+  // 몸 좌표 — at(옆, 키 높이). 윗몸일수록 달리는 쪽으로 기울어진다(기울기는 실제 속도를 따른다)
+  const v = Math.hypot(p.vx, p.vz), a = p.h > 0 || p.fall ? 0 : Math.min(1, v / SPD), ph = p.run * 15, f = p.fd, fs = f >= 0 ? 1 : -1
+  const lean = p.fall ? 0 : clamp(p.vx / SPD, -1.3, 1.3) * 0.16, at = (px, hh) => [px * u + lean * hh * u, -hh * u]
   const holding = ball.owner === p, up = p.act === 'shot' || p.act === 'dunk' || p.h > 0 && !holding
+  const guard = !holding && ball.owner && ball.owner.team !== p.team && dist(p, ball.owner) < 70   // 수비 — 두 손을 벌린다
   g.save()
-  g.translate(x, y - Math.abs(s) * 3 * u)
-  if (p.big > 0) g.scale(1.4, 1.4)   // 자이언트
+  g.translate(x, y - Math.abs(Math.sin(ph)) * 2.5 * u * a)   // 걸을 때 몸이 오르내린다
+  if (big > 1) g.scale(big, big)   // 자이언트
   if (p.ghost > 0) g.globalAlpha = 0.55   // 팬텀 — 반투명
   if (p.act === 'spin') { const c = Math.cos(p.t / 0.45 * Math.PI * 4); g.scale(Math.abs(c) < 0.15 ? 0.15 : c, 1) }   // 회오리 — 제자리에서 두 바퀴
   if (p.fall > 0) g.rotate(-p.dir * 1.35)   // 넘어졌다
   else if (p.sq > 0) g.scale(1 + p.sq * 1.2, 1 - p.sq * 1.2)   // 착지 — 잠깐 눌린다
-  // 다리 · 신발 — 공중에서는 접는다
-  const legs = p.h > 0 ? [[-8, -24, 15, 0], [3, -27, 15, 0]] : [[-7, -22, 22, s * 6], [2, -22, 22, -s * 6]]
-  for (const [lx, ly, len, sw] of legs) {
-    g.fillStyle = SKIN; g.fillRect((lx + sw) * u, ly * u, 5 * u, len * u)
-    g.fillStyle = '#f2f2f2'; g.fillRect((lx - 1 + sw) * u, (ly + len - 3) * u, 7 * u, 3 * u)
+  g.lineCap = 'round'; g.lineJoin = 'round'
+  // 다리 — 엉덩이 · 무릎 · 발. 걸음마다 발이 앞뒤로 오가고 뒤로 갈 때 들린다. 공중에서는 접는다. 먼 다리는 어둡게
+  const leg = (k, col) => {
+    const hip = at(k ? 2.6 : -2.6, 37), s = Math.sin(ph + k * Math.PI)
+    const foot = p.h > 0 || p.act === 'dunk' ? [hip[0] + f * (k ? 7 : -2) * u, (k ? -13 : -7) * u]
+      : [(k ? 2.6 : -2.6) * u * (1 - Math.abs(f)) + f * s * 10 * u * a, -Math.max(0, -Math.cos(ph + k * Math.PI)) * 7 * u * a]
+    const [knee, end] = limb(hip[0], hip[1], foot[0], foot[1], 19 * u, 18.5 * u, -fs)
+    line([hip, knee], 6.4 * u, col); line([knee, end], 5.2 * u, col)
+    line([[end[0], end[1] - 5 * u], [end[0], end[1] - 1.8 * u]], 4.8 * u, '#f2f2f2')   // 양말
+    g.fillStyle = '#fafafa'; oval(end[0] + f * 2.2 * u, end[1] - 1.5 * u, 4.8 * u, 2.3 * u); g.fill()   // 운동화
+    g.fillStyle = T.dark; g.fillRect(end[0] + f * 2.2 * u - 4.8 * u, end[1] - 0.5 * u, 9.6 * u, 1.1 * u)
   }
-  g.fillStyle = T.dark; g.fillRect(-10 * u + L(28), -34 * u, 20 * u, 13 * u)
-  g.fillStyle = T.color; g.fillRect(-11 * u + L(46), -58 * u, 22 * u, 25 * u)
-  g.fillStyle = '#fff'; g.font = `800 ${11 * u}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'
-  g.fillText(p.f.num, L(46), -45 * u)
-  // 팔 — 어깨에서 손까지
-  const sy = -54 * u, ls = -9 * u + L(54), rs = 9 * u + L(54), front = p.dir > 0 ? rs : ls, back = p.dir > 0 ? ls : rs
-  const arm = (ax, hx, hy) => { g.beginPath(); g.moveTo(ax, sy); g.lineTo(hx, hy); g.stroke() }
-  g.strokeStyle = SKIN; g.lineWidth = 4.5 * u; g.lineCap = 'round'
-  if (p.act === 'dunk') { arm(back, p.dir * 4 * u, -96 * u); arm(front, p.dir * 16 * u, -100 * u) }   // 림으로 뻗는다
-  else if (up) { arm(ls, -7 * u, -86 * u); arm(rs, 7 * u, -86 * u) }
-  else if (holding && p.act !== 'air') {   // 공 쪽 손은 튀어 오르는 공을 따라 오르내린다
-    arm(front, (ball.x - p.x) * u, (ball.z - p.z) * 0.7 - (Math.max(ball.h, 24) + 7) * u)
-    arm(back, back - p.dir * 4 * u - s * 5 * u, -33 * u)
-  } else if (holding) { arm(ls, p.dir * 10 * u, -46 * u); arm(rs, p.dir * 14 * u, -48 * u) }
-  else if (p.reach > 0) { arm(front, p.dir * 27 * u + L(44), -46 * u); arm(back, back - p.dir * 6 * u, -34 * u) }   // 스틸 — 손을 뻗는다
-  else { arm(ls, ls - 4 * u - s * 7 * u, -33 * u); arm(rs, rs + 4 * u + s * 7 * u, -33 * u) }
-  g.lineCap = 'butt'
-  const r = 12 * u, hx = L(70)
-  if (p.f.img?.complete && p.f.img.naturalWidth) g.drawImage(p.f.img, hx - r, -70 * u - r, 2 * r, 2 * r)
-  else { g.fillStyle = SKIN; oval(hx, -70 * u, r, r); g.fill() }
-  if (p.ice > 0) { g.fillStyle = 'rgba(170,225,255,.55)'; g.strokeStyle = '#e8f7ff'; g.lineWidth = 1.5; g.fillRect(-15 * u, -86 * u, 30 * u, 88 * u); g.strokeRect(-15 * u, -86 * u, 30 * u, 88 * u) }   // 얼음
+  // 팔 — 어깨 · 팔꿈치 · 손. 팔꿈치는 아래 · 뒤로 꺾이는 쪽을 고른다(위로 꺾이면 닭날개처럼 보인다)
+  const arm = (k, [hx, hy], col) => {
+    const s0 = at((k ? 7.4 : -7.4) * fs, 60), [A, B] = [1, -1].map(b => limb(s0[0], s0[1], hx, hy, 13.5 * u, 13 * u, b))
+    const [el, end] = A[0][1] - fs * A[0][0] * 0.4 >= B[0][1] - fs * B[0][0] * 0.4 ? A : B
+    line([s0, el], 5 * u, col); line([el, end], 4.3 * u, col)
+    g.fillStyle = col; oval(end[0], end[1], 2.5 * u, 2.5 * u); g.fill()
+  }
+  const sw = Math.sin(ph) * 9 * u * a, rise = Math.abs(Math.sin(ph)) * 3 * u * a
+  let near, far   // 손 자리
+  if (p.act === 'dunk') { near = at(fs * 12, 102); far = at(fs * 5, 97) }   // 림으로 뻗는다
+  else if (up) { near = at(fs * 3, 90); far = at(-fs * 2, 88) }   // 슛 · 블록 — 머리 위로
+  else if (holding && p.act === 'air') { near = at(fs * 10, 52); far = at(fs * 8, 50) }   // 가슴 앞에 두 손으로
+  else if (holding) {   // 공 쪽 손은 튀어 오르는 공을 따라 오르내린다(무릎 아래로는 안 내려간다). 다른 손은 공을 감싼다
+    near = [(ball.x - p.x) * u / big, ((ball.z - p.z) * 0.7 - (Math.max(ball.h, 26) + 5) * u) / big]
+    far = at(-fs * 11, 50)
+  }
+  else if (p.reach > 0) { near = at(fs * 26, 48); far = at(-fs * 6, 38) }   // 스틸 — 손을 뻗는다
+  else if (guard) { near = at(fs * 24, 55); far = at(-fs * 21, 51) }
+  else { near = [at(fs * 9.5, 35)[0] + fs * sw, -(35 * u + rise)]; far = [at(-fs * 8.5, 35)[0] - fs * sw, -(35 * u + rise)] }   // 몸 옆에 늘어뜨리고, 걸을 때는 다리와 엇갈려 흔든다
+  arm(0, far, shade)
+  leg(0, shade)
+  leg(1, skin)
+  shape([at(-8.8, 42), at(8.8, 42), at(10.4, 27), at(1, 26), at(0, 29), at(-1, 26), at(-10.4, 27)], T.dark)   // 반바지
+  line([at(-9.6, 41), at(-10.3, 28)], 1.4 * u, T.color); line([at(9.6, 41), at(10.3, 28)], 1.4 * u, T.color)
+  shape([at(-3.6, 64), at(-9.6, 62.5), at(-7.8, 54), at(-8.4, 40.5), at(8.4, 40.5), at(7.8, 54), at(9.6, 62.5), at(3.6, 64), at(0, 58.5)], T.color)   // 민소매 상의
+  g.globalAlpha *= 0.85
+  line([at(-3.6, 64), at(0, 58.5), at(3.6, 64)], 1 * u, '#fff'); line([at(-9.6, 62.5), at(-7.8, 54)], 1 * u, '#fff'); line([at(9.6, 62.5), at(7.8, 54)], 1 * u, '#fff')
+  g.globalAlpha /= 0.85
+  g.fillStyle = '#fff'; g.font = `800 ${8.5 * u}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillText(p.f.num, ...at(0, 50))
+  line([at(0, 62), at(0, 67)], 5.2 * u, skin)   // 목
+  const [hx, hy] = at(0, 75)   // 머리 — 배경을 지운 얼굴 그림(cutHead)
+  if (p.f.head) g.drawImage(p.f.head, hx - 12.25 * u, hy - 13.2 * u, 24.5 * u, 26 * u)
+  else { g.fillStyle = skin; oval(hx, hy, 8 * u, 9 * u); g.fill() }
+  arm(1, near, skin)
+  if (p.ice > 0) { g.fillStyle = 'rgba(170,225,255,.55)'; g.strokeStyle = '#e8f7ff'; g.lineWidth = 1.5; g.fillRect(-15 * u, -92 * u, 30 * u, 94 * u); g.strokeRect(-15 * u, -92 * u, 30 * u, 94 * u) }   // 얼음
   g.restore()
   g.globalAlpha = 1
-  if (p.conf > 0) { g.fillStyle = '#c58bff'; g.font = `900 ${16 * u}px system-ui, sans-serif`; g.fillText('?', x, y - 92 * u) }
+  g.textAlign = 'center'; g.textBaseline = 'middle'
+  if (p.conf > 0) { g.fillStyle = '#c58bff'; g.font = `900 ${16 * u}px system-ui, sans-serif`; g.fillText('?', x, y - 100 * u * big) }
   if (p.fall > 0) {   // 머리 위로 별이 돈다
     g.fillStyle = '#ffd23f'; g.font = `${11 * u}px system-ui, sans-serif`
-    for (let i = 0; i < 3; i++) { const a = tnow * 7 + i * 2.1; g.fillText('★', fx - p.dir * 62 * u + Math.cos(a) * 12 * u, fy - 30 * u + Math.sin(a) * 4 * u) }
+    for (let i = 0; i < 3; i++) { const t = tnow * 7 + i * 2.1; g.fillText('★', x - p.dir * 73 * u * big + Math.cos(t) * 12 * u, y - 26 * u + Math.sin(t) * 4 * u) }
   } else if (p === ctl && p.team === 0) {
-    const tx = x + L(70), ty = y - 90 * u
+    const tx = x + lean * 75 * u, ty = y - 96 * u * big
     g.fillStyle = '#ffd23f'; g.beginPath(); g.moveTo(tx - 6, ty - 4); g.lineTo(tx + 6, ty - 4); g.lineTo(tx, ty + 4); g.fill()
     g.font = '800 13px system-ui, sans-serif'; g.fillText('1P', tx, ty - 13)
   }
@@ -868,21 +909,72 @@ function frame(t) {
 }
 requestAnimationFrame(frame)
 
+// 얼굴 배지(둥근 그림)에서 머리만 — 바깥 고리에서 시작해 노란 배경색만 번져 지우고(flood fill), 흰 고리 · 아래 옷은 머리 모양 타원으로 잘라 낸다
+function cutHead(img) {
+  const c = Object.assign(document.createElement('canvas'), { width: 180, height: 180 }), x = c.getContext('2d', { willReadFrequently: true })
+  x.drawImage(img, 0, 0, 180, 180)
+  const d = x.getImageData(0, 0, 180, 180), px = d.data, seen = new Uint8Array(180 * 180), q = []
+  const bg = k => { const i = k * 4, r = px[i], gg = px[i + 1], b = px[i + 2]; return r > 228 && gg > 165 && gg < 238 && b < 185 && r - b > 70 }
+  for (let k = 0; k < 180 * 180; k++) { const r = Math.hypot(k % 180 - 90, (k / 180 | 0) - 90); if (r > 74 && r < 84 && bg(k)) { seen[k] = 1; q.push(k) } }
+  while (q.length) {
+    const k = q.pop(), cx = k % 180
+    px[k * 4 + 3] = 0
+    for (const n of [cx > 0 ? k - 1 : -1, cx < 179 ? k + 1 : -1, k - 180, k + 180]) if (n >= 0 && n < 180 * 180 && !seen[n] && bg(n)) { seen[n] = 1; q.push(n) }
+  }
+  x.putImageData(d, 0, 0)
+  const h = Object.assign(document.createElement('canvas'), { width: 124, height: 132 }), hx = h.getContext('2d')
+  hx.beginPath(); hx.ellipse(62, 66, 60, 64, 0, 0, Math.PI * 2); hx.clip()
+  hx.drawImage(c, 28, 18, 124, 132, 0, 0, 124, 132)
+  return h
+}
+/** 몸 피부색 — 양 광대의 색 가운데 밝은 쪽(수염 · 그늘을 피한다). [피부, 먼 팔다리용 어두운 색] */
+function skinOf(img) {
+  const c = Object.assign(document.createElement('canvas'), { width: 180, height: 180 }), x = c.getContext('2d', { willReadFrequently: true })
+  x.drawImage(img, 0, 0, 180, 180)
+  const got = []
+  for (const cx of [66, 114]) {
+    const px = x.getImageData(cx - 5, 84, 10, 12).data
+    for (let i = 0; i < px.length; i += 4) { const [r, gg, b] = px.slice(i, i + 3); if (r > gg && gg > b && r - b > 25 && r > 60 && r < 252) got.push([r, gg, b]) }
+  }
+  if (!got.length) return [SKIN, '#8f5f3e']
+  const [r, gg, b] = got.sort((m, n) => m[0] + m[1] + m[2] - n[0] - n[1] - n[2])[Math.floor(got.length * 0.65)]
+  return [`rgb(${r},${gg},${b})`, `rgb(${r * 0.78 | 0},${gg * 0.78 | 0},${b * 0.78 | 0})`]
+}
+
 // 팀마다 포지션 1~5 에서 한 명씩 — 팀끼리 겹치지 않게 포지션 목록의 같은 순번
 await loadData()
-const kr = data.players.filter(p => p.server === 'kr'), imgs = new Map()
-const img = src => src && (imgs.get(src) || imgs.set(src, Object.assign(new Image(), { src })).get(src))
+const kr = data.players.filter(p => p.server === 'kr')
 TEAMS.forEach((T, ti) => {
   T.five = [1, 2, 3, 4, 5].map((pos, i) => {
-    const list = kr.filter(p => p.pos === pos), p = list[ti % list.length]
-    return { name: p ? p.short || p.name : `${pos}번`, img: img(p?.img), num: NUMS[i] }
+    const list = kr.filter(p => p.pos === pos), p = list[ti % list.length], f = { name: p ? p.short || p.name : `${pos}번`, num: NUMS[i], img: null }
+    if (p?.img) {
+      f.img = new Image()
+      f.img.onload = () => { try { f.head = cutHead(f.img); [f.skin, f.shade] = skinOf(f.img) } catch {} }   // 실패하면 동그란 머리 · 기본 피부색
+      f.img.src = p.img
+    }
+    return f
   })
 })
-// 페이지 아래 궁극기 목록 — 팀마다 한 줄
-document.getElementById('skills').replaceChildren(...TEAMS.map((T, ti) => {
-  const li = document.createElement('li'), b = Object.assign(document.createElement('b'), { textContent: T.name })
-  b.style.color = T.color
-  li.append(b, ...T.five.map((f, j) => ` · ${f.name} ${SKILLS[ti][j].name}(${SKILLS[ti][j].desc})`))
-  return li
+
+// 페이지 아래 「팀별 궁극기」 — 팀마다 탭, 그 팀 다섯 명의 궁극기 카드. 경기를 시작하면 고른 팀 탭으로
+const tabs = document.getElementById('skill-tabs'), panel = document.getElementById('skills')
+function showTab(ti) {
+  for (const [i, b] of [...tabs.children].entries()) b.setAttribute('aria-selected', String(i === ti))
+  panel.setAttribute('aria-label', `${TEAMS[ti].name} 궁극기`)
+  panel.replaceChildren(...TEAMS[ti].five.map((f, j) => {
+    const sk = SKILLS[ti][j], card = Object.assign(document.createElement('div'), { className: 'slam-skill' })
+    card.innerHTML = '<img alt=""><div><small></small><b></b><p></p></div>'
+    if (f.img) card.querySelector('img').src = f.img.src
+    card.querySelector('small').textContent = `${POS[j + 1]} · ${f.name}`
+    card.querySelector('b').textContent = sk.name
+    card.querySelector('p').textContent = `${sk.desc}${sk.need ? ' (골대 가까이에서만)' : ''}`
+    return card
+  }))
+}
+tabs.replaceChildren(...TEAMS.map((T, ti) => {
+  const b = Object.assign(document.createElement('button'), { type: 'button', textContent: T.name, onclick: () => showTab(ti) })
+  b.setAttribute('role', 'tab'); b.style.setProperty('--team', T.color)
+  return b
 }))
+showTab(0)
 mode = 'select'

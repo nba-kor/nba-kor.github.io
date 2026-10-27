@@ -1392,12 +1392,26 @@ dialog, .ac-body { overscroll-behavior: contain; }
 @keyframes slam-glow { to { box-shadow: 0 0 0 4px #ffd23f66, 0 0 22px #ffd23f; } }
 @media (prefers-reduced-motion: reduce) { #btn-ul.ready { animation: none; box-shadow: 0 0 0 4px #ffd23f66; } }
 .slam-help { margin: 10px 0 0; color: var(--muted); font-size: 13.5px; }
-.slam-help summary { cursor: pointer; color: var(--text); }
-.slam-skills { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; }
-.slam-help kbd { display: inline-block; min-width: 20px; padding: 0 5px; margin: 0 1px; border: 1px solid var(--muted); border-radius: 4px; font: 600 12px/18px ui-monospace, Menlo, Consolas, monospace; text-align: center; color: var(--text); }
+.slam kbd { display: inline-block; min-width: 20px; padding: 0 5px; margin: 0 1px; border: 1px solid var(--muted); border-radius: 4px; font: 600 12px/18px ui-monospace, Menlo, Consolas, monospace; text-align: center; color: var(--text); }
+/* 아래 설명 — 조작법 표 · 팀별 궁극기 탭 */
+.slam-guide { margin-top: 20px; }
+.slam-guide h2 { margin: 20px 0 8px; font-size: 16px; }
+.slam-keys { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.slam-keys th, .slam-keys td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.slam-keys thead th { color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.slam-keys tbody th { white-space: nowrap; }
+.slam-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.slam-tabs button { padding: 6px 12px; border-color: var(--team); color: var(--team); font-weight: 800; }
+.slam-tabs button[aria-selected="true"] { background: var(--team); color: #fff; }
+.slam-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.slam-skill { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.slam-skill img { width: 46px; height: 46px; flex: none; }
+.slam-skill small { display: block; color: var(--muted); font-size: 12px; }
+.slam-skill b { display: block; font-size: 15px; }
+.slam-skill p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 @media (pointer: coarse) {
   .slam-pad { display: flex; }
-  .slam-help.keys { display: none; }
+  .slam-keys .kb { display: none; }   /* 휴대폰에서는 키보드 칸을 뺀다 */
 }
 /* 휴대폰을 가로로 — 스틱 · 버튼을 화면 아래 양쪽 구석에 겹친다 */
 @media (pointer: coarse) and (orientation: landscape) {
