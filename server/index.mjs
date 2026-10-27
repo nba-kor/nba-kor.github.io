@@ -64,6 +64,9 @@ const WEEK = /^\d{4}-\d{2}-\d{2}$/
 const PLAN_LIMIT = { max: 300, windowMs: 10 * 60_000 }   // 관리자 편성표 저장 — 끌어다 놓을 때마다 저장한다
 const STALE_PLAN = '그새 신청이나 편성표가 바뀌었어요 — 새로 불러올게요'
 const MEMBER_ID = /^(\d{17,20}|k\d{1,20})$/   // 멤버(프로필) ID — 디스코드 ID · k<카카오 회원번호>
+const SLAM_LIST = 20   // 슈퍼 슬램: 최근 대전 · 랭킹 줄 수
+const SLAM_MATCH = /^[A-Za-z0-9_-]{8,24}$/   // 방장 브라우저가 만든 경기 번호
+const SLAM_STALE = 86_400_000   // 한쪽만 올린 결과는 하루 뒤 지운다
 // 받는 요청 — 메서드 + 경로 조각. 예: 'POST team members' = 가입, 'DELETE team members member' = 방출 · 나가기
 const ACTIONS = new Set([
   'GET me', 'PUT me profile', 'DELETE me', 'DELETE me kakao', 'GET', 'POST', 'POST quick', 'GET team', 'DELETE team', 'POST team members', 'DELETE team members member', 'POST team extend',
@@ -319,7 +322,7 @@ const AUDIT_LABEL = {
   'PUT /api/members/:id': '멤버 등급 변경', 'DELETE /api/members/:id': '멤버 탈퇴 처리',
   'POST /api/teams': '모집 팀 만들기', 'POST /api/teams/quick': '모집 빠른 참가', 'PUT /api/teams/:id': '모집 팀 정보 수정', 'DELETE /api/teams/:id': '모집 팀 해제',
   'POST /api/teams/:id/extend': '모집 팀 연장', 'POST /api/teams/:id/members': '모집 팀 가입', 'PUT /api/teams/:id/members/:id': '모집 참가 캐릭터 변경',
-  'DELETE /api/teams/:id/members/:id': '모집 팀 나가기 · 내보내기',
+  'DELETE /api/teams/:id/members/:id': '모집 팀 나가기 · 내보내기', 'POST /api/slam': '슈퍼 슬램 대전 결과',
   ...Object.fromEntries(Object.entries(BOARD_KO).flatMap(([k, ko]) => [
     [`POST /api/${k}`, `${ko} 글 쓰기`], [`PUT /api/${k}/:id`, `${ko} 글 수정`], [`DELETE /api/${k}/:id`, `${ko} 글 삭제`],
     [`POST /api/${k}/:id/like`, `${ko} 추천`], [`POST /api/${k}/:id/comments`, `${ko} 댓글 쓰기`], [`DELETE /api/${k}/:id/comments/:id`, `${ko} 댓글 삭제`],
@@ -523,6 +526,14 @@ const MEMBERS = 'members:recruit_members(id,discord_user_id,leader,joined_at,ent
   + '&members.order=leader.desc,joined_at.asc,id.asc'
 /** 팀원 한 줄을 고르는 Data API 조건 — 계정 팀원은 계정 ID, 계정 없는 팀원은 행 번호(g<id>) */
 const memberRow = (teamId, userId) => `team_id=eq.${enc(teamId)}&${GUEST_ID.test(userId) ? `id=eq.${GUEST_ID.exec(userId)[1]}` : `discord_user_id=eq.${enc(userId)}`}`
+
+/** 슈퍼 슬램 결과 — { match, opp: 상대 ID, host: 내가 방장인지, teams: [방장 팀, 들어온 사람 팀](0~3), score: [방장 점수, 들어온 사람 점수] } */
+function slamReport(b, user) {
+  const two = (a, max) => listOf(a, 2, 2) && a.every(v => Number.isInteger(v) && v >= 0 && v <= max)
+  if (!isObj(b) || !matches(SLAM_MATCH, b.match) || !matches(MEMBER_ID, b.opp) || b.opp === user.id || typeof b.host !== 'boolean'
+    || !two(b.teams, 3) || b.teams[0] === b.teams[1] || !two(b.score, 999)) fail(400, '요청 형식이 잘못됐어요')
+  return { match: b.match, opp: b.opp, host: b.host, teams: b.teams, score: b.score }
+}
 
 // ---------------------------------------------------------------- API
 
@@ -968,6 +979,39 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       }).filter(a => a.chars.length),
     }))
 
+  // ------------------------------------------------ 슈퍼 슬램(/slam/) 온라인 1:1 — 최근 대전 · 랭킹(공개), 결과 올리기(로그인)
+  // 경기는 두 사람의 브라우저끼리 한다. 끝나면 둘이 각자 결과를 올리고, 서로를 가리키는 두 결과가 같을 때만 기록한다 —
+  // 혼자서 아무나 상대로 적어 이긴 기록을 만들 수 없다.
+  // ponytail: 경기 계산은 방장 브라우저가 해서, 방장이 화면 코드를 고쳐 점수를 속이면 상대 화면도 그 점수를 본다 — 막으려면 서버가 경기를 돌려야 한다
+  async function slam(request, t) {
+    if (request.method === 'GET') {
+      const [recent, ranking] = await Promise.all([
+        db(`/slam_matches?select=at,home_name,home_team,home_score,away_name,away_team,away_score&order=at.desc,id.desc&limit=${SLAM_LIST}`),
+        db(`/slam_ranking?select=name,wins,losses,draws,games&order=wins.desc,losses.asc,last_at.desc&limit=${SLAM_LIST}`),
+      ])
+      const side = (m, k) => ({ name: m[`${k}_name`], team: m[`${k}_team`], score: m[`${k}_score`] })
+      return [200, { recent: recent.map(m => ({ at: m.at, home: side(m, 'home'), away: side(m, 'away') })), ranking }]
+    }
+    if (request.method !== 'POST') fail(404, '없는 주소예요')
+    const user = await identity(request)
+    if (await hit(`w ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
+    const r = slamReport(await readJson(request), user), name = await nameOf(user)
+    await db(`/slam_reports?at=lt.${t - SLAM_STALE}`, { method: 'DELETE' })
+    await db('/slam_reports', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { match: r.match, user_id: user.id, user_name: name, opp_id: r.opp, host: r.host, teams: r.teams, score: r.score, at: t } })
+    const [other] = await db(`/slam_reports?select=user_id,user_name,opp_id,host,teams,score&match=eq.${enc(r.match)}&user_id=eq.${enc(r.opp)}`)
+    if (!other) return [202, { recorded: false }]   // 상대가 올리면 기록된다
+    const same = (a, b) => a.every((v, i) => v === b[i])
+    if (other.opp_id !== user.id || other.host === r.host || !same(other.teams, r.teams) || !same(other.score, r.score)) fail(409, '두 사람이 올린 결과가 달라요')
+    const [home, away] = r.host ? [[user.id, name], [other.user_id, other.user_name]] : [[other.user_id, other.user_name], [user.id, name]]
+    // 둘이 동시에 올리면 둘 다 여기까지 온다 — 경기 번호가 unique 라 한 줄만 들어간다
+    await db('/slam_matches?on_conflict=match', { method: 'POST', prefer: 'resolution=ignore-duplicates', body: {
+      match: r.match, at: t, home_id: home[0], home_name: home[1], home_team: r.teams[0], home_score: r.score[0], away_id: away[0], away_name: away[1], away_team: r.teams[1], away_score: r.score[1],
+    } })
+    await db(`/slam_reports?match=eq.${enc(r.match)}`, { method: 'DELETE' })
+    note(request, `${home[1]} vs ${away[1]}`, [`${r.score[0]} : ${r.score[1]}`])
+    return [201, { recorded: true }]
+  }
+
   async function arena(request, sub, t) {
     const action = [request.method, sub].filter(Boolean).join(' ')
     if (!['GET', 'GET mine', 'PUT signup', 'DELETE signup', 'PUT plan'].includes(action)) fail(404, '없는 주소예요')
@@ -1168,6 +1212,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (pathname === '/api/audit') return auditLog(request)
     const b = pathname.match(BOARD_PATH)
     if (b) return board(request, b, now())
+    if (pathname === '/api/slam') return slam(request, now())
     const a = pathname.match(/^\/api\/arena(?:\/(signup|plan|mine))?$/)
     if (a) return arena(request, a[1], now())
     const mb = pathname.match(/^\/api\/members(?:\/([^/]+))?$/)

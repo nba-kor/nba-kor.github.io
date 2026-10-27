@@ -1,10 +1,11 @@
 // 슈퍼 슬램 — 5:5 풀코트 오락실 농구(1P vs CPU). 머리 메뉴의 「게임」.
 // 90년대 오락실 농구(Super Slams) 느낌만 빌린 새 게임이다. 원작 롬 · 그림 · 팀 이름은 쓰지 않는다 — 롬은 저작물이라 이 공개 사이트에 둘 수 없다.
-// 선수 얼굴은 덩크 시티 선수(data/players.json). 1P 는 오른쪽 골대를 공격한다. 궁극기는 20명이 다 다르다(SKILLS) — 게이지가 차면 쓴다.
+// 선수 얼굴은 덩크 시티 선수(data/players.json). 1P 는 오른쪽 골대를 공격한다. 온라인 1:1 · 대전 기록은 아래 「온라인 1:1」. 궁극기는 20명이 다 다르다(SKILLS) — 게이지가 차면 쓴다.
 // 키: 방향키 · WASD 이동, 드리블 Z · J, 패스 X · K, 슛 C · L · 스페이스, 궁극기 V · U. 수비 때는 스틸 · 선수 바꾸기 · 블록 · 스틸 대시. 휴대폰은 캔버스 아래 스틱 · 버튼.
 // ponytail: 파울 · 자유투 · 아웃 오브 바운즈 · 하프코트 바이얼레이션 · 소리 없음 — 공은 코트 끝에서 튕겨 나온다
-import { mountTop, POS } from './app.js?v=fb02b445'
-import { loadData, data, startAuth } from './board.js?v=4233415a'
+import { mountTop, POS, copyLink } from './app.js?v=fb02b445'
+import { loadData, data, startAuth, me as who, loggedIn, h, ago } from './board.js?v=4233415a'
+import { sb, api } from './auth.js?v=1fbb8e2f'
 
 mountTop('/slam/')
 startAuth('', () => {})   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
@@ -41,8 +42,9 @@ const DUNK_MSG = { two: 'SLAM DUNK!', tomahawk: 'TOMAHAWK!', windmill: 'WINDMILL
 const CARDS = [[40, 80], [490, 80], [40, 305], [490, 305]], CARD_W = 430, CARD_H = 205
 
 let mode = 'load', pick = 0, sides = [0, 1]          // sides = [1P 팀, CPU 팀] (TEAMS 번호)
-let ps = [], ball = {}, score = [0, 0], clock = GAME, shot = SHOT, offense = 0, ctl = null, msg = null, wait = 0, tip = null, camX = CL / 2
+let ps = [], ball = {}, score = [0, 0], clock = GAME, shot = SHOT, offense = 0, ctls = [null, null], msg = null, wait = 0, tip = null, camX = CL / 2
 let cut = null, parts = [], rings = [], shake = 0, tnow = 0   // 궁극기 컷인 · 파편 · 충격파 · 화면 흔들림 · 시계(초)
+let net = null, myT = 0   // 온라인 1:1(아래 「온라인 1:1」) · 내 팀 — 혼자 · 방장은 0, 들어온 사람은 1
 
 const rnd = Math.random
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -52,21 +54,27 @@ const side = t => t === 0 ? 1 : -1                   // 공격 방향 x 부호
 const team = t => ps.filter(p => p.team === t)
 const nearest = (list, o) => list.reduce((a, b) => dist(b, o) < dist(a, o) ? b : a)
 const open = p => Math.min(...ps.filter(q => q.team !== p.team).map(q => dist(q, p)))   // 가장 가까운 수비까지
-const say = (text, t = 1.1) => { msg = { text, t, t0: t } }
+let msgN = 0
+const say = (text, t = 1.1) => { msg = { text, t, t0: t, id: ++msgN } }
 const guarded = o => o.act === 'air' || o.act === 'cross' || o.act === 'dunk' || o.act === 'lay' || o.act === 'spin' || o.sure || o.ghost > 0   // 이 동작 중에는 스틸이 안 된다
-/** 월드 → 화면. 가까울수록(z 가 클수록) 크게 — [x, y, 월드 1 의 픽셀] */
-function P(x, z, h = 0) { const u = S * (0.8 + 0.4 * z / CW); return [W / 2 + (x - camX) * u, TOP + z * 0.7 - h * u, u] }
+/** 월드 → 화면. 가까울수록(z 가 클수록) 크게 — [x, y, 월드 1 의 픽셀]. 온라인으로 들어온 사람(myT 1)은 좌우를 뒤집어 자기도 오른쪽으로 공격한다 */
+function P(x, z, h = 0) { const u = S * (0.8 + 0.4 * z / CW); return [W / 2 + ((myT ? CL - x : x) - camX) * u, TOP + z * 0.7 - h * u, u] }
 
 // ---------------------------------------------------------------- 입력
 
 const keys = new Set(), joy = { x: 0, z: 0 }, input = { dr: false, pa: false, sh: false, ul: false }
+const rin = { dr: false, pa: false, sh: false, ul: false }, inputs = [input, rin]   // 팀마다 이번 프레임에 누른 버튼 — 2팀은 온라인 상대(방장이 받는다)
+let rax = [0, 0]   // 온라인 상대의 스틱(월드 방향)
 const KEYS = { KeyZ: 'dr', KeyJ: 'dr', KeyX: 'pa', KeyK: 'pa', KeyC: 'sh', KeyL: 'sh', Space: 'sh', KeyV: 'ul', KeyU: 'ul' }
 
 function press(k) {
-  if (mode === 'select') return start()
+  if (mode === 'wait') return
+  if (mode === 'select') return net ? ready() : start()
   if (mode === 'over') return void (wait <= 0 && (mode = 'select'))   // 끝나자마자 연타로 결과를 건너뛰지 않게
+  if (net && !net.host) { net.n[BTN.indexOf(k)]++; net.press = true; return }   // 들어온 사람 — 방장에게 보낸다(guestInput)
   input[k] = true
 }
+const setPick = i => { if (net?.ready[0]) return; pick = i; if (net?.peer) send({ t: 'pick', p: i }) }   // 온라인은 준비하면 못 바꾼다
 addEventListener('keydown', e => {
   const c = e.code
   if (e.target.closest?.('input, textarea, select, button, a') || !/^(Arrow\w+|Key[WASDZXCVJKLU]|Space|Enter)$/.test(c)) return
@@ -75,7 +83,7 @@ addEventListener('keydown', e => {
   if (e.repeat) return
   if (mode === 'select' && c.startsWith('Arrow')) {
     const col = c === 'ArrowLeft' ? 0 : c === 'ArrowRight' ? 1 : pick % 2, row = c === 'ArrowUp' ? 0 : c === 'ArrowDown' ? 1 : pick >> 1
-    pick = row * 2 + col
+    setPick(row * 2 + col)
   } else if (c === 'Enter') { if (mode === 'select' || mode === 'over') press('sh') }
   else if (KEYS[c]) press(KEYS[c])
 })
@@ -92,7 +100,7 @@ cv.addEventListener('pointerdown', e => {
   const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H
   if (mode === 'select') {
     const i = CARDS.findIndex(([cx, cy]) => x >= cx && x <= cx + CARD_W && y >= cy && y <= cy + CARD_H)
-    if (i >= 0) i === pick ? start() : pick = i
+    if (i >= 0) i === pick ? press('sh') : setPick(i)
   } else if (mode === 'over' && wait <= 0) mode = 'select'
 })
 // 휴대폰 스틱 · 버튼
@@ -126,9 +134,8 @@ document.addEventListener('fullscreenchange', () => setFull(!!document.fullscree
 // ---------------------------------------------------------------- 경기 흐름
 
 function start() {
-  const others = [0, 1, 2, 3].filter(i => i !== pick)
-  sides = [pick, others[Math.floor(rnd() * others.length)]]
-  showTab(pick)
+  if (!net) { const others = [0, 1, 2, 3].filter(i => i !== pick); sides = [pick, others[Math.floor(rnd() * others.length)]] }   // 온라인은 두 사람이 고른 팀
+  showTab(sides[myT])
   ps = [0, 1].flatMap(t => TEAMS[sides[t]].five.map((f, i) => ({
     team: t, i, f, x: 0, z: 0, h: 0, vh: 0, dir: side(t), run: 0, mv: false, act: null, t: 0,
     cool: 0, stun: 0, fall: 0, think: 0, cut: 0, block: 0, reach: 0, ult: rnd() * 0.3, boost: 0, cdx: 0, dp: 0, hand: 1, sq: 0, kb: null, sure: false, trail: [], tt: 0,
@@ -140,8 +147,9 @@ function start() {
   const at = [[370, 250], [415, 120], [415, 380], [330, 170], [456, 250]]
   for (const p of ps) { const [x, z] = at[p.i]; p.x = p.team ? CL - x : x; p.z = p.team ? CW - z : z }
   ball = { st: 'tip', x: 470, z: 250, h: 60, owner: null, trail: [], rot: 0 }
-  ctl = ps.find(p => p.team === 0 && p.i === 4)
-  tip = { t: 0, me: null, cpu: 0.28 + (rnd() - 0.5) * 0.4, cpuUp: false }
+  ctls = [0, 1].map(t => t === 0 || net ? ps.find(p => p.team === t && p.i === 4) : null)   // 사람이 움직이는 선수 — 혼자면 2팀은 CPU(null)
+  for (const k in rin) rin[k] = false
+  tip = { t: 0, at: [null, null], cpu: 0.28 + (rnd() - 0.5) * 0.4 }
   mode = 'tip'
   say('TIP OFF', 1.2)
 }
@@ -150,11 +158,9 @@ function start() {
 function tipOff(dt) {
   tip.t += dt
   ball.h = 60 + 300 * tip.t - 250 * tip.t ** 2
-  const cpuC = ps.find(p => p.team === 1 && p.i === 4)
-  if (input.sh && tip.me == null) { tip.me = tip.t; jump(ctl) }
-  if (!tip.cpuUp && tip.t >= tip.cpu) { tip.cpuUp = true; jump(cpuC) }
+  for (const t of [0, 1]) if (tip.at[t] == null && (ctls[t] ? inputs[t].sh : tip.t >= tip.cpu)) { tip.at[t] = tip.t; jump(ps.find(p => p.team === t && p.i === 4)) }
   if (tip.t < 0.95) return
-  const win = tip.me != null && Math.abs(tip.me - 0.28) < Math.abs(tip.cpu - 0.28) ? 0 : 1
+  const off = t => tip.at[t] == null ? 9 : Math.abs(tip.at[t] - 0.28), win = off(0) < off(1) ? 0 : 1
   offense = win
   Object.assign(ball, { st: 'pass', h: 110, to: ps.find(p => p.team === win && p.i === 0), tried: new Set(ps) })
   mode = 'play'
@@ -168,7 +174,7 @@ function grab(p, why) {
   if (p.act === 'rush') p.act = null
   p.sure = false; p.dp = 0
   p.think = 0.3 + rnd() * 0.3
-  ctl = p.team === 0 ? p : nearest(team(0), p)
+  for (const t of [0, 1]) if (ctls[t]) ctls[t] = p.team === t ? p : nearest(team(t), p)   // 공을 잡은 쪽은 그 선수, 다른 쪽은 가장 가까운 선수
   if (why) say(why)
 }
 
@@ -197,22 +203,24 @@ function miss(h) {
   const s = Math.sign(h.x - CL / 2)
   h.shake = 0.25
   Object.assign(ball, { st: 'loose', owner: null, x: h.x - s * 12, z: h.z, h: RIM + 4, vx: -s * (50 + rnd() * 140), vz: (rnd() - 0.5) * 260, vh: 150 + rnd() * 100, rebound: true, sure: false })
-  ctl = nearest(team(0), ball)
+  toBall()
 }
 
 function swat(p, b) {
   Object.assign(ball, { st: 'loose', owner: null, x: p.x, z: p.z, h: p.h + 70, vx: -side(p.team) * (120 + rnd() * 120), vz: (rnd() - 0.5) * 200, vh: 60, rebound: false })
   b.ult = Math.min(1, b.ult + 0.2)
-  ctl = nearest(team(0), ball)
+  toBall()
   shake = Math.max(shake, 5)
   say('BLOCK!')
 }
 
-const end = () => { mode = 'over'; msg = null; cut = null; wait = 1.5 }
+const toBall = () => { for (const t of [0, 1]) if (ctls[t]) ctls[t] = nearest(team(t), ball) }   // 사람이 움직이는 선수를 공에 가장 가까운 선수로
+const end = () => { mode = 'over'; msg = null; cut = null; wait = 1.5; report() }
 
 // ---------------------------------------------------------------- 효과
 
 function burst(x, z, h, n, c) {
+  if (net?.host && net.peer && net.fx.length < 30) net.fx.push([x, z, h, n, c])
   for (let i = 0; i < n; i++) parts.push({ x, z, h, vx: (rnd() - 0.5) * 300, vz: (rnd() - 0.5) * 200, vh: 80 + rnd() * 320, t: 0.45 + rnd() * 0.4, c: Array.isArray(c) ? c[i % c.length] : c })
 }
 /** 넘어뜨린다 — 밀려나는 속도(vx, vz)는 없어도 된다 */
@@ -354,7 +362,7 @@ function shoot(p) {
   else if (d < 140 && !p.sure) Object.assign(p, { act: 'lay', t: 0, from: { x: p.x, z: p.z }, dur: 0.42, vx: 0, vz: 0 })   // 그 안쪽은 레이업
   else Object.assign(p, { act: 'shot', t: 0, rel: false, vh: JUMP * st(p).jump * (p.sure ? 1.15 : 1), vx: 0, vz: 0 })
   // 가까운 수비는 조금 늦게 뛰어 막으러 온다(1P 가 움직이는 선수는 직접 뛴다)
-  if (!p.sure) for (const q of ps) if (q.team !== p.team && q !== ctl && dist(q, p) < 60 && rnd() < 0.75) q.block = 0.05 + rnd() * 0.22
+  if (!p.sure) for (const q of ps) if (q.team !== p.team && ctls[q.team] !== q && dist(q, p) < 60 && rnd() < 0.75) q.block = 0.05 + rnd() * 0.22
 }
 const blocker = (p, r) => ps.find(q => q.team !== p.team && q.h > 22 && dist(q, p) < r)
 
@@ -401,7 +409,7 @@ function slam(p) {    // 덩크가 림에 닿는 순간
 function steal(p, o) {
   if (p.cool > 0) return
   p.cool = 0.5; p.reach = 0.2
-  if (!guarded(o) && rnd() < (p.team === 0 ? 0.32 : 0.2) * st(p).steal) { grab(p, 'STEAL!'); p.ult = Math.min(1, p.ult + 0.2) }
+  if (!guarded(o) && rnd() < (ctls[p.team] ? 0.32 : 0.2) * st(p).steal) { grab(p, 'STEAL!'); p.ult = Math.min(1, p.ult + 0.2) }
   else p.stun = 0.3
 }
 
@@ -409,7 +417,7 @@ function steal(p, o) {
 function ultimate(p) {
   if (p.ult < 1 || cut || p.act || p.h > 0 || p.stun > 0) return false
   const off = ball.owner === p, need = skillOf(p).need
-  if (off && need && dist(p, goal(p.team)) > need) { if (p.team === 0) say('골대 가까이에서 써요', 0.8); return false }
+  if (off && need && dist(p, goal(p.team)) > need) { if (ctls[p.team] === p) say('골대 가까이에서 써요', 0.8); return false }
   if (!off) { const o = ball.owner; if (!o || o.team === p.team || o.sure || dist(p, o) > 320) return false }
   p.ult = 0
   cut = { p, off, t: 0 }
@@ -424,13 +432,8 @@ function fire(p, off) {
 // 몸 — 쿨타임 · 게이지 · 점프 · 동작. 동작 중 공을 뺏겼으면(ball.owner 가 아니면) 놓지 않는다
 function body(p, dt) {
   for (const k of ['cool', 'stun', 'fall', 'boost', 'cdx', 'sq', 'reach', 'ghost', 'hot', 'slow', 'ice', 'big', 'conf', 'mirror']) p[k] = Math.max(0, p[k] - dt)
-  if (p.hot > 0 && rnd() < dt * 30) parts.push({ x: p.x + (rnd() - 0.5) * 16, z: p.z, h: 30 + rnd() * 50, vx: 0, vz: 0, vh: 260, t: 0.3, c: rnd() < 0.5 ? '#ff7a1a' : '#ffd23f' })   // 핫 핸드 — 불꽃
-  p.ult = Math.min(1, p.ult + dt * ULT_FILL * (p.team ? 0.8 : 1))   // CPU 는 조금 느리게 찬다
-  if (ball.owner === p) p.dp += dt * (7 + 4 * Math.min(1, Math.hypot(p.vx, p.vz) / SPD))
-  p.fd += (p.dir - p.fd) * (1 - Math.exp(-dt * 16))   // 몸 돌리기 — 방향이 바뀌면 0.1초쯤에 걸쳐 돈다
-  if (p.act === 'cross' || p.act === 'air' || p.act === 'rush' || p.boost > 0 || p.kb) {   // 잔상
-    if ((p.tt -= dt) <= 0) { p.tt = 0.035; p.trail.unshift({ x: p.x, z: p.z, h: p.h }); p.trail.length = Math.min(p.trail.length, 5) }
-  } else p.trail.pop()
+  p.ult = Math.min(1, p.ult + dt * ULT_FILL * (ctls[p.team] ? 1 : 0.8))   // CPU 는 조금 느리게 찬다
+  look(p, dt)
   if (p.kb) { p.x += p.kb.vx * dt; p.z += p.kb.vz * dt; if ((p.kb.t -= dt) <= 0) p.kb = null }
   const h = goal(p.team)
   if (p.act === 'cross') {
@@ -484,19 +487,30 @@ function body(p, dt) {
   }
 }
 
+/** 보이기만 하는 것 — 핫 핸드 불꽃 · 드리블 박자 · 몸 돌리기 · 잔상. 온라인으로 들어온 사람 화면은 이것만 돌린다(watch) */
+function look(p, dt) {
+  if (p.hot > 0 && rnd() < dt * 30) parts.push({ x: p.x + (rnd() - 0.5) * 16, z: p.z, h: 30 + rnd() * 50, vx: 0, vz: 0, vh: 260, t: 0.3, c: rnd() < 0.5 ? '#ff7a1a' : '#ffd23f' })   // 핫 핸드 — 불꽃
+  if (ball.owner === p) p.dp += dt * (7 + 4 * Math.min(1, Math.hypot(p.vx, p.vz) / SPD))
+  p.fd += (p.dir - p.fd) * (1 - Math.exp(-dt * 16))   // 몸 돌리기 — 방향이 바뀌면 0.1초쯤에 걸쳐 돈다
+  if (p.act === 'cross' || p.act === 'air' || p.act === 'rush' || p.boost > 0 || p.kb) {   // 잔상
+    if ((p.tt -= dt) <= 0) { p.tt = 0.035; p.trail.unshift({ x: p.x, z: p.z, h: p.h }); p.trail.length = Math.min(p.trail.length, 5) }
+  } else p.trail.pop()
+}
+
 // CPU — 슛 · 레이업으로 떴는데 블록이 오면 더블 클러치나 점프 패스
 function airMind(p) {
-  if (p.team === 0 || p.decided || p.t < 0.12 || ball.owner !== p || p.sure) return
+  if (ctls[p.team] || p.decided || p.t < 0.12 || ball.owner !== p || p.sure) return
   p.decided = true
   if (!blocker(p, 50)) return
   if (rnd() < 0.45) clutch(p)
   else if (rnd() < 0.4) { pass(p, mateFor(p)); say('JUMP PASS!', 0.7) }
 }
 
-// ---------------------------------------------------------------- 1P · CPU
+// ---------------------------------------------------------------- 사람 · CPU
 
-function user(dt) {
-  const p = ctl, [x, z] = axis(), ax = p.conf > 0 ? -x : x, az = p.conf > 0 ? -z : z   // 미러 이미지에 걸리면 방향이 뒤집힌다
+/** 사람이 움직이는 선수 p — [x, z] = 스틱(월드 방향), input = 이번 프레임에 누른 버튼 */
+function user(p, [x, z], input, dt) {
+  const ax = p.conf > 0 ? -x : x, az = p.conf > 0 ? -z : z   // 미러 이미지에 걸리면 방향이 뒤집힌다
   if (canMove(p)) step(p, ax, az, speed(p), dt)
   else if (!p.act) stop(p)   // 대시 · 덩크 같은 동작은 body() 가 속도를 맡는다
   if (cut || input.ul && ultimate(p)) return
@@ -512,8 +526,8 @@ function user(dt) {
     return
   }
   if (input.sh) jump(p)
-  if (input.dr) { const o = ball.owner; if (o && o.team === 1 && dist(p, o) < 34) steal(p, o); else p.reach = 0.2 }
-  if (input.pa) ctl = nearest(team(0), ball)   // 공에 가장 가까운 선수로 바꾼다
+  if (input.dr) { const o = ball.owner; if (o && o.team !== p.team && dist(p, o) < 34) steal(p, o); else p.reach = 0.2 }
+  if (input.pa) ctls[p.team] = nearest(team(p.team), ball)   // 공에 가장 가까운 선수로 바꾼다
 }
 
 function ai(p, dt) {
@@ -544,7 +558,7 @@ function ai(p, dt) {
   toward(p, man.x + (h.x - man.x) / d * gap, man.z + (h.z - man.z) / d * gap, SPD * 0.93, dt)
   if (Math.abs(ball.x - p.x) > 14) p.dir = Math.sign(ball.x - p.x)   // 공을 본다 — 공이 바로 앞이면 그대로(좌우로 떨지 않게)
   if (man !== ball.owner) return
-  if (p.team === 1 && p.ult >= 1 && dist(p, man) < 220 && rnd() < dt * 0.5) ultimate(p)
+  if (!ctls[p.team] && p.ult >= 1 && dist(p, man) < 220 && rnd() < dt * 0.5) ultimate(p)
   else if (dist(p, man) < 32 && rnd() < dt * 0.4) steal(p, man)
 }
 
@@ -582,15 +596,18 @@ function hand(p) {
   return [p.x + p.fd * 12, p.z + p.hand * 5, 2 + 32 * Math.abs(Math.cos(p.dp))]   // 몸이 도는 만큼 공도 앞으로 돌아온다
 }
 
-function moveBall(dt) {
+/** view = 온라인으로 들어온 사람 화면 — 공을 다음 장면까지 움직이기만 한다(잡기 · 가로채기 · 득점은 방장이 정해 보낸다) */
+function moveBall(dt, view) {
   ball.rot += dt * (ball.st === 'held' ? 5 : 14)
   if (ball.st === 'shot' || ball.st === 'pass' || ball.st === 'loose' && ball.h > 8) { ball.trail.unshift({ x: ball.x, z: ball.z, h: ball.h }); ball.trail.length = Math.min(ball.trail.length, 7) }
   else ball.trail.length = 0
   if (ball.st === 'held') {
-    [ball.x, ball.z, ball.h] = hand(ball.owner)
+    if (ball.owner) [ball.x, ball.z, ball.h] = hand(ball.owner)
   } else if (ball.st === 'pass') {   // 받는 사람을 따라간다. 지나가는 길의 상대는 한 번씩 가로챌 기회
+    if (!ball.to) return
     const m = ball.to, dx = m.x - ball.x, dz = m.z - ball.z, d = Math.hypot(dx, dz), v = (ball.safe ? 900 : ball.sp || 560) * dt
     if (d <= v + 8) {
+      if (view) return
       const { oop, chain } = ball
       grab(m)
       if (chain?.length) { pass(m, chain.shift()); Object.assign(ball, { chain, safe: true, oop: false }) }
@@ -599,17 +616,17 @@ function moveBall(dt) {
       return
     }
     ball.x += dx / d * v; ball.z += dz / d * v; ball.h += ((ball.oop ? 120 : 40) - ball.h) * Math.min(1, dt * 6)
-    if (!ball.safe) for (const q of ps) {
+    if (!ball.safe && !view) for (const q of ps) {
       if (q.team === m.team || ball.tried.has(q) || dist(q, ball) >= 18 || q.stun > 0) continue
       ball.tried.add(q)
       if (rnd() < (ball.oop ? 0.1 : 0.3) * st(q).steal) return grab(q, 'STEAL!')   // 높이 띄운 앨리웁은 잘 안 잘린다
     }
-  } else if (ball.st === 'shot') {
+  } else if (ball.st === 'shot' && ball.hoop) {
     ball.t += dt
     const u = Math.min(1, ball.t / ball.T), h = ball.hoop
     ball.x = ball.sx + (h.x - ball.sx) * u; ball.z = ball.sz + (h.z - ball.sz) * u
     ball.h = ball.sh + (RIM + 8 - ball.sh) * u + ball.arc * 4 * u * (1 - u)
-    if (u >= 1) ball.make ? made(ball.team, ball.pts, ball.msg, ball.by) : miss(h)
+    if (u >= 1 && !view) ball.make ? made(ball.team, ball.pts, ball.msg, ball.by) : miss(h)
   } else if (ball.st === 'loose' || ball.st === 'drop') {
     ball.vh -= GRAV * dt; ball.h += ball.vh * dt
     if (ball.h <= 0) { ball.h = 0; ball.vh = Math.abs(ball.vh) > 60 ? -ball.vh * 0.55 : 0 }
@@ -617,9 +634,243 @@ function moveBall(dt) {
     ball.x += ball.vx * dt; ball.z += ball.vz * dt
     if (ball.x < 0 || ball.x > CL) { ball.vx *= -0.6; ball.x = clamp(ball.x, 0, CL) }
     if (ball.z < 0 || ball.z > CW) { ball.vz *= -0.6; ball.z = clamp(ball.z, 0, CW) }
-    if (ball.st === 'loose') for (const p of ps) if (p.cool <= 0 && p.stun <= 0 && dist(p, ball) < 20 * st(p).reb && ball.h < 52 + p.h) return grab(p)   // 리바운드 좋은 선수는 손이 길다
+    if (ball.st === 'loose' && !view) for (const p of ps) if (p.cool <= 0 && p.stun <= 0 && dist(p, ball) < 20 * st(p).reb && ball.h < 52 + p.h) return grab(p)   // 리바운드 좋은 선수는 손이 길다
   }
 }
+
+// ---------------------------------------------------------------- 온라인 1:1
+// 방장이 방을 만들면 4자리 코드. 들어온 사람과 Supabase Realtime 채널(slam-<코드>)에서 만나 WebRTC 로 둘을 직접 잇는다 —
+// 경기 중 오가는 장면 · 버튼은 직접 연결로 보낸다(Realtime 무료 한도: 초당 100 · 한 달 200만 메시지). 직접 안 이어지는 망이면 채널로 조금 드물게.
+// 경기 계산은 방장 브라우저만 한다(방장 = 1P · 1팀). 들어온 사람(2P · 2팀)은 스틱 · 버튼만 보내고, 방장이 보낸 장면을 부드럽게 이어 그린다(watch).
+// 둘 다 로그인해야 하고, 끝나면 둘이 각자 결과를 올려 서로 맞으면 기록된다(/api/slam — 최근 대전 · 랭킹).
+// ponytail: 방 코드가 겹치는지 따로 보지 않는다(9천 개 중 하나) · 끊기면 그 경기는 기록 없이 끝난다 · 직접 연결은 STUN 만(TURN 없음)
+
+const BTN = ['dr', 'pa', 'sh', 'ul'], PLAY = new Set(['tip', 'play', 'dead', 'over'])
+const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }]
+// 장면에 싣는 선수 값(x · z · h 뒤에) · 공 값(잡은 선수 · 받을 선수 · 골대 번호 뒤에)
+const SYNC = ['vx', 'vz', 'vh', 'dir', 'run', 'act', 't', 'dur', 'style', 'hand', 'clutch', 'fall', 'sq', 'big', 'ice', 'ghost', 'hot', 'slow', 'mirror', 'conf', 'ult', 'reach', 'boost', 'kb']
+const BSYNC = ['st', 'x', 'z', 'h', 'vx', 'vz', 'vh', 'sure', 'oop', 'safe', 'sx', 'sz', 'sh', 't', 'T', 'arc', 'sp']
+const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v ?? 0
+let rq = 0, rn = [0, 0, 0, 0]   // 방장: 받은 상대 입력의 마지막 순번 · 버튼마다 누른 횟수
+const $ = id => document.getElementById(id)
+const direct = () => net?.dc?.readyState === 'open'
+const send = m => net?.ch.send({ type: 'broadcast', event: 'm', payload: { ...m, f: who.id } })   // Realtime 채널 — 드문 알림
+const stream = m => direct() ? net.dc.send(JSON.stringify(m)) : send(m)                          // 장면 · 버튼 — 직접 연결이 있으면 그리로
+
+/** 방 만들기(code 없이) · 들어가기 */
+async function openRoom(code) {
+  if (!await loggedIn()) return
+  if (!sb || !who) return roomUI('로그인 정보를 확인하지 못했어요 — 새로고침해 보세요')
+  leave()
+  const host = !code
+  code ||= String(1000 + Math.floor(rnd() * 9000))
+  const ch = sb.channel(`slam-${code}`, { config: { broadcast: { self: false } } })
+  net = { host, code, ch, peer: null, pick: null, ready: [false, false], seen: Date.now(), n: [0, 0, 0, 0], q: 0, fx: [], at: 0, sent: 0, last: '', rec: '' }
+  myT = host ? 0 : 1
+  ch.on('broadcast', { event: 'm' }, ({ payload }) => onMsg(payload, false))
+  ch.subscribe(st => {
+    if (net?.ch !== ch) return
+    if (st === 'SUBSCRIBED') { net.seen = Date.now(); if (!host) send({ t: 'hi', n: who.name, p: pick }) }
+    else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') leave('연결하지 못했어요 — 잠시 뒤 다시 해 보세요')
+  })
+  mode = 'wait'
+  roomUI()
+}
+function leave(note) {
+  if (net) {
+    const { ch, pc } = net
+    send({ t: 'bye' })
+    net = null; myT = 0
+    pc?.close(); sb.removeChannel(ch)
+    if (mode !== 'load') { mode = 'select'; msg = cut = null }
+  }
+  roomUI(note)
+}
+addEventListener('pagehide', () => leave())
+
+function roomUI(note = '') {
+  for (const id of ['room-new', 'room-code', 'room-join']) $(id).hidden = !!net
+  $('room-leave').hidden = !net
+  $('room-link').hidden = !net?.host || !!net.peer
+  $('room-msg').textContent = note || (!net ? '로그인하면 친구와 1:1 로 붙을 수 있어요. 방을 만들어 코드(링크)를 알려 주거나, 받은 코드를 넣으세요. 이긴 기록은 아래 랭킹에 올라가요.'
+    : !net.peer ? net.host ? `방 코드 ${net.code} — 상대에게 알려 주세요. 들어오면 팀 선택으로 넘어가요` : `방 ${net.code} 에 들어가는 중…`
+    : `방 ${net.code} · ${net.peer.name} 님과 연결됨(${direct() ? '직접 연결' : '서버 경유'}) — ${net.host ? '1P' : '2P'}`)
+}
+
+function onMsg(m, viaDc) {
+  if (!net || !m || typeof m.t !== 'string') return
+  if (!viaDc) {
+    if (m.t === 'hi') return hello(m)
+    if (m.t === 'full') return m.to === who.id && leave(m.why || '방이 꽉 찼어요')
+    if (!net.peer || m.f !== net.peer.id) return   // 이 방의 상대가 아닌 사람
+  }
+  net.seen = Date.now()
+  if (m.t === 's') applySnap(m)
+  else if (m.t === 'i') remoteInput(m)
+  else if (m.t === 'sdp') signal(m.d)
+  else if (m.t === 'pick') net.pick = m.p
+  else if (m.t === 'ready') { net.pick = m.p; net.ready[1] = true; maybeStart() }
+  else if (m.t === 'clash') { net.ready[0] = false; say('상대도 같은 팀을 골랐어요 — 다른 팀을 골라 주세요', 2.2) }
+  else if (m.t === 'start' && !net.host) { sides = m.s; net.match = m.m; begin() }
+  else if (m.t === 'bye') leave('상대가 나갔어요')
+}
+/** 인사 — 들어온 사람이 보내고 방장이 받아 준다(방장은 한 명만 받는다). 같은 계정끼리는 안 된다 */
+function hello(m) {
+  const peer = { id: String(m.f), name: String(m.n || '상대').slice(0, 20) }
+  if (net.host && !m.to) {
+    if (m.f === who.id || net.peer && net.peer.id !== peer.id) return send({ t: 'full', to: m.f, why: m.f === who.id ? '같은 계정끼리는 붙을 수 없어요' : '' })
+    const again = net.peer?.id === peer.id   // 답을 못 받아 다시 보낸 인사
+    net.peer = peer; net.seen = Date.now()
+    if (!again) { net.pick = m.p; net.ready = [false, false]; rq = 0; rn = [0, 0, 0, 0]; mode = 'select'; rtc() }
+    send({ t: 'hi', to: peer.id, n: who.name, p: pick })
+  } else if (!net.host && m.to === who.id && !net.peer) {
+    net.peer = peer; net.pick = m.p; net.seen = Date.now(); mode = 'select'
+  }
+  roomUI()
+}
+/** WebRTC — 방장이 제안을, 들어온 사람이 답을 만든다. 후보(ICE)는 다 모은 뒤 설명에 담아 한 번에 보낸다(메시지 둘) */
+async function rtc(offer) {
+  try {
+    const pc = net.pc = new RTCPeerConnection({ iceServers: ICE })
+    const wire = dc => { net.dc = dc; dc.onmessage = e => { try { onMsg(JSON.parse(e.data), true) } catch {} }; dc.onopen = dc.onclose = () => net?.dc === dc && roomUI() }   // 나간 뒤 닫힘은 안내를 덮지 않게
+    if (offer) { pc.ondatachannel = e => wire(e.channel); await pc.setRemoteDescription(offer); await pc.setLocalDescription(await pc.createAnswer()) }
+    else { wire(pc.createDataChannel('g', { ordered: false, maxRetransmits: 0 })); await pc.setLocalDescription(await pc.createOffer()) }
+    await new Promise(r => { pc.onicegatheringstatechange = () => pc.iceGatheringState === 'complete' && r(); if (pc.iceGatheringState === 'complete') r(); setTimeout(r, 2500) })
+    if (net?.pc === pc) send({ t: 'sdp', d: pc.localDescription.toJSON() })
+  } catch (e) { console.warn('직접 연결을 못 해 서버 경유로 해요', e) }
+}
+function signal(d) {
+  if (d?.type === 'offer' && !net.host) { net.pc?.close(); rtc(d) }
+  else if (d?.type === 'answer' && net.host) net.pc?.setRemoteDescription(d).catch(() => {})
+}
+
+// 팀 고르기 — 둘 다 「준비」하면 방장이 시작을 알린다. 같은 팀은 안 된다
+function ready() {
+  if (!net.peer || net.ready[0]) return
+  if (net.ready[1] && net.pick === pick) return say('상대가 이미 고른 팀이에요', 1.5)
+  net.ready[0] = true
+  send({ t: 'ready', p: pick })
+  maybeStart()
+}
+function maybeStart() {
+  if (!net.host || !net.ready[0] || !net.ready[1] || mode !== 'select') return
+  if (net.pick === pick) { net.ready[1] = false; return send({ t: 'clash' }) }
+  sides = [pick, net.pick]
+  net.match = Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+  send({ t: 'start', s: sides, m: net.match })
+  begin()
+}
+function begin() { net.ready = [false, false]; net.rec = ''; start() }
+
+// 방장 → 들어온 사람: 장면(초당 15번, 서버 경유면 10번)
+function snap() {
+  const at = o => o ? ps.indexOf(o) : -1, fx = net.fx
+  net.fx = []
+  return {
+    t: 's', m: mode, c: r2(clock), sc: r2(shot), s: score, o: offense, w: r2(wait), k: ctls.map(at), tp: tip ? r2(tip.t) : 0,
+    p: ps.map(p => [r2(p.x), r2(p.z), r2(p.h), ...SYNC.map(k => k === 'kb' ? p.kb ? 1 : 0 : r2(p[k]))]),
+    b: [at(ball.owner), at(ball.to), ball.hoop ? HOOP.indexOf(ball.hoop) : -1, ...BSYNC.map(k => r2(ball[k]))],
+    g: msg && [msg.id, msg.text, msg.t0, r2(msg.t)], u: cut && [at(cut.p), cut.off ? 1 : 0, r2(cut.t)], fx,
+    r: rings.map(r => [r2(r.x), r2(r.z), r2(r.t), r.c || '', r.in ? 1 : 0, r.big ? 1 : 0]), e: [r2(shake), ...HOOP.map(h => r2(h.shake))],
+  }
+}
+function applySnap(s) {
+  if (net.host || !PLAY.has(s.m) || mode === 'select' || mode === 'wait' || s.p?.length !== ps.length) return   // 결과 화면에서 팀 선택으로 넘어갔으면 그만 받는다
+  const was = mode
+  mode = s.m; clock = s.c; shot = s.sc; score = s.s; offense = s.o; wait = s.w
+  ctls = s.k.map(i => ps[i] || null)
+  s.p.forEach((v, i) => {
+    const p = ps[i], [x, z, hh] = v
+    SYNC.forEach((k, j) => { p[k] = v[j + 3] })
+    if (p.nx == null || Math.hypot(x - p.x, z - p.z) > 120) { p.x = x; p.z = z; p.h = hh }   // 처음 · 순간이동(인바운드 · 블링크)은 바로
+    p.nx = x; p.nz = z; p.nh = hh
+  })
+  const [oi, ti, hi, ...bv] = s.b
+  BSYNC.forEach((k, j) => { ball[k] = bv[j] })
+  ball.owner = ps[oi] || null; ball.to = ps[ti] || null; ball.hoop = HOOP[hi] || null
+  if (tip) tip.t = s.tp
+  if (s.g && s.g[0] !== msg?.id) msg = { id: s.g[0], text: String(s.g[1]), t0: s.g[2], t: s.g[3] }
+  cut = s.u ? cut?.p === ps[s.u[0]] ? cut : { p: ps[s.u[0]], off: !!s.u[1], t: s.u[2] } : null
+  for (const f of s.fx) burst(...f)
+  rings = s.r.map(([x, z, t, c, i, b]) => ({ x, z, t, c: c || undefined, in: !!i, big: !!b }))
+  shake = Math.max(shake, s.e[0]); HOOP.forEach((o, i) => { o.shake = Math.max(o.shake, s.e[i + 1]) })
+  if (mode === 'over') { msg = null; if (was !== 'over') report() }
+}
+/** 들어온 사람 화면 — 계산 없이 받은 장면을 따라간다. 다음 장면이 올 때까지 속도대로 미리 움직이고, 그린 자리는 부드럽게 맞춘다 */
+function watch(rdt) {
+  tnow += rdt
+  shake = shake > 0.3 ? shake * Math.exp(-7 * rdt) : 0
+  if (msg && (msg.t -= rdt) <= 0) msg = null
+  if (mode === 'over') wait -= rdt
+  if (cut) cut.t += rdt
+  const dt = cut ? rdt * 0.08 : rdt, k = 1 - Math.exp(-rdt * 20)
+  for (const p of ps) {
+    if (p.nx == null) continue
+    p.nx += p.vx * dt; p.nz += p.vz * dt
+    if (p.nh > 0 || p.vh > 0) { p.vh -= GRAV * dt; p.nh = Math.max(0, p.nh + p.vh * dt) }
+    p.x += (p.nx - p.x) * k; p.z += (p.nz - p.z) * k; p.h += (p.nh - p.h) * k
+    if (p.act) p.t += dt
+    p.run += dt * Math.min(1.3, Math.hypot(p.vx, p.vz) / SPD)
+    p.sq = Math.max(0, p.sq - dt)
+    look(p, dt)
+  }
+  if (mode === 'tip') { tip.t += dt; ball.h = 60 + 300 * tip.t - 250 * tip.t ** 2 }
+  else moveBall(dt, true)
+  effects(dt, rdt)
+}
+// 들어온 사람 → 방장: 스틱 · 버튼. 버튼은 누른 횟수를 쌓아 보내 하나가 빠져도 다음 것에 실린다(직접 연결은 다시 보내지 않는다)
+function guestInput() {
+  const [x, z] = axis(), n = net.n, key = `${r2(x)},${r2(z)}`
+  if (!net.press && (key === net.last ? tnow - net.sent < 0.25 : tnow - net.sent < (direct() ? 0.033 : 0.1))) return
+  net.press = false; net.last = key; net.sent = tnow
+  stream({ t: 'i', q: ++net.q, x: r2(-x), z: r2(z), n })   // 화면이 뒤집혀 있어 오른쪽 = 월드 왼쪽
+}
+function remoteInput(m) {
+  if (!net.host || !(m.q > rq)) return   // 늦게 온 옛 입력은 버린다
+  rq = m.q
+  rax = [clamp(+m.x || 0, -1, 1), clamp(+m.z || 0, -1, 1)]
+  BTN.forEach((k, j) => { const c = +m.n?.[j] || 0; if (c > rn[j]) { rin[k] = true; rn[j] = c } })
+}
+// 끊김 — 2초마다 신호. 들어온 사람은 방장 답이 올 때까지 인사를 다시 보낸다
+setInterval(() => {
+  if (!net) return
+  if (!net.peer) {
+    if (net.host) return
+    if (Date.now() - net.seen > 9000) return leave('방을 찾지 못했어요 — 코드를 확인해 주세요')
+    return send({ t: 'hi', n: who.name, p: pick })
+  }
+  if (Date.now() - net.seen > 10000) return leave('상대와 연결이 끊겼어요')
+  stream({ t: 'ping' })
+  roomUI()
+}, 2000)
+
+// 결과 올리기 — 방장은 끝날 때, 들어온 사람은 끝난 장면을 받을 때. 두 결과가 맞으면 서버가 기록한다
+async function report() {
+  if (!net?.peer || !net.match) return
+  const n = net, body = { match: n.match, opp: n.peer.id, host: n.host, teams: [...sides], score: [...score] }
+  n.rec = '대전 기록에 올리는 중…'
+  try { await api('/slam', { method: 'POST', body, withToken: true }); n.rec = '대전 기록에 올렸어요' }
+  catch (e) { n.rec = `기록하지 못했어요 — ${e.message}` }
+  setTimeout(records, 2500)
+}
+/** 페이지 아래 대전 랭킹 · 최근 대전 */
+async function records() {
+  try {
+    const { ranking, recent } = await api('/slam')
+    $('rank').replaceChildren(...ranking.length ? ranking.map((r, i) => h('tr', {}, h('th', {}, String(i + 1)), h('td', {}, r.name),
+      ...[r.wins, r.losses, r.draws].map(v => h('td', { className: 'num' }, String(v))), h('td', { className: 'num' }, `${Math.round(r.wins / r.games * 100)}%`)))
+      : [h('tr', {}, h('td', { colSpan: 6, className: 'slam-none' }, '아직 기록이 없어요 — 첫 승리를 올려 보세요'))])
+    const side = (s, win) => h('span', { className: win ? 'win' : '' }, h('b', {}, s.name), ` ${TEAMS[s.team]?.name ?? ''}`)
+    $('recent').replaceChildren(...recent.length ? recent.map(m => h('li', {}, h('time', {}, ago(m.at)),
+      side(m.home, m.home.score > m.away.score), h('strong', {}, `${m.home.score} : ${m.away.score}`), side(m.away, m.away.score > m.home.score)))
+      : [h('li', { className: 'slam-none' }, '아직 대전이 없어요')])
+  } catch (e) { $('recent').replaceChildren(h('li', { className: 'slam-none' }, `기록을 불러오지 못했어요 — ${e.message}`)) }
+}
+$('room-new').onclick = () => openRoom()
+$('room-join').onclick = () => { const c = $('room-code').value.trim(); /^\d{4}$/.test(c) ? openRoom(c) : roomUI('방 코드 4자리를 넣어 주세요') }
+$('room-code').onkeydown = e => { if (e.key === 'Enter') $('room-join').click() }
+$('room-leave').onclick = () => leave()
+$('room-link').onclick = e => copyLink(e.currentTarget, `${location.origin}/slam/?room=${net.code}`)
 
 // ---------------------------------------------------------------- 한 프레임
 
@@ -637,8 +888,8 @@ function update(rdt) {
       if ((ball.st === 'held' || ball.st === 'pass') && (shot -= dt) <= 0) { say('SHOT CLOCK'); grab(nearest(team(1 - offense), ball)) }
     }
     for (const p of ps) body(p, dt)
-    user(dt)
-    for (const p of ps) if (p !== ctl) ai(p, dt)
+    for (const t of [0, 1]) if (ctls[t]) user(ctls[t], t ? rax : axis(), inputs[t], dt)   // 2팀 사람 = 온라인 상대(방장이 받은 스틱 · 버튼)
+    for (const p of ps) if (ctls[p.team] !== p) ai(p, dt)
     const through = p => p.act === 'dunk' || p.act === 'air' || p.act === 'rush' || p.ghost > 0
     for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {   // 겹치지 않게 밀어낸다
       const a = ps[i], b = ps[j], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz)
@@ -650,6 +901,12 @@ function update(rdt) {
     // 시간이 끝나도 떠 있는 슛 · 덩크 · 궁극기는 끝까지 본다(버저비터)
     if (mode === 'play' && clock <= 0) { clock = 0; if (ball.st !== 'shot' && !ball.owner?.act && !cut) end() }
   }
+  effects(dt, rdt)
+  for (const k in input) input[k] = rin[k] = false
+}
+
+/** 파편 · 충격파 · 골대 흔들림 · 카메라 플래시 · 카메라 — 경기 계산과 상관없이 화면만 */
+function effects(dt, rdt) {
   for (const q of parts) {
     q.vh -= GRAV * 0.6 * dt; q.x += q.vx * dt; q.z += q.vz * dt; q.h += q.vh * dt; q.t -= dt
     if (q.h < 0) { q.h = 0; q.vh *= -0.3 }
@@ -660,8 +917,7 @@ function update(rdt) {
   for (const h of HOOP) h.shake = Math.max(0, h.shake - rdt)
   for (const f of flashes) f.t -= rdt
   flashes = flashes.filter(f => f.t > 0)
-  if (ps.length) camX = clamp(camX + (ball.x - camX) * Math.min(1, rdt * 4), 300, CL - 300)
-  for (const k in input) input[k] = false
+  if (ps.length) camX = clamp(camX + ((myT ? CL - ball.x : ball.x) - camX) * Math.min(1, rdt * 4), 300, CL - 300)
 }
 
 // ---------------------------------------------------------------- 그리기
@@ -808,18 +1064,19 @@ function shape(pts, c, edge, ew) {
   if (edge) { g.strokeStyle = edge; g.lineWidth = ew; g.stroke() }
 }
 const EDGE = 'rgba(25,12,6,.38)'   // 팔다리 · 옷 윤곽선
+const PC = ['#ffd23f', '#5fd4ff']   // 1P · 2P 표시 색
 
 /** 머리 — 배경을 지운 얼굴 그림(cutHead). 얼굴 그림은 거의 다 왼쪽을 보고 있어서 오른쪽으로 갈 때 뒤집는다.
  *  fd 가 0.1초쯤에 걸쳐 바뀌니 그동안 얼굴이 좁아졌다 넓어지며 고개를 돌린다 */
-function head(p, x, y, u) {
+function head(p, f, x, y, u) {
   if (!p.f.head) return
-  const f = p.fd, sx = Math.abs(f) < 0.3 ? (f < 0 ? 0.3 : -0.3) : -f
+  const sx = Math.abs(f) < 0.3 ? (f < 0 ? 0.3 : -0.3) : -f
   g.save(); g.translate(x, y); g.scale(sx, 1); g.drawImage(p.f.head, -12.25 * u, -13.2 * u, 24.5 * u, 26 * u); g.restore()
 }
 
 /** 선수 한 명. refl = 바닥 반사용(그림자 · 표시 · 공은 빼고 몸만) */
 function drawPlayer(p, refl) {
-  const [x, y, u] = P(p.x, p.z, p.h), [fx, fy] = P(p.x, p.z), T = TEAMS[sides[p.team]], big = p.big > 0 ? 1.4 : 1
+  const [x, y, u] = P(p.x, p.z, p.h), [fx, fy] = P(p.x, p.z), T = TEAMS[sides[p.team]], big = p.big > 0 ? 1.4 : 1, F = myT ? -1 : 1   // F = 화면이 뒤집혔으면 -1
   const skin = p.f.skin || SKIN, shade = p.f.shade || '#8f5f3e'
   if (!refl) {
     p.trail.forEach((s, j) => {   // 잔상
@@ -831,7 +1088,7 @@ function drawPlayer(p, refl) {
     if (p.mirror > 0) for (const dz of [-38, 38]) {   // 미러 이미지 — 양옆의 분신
       const [mx, my, mu] = P(p.x + Math.sin(tnow * 6 + dz) * 8, p.z + dz, p.h)
       g.globalAlpha = 0.45; g.fillStyle = T.color; g.fillRect(mx - 9 * mu, my - 62 * mu, 18 * mu, 56 * mu)
-      head(p, mx, my - 75 * mu, mu)
+      head(p, F * p.fd, mx, my - 75 * mu, mu)
       g.globalAlpha = 1
     }
     if (p.slow > 0) { g.strokeStyle = 'rgba(120,190,255,.85)'; g.lineWidth = 2; oval(fx, fy + 2, 18 * u, 6.5 * u); g.stroke() }
@@ -840,13 +1097,13 @@ function drawPlayer(p, refl) {
     const rs = 16 * u * Math.max(0.5, 1 - p.h / 160) * big, sg = g.createRadialGradient(fx, fy, 0, fx, fy, rs)   // 부드러운 그림자 — 높이 뜰수록 작고 옅게
     sg.addColorStop(0, `rgba(0,0,0,${0.45 - Math.min(0.25, p.h / 400)})`); sg.addColorStop(1, 'rgba(0,0,0,0)')
     g.save(); g.translate(fx, fy); g.scale(1, 0.34); g.translate(-fx, -fy); g.fillStyle = sg; g.beginPath(); g.arc(fx, fy, rs, 0, Math.PI * 2); g.fill(); g.restore()
-    if (p === ctl) { g.strokeStyle = '#ffd23f'; g.lineWidth = 3; oval(fx, fy, 19 * u * big, 7 * u * big); g.stroke() }
+    if (ctls[p.team] === p) { g.strokeStyle = PC[p.team]; g.lineWidth = 3; oval(fx, fy, 19 * u * big, 7 * u * big); g.stroke() }   // 사람이 움직이는 선수
   }
 
   // 몸 좌표 — at(옆, 키 높이). 윗몸일수록 달리는 쪽으로 기울어진다(기울기는 실제 속도를 따른다)
-  const v = Math.hypot(p.vx, p.vz), a = p.h > 0 || p.fall ? 0 : Math.min(1, v / SPD), ph = p.run * 15, f = p.fd, fs = f >= 0 ? 1 : -1
+  const v = Math.hypot(p.vx, p.vz), a = p.h > 0 || p.fall ? 0 : Math.min(1, v / SPD), ph = p.run * 15, f = F * p.fd, fs = f >= 0 ? 1 : -1
   const kh = 1 - Math.exp(-drawDt * 20), kj = 1 - Math.exp(-drawDt * 28), kb = 1 - Math.exp(-drawDt * 45), kp = 1 - Math.exp(-drawDt * 80)   // 손 · 관절 · 공 쪽 손 · 동작 손이 따라가는 빠르기
-  const lean = p.fall ? 0 : clamp(p.vx / SPD, -1.3, 1.3) * 0.16, at = (px, hh) => [px * u + lean * hh * u, -hh * u]
+  const lean = p.fall ? 0 : clamp(F * p.vx / SPD, -1.3, 1.3) * 0.16, at = (px, hh) => [px * u + lean * hh * u, -hh * u]
   const holding = ball.owner === p, posing = holding && (p.act === 'dunk' || p.act === 'lay' || p.act === 'shot')
   const up = p.act === 'shot' || p.act === 'dunk' || p.h > 0 && !holding
   const guard = !holding && ball.owner && ball.owner.team !== p.team && dist(p, ball.owner) < 70   // 공 가진 상대 앞의 수비
@@ -859,7 +1116,7 @@ function drawPlayer(p, refl) {
     const c = Math.cos(p.act === 'spin' ? p.t / 0.45 * Math.PI * 4 : Math.min(1, p.t / p.dur) * Math.PI * 2)
     g.scale(turn = Math.abs(c) < 0.15 ? 0.15 * Math.sign(c || 1) : c, 1)
   }
-  if (p.fall > 0) g.rotate(-p.dir * 1.35)   // 넘어졌다
+  if (p.fall > 0) g.rotate(-F * p.dir * 1.35)   // 넘어졌다
   else if (p.sq > 0) g.scale(1 + p.sq * 1.2, 1 - p.sq * 1.2)   // 착지 — 잠깐 눌린다
   g.lineCap = 'round'; g.lineJoin = 'round'
   // 다리 — 엉덩이 · 무릎 · 발. 걸음마다 발이 앞뒤로 오가고 뒤로 갈 때 들린다. 공중에서는 접는다. 먼 다리는 어둡게
@@ -891,7 +1148,7 @@ function drawPlayer(p, refl) {
   else if (up) { near = at(fs * 3, 90); far = at(-fs * 2, 88) }   // 놓은 뒤 · 블록 · 림에 매달리기 — 머리 위로
   else if (holding && p.act === 'air') { near = at(fs * 10, 52); far = at(fs * 8, 50) }   // 가슴 앞에 두 손으로
   else if (holding) {   // 공 쪽 손은 튀어 오르는 공을 따라 오르내린다(무릎 아래로는 안 내려간다). 다른 손은 공을 감싼다
-    near = [(ball.x - p.x) * u / big, ((ball.z - p.z) * 0.7 - (Math.max(ball.h, 26) + 5) * u) / big]
+    near = [F * (ball.x - p.x) * u / big, ((ball.z - p.z) * 0.7 - (Math.max(ball.h, 26) + 5) * u) / big]
     far = at(fs * 11, 46)   // 다른 팔은 몸 앞으로 내밀어 공을 감싼다(몸에 가려 손만 보인다)
   }
   else if (p.reach > 0) { near = at(fs * 26, 48); far = at(-fs * 6, 38) }   // 스틸 — 손을 뻗는다
@@ -912,7 +1169,7 @@ function drawPlayer(p, refl) {
   g.save(); g.translate(...at(0, 50)); if (turn < 0) g.scale(-1, 1); g.fillText(p.f.num, 0, 0); g.restore()
   line([at(0, 62), at(0, 67)], 5.2 * u, skin)   // 목
   const [hx, hy] = at(0, 75)
-  if (p.f.head) head(p, hx, hy, u)
+  if (p.f.head) head(p, f, hx, hy, u)
   else { g.fillStyle = skin; oval(hx, hy, 8 * u, 9 * u); g.fill() }
   arm(fs, near, skin, posing ? kp : holding ? kb : kh)
   if (p.ice > 0) { g.fillStyle = 'rgba(170,225,255,.55)'; g.strokeStyle = '#e8f7ff'; g.lineWidth = 1.5; g.fillRect(-15 * u, -92 * u, 30 * u, 94 * u); g.strokeRect(-15 * u, -92 * u, 30 * u, 94 * u) }   // 얼음
@@ -922,11 +1179,11 @@ function drawPlayer(p, refl) {
   if (p.conf > 0) { g.fillStyle = '#c58bff'; g.font = `900 ${16 * u}px system-ui, sans-serif`; g.fillText('?', x, y - 100 * u * big) }
   if (p.fall > 0) {   // 머리 위로 별이 돈다
     g.fillStyle = '#ffd23f'; g.font = `${11 * u}px system-ui, sans-serif`
-    for (let i = 0; i < 3; i++) { const t = tnow * 7 + i * 2.1; g.fillText('★', x - p.dir * 73 * u * big + Math.cos(t) * 12 * u, y - 26 * u + Math.sin(t) * 4 * u) }
-  } else if (p === ctl && p.team === 0) {
+    for (let i = 0; i < 3; i++) { const t = tnow * 7 + i * 2.1; g.fillText('★', x - F * p.dir * 73 * u * big + Math.cos(t) * 12 * u, y - 26 * u + Math.sin(t) * 4 * u) }
+  } else if (ctls[p.team] === p) {   // 1P · 2P(온라인 상대)
     const tx = x + lean * 75 * u, ty = y - 96 * u * big
-    g.fillStyle = '#ffd23f'; g.beginPath(); g.moveTo(tx - 6, ty - 4); g.lineTo(tx + 6, ty - 4); g.lineTo(tx, ty + 4); g.fill()
-    g.font = '800 13px system-ui, sans-serif'; g.fillText('1P', tx, ty - 13)
+    g.fillStyle = PC[p.team]; g.beginPath(); g.moveTo(tx - 6, ty - 4); g.lineTo(tx + 6, ty - 4); g.lineTo(tx, ty + 4); g.fill()
+    g.font = '800 13px system-ui, sans-serif'; g.fillText(p.team ? '2P' : '1P', tx, ty - 13)
   }
   if (holding) drawBall()
 }
@@ -973,11 +1230,12 @@ function hud() {
   box(W - 100, 'TIME', `${String(Math.floor(c / 60)).padStart(2, '0')}:${String(c % 60).padStart(2, '0')}`)
   const pad = n => String(n).padStart(3, '0')
   g.font = '800 22px ui-monospace, Menlo, Consolas, monospace'; g.textBaseline = 'middle'
-  g.textAlign = 'right'; g.fillStyle = TEAMS[sides[0]].color; g.fillText(TEAMS[sides[0]].name, W / 2 - 66, 26)
-  g.textAlign = 'center'; g.fillStyle = '#ffd23f'; g.fillText(`${pad(score[0])}-${pad(score[1])}`, W / 2, 26)
-  g.textAlign = 'left'; g.fillStyle = TEAMS[sides[1]].color; g.fillText(TEAMS[sides[1]].name, W / 2 + 66, 26)
-  // 1P 팀 궁극기 게이지 — 얼굴 둘레가 차오른다. 지금 움직이는 선수의 궁극기 이름을 옆에
-  const mine = team(0), x0 = W / 2 - 150
+  const L = myT, R = 1 - myT   // 내 팀이 왼쪽(들어온 사람은 화면도 뒤집혀 있다)
+  g.textAlign = 'right'; g.fillStyle = TEAMS[sides[L]].color; g.fillText(TEAMS[sides[L]].name, W / 2 - 66, 26)
+  g.textAlign = 'center'; g.fillStyle = '#ffd23f'; g.fillText(`${pad(score[L])}-${pad(score[R])}`, W / 2, 26)
+  g.textAlign = 'left'; g.fillStyle = TEAMS[sides[R]].color; g.fillText(TEAMS[sides[R]].name, W / 2 + 66, 26)
+  // 내 팀 궁극기 게이지 — 얼굴 둘레가 차오른다. 지금 움직이는 선수의 궁극기 이름을 옆에
+  const mine = team(myT), x0 = W / 2 - 150, ctl = ctls[myT]
   mine.forEach((p, i) => {
     const cx = x0 + i * 46, cy = H - 24, ready = p.ult >= 1
     g.fillStyle = 'rgba(0,0,0,.6)'; oval(cx, cy, 19, 19); g.fill()
@@ -986,7 +1244,7 @@ function hud() {
     g.beginPath(); g.arc(cx, cy, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p.ult); g.stroke()
     if (p === ctl) { g.strokeStyle = '#ffd23f'; g.lineWidth = 2; oval(cx, cy, 22, 22); g.stroke() }
   })
-  if (ctl?.team === 0) {
+  if (ctl) {
     g.textAlign = 'left'; g.textBaseline = 'middle'; g.font = '800 15px system-ui, sans-serif'
     g.fillStyle = ctl.ult >= 1 ? '#ffd23f' : '#e9edf5'
     g.fillText(`${skillOf(ctl).name}${ctl.ult >= 1 ? ' — 준비!' : ` ${Math.floor(ctl.ult * 100)}%`}`, x0 + 5 * 46 - 10, H - 24)
@@ -1014,7 +1272,8 @@ function selectScreen() {
   const bg = g.createLinearGradient(0, 0, 0, H)
   bg.addColorStop(0, '#3a2414'); bg.addColorStop(1, '#1d120a')
   g.fillStyle = bg; g.fillRect(0, 0, W, H)
-  text('★ TEAM SELECT ★', W / 2, 42, 34, '#8ef08a', '#0d2a10')
+  text(net ? `ONLINE 1:1 · 방 ${net.code}` : '★ TEAM SELECT ★', W / 2, 42, 34, '#8ef08a', '#0d2a10')
+  const tag = (cx, cy, label, color, dx = 0) => { g.fillStyle = color; g.fillRect(cx + dx, cy, 40, 24); g.fillStyle = '#2a1400'; g.font = '900 15px system-ui, sans-serif'; g.fillText(label, cx + dx + 20, cy + 13) }
   CARDS.forEach(([cx, cy], i) => {
     const T = TEAMS[i], c = g.createLinearGradient(cx, cy, cx, cy + CARD_H)
     c.addColorStop(0, T.color); c.addColorStop(1, T.dark)
@@ -1027,16 +1286,26 @@ function selectScreen() {
       g.fillStyle = '#ffe08a'; g.font = '700 10.5px system-ui, sans-serif'; g.fillText(SKILLS[i][j].name, x + 38, y + 104)
     })
     text(T.name, cx + CARD_W / 2, cy + 168, 32, '#fff', '#120a06')
-    g.lineWidth = i === pick ? 6 : 2; g.strokeStyle = i === pick ? '#ffd23f' : 'rgba(0,0,0,.5)'; g.strokeRect(cx, cy, CARD_W, CARD_H)
-    if (i === pick) { g.fillStyle = '#ffd23f'; g.fillRect(cx, cy, 40, 24); g.fillStyle = '#2a1400'; g.font = '900 15px system-ui, sans-serif'; g.fillText('1P', cx + 20, cy + 13) }
+    const theirs = net?.peer && net.pick === i
+    g.lineWidth = i === pick || theirs ? 6 : 2; g.strokeStyle = i === pick ? PC[myT] : theirs ? PC[1 - myT] : 'rgba(0,0,0,.5)'; g.strokeRect(cx, cy, CARD_W, CARD_H)
+    if (i === pick) tag(cx, cy, myT ? '2P' : '1P', PC[myT])
+    if (theirs) tag(cx, cy, myT ? '1P' : '2P', PC[1 - myT], i === pick ? 44 : 0)
+    if (net) [[i === pick, 0], [theirs, 1]].forEach(([on, k]) => { if (on && net.ready[k]) text('READY', cx + CARD_W - 52, cy + 188 - 22 * k, 18, PC[k ? 1 - myT : myT], '#120a06') })   // k 0 = 나, 1 = 상대
   })
   g.fillStyle = '#e9edf5'; g.font = '600 15px system-ui, sans-serif'
-  g.fillText('방향키로 고르고 C(슛) · Enter 로 시작 — 휴대폰은 팀을 한 번 더 누르세요', W / 2, 528)
+  g.fillText(!net ? '방향키로 고르고 C(슛) · Enter 로 시작 — 휴대폰은 팀을 한 번 더 누르세요'
+    : `vs ${net.peer?.name ?? '?'} — ${net.ready[0] ? `상대를 기다리는 중${net.ready[1] ? '' : '(팀 고르는 중)'}` : `팀을 고르고 C(슛) · Enter 로 준비${net.ready[1] ? ' — 상대는 준비 완료' : ''}`}`, W / 2, 528)
+  if (msg) text(msg.text, W / 2, 300, 26, '#fff', '#120a06')
 }
 
 function draw() {
   if (mode === 'load') { g.fillStyle = '#0b0e14'; g.fillRect(0, 0, W, H); return text('LOADING…', W / 2, H / 2, 32) }
   if (mode === 'select') return selectScreen()
+  if (mode === 'wait') {   // 온라인 — 상대를 기다린다
+    g.fillStyle = '#1d120a'; g.fillRect(0, 0, W, H)
+    text(net?.host ? `방 코드 ${net.code}` : `방 ${net?.code ?? ''}`, W / 2, H / 2 - 30, 64, '#ffd23f')
+    return text(net?.host ? '상대가 이 코드로 들어오길 기다리는 중…' : '방에 들어가는 중…', W / 2, H / 2 + 40, 24, '#fff')
+  }
   g.save()
   if (shake) g.translate((rnd() - 0.5) * shake, (rnd() - 0.5) * shake)
   backdrop(); court()
@@ -1064,10 +1333,11 @@ function draw() {
   if (mode === 'over') {
     g.fillStyle = 'rgba(0,0,0,.62)'; g.fillRect(0, 50, W, H - 50)
     text('GAME OVER', W / 2, 170, 64)
-    text(`${TEAMS[sides[0]].name} ${score[0]} - ${score[1]} ${TEAMS[sides[1]].name}`, W / 2, 255, 34, '#fff')
-    const [a, b] = score
+    const L = myT, R = 1 - myT, a = score[L], b = score[R]   // 내 팀이 앞
+    text(`${TEAMS[sides[L]].name} ${a} - ${b} ${TEAMS[sides[R]].name}`, W / 2, 255, 34, '#fff')
     text(a > b ? 'YOU WIN!' : a < b ? 'YOU LOSE' : 'DRAW', W / 2, 335, 50, a > b ? '#8ef08a' : a < b ? '#ff6b6b' : '#ffd23f')
-    text('다시 하기 — Enter · 화면 누르기', W / 2, 430, 20, '#e9edf5')
+    if (net?.peer) text(`vs ${net.peer.name}${net.rec ? ` — ${net.rec}` : ''}`, W / 2, 388, 20, '#fff')
+    text(net ? '팀 선택으로 — Enter · 화면 누르기' : '다시 하기 — Enter · 화면 누르기', W / 2, 430, 20, '#e9edf5')
   }
 }
 
@@ -1077,8 +1347,11 @@ let last = 0, ulShown = -1, drawDt = 0, reflecting = false   // reflecting = 바
 function frame(t) {
   const dt = Math.min(0.05, (t - last) / 1000 || 0)
   last = t; drawDt = dt
-  update(dt); draw()
-  const ul = (mode === 'play' || mode === 'dead') && ctl?.team === 0 ? Math.floor(ctl.ult * 50) / 50 : 0   // 휴대폰 궁극기 버튼 둘레 게이지
+  if (net && !net.host && PLAY.has(mode)) { watch(dt); guestInput() }   // 들어온 사람은 받은 장면을 그리고 버튼을 보낸다
+  else update(dt)
+  if (net?.host && net.peer && PLAY.has(mode) && (mode !== 'over' || wait > -2) && tnow - net.at >= (direct() ? 1 / 15 : 1 / 10)) { net.at = tnow; stream(snap()) }
+  draw()
+  const ul = (mode === 'play' || mode === 'dead') && ctls[myT] ? Math.floor(ctls[myT].ult * 50) / 50 : 0   // 휴대폰 궁극기 버튼 둘레 게이지
   if (ul !== ulShown) { ulShown = ul; ulBtn.style.setProperty('--g', ul); ulBtn.classList.toggle('ready', ul >= 1) }
   requestAnimationFrame(frame)
 }
@@ -1159,3 +1432,6 @@ document.getElementById('pos-table').replaceChildren(...STATS.map((S, i) => {
   return tr
 }))
 mode = 'select'
+roomUI(); records()
+const inv = new URL(location.href).searchParams.get('room')   // 받은 링크(?room=1234)로 왔으면 바로 들어간다(로그인이 안 돼 있으면 로그인부터)
+if (/^\d{4}$/.test(inv ?? '')) { $('room-code').value = inv; openRoom(inv) }

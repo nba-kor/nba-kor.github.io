@@ -1409,6 +1409,22 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .slam kbd { display: inline-block; min-width: 20px; padding: 0 5px; margin: 0 1px; border: 1px solid var(--muted); border-radius: 4px; font: 600 12px/18px ui-monospace, Menlo, Consolas, monospace; text-align: center; color: var(--text); }
 /* 아래 설명 — 조작법 표 · 팀별 궁극기 탭 */
 .slam-guide { margin-top: 20px; }
+/* 온라인 1:1 — 방 만들기 · 코드로 들어가기, 아래 대전 랭킹 · 최근 대전(slam.js 의 「온라인 1:1」) */
+.slam-online { margin-top: 12px; }
+.slam-room { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.slam-room input { width: 6.5em; text-align: center; letter-spacing: .15em; }
+.slam-records { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 0 24px; }
+.slam-guide h2 small { font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.slam-keys .num { text-align: right; }
+.slam-rank td:nth-child(2) { word-break: break-all; }
+.slam-recent { list-style: none; margin: 0; padding: 0; font-size: 13.5px; }
+.slam-recent li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.slam-recent time { min-width: 4.2em; color: var(--muted); font-size: 12px; }
+.slam-recent span { color: var(--muted); font-size: 12px; }
+.slam-recent span b { color: var(--text); font-size: 13.5px; }
+.slam-recent span.win b { color: var(--accent); }
+.slam-recent strong { font-variant-numeric: tabular-nums; }
+.slam-none { color: var(--muted); }
 .slam-guide h2 { margin: 20px 0 8px; font-size: 16px; }
 .slam-keys { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .slam-keys th, .slam-keys td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }

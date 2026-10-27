@@ -22,7 +22,7 @@
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=791cb789">
+<link rel="stylesheet" href="/assets/style.css?v=31d07466">
 </head>
 <body>
 
@@ -41,7 +41,7 @@
 </header>
 
 <main class="slam">
-  <h1>슈퍼 슬램 <small>5:5 오락실 농구 · 1P vs CPU · 1분 30초 · 궁극기</small></h1>
+  <h1>슈퍼 슬램 <small>5:5 오락실 농구 · 1P vs CPU · 온라인 1:1 · 1분 30초 · 궁극기</small></h1>
   <div class="slam-stage">
     <div class="slam-screen">
       <canvas id="slam" aria-label="슈퍼 슬램 게임 화면"></canvas>
@@ -57,7 +57,28 @@
       </div>
     </div>
   </div>
+  <section class="slam-online" aria-label="온라인 1:1">
+    <div class="slam-room">
+      <b>온라인 1:1</b>
+      <button type="button" class="primary" id="room-new">방 만들기</button>
+      <input type="text" id="room-code" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="방 코드" aria-label="방 코드 4자리" autocomplete="off">
+      <button type="button" id="room-join">들어가기</button>
+      <button type="button" id="room-link" hidden>링크 복사</button>
+      <button type="button" id="room-leave" hidden>나가기</button>
+    </div>
+    <p class="slam-help" id="room-msg" aria-live="polite"></p>
+  </section>
   <section class="slam-guide">
+    <div class="slam-records">
+      <div>
+        <h2>대전 랭킹 <small>온라인 1:1 · 승리 순</small></h2>
+        <table class="slam-keys slam-rank"><thead><tr><th>순위</th><th>이름</th><th class="num">승</th><th class="num">패</th><th class="num">무</th><th class="num">승률</th></tr></thead><tbody id="rank"></tbody></table>
+      </div>
+      <div>
+        <h2>최근 대전 <small>전체</small></h2>
+        <ul class="slam-recent" id="recent"></ul>
+      </div>
+    </div>
     <h2>조작법</h2>
     <table class="slam-keys">
       <thead><tr><th>버튼</th><th class="kb">키보드</th><th>공격할 때</th><th>수비할 때</th></tr></thead>
@@ -81,6 +102,6 @@
   </section>
 </main>
 
-<script type="module" src="/assets/slam.js?v=561054b8"></script>
+<script type="module" src="/assets/slam.js?v=dc8b7b49"></script>
 </body>
 </html>

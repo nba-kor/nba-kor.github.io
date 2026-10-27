@@ -1340,6 +1340,10 @@ dbTest('Data API 권한: anon · authenticated 키나 키 없이는 팀원모집
       ['/audit_log?select=action&limit=1', {}],
       ['/audit_log', post({ at: 0, action: 'PUT /api/x', status: 200 })],
       ['/arena_plans?select=plan&limit=1', {}],
+      ['/slam_reports?select=match&limit=1', {}],
+      ['/slam_matches?select=match&limit=1', {}],
+      ['/slam_ranking?select=name&limit=1', {}],
+      ['/slam_matches', post({ match: 'AAAAAAAA', at: 0, home_id: someone, home_name: 'x', home_team: 0, home_score: 1, away_id: '1', away_name: 'y', away_team: 1, away_score: 0 })],
       ['/arena_plans', post({ week: '2100-01-02', plan: {}, updated_at: 0, updated_by: someone })],
       ['/site_gate', post({ id: 1, code: '1234', token: 'x', changed_at: 0, changed_by: someone })],
       ['/recruit_profiles', post({ discord_user_id: someone, discord_name: 'x', mic: true, entries: [], created_at: 0, updated_at: 0 })],
@@ -1871,6 +1875,42 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   assert.equal((await plan(boss, p1, clock)).status, 409, '지난 주 편성표는 못 고친다')
   assert.deepEqual((await view()).signups, [], '이번 주는 새로')
   await rest(`/site_admins?user_id=eq.${boss.id}`, { method: 'DELETE' })
+})
+
+dbTest('슈퍼 슬램: 두 사람이 서로를 가리키는 같은 결과를 올려야 기록 · 다르면 409 · 검증 · 보기는 공개(최근 대전 · 랭킹)', async () => {
+  let clock = futureBase()
+  const { api } = start({ now: () => clock })
+  const [a, b, c] = await Promise.all(['A', 'B', 'C'].map(k => person(api, { name: `슬램${k}${RUN}` })))
+  const match = `m${RUN}`
+  const report = (who, o) => api('POST', '/api/slam', { match, teams: [0, 2], score: [21, 18], ...o }, { as: who.as })
+  // 검증 — 나 자신 · 같은 팀 · 점수 · 경기 번호 · 로그인
+  for (const o of [{ opp: a.id, host: true }, { opp: b.id, host: true, teams: [1, 1] }, { opp: b.id, host: true, score: [-1, 3] }, { opp: b.id, host: true, teams: [0, 4] },
+    { opp: b.id, host: 'yes' }, { opp: b.id, host: true, match: 'x' }, { opp: 'abc', host: true }]) {
+    assert.equal((await report(a, o)).status, 400, JSON.stringify(o))
+  }
+  assert.equal((await api('POST', '/api/slam', { match, opp: b.id, host: true, teams: [0, 2], score: [1, 0] })).status, 401)
+  assert.deepEqual((await report(a, { opp: b.id, host: true })).body, { recorded: false })   // 한쪽만 — 아직 기록되지 않는다
+  assert.equal((await report(c, { opp: a.id, host: false })).status, 409, '방장은 다른 사람(B)과 했다고 올렸다')
+  assert.equal((await report(b, { opp: a.id, host: false, score: [18, 21] })).status, 409, '점수가 다르다')
+  assert.equal((await report(b, { opp: a.id, host: true })).status, 409, '둘 다 방장일 수 없다')
+  clock += 1000
+  const ok = await report(b, { opp: a.id, host: false })
+  assert.equal(ok.status, 201, ok.text)
+  assert.deepEqual(ok.body, { recorded: true })
+  assert.deepEqual(await rows(`/slam_reports?select=user_id&match=eq.${match}`), [], '기록하면 두 결과를 지운다')
+  assert.deepEqual((await report(a, { opp: b.id, host: true })).body, { recorded: false }, '이미 기록된 경기를 다시 올려도 두 번 기록되지 않는다')
+  assert.equal((await rows(`/slam_matches?select=id&match=eq.${match}`)).length, 1)
+  // 보기 — 로그인 없이. 가장 최근 경기가 맨 위, 방장이 home
+  const v = await api('GET', '/api/slam')
+  assert.equal(v.status, 200)
+  assert.deepEqual(v.body.recent[0], { at: clock, home: { name: a.name, team: 0, score: 21 }, away: { name: b.name, team: 2, score: 18 } })
+  const rank = await rows(`/slam_ranking?select=name,wins,losses,draws,games&user_id=in.(${a.id},${b.id})&order=wins.desc`)
+  assert.deepEqual(rank, [{ name: a.name, wins: 1, losses: 0, draws: 0, games: 1 }, { name: b.name, wins: 0, losses: 1, draws: 0, games: 1 }])
+  assert.ok(v.body.ranking.every(r => Object.keys(r).join() === 'name,wins,losses,draws,games'), 'ID 는 내보내지 않는다')
+  // 하루 지난 한쪽 결과는 다음 올리기 때 지운다
+  clock += 86_400_001
+  await api('POST', '/api/slam', { match: `n${RUN}`, opp: a.id, host: false, teams: [1, 3], score: [3, 3] }, { as: c.as })
+  assert.deepEqual(await rows(`/slam_reports?select=user_id&match=eq.${match}`), [])
 })
 
 dbTest('감사 로그: 바꾼 요청(성공)만 누가 · 무엇을 · 무엇에 · 바뀐 내용 — 읽기 · 실패는 안 남긴다 · 함수 키로도 못 고친다 · 보기는 슈퍼관리자만(최근 것부터 · 사람별 · 더 보기)', async () => {
