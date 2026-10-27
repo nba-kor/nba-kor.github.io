@@ -245,7 +245,7 @@ delete from public.site_admins where user_id = '<디스코드 ID 또는 k카카�
 **처음 운영에 올릴 때** (순서대로 — 함수가 `site_admins` 를 읽고, 새 화면은 티어 없는 프로필을 보낸다)
 
 1. `20261023000000_arena.sql` 을 SQL Editor 에 붙여 넣어 Run → 위 SQL 로 관리자를 넣는다.
-2. Supabase **Authentication > URL Configuration > Redirect URLs** 에 `https://nba-kor.github.io/` · `https://nba-kor.github.io/arena/` · `https://nba-kor.github.io/arena/plan/` · `https://nba-kor.github.io/me/` 추가(로그인은 누른 페이지로 돌아온다).
+2. Supabase **Authentication > URL Configuration > Redirect URLs** 에 `https://nba-kor.github.io/` · `https://nba-kor.github.io/arena/` · `https://nba-kor.github.io/arena/plan/` · `https://nba-kor.github.io/me/` · `https://nba-kor.github.io/slam/` 추가(로그인은 누른 페이지로 돌아온다).
 3. `sh tools/deploy-api.sh` → `node tools/stamp-assets.mjs` → main 푸시.
 
 ## 팀원모집
