@@ -110,7 +110,7 @@ function start() {
   ps = [0, 1].flatMap(t => TEAMS[sides[t]].five.map((f, i) => ({
     team: t, i, f, x: 0, z: 0, h: 0, vh: 0, dir: side(t), run: 0, mv: false, act: null, t: 0,
     cool: 0, stun: 0, fall: 0, think: 0, cut: 0, block: 0, reach: 0, ult: rnd() * 0.3, boost: 0, cdx: 0, dp: 0, hand: 1, sq: 0, kb: null, sure: false, trail: [], tt: 0,
-    ghost: 0, hot: 0, slow: 0, ice: 0, big: 0, conf: 0, mirror: 0, wt: 0, poster: false, four: false, hook: false, vx: 0, vz: 0, fd: side(t),
+    ghost: 0, hot: 0, slow: 0, ice: 0, big: 0, conf: 0, mirror: 0, wt: 0, poster: false, four: false, hook: false, vx: 0, vz: 0, fd: side(t), joints: {},
   })))
   score = [0, 0]; clock = GAME; shot = SHOT; offense = 0
   cut = null; parts = []; rings = []; shake = 0
@@ -281,7 +281,7 @@ function step(p, dx, dz, spd, dt) {
   p.x += p.vx * dt; p.z += p.vz * dt
   const v = Math.hypot(p.vx, p.vz)
   p.mv = v > 20
-  if (Math.abs(dx) > 0.15) p.dir = Math.sign(dx)
+  if (Math.abs(p.vx) > 45) p.dir = Math.sign(p.vx)   // 실제로 그쪽으로 움직일 때만 돈다 — 제자리에서 방향이 떨리지 않게
   p.run += dt * Math.min(1.3, v / SPD)   // 걸음 박자도 속도를 따라간다
 }
 function toward(p, tx, tz, spd, dt) {   // 가까워질수록 천천히 — 도착하면 선다
@@ -479,7 +479,7 @@ function ai(p, dt) {
   // 대인 수비 — 자기 사람과 골대 사이. 공 가진 사람은 붙어서 가끔 스틸, CPU 는 게이지가 차면 스틸 대시
   const man = ps.find(q => q.team !== p.team && q.i === p.i), h = goal(man.team), d = dist(man, h) || 1, gap = man === ball.owner ? 24 : 42
   toward(p, man.x + (h.x - man.x) / d * gap, man.z + (h.z - man.z) / d * gap, SPD * 0.93, dt)
-  p.dir = Math.sign(ball.x - p.x) || p.dir
+  if (Math.abs(ball.x - p.x) > 14) p.dir = Math.sign(ball.x - p.x)   // 공을 본다 — 공이 바로 앞이면 그대로(좌우로 떨지 않게)
   if (man !== ball.owner) return
   if (p.team === 1 && p.ult >= 1 && dist(p, man) < 220 && rnd() < dt * 0.5) ultimate(p)
   else if (dist(p, man) < 32 && rnd() < dt * 0.4) steal(p, man)
@@ -505,8 +505,8 @@ function handle(p, dt) {
 function hand(p) {
   if (p.act === 'shot' || p.act === 'dunk') return [p.x + p.dir * 4, p.z, p.h + 94]   // 머리 위 — 두 손 위
   if (p.act === 'air') return [p.x + p.dir * 12, p.z, p.h + 50]   // 가슴 앞에 두 손으로
-  if (p.act === 'cross') return [p.x + p.dir * 10, p.z + p.hand * (16 * Math.min(1, p.t / 0.26) - 8), 6]   // 낮게 몸 앞을 가로지른다
-  return [p.x + p.dir * 12, p.z + p.hand * 5, 2 + 32 * Math.abs(Math.cos(p.dp))]
+  if (p.act === 'cross') return [p.x + p.fd * 10, p.z + p.hand * (16 * Math.min(1, p.t / 0.26) - 8), 6]   // 낮게 몸 앞을 가로지른다
+  return [p.x + p.fd * 12, p.z + p.hand * 5, 2 + 32 * Math.abs(Math.cos(p.dp))]   // 몸이 도는 만큼 공도 앞으로 돌아온다
 }
 
 function moveBall(dt) {
@@ -672,6 +672,17 @@ function limb(ax, ay, bx, by, l1, l2, bend) {
   const k = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - k * k))
   return [[ax + ux * k - uy * h * bend, ay + uy * k + ux * h * bend], [ax + ux * d, ay + uy * d]]
 }
+/** 관절 — 두 해 가운데 pole 에 가까운 쪽(팔꿈치는 아래 · 뒤, 무릎은 앞)을 고르고, 그 자리를 부드럽게 따라간다(한 번에 뒤집히지 않게). 몸 좌표를 u 로 나눠 기억한다 */
+function joint(p, key, a, b, l1, l2, pole, u, k) {
+  const [A, B] = [1, -1].map(s => limb(a[0], a[1], b[0], b[1], l1, l2, s))
+  const [j, end] = Math.hypot(A[0][0] - pole[0], A[0][1] - pole[1]) <= Math.hypot(B[0][0] - pole[0], B[0][1] - pole[1]) ? A : B
+  return [ease(p, key, j, u, k), end]
+}
+function ease(p, key, [tx, ty], u, k) {
+  const m = p.joints[key] ||= [tx / u, ty / u]
+  m[0] += (tx / u - m[0]) * k; m[1] += (ty / u - m[1]) * k
+  return [m[0] * u, m[1] * u]
+}
 function line(pts, w, c) { g.strokeStyle = c; g.lineWidth = w; g.beginPath(); pts.forEach(([a, b], i) => i ? g.lineTo(a, b) : g.moveTo(a, b)); g.stroke() }
 function shape(pts, c) { g.fillStyle = c; g.beginPath(); pts.forEach(([a, b], i) => i ? g.lineTo(a, b) : g.moveTo(a, b)); g.closePath(); g.fill() }
 
@@ -699,9 +710,10 @@ function drawPlayer(p) {
 
   // 몸 좌표 — at(옆, 키 높이). 윗몸일수록 달리는 쪽으로 기울어진다(기울기는 실제 속도를 따른다)
   const v = Math.hypot(p.vx, p.vz), a = p.h > 0 || p.fall ? 0 : Math.min(1, v / SPD), ph = p.run * 15, f = p.fd, fs = f >= 0 ? 1 : -1
+  const kh = 1 - Math.exp(-drawDt * 20), kj = 1 - Math.exp(-drawDt * 28), kb = 1 - Math.exp(-drawDt * 45)   // 손 · 관절 · 공 쪽 손이 따라가는 빠르기
   const lean = p.fall ? 0 : clamp(p.vx / SPD, -1.3, 1.3) * 0.16, at = (px, hh) => [px * u + lean * hh * u, -hh * u]
   const holding = ball.owner === p, up = p.act === 'shot' || p.act === 'dunk' || p.h > 0 && !holding
-  const guard = !holding && ball.owner && ball.owner.team !== p.team && dist(p, ball.owner) < 70   // 수비 — 두 손을 벌린다
+  const guard = !holding && ball.owner && ball.owner.team !== p.team && dist(p, ball.owner) < 70   // 공 가진 상대 앞의 수비
   g.save()
   g.translate(x, y - Math.abs(Math.sin(ph)) * 2.5 * u * a)   // 걸을 때 몸이 오르내린다
   if (big > 1) g.scale(big, big)   // 자이언트
@@ -715,16 +727,16 @@ function drawPlayer(p) {
     const hip = at(k ? 2.6 : -2.6, 37), s = Math.sin(ph + k * Math.PI)
     const foot = p.h > 0 || p.act === 'dunk' ? [hip[0] + f * (k ? 7 : -2) * u, (k ? -13 : -7) * u]
       : [(k ? 2.6 : -2.6) * u * (1 - Math.abs(f)) + f * s * 10 * u * a, -Math.max(0, -Math.cos(ph + k * Math.PI)) * 7 * u * a]
-    const [knee, end] = limb(hip[0], hip[1], foot[0], foot[1], 19 * u, 18.5 * u, -fs)
+    const [knee, end] = joint(p, `k${k}`, hip, foot, 19 * u, 18.5 * u, [hip[0] + f * 14 * u, hip[1] + 18 * u], u, kj)
     line([hip, knee], 6.4 * u, col); line([knee, end], 5.2 * u, col)
     line([[end[0], end[1] - 5 * u], [end[0], end[1] - 1.8 * u]], 4.8 * u, '#f2f2f2')   // 양말
     g.fillStyle = '#fafafa'; oval(end[0] + f * 2.2 * u, end[1] - 1.5 * u, 4.8 * u, 2.3 * u); g.fill()   // 운동화
     g.fillStyle = T.dark; g.fillRect(end[0] + f * 2.2 * u - 4.8 * u, end[1] - 0.5 * u, 9.6 * u, 1.1 * u)
   }
-  // 팔 — 어깨 · 팔꿈치 · 손. 팔꿈치는 아래 · 뒤로 꺾이는 쪽을 고른다(위로 꺾이면 닭날개처럼 보인다)
-  const arm = (k, [hx, hy], col) => {
-    const s0 = at((k ? 7.4 : -7.4) * fs, 60), [A, B] = [1, -1].map(b => limb(s0[0], s0[1], hx, hy, 13.5 * u, 13 * u, b))
-    const [el, end] = A[0][1] - fs * A[0][0] * 0.4 >= B[0][1] - fs * B[0][0] * 0.4 ? A : B
+  // 팔 — 어깨는 왼쪽 · 오른쪽 그대로이고 몸이 향한 쪽이 앞 팔. 손은 목표 자리를, 팔꿈치는 아래 · 뒤를 부드럽게 따라간다
+  const arm = (side, target, col, k) => {
+    const s0 = at(side * 7.4, 60), hand = ease(p, `h${side}`, target, u, k)
+    const [el, end] = joint(p, `e${side}`, s0, hand, 13.5 * u, 13 * u, [s0[0] - f * 10 * u, s0[1] + 16 * u], u, kj)
     line([s0, el], 5 * u, col); line([el, end], 4.3 * u, col)
     g.fillStyle = col; oval(end[0], end[1], 2.5 * u, 2.5 * u); g.fill()
   }
@@ -735,12 +747,12 @@ function drawPlayer(p) {
   else if (holding && p.act === 'air') { near = at(fs * 10, 52); far = at(fs * 8, 50) }   // 가슴 앞에 두 손으로
   else if (holding) {   // 공 쪽 손은 튀어 오르는 공을 따라 오르내린다(무릎 아래로는 안 내려간다). 다른 손은 공을 감싼다
     near = [(ball.x - p.x) * u / big, ((ball.z - p.z) * 0.7 - (Math.max(ball.h, 26) + 5) * u) / big]
-    far = at(-fs * 11, 50)
+    far = at(fs * 11, 46)   // 다른 팔은 몸 앞으로 내밀어 공을 감싼다(몸에 가려 손만 보인다)
   }
   else if (p.reach > 0) { near = at(fs * 26, 48); far = at(-fs * 6, 38) }   // 스틸 — 손을 뻗는다
-  else if (guard) { near = at(fs * 24, 55); far = at(-fs * 21, 51) }
+  else if (guard) { near = at(fs * 17, 70); far = at(fs * 13, 42) }   // 수비 — 한 손은 들어 앞을 막고 한 손은 낮게(옆에서 보니 둘 다 몸 앞)
   else { near = [at(fs * 9.5, 35)[0] + fs * sw, -(35 * u + rise)]; far = [at(-fs * 8.5, 35)[0] - fs * sw, -(35 * u + rise)] }   // 몸 옆에 늘어뜨리고, 걸을 때는 다리와 엇갈려 흔든다
-  arm(0, far, shade)
+  arm(-fs, far, shade, kh)
   leg(0, shade)
   leg(1, skin)
   shape([at(-8.8, 42), at(8.8, 42), at(10.4, 27), at(1, 26), at(0, 29), at(-1, 26), at(-10.4, 27)], T.dark)   // 반바지
@@ -755,7 +767,7 @@ function drawPlayer(p) {
   const [hx, hy] = at(0, 75)   // 머리 — 배경을 지운 얼굴 그림(cutHead)
   if (p.f.head) g.drawImage(p.f.head, hx - 12.25 * u, hy - 13.2 * u, 24.5 * u, 26 * u)
   else { g.fillStyle = skin; oval(hx, hy, 8 * u, 9 * u); g.fill() }
-  arm(1, near, skin)
+  arm(fs, near, skin, holding && !up ? kb : kh)
   if (p.ice > 0) { g.fillStyle = 'rgba(170,225,255,.55)'; g.strokeStyle = '#e8f7ff'; g.lineWidth = 1.5; g.fillRect(-15 * u, -92 * u, 30 * u, 94 * u); g.strokeRect(-15 * u, -92 * u, 30 * u, 94 * u) }   // 얼음
   g.restore()
   g.globalAlpha = 1
@@ -898,10 +910,10 @@ function draw() {
   }
 }
 
-let last = 0, ulShown = -1
+let last = 0, ulShown = -1, drawDt = 0
 function frame(t) {
   const dt = Math.min(0.05, (t - last) / 1000 || 0)
-  last = t
+  last = t; drawDt = dt
   update(dt); draw()
   const ul = (mode === 'play' || mode === 'dead') && ctl?.team === 0 ? Math.floor(ctl.ult * 50) / 50 : 0   // 휴대폰 궁극기 버튼 둘레 게이지
   if (ul !== ulShown) { ulShown = ul; ulBtn.style.setProperty('--g', ul); ulBtn.classList.toggle('ready', ul >= 1) }
