@@ -144,11 +144,11 @@ function profile(v) {
     const key = `${nick}\n${e.char}`   // 닉네임에 제어문자가 없으니 \n 으로 이어도 겹치지 않는다
     if (seen.has(key)) fail(400, '같은 계정에 같은 캐릭터가 두 번 들어갔어요')
     seen.add(key)
-    // 아레나 — 계정의 주력 포지션(1 · 2순위, 그 계정의 줄마다 같은 값)과 캐릭터 돌파(1~7). 둘 다 없어도 된다(팀원모집 · 옛 프로필)
+    // 아레나 — 계정의 주력 포지션(1 · 2순위, 그 계정의 줄마다 같은 값)과 캐릭터 레벨(1~7, 저장 이름은 breakthrough). 둘 다 없어도 된다(팀원모집 · 옛 프로필)
     const roles = e.roles ?? []
     if (!listOf(roles, 2) || roles.some(r => !ROLES.has(r)) || new Set(roles).size !== roles.length || roles.includes('allpos') && roles.length > 1) fail(400, '주력 포지션을 다시 골라 주세요')
     const bt = e.breakthrough ?? null
-    if (bt !== null && !(Number.isInteger(bt) && bt >= 1 && bt <= ARENA.breakthrough)) fail(400, `돌파는 1~${ARENA.breakthrough} 중에 골라 주세요`)
+    if (bt !== null && !(Number.isInteger(bt) && bt >= 1 && bt <= ARENA.breakthrough)) fail(400, `레벨은 1~${ARENA.breakthrough} 중에 골라 주세요`)
     return { nick, tier, char: e.char, ...(roles.length && { roles }), ...(bt && { breakthrough: bt }) }
   })
   return { name: v.name == null ? null : text(v.name, 32, '표시 이름'), mic: v.mic, entries }
@@ -366,7 +366,7 @@ export function profileChanges(old, now) {
     const pm = plusMinus(b.chars, a.chars, charKo)
     if (pm) out.push(`${n} 캐릭터 ${pm}`)
     else if (b.chars[0] !== a.chars[0]) out.push(`${n} 대표 캐릭터: ${charKo(b.chars[0])} → ${charKo(a.chars[0])}`)
-    for (const c of a.chars) if (b.chars.includes(c) && (b.bt[c] ?? 0) !== (a.bt[c] ?? 0)) out.push(`${n} ${charKo(c)} 돌파: ${b.bt[c] ?? '-'} → ${a.bt[c] ?? '-'}`)
+    for (const c of a.chars) if (b.chars.includes(c) && (b.bt[c] ?? 0) !== (a.bt[c] ?? 0)) out.push(`${n} ${charKo(c)} 레벨: ${b.bt[c] ?? '-'} → ${a.bt[c] ?? '-'}`)
   }
   for (const n of before.keys()) if (!after.has(n)) out.push(`계정 삭제 ${n}`)
   return out
@@ -958,7 +958,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   // ------------------------------------------------ 아레나전 — 보기는 공개, 신청은 로그인(프로필 필요), 편성표는 관리자
 
   // 신청 한 줄 = 그 사람의 프로필을 조인한다 — 계정(게임 닉네임)의 캐릭터 · 표시 이름은 늘 지금 프로필 것. 프로필에서 빠진 닉네임은 안 보인다
-  // owner = 본계(프로필 첫 줄) 닉네임 — 길드에서는 본계 닉네임으로 사람을 안다. 계정: 주력 포지션 · 캐릭터 · 돌파({ 캐릭터: 1~7 })
+  // owner = 본계(프로필 첫 줄) 닉네임 — 길드에서는 본계 닉네임으로 사람을 안다. 계정: 주력 포지션 · 캐릭터 · 레벨({ 캐릭터: 1~7 })
   const signupsOf = async week => (await db(`/arena_signups?select=user_id,slots,nicks,memo,updated_at,profile:recruit_profiles(name:discord_name,entries)&week=eq.${week}&order=created_at.asc,user_id.asc`))
     .map(s => ({
       userId: s.user_id, name: s.profile.name, owner: s.profile.entries[0]?.nick ?? s.profile.name, slots: s.slots, memo: s.memo, updatedAt: s.updated_at,

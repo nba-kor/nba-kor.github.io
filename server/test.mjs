@@ -665,7 +665,7 @@ test('검증: 프로필(마이크 O/X · 계정 1~maxEntries 줄) 이 잘못되�
   await bad({ ...ok, entries: [entry({ tier: '마스터' })] }, '없는 티어(티어는 안 적어도 되지만 적으면 목록 안에서)')
   await bad({ ...ok, entries: [entry({ char: 'nope' })] }, '없는 캐릭터')
   for (const [roles, why] of [[['x'], '없는 포지션'], [['scorer', 'mid', 'center'], '포지션 3개'], [['mid', 'mid'], '같은 포지션 두 번'], [['allpos', 'mid'], '올포는 2순위 없이'], [['mid', 'allpos'], '올포는 1순위로만'], ['scorer', '포지션이 배열 아님']]) await bad({ ...ok, entries: [entry({ roles })] }, why)
-  for (const breakthrough of [0, 8, 2.5, '3']) await bad({ ...ok, entries: [entry({ breakthrough })] }, `돌파 ${breakthrough}`)
+  for (const breakthrough of [0, 8, 2.5, '3']) await bad({ ...ok, entries: [entry({ breakthrough })] }, `레벨 ${breakthrough}`)
   await bad({ ...ok, entries: [entry({ char: UPCOMING })] }, '미출시 캐릭터')
   await bad({ ...ok, entries: Array.from({ length: CFG.maxEntries + 1 }, (_, i) => entry({ nick: `n${i}` })) }, `${CFG.maxEntries + 1}개`)
   await bad({ ...ok, entries: [] }, '0개')
@@ -1762,7 +1762,7 @@ test('감사 로그 내용: 한글 이름 · 프로필 · 아레나 신청 · �
     { discord_name: '갑', mic: true, entries: [{ nick: '본', char: 'bl', roles: ['scorer'] }, { nick: '부', char: 'sga' }] },
     { name: '을', mic: false, entries: [{ nick: '새', char: 'sga', roles: ['mid'] }, { nick: '본', char: 'bl', roles: ['allpos'], breakthrough: 3 }, { nick: '본', char: 'kl', roles: ['allpos'] }] }), [
     '표시 이름: 갑 → 을', '마이크: 사용 → 안 함', '본계정: 본 → 새', '계정 추가 새: 포지션 중열 · 알렉산더',
-    '본 포지션: 스코어러 → 올포', '본 캐릭터 +탐슨', '본 라멜로 볼 돌파: - → 3', '계정 삭제 부'])
+    '본 포지션: 스코어러 → 올포', '본 캐릭터 +탐슨', '본 라멜로 볼 레벨: - → 3', '계정 삭제 부'])
   assert.deepEqual(profileChanges({ discord_name: '갑', mic: true, entries: [{ nick: '본', char: 'bl' }, { nick: '본', char: 'kl' }] },
     { name: '갑', mic: true, entries: [{ nick: '본', char: 'kl' }, { nick: '본', char: 'bl' }] }), ['본 대표 캐릭터: 라멜로 볼 → 탐슨'])
   assert.deepEqual(signupChanges(null, { slots: ['sat1', 'sunfa'], nicks: ['A', 'B'], memo: '' }), ['시간: 토 1차 · 일 FA', '계정: A, B'])
@@ -1823,7 +1823,7 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
     [a.id, 'A본', ['sat1', 'sun2', 'satfa', 'sunfa'], [{ nick: 'A부', roles: ['center', 'mid'], chars: ['klfd'], bt: {} }, { nick: 'A본', roles: ['scorer'], chars: ['bl', 'sga'], bt: { bl: 5 } }]],
     [b.id, `B${RUN}`, ['sat1', 'sat2'], [{ nick: `B${RUN}`, roles: ['mid'], chars: ['bl'], bt: {} }]],
     [c.id, `C${RUN}`, ['absent'], []],
-  ], '신청 순서 · 소유자 = 본계 닉네임 · 계정의 포지션 · 캐릭터 · 돌파는 프로필에서')
+  ], '신청 순서 · 소유자 = 본계 닉네임 · 계정의 포지션 · 캐릭터 · 레벨은 프로필에서')
   assert.ok(v.missing.includes(`관리${RUN}`) && !v.missing.includes(`C${RUN}`), '미신청 = 프로필은 있는데 신청이 없는 사람(본계 닉네임) — 사유불참도 신청이다')
   clock += MIN
   assert.equal((await signup(a, { slots: ['sat1', 'sun2', 'satfa', 'sunfa'], nicks: ['A부', 'A본'] })).status, 200)
@@ -1888,7 +1888,7 @@ dbTest('감사 로그: 바꾼 요청(성공)만 누가 · 무엇을 · 무엇에
   const me = { user_id: id, user_name: '감사' }
   assert.deepEqual(await rows(), [
     { ...me, action: 'PUT /api/me/profile', status: 200, label: '프로필 저장', target: '감사', detail: ['프로필 만듦 — 이름 감사 · 마이크 사용', '계정 보노: 포지션 없음 · 라멜로 볼'] },
-    { ...me, action: 'PUT /api/me/profile', status: 200, label: '프로필 저장', target: '감사', detail: ['마이크: 사용 → 안 함', '보노 포지션: 없음 → 올포', '보노 라멜로 볼 돌파: - → 3', '계정 추가 부캐: 포지션 없음 · 알렉산더'] },
+    { ...me, action: 'PUT /api/me/profile', status: 200, label: '프로필 저장', target: '감사', detail: ['마이크: 사용 → 안 함', '보노 포지션: 없음 → 올포', '보노 라멜로 볼 레벨: - → 3', '계정 추가 부캐: 포지션 없음 · 알렉산더'] },
     { ...me, action: 'POST /api/builds', status: 201, label: '잠재력추천 글 쓰기', target: `#${bid} 픽앤롤 빌드`, detail: ['캐릭터: 라멜로 볼'] },
     { ...me, action: `DELETE /api/builds/${bid}`, status: 200, label: '잠재력추천 글 삭제', target: `#${bid} 픽앤롤 빌드`, detail: null },
   ])

@@ -556,7 +556,7 @@ function profileForm() {
     else {
       res = await submit(form, async () => {
         if (auth !== 'in') throw new Error('로그인해 주세요')
-        // 이 폼에는 아레나 칸(주력 포지션 · 돌파)이 없다 — 저장된 값을 계정 · 캐릭터마다 그대로 실어 지우지 않는다
+        // 이 폼에는 아레나 칸(주력 포지션 · 레벨)이 없다 — 저장된 값을 계정 · 캐릭터마다 그대로 실어 지우지 않는다
         const old = me.profile?.entries || []
         const keep = e => {
           const acct = old.find(x => x.nick === e.nick), same = old.find(x => x.nick === e.nick && x.char === e.char)

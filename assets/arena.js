@@ -3,7 +3,7 @@
 import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=fb02b445'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=1fbb8e2f'
 import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=4233415a'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES, ALLPOS } from './profile.js?v=8d99c001'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES, ALLPOS } from './profile.js?v=a465db33'
 
 await loadData()
 mountTop('/arena/')
@@ -39,7 +39,7 @@ let data = null      // GET /api/arena — { week, current, signups, plan, planA
 let plan = {}        // 편성표 사본 { 시간대: [[{ u, n }]] } — 관리자가 고친다
 let accts = new Map()   // 신청한 계정 key → { u, n, owner(본계 닉네임), roles, chars, bt, slots, count(소유자의 참가 계정 수) }
 let tab = 'all', poolTab = 'all', roleTab = 'all'   // roleTab = 편성 대기 목록의 포지션 필터
-// 편성의 「자세히 보기」 — 칩마다 캐릭터(돌파)가 펼쳐진다. 처음엔 켜져 있고, 끄면 이 브라우저에 기억한다
+// 편성의 「자세히 보기」 — 칩마다 캐릭터(레벨)가 펼쳐진다. 처음엔 켜져 있고, 끄면 이 브라우저에 기억한다
 const DETAIL_KEY = 'dc.arena.detail'
 let detail = (() => { try { return localStorage.getItem(DETAIL_KEY) !== '0' } catch { return true } })()
 let draft = null     // 신청 폼 상태 — 다시 그려도 남는다. 신청 · 취소하면 서버 값으로 다시 채운다
@@ -394,9 +394,9 @@ function memberCard(a, lead) {
   return el
 }
 
-/** 캐릭터 뱃지(돌파). max 를 주면 앞 max 개 + 나머지 수 */
+/** 캐릭터 뱃지(레벨). max 를 주면 앞 max 개 + 나머지 수 */
 function charTags(a, max = Infinity) {
-  return h('div', { className: 'ar-chars' }, a.chars.slice(0, max).map(id => h('span', {}, `${P(id).short || P(id).name}${a.bt?.[id] ? ` ${a.bt[id]}돌` : ''}`)), a.chars.length > max && h('em', { title: charNames(a.chars.slice(max), a.bt) }, `+${a.chars.length - max}`))
+  return h('div', { className: 'ar-chars' }, a.chars.slice(0, max).map(id => h('span', {}, `${P(id).short || P(id).name}${a.bt?.[id] ? ` ${a.bt[id]}렙` : ''}`)), a.chars.length > max && h('em', { title: charNames(a.chars.slice(max), a.bt) }, `+${a.chars.length - max}`))
 }
 
 /** 막대 한 줄 — 이름 · 비율(0~1) · 뒤에 붙는 수. 막대는 CSS 로만 그린다 */
@@ -522,7 +522,7 @@ function memoCard() {
 }
 
 function chip(a, from, lead = false) {
-  // 부계정이면 본계정 닉네임을 따로 한 줄 — 누구 계정인지 먼저 보이게. 「자세히 보기」 면 캐릭터(돌파)까지
+  // 부계정이면 본계정 닉네임을 따로 한 줄 — 누구 계정인지 먼저 보이게. 「자세히 보기」 면 캐릭터(레벨)까지
   const el = h('div', { className: `ar-chip${detail ? ' is-detail' : ''}${lead ? ' is-lead' : ''}`, tabIndex: 0, title: `${a.owner} · ${a.roles.map(r => ROLES.find(x => x.id === r)?.label).join(' / ')} · ${charNames(a.chars, a.bt)}` },
     lead && leadTag(),
     h('img', { src: faceOf(P(a.chars[0])), alt: '', draggable: false }),

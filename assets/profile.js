@@ -1,6 +1,6 @@
 // 내 프로필의 게임 계정 · 보유 캐릭터 — 마이페이지 · 아레나 신청 · 홈이 같이 쓴다.
 // 프로필은 캐릭터 줄 목록(entries: [{ nick, tier, char, roles?, breakthrough? }]) 그대로 저장한다 — 같은 게임 닉네임 줄들이 한 계정, 첫 줄의 계정이 본계정.
-// 계정의 주력 포지션(roles: 1 · 2순위)은 그 계정의 줄마다 같은 값을 넣고 첫 줄 것을 읽는다. 돌파(breakthrough 1~7)는 캐릭터 줄마다.
+// 계정의 주력 포지션(roles: 1 · 2순위)은 그 계정의 줄마다 같은 값을 넣고 첫 줄 것을 읽는다. 레벨(저장 이름은 breakthrough, 1~7)은 캐릭터 줄마다.
 // 팀원모집(숨김) · 디스코드 알림도 이 줄을 읽으므로 모양을 바꾸지 않았다. 티어는 더 받지 않는다(예전에 적은 값은 계정에 남겨 둔다)
 import { faceOf } from './app.js?v=fb02b445'
 import { api } from './auth.js?v=1fbb8e2f'
@@ -10,7 +10,7 @@ const json = p => fetch(p, { cache: 'no-cache' }).then(r => r.json())
 let recruitP, arenaP
 export const recruitCfg = () => recruitP ||= json('/data/recruit.json')   // maxEntries — 서버와 같은 값
 export const arenaCfg = () => arenaP ||= json('/data/arena.json')
-const A = await arenaCfg()   // 주력 포지션 · 돌파 단계
+const A = await arenaCfg()   // 주력 포지션 · 레벨 단계
 
 // 주력 포지션 — 스코어러 > 중열 > 센터(집계표 순서 = data/arena.json 의 roles 순서)
 export const ROLES = A.roles
@@ -18,7 +18,7 @@ export const ALLPOS = 'allpos'   // 올포 — 스코어러 · 중열 · 센터 
 export const roleLabel = id => ROLES.find(r => r.id === id)?.label || '포지션 미정'
 const LINK_RE = /:\/\/|www\.|discord\.gg/i   // 서버와 같은 규칙 — 이름에 링크 금지
 
-/** entries → [{ nick, tier, roles, chars, bt: { 캐릭터: 돌파 } }] — 처음 나온 순서, 첫 계정이 본계정 */
+/** entries → [{ nick, tier, roles, chars, bt: { 캐릭터: 레벨 } }] — 처음 나온 순서, 첫 계정이 본계정 */
 export function accountsOf(entries = []) {
   const map = new Map()
   for (const e of entries) {
@@ -34,8 +34,8 @@ export const entriesOf = accounts => accounts.flatMap(a => a.chars.map(char => (
 })))
 const countChars = accounts => accounts.reduce((n, a) => n + a.chars.length, 0)
 
-/** '엠비드 5돌 · 요키치' — bt = { 캐릭터: 돌파 } */
-export const charNames = (chars, bt = {}) => chars.map(id => `${P(id).short || P(id).name}${bt[id] ? ` ${bt[id]}돌` : ''}`).join(' · ')
+/** '엠비드 5렙 · 요키치' — bt = { 캐릭터: 레벨 } */
+export const charNames = (chars, bt = {}) => chars.map(id => `${P(id).short || P(id).name}${bt[id] ? ` ${bt[id]}렙` : ''}`).join(' · ')
 export const charFaces = (chars, max = 4) => h('span', { className: 'ac-faces' },
   chars.slice(0, max).map(id => h('img', { src: faceOf(P(id)), alt: '', title: P(id).name, loading: 'lazy' })),
   chars.length > max && h('em', {}, `+${chars.length - max}`))
@@ -44,7 +44,7 @@ export const roleTags = roles => h('span', { className: 'ac-roles' }, roles?.len
   ? roles.map((r, i) => h('span', { className: i ? '' : 'is-first', title: `${i + 1}순위` }, roleLabel(r)))
   : h('span', { className: 'is-none' }, '포지션 미정'))
 
-/** 계정 한 줄: (체크) 본계정/부계정 · 닉네임 · 주력 포지션 · 캐릭터(돌파) · 얼굴 · (✎) */
+/** 계정 한 줄: (체크) 본계정/부계정 · 닉네임 · 주력 포지션 · 캐릭터(레벨) · 얼굴 · (✎) */
 export function accountRow(a, i, { checked, onCheck, onEdit } = {}) {
   const body = [
     h('span', { className: `ac-kind${i ? '' : ' is-main'}` }, i ? '부계정' : '본계정'),
@@ -61,7 +61,7 @@ export function accountRow(a, i, { checked, onCheck, onEdit } = {}) {
 }
 
 /**
- * 계정 하나 고치기 · 추가(acct = null) — 닉네임 · 본계정 · 주력 포지션 1 · 2순위 · 보유 캐릭터(계정마다 제한 없음, 프로필 전체 maxEntries 개) · 돌파.
+ * 계정 하나 고치기 · 추가(acct = null) — 닉네임 · 본계정 · 주력 포지션 1 · 2순위 · 보유 캐릭터(계정마다 제한 없음, 프로필 전체 maxEntries 개) · 레벨.
  * accounts = 지금 목록 — 닉네임 겹침 · 전체 캐릭터 수를 본다. 돌려주는 값: { acct, main } (main = 본계정으로) | 'delete' | null(취소)
  */
 export async function editAccount(acct, accounts) {
@@ -87,10 +87,10 @@ export async function editAccount(acct, accounts) {
   const count = h('small', {})
   const say = msg => { err.textContent = msg; err.hidden = false }
   const paint = () => {
-    count.textContent = `${chars.length}개 · 앞 캐릭터가 대표(누르면 맨 앞으로) · 돌파는 선택`
+    count.textContent = `${chars.length}개 · 앞 캐릭터가 대표(누르면 맨 앞으로) · 레벨은 선택`
     picked.replaceChildren(...chars.length ? chars.map((id, k) => {
-      const lv = h('select', { 'aria-label': `${P(id).name} 돌파`, onchange: () => { bt[id] = +lv.value || undefined } },
-        h('option', { value: '' }, '돌파 -'), Array.from({ length: A.breakthrough }, (_, n) => h('option', { value: n + 1 }, `${n + 1}돌`)))
+      const lv = h('select', { 'aria-label': `${P(id).name} 레벨`, onchange: () => { bt[id] = +lv.value || undefined } },
+        h('option', { value: '' }, '레벨 -'), Array.from({ length: A.breakthrough }, (_, n) => h('option', { value: n + 1 }, `${n + 1}렙`)))
       lv.value = bt[id] || ''
       return h('span', { className: 'ac-pchip' },
         h('button', { type: 'button', title: k ? '눌러서 대표(맨 앞)로' : '대표 캐릭터', onclick: () => { chars = [id, ...chars.filter(c => c !== id)]; paint() } },
