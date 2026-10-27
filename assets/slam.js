@@ -1,7 +1,7 @@
 // 슈퍼 슬램 — 5:5 풀코트 오락실 농구(1P vs CPU). 머리 메뉴의 「게임」.
 // 90년대 오락실 농구(Super Slams) 느낌만 빌린 새 게임이다. 원작 롬 · 그림 · 팀 이름은 쓰지 않는다 — 롬은 저작물이라 이 공개 사이트에 둘 수 없다.
 // 선수 얼굴은 덩크 시티 선수(data/players.json). 1P 는 오른쪽 골대를 공격한다. 온라인 1:1 · 대전 기록은 아래 「온라인 1:1」. 궁극기는 20명이 다 다르다(SKILLS) — 게이지가 차면 쓴다.
-// 키: 방향키 · WASD 이동, 드리블 Z · J, 패스 X · K, 슛 C · L · 스페이스, 궁극기 V · U. 수비 때는 스틸 · 선수 바꾸기 · 블록 · 스틸 대시. 휴대폰은 캔버스 아래 스틱 · 버튼.
+// 키: 방향키 · WASD 이동, 드리블 Z · J, 패스 X · K, 슛 C · L · 스페이스, 궁극기 V · U. 수비 때는 스틸 · 선수 바꾸기 · 블록 · 수비 궁극기. 휴대폰은 캔버스 아래 스틱 · 버튼.
 // ponytail: 파울 · 자유투 · 아웃 오브 바운즈 · 하프코트 바이얼레이션 · 소리 없음 — 공은 코트 끝에서 튕겨 나온다
 import { mountTop, POS, copyLink } from './app.js?v=fb02b445'
 import { loadData, data, startAuth, me as who, loggedIn, h, ago } from './board.js?v=4233415a'
@@ -10,9 +10,9 @@ import { sb, api } from './auth.js?v=1fbb8e2f'
 mountTop('/slam/')
 startAuth('', () => {})   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
 
-const cv = document.getElementById('slam'), g = cv.getContext('2d')
-const W = 960, H = 540, DPR = Math.min(2, devicePixelRatio || 1)
-cv.width = W * DPR; cv.height = H * DPR; g.scale(DPR, DPR)
+const cv = document.getElementById('slam'), main = cv.getContext('2d')
+let g = main   // 그리는 곳 — 미리 그려 두는 그림(bake)을 만들 때만 잠깐 바뀐다
+const W = 960, H = 540
 
 const CL = 940, CW = 500, RIM = 100                 // 코트 길이 · 너비 · 림 높이(월드 단위 = 0.1피트)
 const HOOP = [{ x: 52, z: 250, shake: 0 }, { x: 888, z: 250, shake: 0 }]
@@ -24,7 +24,21 @@ const TEAMS = [
   { name: 'VIPERS_A', color: '#2f6fd0', dark: '#173c7a' },
   { name: 'VIPERS_B', color: '#8b4fd0', dark: '#4a2483' },
 ]
-const NUMS = [1, 7, 10, 23, 34]
+const NUMS = [1, 7, 10, 23, 34]   // 실제 등번호를 모르는 선수(덩크 시티에만 있는 선수)는 포지션 번호
+// 등번호 — 실제 NBA 등번호(가장 잘 알려진 번호). 선수 id 로 — 국내 서버에 아직 없는 선수(upcoming)도 들어오면 바로 쓴다
+const NBA_NUM = {
+  lkdqq: 77, bl: 1, weisblk: 0, sga: 2, klfd: 30, hcyh: 17, 'tyrese-haliburton': 0,
+  djse: 17, bk: 1, sskl: 30, klks: 11, clarkson: '00', kl: 11,
+  hwd: 20, dlz: 10, james: 23, ml: 24, wjs: 22, kjm: 23, durant: 35, blqz: 13, 'jimmy-butler': 22,
+  nwsj: 41, mkds: 24, yns: 34, wsblk: 1, kmlyhx: '00', lke: 1,
+  yjq: 15, bm: 13, pts: 52, dqq: 12, nejq: 27, ebd: 21, bldml: 6, kpl: 15, 'brook-lopez': 11, 'anthony-davis': 3,
+  'derrick-rose': 1, 'rajon-rondo': 9, 'jamal-murray': 27, 'jeremy-lin': 17, 'jason-kidd': 5, 'jrue-holiday': 21, 'kyrie-irving': 11, 'chris-paul': 3, 'tony-parker': 9,
+  'dwyane-wade': 3, 'ray-allen': 20, 'manu-ginobili': 20, 'anthony-edwards': 5, 'allen-iverson': 3, 'zach-lavine': 8, 'james-harden': 13, 'tyler-herro': 14, 'tracy-mcgrady': 1, 'cj-mccollum': 3,
+  'dillon-brooks': 24, 'metta-world-peace': 37, 'mikal-bridges': 25, 'brandon-ingram': 14, 'jaylen-brown': 7, 'kawhi-leonard': 2, 'paul-pierce': 34,
+  'dennis-rodman': 91, 'draymond-green': 23, 'lauri-markkanen': 23, 'blake-griffin': 32, 'aaron-gordon': 50, 'jaren-jackson-jr': 13, 'jayson-tatum': 0,
+  'karl-malone': 32, 'karl-anthony-towns': 32, 'tim-duncan': 21, 'pascal-siakam': 43,
+  'myles-turner': 33, 'ben-wallace': 3, 'victor-wembanyama': 1, 'shaquille-o-neal': 34, 'alonzo-mourning': 33, 'pau-gasol': 16, 'hakeem-olajuwon': 34,
+}
 const ULT_FILL = 1 / 32                                                        // 초당 — 32초면 찬다
 const SPOT = [[270, 0], [210, -150], [210, 150], [75, -100], [65, 100]]   // 공격 골대에서 [뒤로, 옆으로] — 포지션 1~5
 const SKIN = '#b9825a'
@@ -48,6 +62,18 @@ let net = null, myT = 0   // 온라인 1:1(아래 「온라인 1:1」) · 내 �
 
 const rnd = Math.random
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
+const sm = t => t * t * (3 - 2 * t)   // 부드럽게(smoothstep) — 0~1
+/** 키프레임 — [[시각, 값]…] 사이를 부드럽게 잇는다. 값은 수나 [앞, 높이] */
+function kf(t, keys) {
+  if (t <= keys[0][0]) return keys[0][1]
+  for (let i = 1; i < keys.length; i++) {
+    const [t1, b] = keys[i]
+    if (t > t1) continue
+    const [t0, a] = keys[i - 1], k = sm((t - t0) / (t1 - t0))
+    return Array.isArray(a) ? [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k] : a + (b - a) * k
+  }
+  return keys[keys.length - 1][1]
+}
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z)
 const goal = t => HOOP[t === 0 ? 1 : 0]              // 공격하는 골대
 const side = t => t === 0 ? 1 : -1                   // 공격 방향 x 부호
@@ -56,7 +82,7 @@ const nearest = (list, o) => list.reduce((a, b) => dist(b, o) < dist(a, o) ? b :
 const open = p => Math.min(...ps.filter(q => q.team !== p.team).map(q => dist(q, p)))   // 가장 가까운 수비까지
 let msgN = 0
 const say = (text, t = 1.1) => { msg = { text, t, t0: t, id: ++msgN } }
-const guarded = o => o.act === 'air' || o.act === 'cross' || o.act === 'dunk' || o.act === 'lay' || o.act === 'spin' || o.sure || o.ghost > 0   // 이 동작 중에는 스틸이 안 된다
+const guarded = o => o.act === 'air' || o.act === 'cross' || o.act === 'dunk' || o.act === 'lay' || o.act === 'hang' || o.act === 'spin' || o.sure || o.ghost > 0   // 이 동작 중에는 스틸이 안 된다
 /** 월드 → 화면. 가까울수록(z 가 클수록) 크게 — [x, y, 월드 1 의 픽셀]. 온라인으로 들어온 사람(myT 1)은 좌우를 뒤집어 자기도 오른쪽으로 공격한다 */
 function P(x, z, h = 0) { const u = S * (0.8 + 0.4 * z / CW); return [W / 2 + ((myT ? CL - x : x) - camX) * u, TOP + z * 0.7 - h * u, u] }
 
@@ -148,7 +174,7 @@ function start() {
   showTab(sides[myT])
   ps = [0, 1].flatMap(t => TEAMS[sides[t]].five.map((f, i) => ({
     team: t, i, f, x: 0, z: 0, h: 0, vh: 0, dir: side(t), run: 0, mv: false, act: null, t: 0,
-    cool: 0, stun: 0, fall: 0, think: 0, cut: 0, block: 0, reach: 0, ult: rnd() * 0.3, boost: 0, acc: 1, cdx: 0, dp: 0, hand: 1, sq: 0, kb: null, sure: false, trail: [], tt: 0,
+    cool: 0, stun: 0, fall: 0, think: 0, cut: 0, block: 0, reach: 0, ult: rnd() * 0.3, boost: 0, acc: 1, cheer: 0, throw: 0, f0: 1, vh0: 0, cdx: 0, dp: 0, hand: 1, sq: 0, kb: null, sure: false, trail: [], tt: 0,
     ghost: 0, hot: 0, slow: 0, ice: 0, big: 0, conf: 0, mirror: 0, wt: 0, poster: false, four: false, hook: false, vx: 0, vz: 0, fd: side(t), joints: {},
   })))
   score = [0, 0]; clock = GAME; shot = SHOT; offense = 0
@@ -181,7 +207,7 @@ function grab(p, why) {
   if (turn || ball.rebound) shot = SHOT
   if (turn) fresh(1 - p.team)
   offense = p.team
-  Object.assign(ball, { st: 'held', owner: p, to: null, rebound: false, sure: false, oop: false, chain: null, safe: false })
+  Object.assign(ball, { st: 'held', owner: p, to: null, rebound: false, sure: false, oop: false, chain: null, safe: false, tg: null })
   if (p.act === 'rush') p.act = null
   p.sure = false; p.dp = 0
   p.think = 0.3 + rnd() * 0.3
@@ -196,7 +222,7 @@ function made(t, pts, text, by) {
   burst(h.x, h.z, RIM, 40, ['#ffd23f', '#ff9d00', '#fff'])
   rings.push({ x: h.x, z: h.z, t: 0, c: '255,210,63' })
   h.shake = Math.max(h.shake, 0.3)
-  if (by) by.ult = Math.min(1, by.ult + 0.3)
+  if (by) { by.ult = Math.min(1, by.ult + 0.3); by.cheer = 1.2 }   // 넣은 선수는 주먹을 치켜든다
   Object.assign(ball, { st: 'drop', owner: null, x: h.x, z: h.z, h: RIM - 4, vx: 0, vz: 0, vh: -60 })
   offense = 1 - t; fresh(t)
   mode = 'dead'; wait = 1.2
@@ -236,14 +262,15 @@ function burst(x, z, h, n, c) {
 }
 /** 넘어뜨린다 — 밀려나는 속도(vx, vz)는 없어도 된다 */
 function knock(q, vx, vz, t) {
-  q.stun = q.fall = t
+  q.stun = q.fall = q.f0 = t
   q.act = null
   q.kb = vx || vz ? { vx, vz, t: 0.35 } : null
   burst(q.x, q.z, 4, 6, '#e3cfa3')
 }
 
 // ---------------------------------------------------------------- 궁극기 — 팀마다 포지션 1~5, 20명이 다 다르다
-// need = 골대까지 이 거리 안에서만 쓴다. cpu(골대까지, 가장 가까운 수비까지) = CPU 가 쓰는 때. 수비 때 궁극기는 모두 스틸 대시
+// 공격 궁극기는 공을 잡았을 때만, 수비 궁극기(def)는 수비 때만 쓴다. need = 골대까지 이 거리 안에서만 · reach = 공 가진 상대가 이 안에 있어야.
+// cpu = CPU 가 쓰는 때 — 공격은 (골대까지, 가장 가까운 수비까지), 수비는 (공 가진 상대까지, 그 상대가 골대까지)
 
 const close = (d, c) => c < 50, far = d => d > 200 && d < 460, drive = d => d > 150, any = () => true
 const SKILLS = [
@@ -251,29 +278,29 @@ const SKILLS = [
     { name: '앵클 브레이커', desc: '주변 수비가 넘어지고 빨라진다', cpu: close, fx: p => { down(p, 110, 1.6); p.boost = 2.5; say('ANKLE BREAKER!') } },
     { name: '딥 쓰리', desc: '어디서 던져도 꼭 들어가는 슛', cpu: far, fx: p => sureShot(p) },
     { name: '에어 워크', desc: '골대까지 날아가 덩크', cpu: drive, fx: p => Object.assign(p, { act: 'air', t: 0, sure: true }) },
-    { name: '불도저', desc: '주변 수비를 밀쳐 낸다', cpu: close, fx: p => { push(p, p, 150, 340, 1.3); p.boost = 2; shake = Math.max(shake, 10); say('BULLDOZER!') } },
+    { name: '불도저', def: true, reach: 320, desc: '공 가진 상대에게 돌진해 둘레까지 밀쳐 넘어뜨리고 공을 뺏는다', cpu: d => d < 260, fx: p => { Object.assign(p, { act: 'rush', t: 0 }); say('BULLDOZER!') } },
     { name: '메가 슬램', desc: '골밑에서 충격파 덩크', need: 300, cpu: d => d < 280, fx: p => { p.sure = true; dunkFrom(p, true) } },
   ],
   [   // VIPERS_N — 기술로
     { name: '팬텀 드리블', desc: '4초 동안 뺏기지 않고 수비를 통과한다', cpu: close, fx: p => { p.ghost = 4; say('PHANTOM!') } },
     { name: '핫 핸드', desc: '6초 동안 점프슛이 다 들어간다', cpu: d => d < 380, fx: p => { p.hot = 6; say('ON FIRE!') } },
     { name: '앨리웁 쇼', desc: '골밑 동료에게 띄워 주면 그대로 덩크', cpu: any, fx: p => oop(p) },
-    { name: '회오리 스핀', desc: '돌면서 주변 수비를 날려 버린다', cpu: close, fx: p => { Object.assign(p, { act: 'spin', t: 0 }); push(p, p, 100, 300, 1.1); p.boost = 1.5 } },
+    { name: '회오리 스핀', def: true, reach: 150, desc: '돌면서 둘레 상대를 날려 버린다 — 휘말린 상대는 공을 놓친다', cpu: d => d < 110, fx: p => { Object.assign(p, { act: 'spin', t: 0 }); fumbleNear(p, 150); push(p, p, 140, 300, 1.1); say('TORNADO!') } },
     { name: '스카이 훅', desc: '아무도 못 막는 높은 훅슛', need: 330, cpu: d => d < 300, fx: p => { p.hook = true; sureShot(p) } },
   ],
   [   // VIPERS_A — 얼음 · 시간
-    { name: '아이스 타임', desc: '주변 수비를 2초 동안 얼린다', cpu: close, fx: p => { freeze(p, 220, 2.2); rings.push({ x: p.x, z: p.z, t: 0, c: '170,225,255' }); say('FREEZE!') } },
+    { name: '아이스 타임', def: true, reach: 240, desc: '둘레 상대를 2초 동안 얼린다 — 얼어붙은 상대의 공은 손만 대도 뺏는다', cpu: d => d < 200, fx: p => { freeze(p, 240, 2.2); rings.push({ x: p.x, z: p.z, t: 0, c: '170,225,255' }); say('FREEZE!') } },
     { name: '포 포인트', desc: '3점 밖에서 꼭 들어가는 4점 슛', cpu: d => d > 240 && d < 460, fx: p => { p.four = true; sureShot(p) } },
     { name: '블링크 덩크', desc: '골대 앞으로 순간이동해 덩크', cpu: drive, fx: p => blink(p) },
-    { name: '슬로우 필드', desc: '5초 동안 상대 모두가 느려진다', cpu: any, fx: p => { for (const q of opp(p)) q.slow = 5; rings.push({ x: p.x, z: p.z, t: 0, c: '120,190,255', big: true }); say('SLOW!') } },
+    { name: '슬로우 필드', def: true, desc: '5초 동안 상대 모두가 느려진다', cpu: (d, g) => g < 420, fx: p => { for (const q of opp(p)) q.slow = 5; rings.push({ x: p.x, z: p.z, t: 0, c: '120,190,255', big: true }); say('SLOW!') } },
     { name: '자이언트', desc: '6초 동안 커져서 먼 데서도 덩크', cpu: any, fx: p => { p.big = 6; shake = Math.max(shake, 6); say('GIANT!') } },
   ],
   [   // VIPERS_B — 그림자
     { name: '미러 이미지', desc: '분신으로 상대를 3초 동안 헷갈리게 한다', cpu: close, fx: p => { for (const q of opp(p)) q.conf = 3.5; p.mirror = 3.5; p.boost = 2; say('WHO?!') } },
     { name: '체인 패스', desc: '동료 넷을 거친 공을 마지막이 꼭 넣는다', cpu: far, fx: p => chain(p) },
     { name: '포스터라이저', desc: '길을 막는 수비를 넘어뜨리며 덩크', cpu: drive, fx: p => Object.assign(p, { act: 'air', t: 0, sure: true, poster: true }) },
-    { name: '블랙홀', desc: '상대를 뒤쪽 한 점으로 빨아들인다', cpu: close, fx: p => blackhole(p) },
-    { name: '어스퀘이크', desc: '땅을 내리쳐 주변 상대를 모두 넘어뜨린다', cpu: close, fx: p => { down(p, 420, 1.5); p.sq = 0.3; shake = Math.max(shake, 22); rings.push({ x: p.x, z: p.z, t: 0, c: '220,160,90', big: true }); say('EARTHQUAKE!') } },
+    { name: '블랙홀', def: true, desc: '상대를 골대에서 먼 한 점으로 빨아들인다 — 공 가진 상대는 공을 놓친다', cpu: (d, g) => g < 300, fx: p => blackhole(p) },
+    { name: '어스퀘이크', def: true, desc: '땅을 내리쳐 둘레 상대를 모두 넘어뜨린다 — 공 가진 상대는 공을 놓친다', cpu: d => d < 300, fx: p => { fumbleNear(p, 420); down(p, 420, 1.5); p.sq = 0.3; shake = Math.max(shake, 22); rings.push({ x: p.x, z: p.z, t: 0, c: '220,160,90', big: true }); say('EARTHQUAKE!') } },
   ],
 ]
 const skillOf = p => SKILLS[sides[p.team]][p.i]
@@ -283,6 +310,14 @@ function down(p, r, t) { for (const q of opp(p)) if (dist(q, p) < r) knock(q, 0,
 function push(from, p, r, f, t) { for (const q of opp(p)) { const d = dist(q, from); if (d < r) knock(q, (q.x - from.x) / (d || 1) * f, (q.z - from.z) / (d || 1) * f, t) } }
 function freeze(p, r, t) { for (const q of opp(p)) if (dist(q, p) < r) Object.assign(q, { stun: t, ice: t, act: null, mv: false }) }
 function sureShot(p) { p.sure = true; shoot(p) }
+/** 공을 놓친다 — 손에서 튀어 나와 굴러간다(놓친 사람은 잠깐 못 줍는다) */
+function fumble(o) {
+  const [x, z, h] = hand(o)
+  Object.assign(ball, { st: 'loose', owner: null, x, z, h, vx: (rnd() - 0.5) * 180, vz: (rnd() - 0.5) * 180, vh: 170, rebound: false, sure: false })
+  o.cool = 0.6; o.sure = false
+  toBall()
+}
+const fumbleNear = (p, r) => { const o = ball.owner; if (o && o.team !== p.team && dist(o, p) < r) fumble(o) }
 function oop(p) {   // 골대에 가장 가까운 동료에게 높이 띄운다 — 가로챌 수 없다
   pass(p, nearest(team(p.team).filter(m => m !== p), goal(p.team)))
   Object.assign(ball, { oop: 'ult', safe: true })
@@ -301,8 +336,9 @@ function blink(p) {
   burst(p.x, p.z, 40, 18, ['#7ff3ff', '#fff'])
   dunkFrom(p, false)
 }
-function blackhole(p) {   // 공격 방향 반대쪽 한 점으로 — 골밑이 빈다
-  const at = { x: clamp(p.x - side(p.team) * 260, 30, CL - 30), z: 250 }
+function blackhole(p) {   // 상대를 그 골대에서 먼 한 점(공 가진 사람 뒤쪽)으로 — 골밑이 빈다. 공 가진 상대는 공을 놓친다
+  const o = 1 - p.team, c = ball.owner?.team === o ? ball.owner : nearest(opp(p), goal(o)), at = { x: clamp(c.x - side(o) * 260, 30, CL - 30), z: 250 }
+  fumbleNear(p, Infinity)
   for (const q of opp(p)) { const d = dist(q, at); if (d > 20) knock(q, (at.x - q.x) / d * Math.min(800, d * 2.6), (at.z - q.z) / d * Math.min(800, d * 2.6), 1.4) }
   for (const q of opp(p)) q.fall = 0   // 넘어지지 않고 빨려 가서 멍하니 선다
   rings.push({ x: at.x, z: at.z, t: 0, c: '170,90,255', in: true, big: true })
@@ -324,10 +360,8 @@ function step(p, dx, dz, spd, dt) {
   const k = 1 - Math.exp(-dt * 11)
   p.vx += (dx * spd - p.vx) * k; p.vz += (dz * spd * 0.85 - p.vz) * k
   p.x += p.vx * dt; p.z += p.vz * dt
-  const v = Math.hypot(p.vx, p.vz)
-  p.mv = v > 20
+  p.mv = Math.hypot(p.vx, p.vz) > 20
   if (Math.abs(p.vx) > 45) p.dir = Math.sign(p.vx)   // 실제로 그쪽으로 움직일 때만 돈다 — 제자리에서 방향이 떨리지 않게
-  p.run += dt * Math.min(1.3, v / SPD)   // 걸음 박자도 속도를 따라간다
 }
 function toward(p, tx, tz, spd, dt) {   // 가까워질수록 천천히 — 도착하면 선다
   const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz), k = d < 4 ? 0 : Math.min(1, d / 40) / d
@@ -338,7 +372,7 @@ const stop = p => { p.vx = p.vz = 0; p.mv = false }
 function pass(p, m) {
   const h = goal(p.team), dm = dist(m, h), lob = dm < 170 && (m.cut > 0 || dm < 120) && dm < dist(p, h) - 40   // 골밑으로 들어가는 동료 — 높이 띄우는 앨리웁
   Object.assign(ball, { st: 'pass', owner: null, to: m, x: p.x + p.dir * 12, z: p.z, h: 40, tried: new Set([p]), oop: lob && 'lob', chain: null, safe: false, sp: 560 * st(p).pass })
-  p.cool = 0.25
+  p.cool = 0.25; p.throw = 0.22   // 두 손으로 밀어 내는 몸짓
 }
 /** 스틱 방향에 가장 가까운 동료. 방향이 없으면 비어 있고 골대에 가까운 동료 */
 function mateFor(p, dx = 0, dz = 0) {
@@ -361,9 +395,12 @@ function crossover(p, ax, az) {
   for (const q of team(1 - p.team)) if (dist(q, p) < 45 && rnd() < 0.4) { knock(q, 0, 0, 0.9); say('ANKLES!', 0.7) }
 }
 
+// 덩크 — 땅에서 뛰면 DUNK_G 초 웅크렸다 뛴다. 높이 솟았다가 내려오며 림에 꽂는다(그때 몸 높이 DUNK_H — 손이 림에 온다). 넣으면 잠깐 림에 매달린다(hang)
+const DUNK_G = 0.07, DUNK_H = 12
+const du = p => clamp((p.t - DUNK_G) / p.dur, 0, 1)   // 덩크가 얼마나 지났나(0~1)
 function dunkFrom(p, mega) {   // 덩크 종류는 포지션마다 — 윈드밀 · 360 은 조금 더 오래 난다
   const list = DUNK_STYLES[p.i], style = mega ? 'two' : list[Math.floor(rnd() * list.length)], long = style === 'windmill' || style === 'spin'
-  Object.assign(p, { act: 'dunk', t: 0, from: { x: p.x, z: p.z }, dur: mega ? 0.6 : long ? 0.5 : 0.42, peak: mega ? 130 : long ? 96 : 88, vx: 0, vz: 0, style, mega })
+  Object.assign(p, { act: 'dunk', t: p.h > 0 ? DUNK_G : 0, from: { x: p.x, z: p.z, h: p.h }, dur: mega ? 0.6 : long ? 0.5 : 0.42, peak: mega ? 120 : long ? 92 : 84, vx: 0, vz: 0, style, mega })
   p.dir = Math.sign(goal(p.team).x - p.x) || p.dir
   if (style === 'reverse') p.dir = -p.dir   // 리버스 — 골대를 등지고 머리 너머로
 }
@@ -374,11 +411,12 @@ function shoot(p) {
   p.clutch = p.decided = false
   if (d < (p.big > 0 ? 200 : st(p).dunk)) dunkFrom(p, false)   // 덩크 거리는 포지션마다(자이언트는 멀리서도)
   else if (d < 140 && !p.sure) Object.assign(p, { act: 'lay', t: 0, from: { x: p.x, z: p.z }, dur: 0.42, vx: 0, vz: 0 })   // 그 안쪽은 레이업
-  else Object.assign(p, { act: 'shot', t: 0, rel: false, vh: JUMP * st(p).jump * (p.sure ? 1.15 : 1), vx: 0, vz: 0 })
+  else Object.assign(p, { act: 'shot', t: 0, rel: false, vh: 0, vh0: JUMP * st(p).jump * (p.sure ? 1.15 : 1), vx: 0, vz: 0 })   // SHOT_DIP 초 무릎을 굽혔다 뛴다
   // 가까운 수비는 조금 늦게 뛰어 막으러 온다(1P 가 움직이는 선수는 직접 뛴다)
   if (!p.sure) for (const q of ps) if (q.team !== p.team && ctls[q.team] !== q && dist(q, p) < 60 && rnd() < 0.75) q.block = 0.05 + rnd() * 0.22
 }
 const blocker = (p, r) => ps.find(q => q.team !== p.team && q.h > 22 && dist(q, p) < r)
+const SHOT_DIP = 0.06
 
 function letGo(p) {   // 점프슛을 놓는 순간
   const h = goal(p.team), d = dist(p, h), sure = p.sure || p.hot > 0, { four, hook, clutch } = p
@@ -386,8 +424,9 @@ function letGo(p) {   // 점프슛을 놓는 순간
   if (!sure) { const b = blocker(p, 40); if (b && rnd() < 0.45 * st(b).block * (clutch ? 0.35 : 1)) return swat(p, b) }   // 더블 클러치는 먼저 뛴 수비를 피한다
   const c = open(p), three = d > 237 || Math.abs(p.z - h.z) > 220
   const pr = Math.min(0.92, (d < 160 ? 0.62 : d < 237 ? 0.5 : d < 300 ? 0.38 : 0.12) * (c < 30 ? 0.55 : c < 55 ? 0.8 : 1) * (three ? st(p).three : st(p).mid) * (clutch ? 0.85 : 1))
+  const [bx, bz, bh] = hand(p)
   Object.assign(ball, {
-    st: 'shot', owner: null, x: p.x + p.dir * 6, z: p.z, h: p.h + 74, t: 0, T: 0.7 + d / 900, make: sure || rnd() < pr, pts: three ? (four ? 4 : 3) : 2, team: p.team, hoop: h,
+    st: 'shot', owner: null, x: bx, z: bz, h: bh, t: 0, T: 0.7 + d / 900, make: sure || rnd() < pr, pts: three ? (four ? 4 : 3) : 2, team: p.team, hoop: h,
     arc: hook ? 150 + d * 0.4 : 60 + d * 0.3, sure, by: p, msg: four && three ? '4 POINTS!' : hook ? 'SKY HOOK!' : sure && three ? 'DEEP THREE!' : clutch ? 'DOUBLE CLUTCH!' : '',
   })
   Object.assign(ball, { sx: ball.x, sz: ball.z, sh: ball.h })
@@ -409,7 +448,7 @@ function clutch(p) {
 function slam(p) {    // 덩크가 림에 닿는 순간
   const sure = p.sure || p.big > 0, mega = p.mega, lob = p.lob, h = goal(p.team)
   p.sure = p.poster = p.lob = false
-  if (!sure) { const b = blocker(p, 34); if (b && rnd() < 0.3 * st(b).block) return swat(p, b) }
+  if (!sure) { const b = blocker(p, 34); if (b && rnd() < 0.3 * st(b).block) { p.act = 'land'; return swat(p, b) } }   // 막히면 매달리지 않고 떨어진다
   h.shake = 0.6
   shake = Math.max(shake, mega ? 18 : 8)
   if (mega) {   // 충격파 — 골밑 상대가 다 넘어진다
@@ -423,35 +462,41 @@ function slam(p) {    // 덩크가 림에 닿는 순간
 function steal(p, o) {
   if (p.cool > 0) return
   p.cool = 0.5; p.reach = 0.2
-  if (!guarded(o) && rnd() < (ctls[p.team] ? 0.32 : 0.2) * st(p).steal) { grab(p, 'STEAL!'); p.ult = Math.min(1, p.ult + 0.2) }
+  if (!guarded(o) && (o.ice > 0 || rnd() < (ctls[p.team] ? 0.32 : 0.2) * st(p).steal)) { grab(p, 'STEAL!'); p.ult = Math.min(1, p.ult + 0.2) }   // 얼어붙은 상대는 손만 대도
   else p.stun = 0.3
 }
 
-// 궁극기 — 게이지가 차 있으면 컷인(느린 화면) 뒤에 fire(). 공을 가지면 포지션의 기술, 수비면 공 가진 상대에게 날아가는 스틸 대시
+// 궁극기 — 게이지가 차 있고 때가 맞으면 컷인(느린 화면) 뒤에 fire(). 공격 궁극기는 공을 잡았을 때, 수비 궁극기는 수비 때만
+const ultReady = p => p.ult >= 1 && (skillOf(p).def ? offense !== p.team : ball.owner === p)
 function ultimate(p) {
   if (p.ult < 1 || cut || p.act || p.h > 0 || p.stun > 0) return false
-  const off = ball.owner === p, need = skillOf(p).need
-  if (off && need && dist(p, goal(p.team)) > need) { if (ctls[p.team] === p) say('골대 가까이에서 써요', 0.8); return false }
-  if (!off) { const o = ball.owner; if (!o || o.team === p.team || o.sure || dist(p, o) > 320) return false }
+  const sk = skillOf(p), o = ball.owner, no = m => { if (ctls[p.team] === p) say(m, 0.8); return false }
+  if (sk.def) {
+    if (offense === p.team) return no('수비 궁극기 — 수비 때 써요')
+    if (sk.reach && !(o && o.team !== p.team && !o.sure && dist(p, o) < sk.reach)) return no('공 가진 상대 가까이에서 써요')
+  } else {
+    if (o !== p) return no(offense === p.team ? '공을 잡고 써요' : '공격 궁극기 — 공격 때 써요')
+    if (sk.need && dist(p, goal(p.team)) > sk.need) return no('골대 가까이에서 써요')
+  }
   p.ult = 0
-  cut = { p, off, t: 0 }
+  cut = { p, off: !sk.def, t: 0 }
   shake = Math.max(shake, 4)
   return true
 }
 function fire(p, off) {
-  if (!off) return void Object.assign(p, { act: 'rush', t: 0 })
-  if (ball.owner === p) skillOf(p).fx(p)   // 그새 뺏겼으면 그냥 지나간다
+  flash = 0.22
+  if (off ? ball.owner === p : offense !== p.team) skillOf(p).fx(p)   // 그새 공을 뺏겼거나 공격으로 바뀌었으면 그냥 지나간다
 }
 
 // 몸 — 쿨타임 · 게이지 · 점프 · 동작. 동작 중 공을 뺏겼으면(ball.owner 가 아니면) 놓지 않는다
 function body(p, dt) {
-  for (const k of ['cool', 'stun', 'fall', 'boost', 'cdx', 'sq', 'reach', 'ghost', 'hot', 'slow', 'ice', 'big', 'conf', 'mirror']) p[k] = Math.max(0, p[k] - dt)
+  for (const k of ['cool', 'stun', 'fall', 'boost', 'cdx', 'sq', 'reach', 'ghost', 'hot', 'slow', 'ice', 'big', 'conf', 'mirror', 'cheer', 'throw']) p[k] = Math.max(0, p[k] - dt)
   p.ult = Math.min(1, p.ult + dt * ULT_FILL * (ctls[p.team] ? 1 : 0.8))   // CPU 는 조금 느리게 찬다
   look(p, dt)
   if (p.kb) { p.x += p.kb.vx * dt; p.z += p.kb.vz * dt; if ((p.kb.t -= dt) <= 0) p.kb = null }
   const h = goal(p.team)
   if (p.act === 'cross') {
-    p.x += p.cx * dt; p.z += p.cz * dt; p.run += dt * 1.2
+    p.x += p.cx * dt; p.z += p.cz * dt
     if ((p.t += dt) >= 0.26) p.act = null
     return
   }
@@ -459,38 +504,45 @@ function body(p, dt) {
   if (p.act === 'air') {   // 에어 워크 · 앨리웁 · 포스터라이저 — 골대 앞까지 날아간다
     const d = dist(p, h), v = 620 * dt
     if (p.poster) for (const q of team(1 - p.team)) if (!q.fall && dist(q, p) < 36) knock(q, 0, (q.z > p.z ? 1 : -1) * 320, 1.3)   // 길을 막는 수비는 옆으로 쓰러진다
+    p.h += (34 - p.h) * Math.min(1, dt * 5)   // 떠올라 날아간다
     if (d < 80) return dunkFrom(p, false)
     p.vx = (h.x - p.x) / d * 620; p.vz = (h.z - p.z) / d * 620
-    p.x += p.vx * dt; p.z += p.vz * dt; p.run += dt * 2; p.dir = Math.sign(p.vx) || p.dir
+    p.x += p.vx * dt; p.z += p.vz * dt; p.dir = Math.sign(p.vx) || p.dir
     return
   }
-  if (p.act === 'rush') {  // 스틸 대시 — 공을 끝까지 쫓는다. 패스하면 날아가는 공을, 받으면 받은 사람을
-    const o = ball.owner, tg = o || ball, d = dist(p, tg), v = 700 * dt
+  if (p.act === 'rush') {  // 불도저 — 공을 끝까지 쫓아 닿으면 둘레까지 밀쳐 넘어뜨리고 뺏는다. 패스하면 날아가는 공을, 받으면 받은 사람을
+    const o = ball.owner, tg = o || ball, d = dist(p, tg)
     if (o ? o.team === p.team || o.sure || o.ghost > 0 : ball.st !== 'pass' && ball.st !== 'loose' || ball.safe) return void (p.act = null)
     if ((p.t += dt) > 1.5) return void (p.act = null)
-    if (d < 22) { p.act = null; return grab(p, 'STEAL!') }
+    if (d < 22) { p.act = null; push(p, p, 110, 320, 1.2); shake = Math.max(shake, 10); return grab(p, 'STEAL!') }
     p.vx = (tg.x - p.x) / d * 700; p.vz = (tg.z - p.z) / d * 700
-    p.x += p.vx * dt; p.z += p.vz * dt; p.dir = Math.sign(tg.x - p.x) || p.dir; p.run += dt * 2
+    p.x += p.vx * dt; p.z += p.vz * dt; p.dir = Math.sign(tg.x - p.x) || p.dir
     return
   }
   if (p.act === 'lay') {   // 레이업 — 림 앞까지 떠 가서 끝에 놓는다
     p.t += dt
     const u = Math.min(1, p.t / p.dur), k = Math.min(1, u * 1.3), tx = h.x - side(p.team) * 34
     p.x = p.from.x + (tx - p.from.x) * k; p.z = p.from.z + (h.z - p.from.z) * k
-    p.h = 66 * Math.sin(Math.min(1, u) * Math.PI / 2)
+    p.h = 50 * Math.sin(Math.min(1, u) * Math.PI / 2)
     airMind(p)
-    if (u >= 1) { p.act = 'land'; p.vh = 0; if (ball.owner === p) layIn(p) }
+    if (u >= 1) { if (ball.owner === p) layIn(p); p.act = 'land'; p.vh = 0 }   // 놓는 순간의 손(공) 자리에서 — 'land' 로 바꾸기 전에
     return
   }
   if (p.act === 'dunk') {
     p.t += dt
-    const u = Math.min(1, p.t / p.dur)
+    const u = du(p)
     p.x = p.from.x + (h.x - side(p.team) * 16 - p.from.x) * u; p.z = p.from.z + (h.z - p.from.z) * u
-    p.h = p.peak * Math.sin(u * Math.PI / 2)
-    if (u >= 1) { p.act = 'land'; p.vh = 0; if (ball.owner === p) slam(p) }
+    p.h = p.from.h * (1 - u) + DUNK_H * u + p.peak * Math.sin(u * Math.PI)
+    if (u >= 1) { if (ball.owner === p) { Object.assign(p, { act: 'hang', t: 0, vh: 0 }); slam(p) } else Object.assign(p, { act: 'land', vh: 0 }) }
     return
   }
-  if (p.act === 'shot') { airMind(p); if (!p.rel && (p.t += dt) >= (p.clutch ? 0.5 : 0.3)) { p.rel = true; if (ball.owner === p) letGo(p) } }
+  if (p.act === 'hang') { if ((p.t += dt) >= 0.24) Object.assign(p, { act: 'land', vh: 0 }); return }   // 림에 매달렸다가 내려온다
+  if (p.act === 'shot') {
+    p.t += dt
+    if (p.vh0 && p.t >= SHOT_DIP) { p.vh = p.vh0; p.vh0 = 0 }
+    airMind(p)
+    if (!p.rel && p.t >= (p.clutch ? 0.5 : 0.3) + SHOT_DIP) { p.rel = true; if (ball.owner === p) letGo(p) }
+  }
   if (p.h > 0 || p.vh > 0) {
     p.vh -= GRAV * dt; p.h += p.vh * dt
     if (p.h <= 0) {
@@ -504,7 +556,10 @@ function body(p, dt) {
 /** 보이기만 하는 것 — 핫 핸드 불꽃 · 드리블 박자 · 몸 돌리기 · 잔상. 온라인으로 들어온 사람 화면은 이것만 돌린다(watch) */
 function look(p, dt) {
   if (p.hot > 0 && rnd() < dt * 30) parts.push({ x: p.x + (rnd() - 0.5) * 16, z: p.z, h: 30 + rnd() * 50, vx: 0, vz: 0, vh: 260, t: 0.3, c: rnd() < 0.5 ? '#ff7a1a' : '#ffd23f' })   // 핫 핸드 — 불꽃
-  if (ball.owner === p) p.dp += dt * (7 + 4 * Math.min(1, Math.hypot(p.vx, p.vz) / SPD))
+  const a = Math.hypot(p.vx, p.vz) / SPD
+  if (ball.owner === p) p.dp += dt * (7 + 4 * Math.min(1, a))
+  if (p.act === 'air' || p.act === 'rush') p.run += dt * 3.4   // 걸음 박자(바퀴) — 날아가는 동안에도 다리는 달린다
+  else if (p.h === 0 && a > 0.05) p.run += dt * (1.5 + 1.3 * Math.min(a, 1.5)) * (p.vx * p.dir < -30 ? -1 : 1)   // 빠를수록 잦다. 뒷걸음은 거꾸로
   p.fd += (p.dir - p.fd) * (1 - Math.exp(-dt * 16))   // 몸 돌리기 — 방향이 바뀌면 0.1초쯤에 걸쳐 돈다
   if (p.act === 'cross' || p.act === 'air' || p.act === 'rush' || p.boost > 0 || p.kb) {   // 잔상
     if ((p.tt -= dt) <= 0) { p.tt = 0.035; p.trail.unshift({ x: p.x, z: p.z, h: p.h }); p.trail.length = Math.min(p.trail.length, 5) }
@@ -534,13 +589,16 @@ function user(p, [x, z], input, dt) {
     return
   }
   if (ball.owner === p) {
+    if (p.stun > 0) return   // 얼었거나 휘청이면 공을 다루지 못한다
     if (input.dr) crossover(p, ax, az)
     else if (input.pa) pass(p, mateFor(p, ax, az))
     else if (input.sh) shoot(p)
     return
   }
-  if (input.sh) jump(p)
-  if (input.dr) { const o = ball.owner; if (o && o.team !== p.team && dist(p, o) < 34) steal(p, o); else if (p.team !== offense && p.acc && canMove(p)) accel(p); else p.reach = 0.2 }   // 스틸이 안 닿으면 가속
+  if (!p.act && !(p.stun > 0)) {   // 동작 중 · 휘청일 때는 점프 · 스틸이 안 된다
+    if (input.sh) jump(p)
+    if (input.dr) { const o = ball.owner; if (o && o.team !== p.team && dist(p, o) < 34) steal(p, o); else if (p.team !== offense && p.acc && canMove(p)) accel(p); else p.reach = 0.2 }   // 스틸이 안 닿으면 가속
+  }
   if (input.pa) ctls[p.team] = nearest(team(p.team), ball)   // 공에 가장 가까운 선수로 바꾼다
 }
 
@@ -567,14 +625,15 @@ function ai(p, dt) {
     if (ball.owner?.team === p.team && rnd() < dt * (p.i >= 2 ? 0.25 : 0.12)) { p.cut = 1.3; p.cz = (rnd() - 0.5) * 80 }   // 포워드 · 센터가 더 자주 파고든다(앨리웁)
     return toward(p, h.x - s * back, h.z + lat, SPD * 0.9, dt)
   }
-  // 대인 수비 — 자기 사람과 골대 사이. 공 가진 사람은 붙어서 가끔 스틸, CPU 는 게이지가 차면 스틸 대시
+  // 대인 수비 — 자기 사람과 골대 사이. 공 가진 사람은 붙어서 가끔 스틸, CPU 는 게이지가 차면 수비 궁극기
   const man = ps.find(q => q.team !== p.team && q.i === p.i), h = goal(man.team), d = dist(man, h) || 1, gap = man === ball.owner ? 24 : 42
   toward(p, man.x + (h.x - man.x) / d * gap, man.z + (h.z - man.z) / d * gap, SPD * 0.93, dt)
   if (Math.abs(ball.x - p.x) > 14) p.dir = Math.sign(ball.x - p.x)   // 공을 본다 — 공이 바로 앞이면 그대로(좌우로 떨지 않게)
-  if (man !== ball.owner) return
+  const o = ball.owner, sk = skillOf(p)   // CPU 팀의 수비 궁극기 — 그 기술에 맞는 때(cpu)에
+  if (!ctls[p.team] && sk.def && p.ult >= 1 && o && o.team !== p.team && sk.cpu(dist(p, o), dist(o, goal(o.team))) && rnd() < dt * 0.7 && ultimate(p)) return
+  if (man !== o) return
   if (p.acc && dist(p, man) > 50 && dist(man, h) < dist(p, h)) return accel(p)   // 제쳐졌으면 가속으로 따라간다
-  if (!ctls[p.team] && p.ult >= 1 && dist(p, man) < 220 && rnd() < dt * 0.5) ultimate(p)
-  else if (dist(p, man) < 32 && rnd() < dt * 0.4) steal(p, man)
+  if (dist(p, man) < 32 && rnd() < dt * 0.4) steal(p, man)
 }
 
 // CPU 의 공 가진 선수 — 골대로 몰고 가다 비면 쏘고, 막히면 제치거나 패스. 게이지가 차면 포지션에 맞는 자리에서 궁극기
@@ -584,7 +643,7 @@ function handle(p, dt) {
   toward(p, h.x - s * (d > 300 ? 120 : 40), h.z + (d > 200 ? p.wz : p.wz * 0.3), speed(p) * 0.93, dt)
   if ((p.think -= dt) > 0) return
   p.think = 0.3 + rnd() * 0.4
-  if (p.ult >= 1 && skillOf(p).cpu(d, c) && rnd() < 0.6 && ultimate(p)) return
+  if (p.ult >= 1 && !skillOf(p).def && skillOf(p).cpu(d, c) && rnd() < 0.6 && ultimate(p)) return
   if (p.hot > 0 && d > 90 && d < 420) return shoot(p)   // 핫 핸드 동안은 보이면 쏜다
   if (c < 30 && p.cdx <= 0 && rnd() < 0.35) return crossover(p, 0, 0)
   if (d < 140 || shot < 2.5 || d < 300 && c > 55 && rnd() < (d < 237 ? 0.5 * st(p).mid : 0.3 * st(p).three)) shoot(p)
@@ -593,19 +652,28 @@ function handle(p, dt) {
 
 // ---------------------------------------------------------------- 공
 
-/** 공 자리 — 들고 있으면 손, 움직이면 바닥까지 튕긴다(|cos| 라 바닥에서 꺾여 올라온다) */
-/** 손에 든 공(= 앞 손) 자리 — 몸 기준 [앞으로, 위로]. 덩크는 종류마다 길이 다르고, 슛 · 레이업은 더블 클러치면 내렸다 다시 올린다 */
+/** 손에 든 공(= 앞 손) 자리 — 몸 기준 [앞으로, 위로]. 점프슛은 dip 에서 공을 내렸다 이마 위(셋 포인트)로, 레이업은 림으로 뻗고,
+ *  덩크는 종류마다 다른 길로 들어 올렸다가 림에 내리꽂는다(끝 = 림 높이). 더블 클러치는 내렸다 다시 올린다 */
+const SHOT_HAND = [[0, [10, 50]], [0.06, [10, 45]], [0.2, [7, 80]], [0.32, [6, 92]], [0.4, [15, 98]]]
+const LAY_HAND = [[0, [9, 46]], [0.45, [12, 70]], [1, [17, 96]]]
+const DUNK_HAND = {
+  two: [[0, [10, 52]], [0.5, [5, 98]], [0.82, [7, 102]], [1, [14, 86]]],
+  spin: [[0, [10, 52]], [0.4, [4, 96]], [0.85, [6, 100]], [1, [14, 86]]],
+  tomahawk: [[0, [10, 54]], [0.55, [-13, 96]], [0.8, [-6, 104]], [1, [16, 86]]],   // 머리 뒤로 젖혔다 내리꽂는다
+  reverse: [[0, [10, 52]], [0.5, [4, 100]], [0.85, [-4, 102]], [1, [-14, 86]]],   // 등진 채 머리 너머 뒤로
+}
 function pose(p) {
-  const u = Math.min(1, p.t / (p.dur || 1)), dip = s => p.clutch ? Math.sin(clamp(s, 0, 1) * Math.PI) : 0
-  if (p.act === 'shot') { const k = dip((p.t - 0.16) / 0.34); return [4 + 8 * k, 94 - 38 * k] }
-  if (p.act === 'lay') { const k = dip((u - 0.3) / 0.55); return [8 + 6 * u, 50 + 46 * u - 36 * k] }
-  if (p.style === 'windmill') { const th = u < 0.7 ? u / 0.7 * Math.PI : Math.PI * (1 + (u - 0.7)); return [-Math.sin(th) * 26, 60 - Math.cos(th) * 26] }   // 아래 → 뒤 → 위 → 앞으로 한 바퀴
-  if (p.style === 'tomahawk') return u < 0.6 ? [8 - 20 * u / 0.6, 60 + 34 * u / 0.6] : [-12 + 30 * (u - 0.6) / 0.4, 94 - 10 * (u - 0.6) / 0.4]   // 머리 뒤로 젖혔다 내리꽂는다
-  if (p.style === 'reverse') return [-6 - 6 * u, 90 + 6 * u]   // 등진 채 머리 너머로
-  return [4 + 10 * u, 92 - 4 * u]   // 투핸드 · 360
+  const dip = s => p.clutch ? Math.sin(clamp(s, 0, 1) * Math.PI) : 0
+  if (p.act === 'shot') { const k = dip((p.t - 0.22) / 0.34), [fw, up] = kf(p.t, SHOT_HAND); return [fw + 8 * k, up - 40 * k] }
+  if (p.act === 'lay') { const u = Math.min(1, p.t / p.dur), k = dip((u - 0.3) / 0.55), [fw, up] = kf(u, LAY_HAND); return [fw, up - 36 * k] }
+  if (p.act === 'hang') return [p.style === 'reverse' ? -14 : 14, 86]
+  const u = du(p)
+  if (p.style === 'windmill') { const th = 0.5 - sm(u) * (0.5 + 1.27 * Math.PI); return [2 + Math.sin(th) * 24, 72 - Math.cos(th) * 24] }   // 앞 아래 → 뒤 → 머리 위 → 앞으로 한 바퀴
+  return kf(u, DUNK_HAND[p.style] || DUNK_HAND.two)
 }
 function hand(p) {
-  if (p.act === 'shot' || p.act === 'dunk' || p.act === 'lay') { const [fw, up] = pose(p); return [p.x + p.fd * fw, p.z, p.h + up + 4] }
+  if (p.act === 'shot' || p.act === 'dunk' || p.act === 'lay' || p.act === 'hang') { const [fw, up] = pose(p); return [p.x + p.fd * fw, p.z, p.h + up + 4] }
+  if (cut?.p === p && !p.act) return [p.x + p.fd * 9, p.z, p.h + 88]   // 궁극기 — 공을 머리 위로 치켜든다
   if (p.act === 'air') return [p.x + p.dir * 12, p.z, p.h + 50]   // 가슴 앞에 두 손으로
   if (p.act === 'cross') return [p.x + p.fd * 10, p.z + p.hand * (16 * Math.min(1, p.t / 0.26) - 8), 6]   // 낮게 몸 앞을 가로지른다
   return [p.x + p.fd * 12, p.z + p.hand * 5, 2 + 32 * Math.abs(Math.cos(p.dp))]   // 몸이 도는 만큼 공도 앞으로 돌아온다
@@ -617,7 +685,13 @@ function moveBall(dt, view) {
   if (ball.st === 'shot' || ball.st === 'pass' || ball.st === 'loose' && ball.h > 8) { ball.trail.unshift({ x: ball.x, z: ball.z, h: ball.h }); ball.trail.length = Math.min(ball.trail.length, 7) }
   else ball.trail.length = 0
   if (ball.st === 'held') {
-    if (ball.owner) [ball.x, ball.z, ball.h] = hand(ball.owner)
+    if (ball.owner) {   // 손 자리가 확 바뀌면(잡는 순간 · 드리블 → 슛) 그 차이(off)를 남겼다가 빨리 줄여 공이 부드럽게 손으로 간다
+      const t = hand(ball.owner), q = ball.tg, o = ball.off ||= [0, 0, 0], k = Math.exp(-dt * 16)
+      if (!q) { o[0] = ball.x - t[0]; o[1] = ball.z - t[1]; o[2] = ball.h - t[2] }
+      else if (Math.hypot(t[0] - q[0], t[1] - q[1], t[2] - q[2]) > 18) for (let i = 0; i < 3; i++) o[i] += q[i] - t[i]
+      for (let i = 0; i < 3; i++) o[i] *= k
+      ball.tg = t; ball.x = t[0] + o[0]; ball.z = t[1] + o[1]; ball.h = t[2] + o[2]
+    }
   } else if (ball.st === 'pass') {   // 받는 사람을 따라간다. 지나가는 길의 상대는 한 번씩 가로챌 기회
     if (!ball.to) return
     const m = ball.to, dx = m.x - ball.x, dz = m.z - ball.z, d = Math.hypot(dx, dz), v = (ball.safe ? 900 : ball.sp || 560) * dt
@@ -663,7 +737,7 @@ function moveBall(dt, view) {
 const BTN = ['dr', 'pa', 'sh', 'ul'], PLAY = new Set(['tip', 'play', 'dead', 'over'])
 const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }]
 // 장면에 싣는 선수 값(x · z · h 뒤에) · 공 값(잡은 선수 · 받을 선수 · 골대 번호 뒤에)
-const SYNC = ['vx', 'vz', 'vh', 'dir', 'run', 'act', 't', 'dur', 'style', 'hand', 'clutch', 'fall', 'sq', 'big', 'ice', 'ghost', 'hot', 'slow', 'mirror', 'conf', 'ult', 'reach', 'boost', 'kb', 'acc']
+const SYNC = ['vx', 'vz', 'vh', 'dir', 'act', 't', 'dur', 'style', 'hand', 'clutch', 'fall', 'f0', 'sq', 'big', 'ice', 'ghost', 'hot', 'slow', 'mirror', 'conf', 'ult', 'reach', 'boost', 'kb', 'acc', 'cheer', 'throw']
 const BSYNC = ['st', 'x', 'z', 'h', 'vx', 'vz', 'vh', 'sure', 'oop', 'safe', 'sx', 'sz', 'sh', 't', 'T', 'arc', 'sp']
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v ?? 0
 let rq = 0, rn = [0, 0, 0, 0]   // 방장: 받은 상대 입력의 마지막 순번 · 버튼마다 누른 횟수
@@ -805,6 +879,7 @@ function applySnap(s) {
   ball.owner = ps[oi] || null; ball.to = ps[ti] || null; ball.hoop = HOOP[hi] || null
   if (tip) tip.t = s.tp
   if (s.g && s.g[0] !== msg?.id) msg = { id: s.g[0], text: String(s.g[1]), t0: s.g[2], t: s.g[3] }
+  if (cut && !s.u) flash = 0.22   // 궁극기가 터졌다
   cut = s.u ? cut?.p === ps[s.u[0]] ? cut : { p: ps[s.u[0]], off: !!s.u[1], t: s.u[2] } : null
   for (const f of s.fx) burst(...f)
   rings = s.r.map(([x, z, t, c, i, b]) => ({ x, z, t, c: c || undefined, in: !!i, big: !!b }))
@@ -818,15 +893,16 @@ function watch(rdt) {
   if (msg && (msg.t -= rdt) <= 0) msg = null
   if (mode === 'over') wait -= rdt
   if (cut) cut.t += rdt
+  flash = Math.max(0, flash - rdt)
   const dt = cut ? rdt * 0.08 : rdt, k = 1 - Math.exp(-rdt * 20)
   for (const p of ps) {
     if (p.nx == null) continue
     p.nx += p.vx * dt; p.nz += p.vz * dt
-    if (p.nh > 0 || p.vh > 0) { p.vh -= GRAV * dt; p.nh = Math.max(0, p.nh + p.vh * dt) }
+    const scripted = p.act === 'dunk' || p.act === 'lay' || p.act === 'hang' || p.act === 'air' || p.act === 'rush'   // 높이를 정해 두고 움직이는 동작 — 떨어뜨려 미리 움직이지 않는다
+    if (!scripted && (p.nh > 0 || p.vh > 0)) { p.vh -= GRAV * dt; p.nh = Math.max(0, p.nh + p.vh * dt) }
     p.x += (p.nx - p.x) * k; p.z += (p.nz - p.z) * k; p.h += (p.nh - p.h) * k
     if (p.act) p.t += dt
-    p.run += dt * Math.min(1.3, Math.hypot(p.vx, p.vz) / SPD)
-    p.sq = Math.max(0, p.sq - dt)
+    for (const q of ['sq', 'cheer', 'throw', 'reach']) p[q] = Math.max(0, p[q] - dt)
     look(p, dt)
   }
   if (mode === 'tip') { tip.t += dt; ball.h = 60 + 300 * tip.t - 250 * tip.t ** 2 }
@@ -894,6 +970,7 @@ function update(rdt) {
   shake = shake > 0.3 ? shake * Math.exp(-7 * rdt) : 0
   if (msg && (msg.t -= rdt) <= 0) msg = null
   if (mode === 'over') wait -= rdt
+  flash = Math.max(0, flash - rdt)
   if (cut && (cut.t += rdt) >= 0.9) { const c = cut; cut = null; fire(c.p, c.off) }
   const dt = cut ? rdt * 0.08 : rdt   // 컷인 동안은 거의 멈춘다
   if (mode === 'tip') { for (const p of ps) body(p, dt); tipOff(dt) }
@@ -905,7 +982,7 @@ function update(rdt) {
     for (const p of ps) body(p, dt)
     for (const t of [0, 1]) if (ctls[t]) user(ctls[t], t ? rax : axis(), inputs[t], dt)   // 2팀 사람 = 온라인 상대(방장이 받은 스틱 · 버튼)
     for (const p of ps) if (ctls[p.team] !== p) ai(p, dt)
-    const through = p => p.act === 'dunk' || p.act === 'air' || p.act === 'rush' || p.ghost > 0
+    const through = p => p.act === 'dunk' || p.act === 'hang' || p.act === 'air' || p.act === 'rush' || p.ghost > 0
     for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {   // 겹치지 않게 밀어낸다
       const a = ps[i], b = ps[j], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz)
       if (d > 0 && d < 20 && !through(a) && !through(b)) { const m = (20 - d) / 2 / d; a.x -= dx * m; a.z -= dz * m; b.x += dx * m; b.z += dz * m }
@@ -948,50 +1025,71 @@ const arc = (cx, cz, r, a0, a1, n = 24) => Array.from({ length: n + 1 }, (_, i) 
 const oval = (x, y, rx, ry) => { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2) }
 const face = (f, x, y, size) => { if (f.img?.complete && f.img.naturalWidth) g.drawImage(f.img, x, y, size, size) }
 
-const CROWD = Array.from({ length: 360 }, (_, i) => ({ x: -260 + rnd() * (CL + 520), row: i % 4, c: ['#e8c07a', '#c5523b', '#3d6fb5', '#e9e2d0', '#6b4b8a', '#2f8a6a', '#d98a3a'][i % 7], ph: rnd() * 6 }))
+// 해상도 — 느린 기기는 경기 중에 낮춘다(frame). 바뀌면 미리 그려 둔 그림(바닥 · 전광판 · 조명)도 다시 그린다
+let dpr = 0, floorC = null, ledC = null, glowC = null
+function resize(d) { dpr = d; cv.width = W * d; cv.height = H * d; main.setTransform(d, 0, 0, d, 0, 0); floorC = ledC = glowC = null }
+resize(Math.min(2, devicePixelRatio || 1))
+/** 한 번 그려 두는 그림 — 화면 좌표 (x0, y0) 부터 w × h 를 fn 으로 그린다(그동안 g 가 그 그림을 가리킨다) */
+function bake(x0, y0, w, h, fn) {
+  const c = Object.assign(document.createElement('canvas'), { width: Math.ceil(w * dpr), height: Math.ceil(h * dpr) })
+  g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, -x0 * dpr, -y0 * dpr)
+  try { fn() } finally { g = main }
+  return c
+}
+/** 가운데가 진하고 가장자리로 사라지는 동그라미 한 장 — 카메라 플래시 · 선수 그림자에 늘려 쓴다 */
+function blob(rgb) {
+  const c = Object.assign(document.createElement('canvas'), { width: 64, height: 64 }), x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32)
+  gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(1, `rgba(${rgb},0)`)
+  x.fillStyle = gr; x.fillRect(0, 0, 64, 64)
+  return c
+}
+const GLOW = blob('255,255,255'), SHADOW = blob('0,0,0')
+
+const CROWD_C = ['#e8c07a', '#c5523b', '#3d6fb5', '#e9e2d0', '#6b4b8a', '#2f8a6a', '#d98a3a']
+const CROWD = Array.from({ length: 360 }, (_, i) => ({ x: -260 + rnd() * (CL + 520), row: i % 4, j: i % 7, ph: rnd() * 6, sx: 0, sy: 0 }))
+const LED_P = 546   // 전광판 글자가 되풀이되는 길이(글자 간격 273 × 2)
 function backdrop() {
   const sky = g.createLinearGradient(0, 50, 0, TOP)
   sky.addColorStop(0, '#141a28'); sky.addColorStop(1, '#2a3550')
   g.fillStyle = sky; g.fillRect(0, 50, W, TOP)
   const hype = msg ? 4 : 1   // 득점 · 궁극기 때는 관중이 들썩인다
-  for (const c of CROWD) {   // 관중 — 코트보다 느리게 흐른다
-    const x = W / 2 + (c.x - camX) * 0.9, y = 64 + c.row * 12 - Math.max(0, Math.sin(tnow * 3.5 * hype + c.ph)) * hype
-    g.fillStyle = c.c; g.fillRect(x - 6, y + 4, 12, 10)
-    g.fillStyle = '#d9a77c'; oval(x, y, 5, 5); g.fill()
-  }
+  for (const c of CROWD) { c.sx = W / 2 + (c.x - camX) * 0.9; c.sy = 64 + c.row * 12 - Math.max(0, Math.sin(tnow * 3.5 * hype + c.ph)) * hype }   // 관중 — 코트보다 느리게 흐른다
+  const seen = c => c.sx > -8 && c.sx < W + 8
+  CROWD_C.forEach((col, j) => { g.fillStyle = col; g.beginPath(); for (const c of CROWD) if (c.j === j && seen(c)) g.rect(c.sx - 6, c.sy + 4, 12, 10); g.fill() })   // 옷 색마다 한 번에
+  g.fillStyle = '#d9a77c'; g.beginPath(); for (const c of CROWD) if (seen(c)) { g.moveTo(c.sx + 5, c.sy); g.arc(c.sx, c.sy, 5, 0, Math.PI * 2) } g.fill()
   if (rnd() < (msg ? 0.6 : 0.08)) flashes.push({ x: rnd() * W, y: 60 + rnd() * 46, t: 0.12 })   // 카메라 플래시 — 득점 때 많이
-  g.globalCompositeOperation = 'lighter'
-  for (const f of flashes) {
-    const r = 14 * f.t / 0.12, fg = g.createRadialGradient(f.x, f.y, 0, f.x, f.y, r)
-    fg.addColorStop(0, 'rgba(255,255,255,.95)'); fg.addColorStop(1, 'rgba(255,255,255,0)')
-    g.fillStyle = fg; g.fillRect(f.x - r, f.y - r, r * 2, r * 2)
-  }
-  g.globalCompositeOperation = 'source-over'
-  // 전광판 — 글자가 천천히 흐르고 빛난다
-  const led = g.createLinearGradient(0, 110, 0, 136)
-  led.addColorStop(0, '#0b1020'); led.addColorStop(1, '#151c30')
-  g.fillStyle = led; g.fillRect(0, 110, W, 26)
-  g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(0, 110, W, 1)
-  g.font = '800 15px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
-  const roll = (tnow * 30) % 520
-  for (let i = -3; i < 8; i++) {
-    g.fillStyle = i % 2 ? '#f5a623' : '#e9edf5'; g.shadowColor = g.fillStyle; g.shadowBlur = 8
-    g.fillText(i % 2 ? 'SUPER SLAM' : 'TNAB VIPERS', W / 2 + (i * 260 - camX) * 1.05 - roll, 123)
-  }
-  g.shadowBlur = 0
+  g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.95
+  for (const f of flashes) { const r = 14 * f.t / 0.12; g.drawImage(GLOW, f.x - r, f.y - r, r * 2, r * 2) }
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1
+  ledC ||= bake(0, 110, W + LED_P, 26, () => {   // 전광판 — 빛나는 글자 띠를 한 번 그려 두고 흘린다
+    const led = g.createLinearGradient(0, 110, 0, 136)
+    led.addColorStop(0, '#0b1020'); led.addColorStop(1, '#151c30')
+    g.fillStyle = led; g.fillRect(0, 110, W + LED_P, 26)
+    g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(0, 110, W + LED_P, 1)
+    g.font = '800 15px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
+    for (let i = -2; i < 5; i++) { g.fillStyle = i % 2 ? '#f5a623' : '#e9edf5'; g.shadowColor = g.fillStyle; g.shadowBlur = 8; g.fillText(i % 2 ? 'SUPER SLAM' : 'TNAB VIPERS', W / 2 + i * 273, 123) }
+  })
+  g.drawImage(ledC, -(((camX * 1.05 + tnow * 30) % LED_P + LED_P) % LED_P), 110, W + LED_P, 26)
 }
-/** 천장 조명 — 위에서 코트로 떨어지는 빛줄기(화면에 고정) */
-function lights() {
-  g.globalCompositeOperation = 'lighter'
-  for (const lx of [W * 0.22, W * 0.5, W * 0.78]) {
-    const lg = g.createLinearGradient(0, 50, 0, H)
-    lg.addColorStop(0, 'rgba(255,245,215,.09)'); lg.addColorStop(1, 'rgba(255,245,215,0)')
-    g.fillStyle = lg; g.beginPath(); g.moveTo(lx - 30, 50); g.lineTo(lx + 30, 50); g.lineTo(lx + 170, H); g.lineTo(lx - 170, H); g.fill()
-  }
-  g.globalCompositeOperation = 'source-over'
+/** 천장 조명 빛줄기 + 가장자리 어둡게 — 화면에 고정이라 한 번 그려 두고 덮는다 */
+function overlay() {
+  glowC ||= bake(0, 50, W, H - 50, () => {
+    for (const lx of [W * 0.22, W * 0.5, W * 0.78]) {
+      const lg = g.createLinearGradient(0, 50, 0, H)
+      lg.addColorStop(0, 'rgba(255,245,215,.09)'); lg.addColorStop(1, 'rgba(255,245,215,0)')
+      g.fillStyle = lg; g.beginPath(); g.moveTo(lx - 30, 50); g.lineTo(lx + 30, 50); g.lineTo(lx + 170, H); g.lineTo(lx - 170, H); g.fill()
+    }
+    const v = g.createRadialGradient(W / 2, H / 2 + 30, H * 0.3, W / 2, H / 2, W * 0.62)
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.42)')
+    g.fillStyle = v; g.fillRect(0, 50, W, H - 50)
+  })
+  g.drawImage(glowC, 0, 50, W, H - 50)
 }
 
-function court() {
+// 코트 바닥 — 카메라가 가운데(C0)일 때 한 번 그려 두고, 카메라가 움직이면 기울여 옮긴다.
+// 원근 때문에 가까운 줄(아래)일수록 많이 움직이는데, 줄의 화면 높이와 움직이는 양이 정비례라 화면에서는 기울이기(shear) 한 번과 같다
+const C0 = CL / 2, FM = 320, FY = TOP - 16
+function floor() {
   poly([[-400, -20], [CL + 400, -20], [CL + 400, CW + 60], [-400, CW + 60]], '#7c4f28', null, true)
   const [, y0] = P(0, 0), [, y1] = P(0, CW), wood = g.createLinearGradient(0, y0, 0, y1)
   wood.addColorStop(0, '#d29a62'); wood.addColorStop(1, '#c07a43')
@@ -1021,6 +1119,11 @@ function court() {
     sg.addColorStop(0, 'rgba(255,240,210,.2)'); sg.addColorStop(1, 'rgba(255,240,210,0)')
     g.save(); g.translate(gx, gy); g.scale(1, 0.38); g.translate(-gx, -gy); g.fillStyle = sg; g.beginPath(); g.arc(gx, gy, R, 0, Math.PI * 2); g.fill(); g.restore()
   }
+}
+function court() {
+  floorC ||= bake(-FM, FY, W + FM * 2, H - FY, () => { const c = camX; camX = C0; try { floor() } finally { camX = c } })
+  const d = camX - C0, k = -d * S * 0.4 / (0.7 * CW)
+  g.save(); g.transform(1, 0, k, 1, -d * S * 0.8 - k * TOP, 0); g.drawImage(floorC, -FM, FY, W + FM * 2, H - FY); g.restore()
   for (const r of rings) {   // 충격파 — 블랙홀은 안으로 빨려 든다
     const k = r.in ? 1 - r.t / 0.6 : r.t / 0.6, [rx, ry, u] = P(r.x, r.z), R = (30 + (r.big ? 420 : 220) * k) * u
     g.strokeStyle = `rgba(${r.c || '255,220,120'},${r.in ? k : 1 - k})`; g.lineWidth = 6 * (1 - k) + 1
@@ -1042,7 +1145,7 @@ function drawHoop(h) {
   const [sx, sy, su] = P(bx, 250, 146)   // 백보드 위 샷클락
   g.fillStyle = '#05070c'; g.fillRect(sx - 11 * su, sy - 6 * su, 22 * su, 11 * su)
   g.fillStyle = '#ff3b2f'; g.font = `700 ${8 * su}px ui-monospace, Menlo, Consolas, monospace`; g.textAlign = 'center'; g.textBaseline = 'middle'
-  g.shadowColor = '#ff3b2f'; g.shadowBlur = 6; g.fillText(String(Math.ceil(shot)).padStart(2, '0'), sx, sy); g.shadowBlur = 0
+  g.fillText(String(Math.ceil(shot)).padStart(2, '0'), sx, sy)
   const [x, y0, u] = P(h.x, h.z, RIM), y = y0 + wob
   g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 1.1
   for (let i = 0; i < 12; i++) {   // 그물 — 흔들릴 때는 아래가 출렁인다
@@ -1089,6 +1192,141 @@ function head(p, f, x, y, u) {
   g.save(); g.translate(x, y); g.scale(sx, 1); g.drawImage(p.f.head, -12.25 * u, -13.2 * u, 24.5 * u, 26 * u); g.restore()
 }
 
+// ---------------------------------------------------------------- 몸짓
+// 선수는 자세 하나(엉덩이 높이 hip · 윗몸 숙이기 bend · 어깨 sh · 두 손 · 두 발)를 상태마다 정하고(rig) 그 자세를 부드럽게 따라간다(settle).
+// 동작(점프슛 · 레이업 · 덩크 · 크로스오버 · 궁극기)은 키프레임(kf)으로 — 준비(웅크리기) → 도약 → 정점 → 마무리(팔로 스루 · 착지)가 있다.
+// 걷기 · 달리기는 걸음 박자(p.run)대로 디딘 발이 몸 속도만큼 뒤로 밀리고(미끄러지지 않게) 든 발이 앞으로 나간다. 팔은 다리와 엇갈려 흔든다.
+// 몸 단위: 앞(fw) = 보는 쪽, 높이 = 발바닥에서. 서 있으면 엉덩이 37 · 어깨 60 · 머리 75. 손은 몸에 붙은 자리(숙이고 웅크린 만큼 따라간다),
+// 공 길(pose — abs), 또는 'ball'(튀는 공을 따라간다)
+
+/** 지금 상태의 자세. k = 따라가는 빠르기(초당) */
+function rig(p, holding) {
+  const a = Math.min(1.5, Math.hypot(p.vx, p.vz) / SPD), run = Math.min(1, a), ph = p.run * Math.PI * 2, air = p.h > 0, act = p.act, o = ball.owner
+  const br = Math.sin(tnow * 2.3 + p.i * 1.7)   // 숨쉬기
+  const R = { hip: 36.4 + br * 0.25, bend: 0.8, sh: br * 0.35, sl: p.fall ? 0 : clamp((myT ? -1 : 1) * p.vx / SPD, -1.3, 1.3) * 0.1, nh: [9.5, 35], fh: [-8.5, 35], nf: [2.5, 0], ff: [-2.5, 0], hd: [0, 0], k: 10 }
+  const set = v => Object.assign(R, v)
+  /** 걸음 — [먼 발, 가까운 발]. 박자의 앞 절반은 디딤(L → -L, 몸 속도만큼 뒤로), 뒤 절반은 듦(들어 올려 앞으로) */
+  const gait = (L, lift) => [0, 1].map(k => { const c = ((p.run + k / 2) % 1 + 1) % 1; return c < 0.5 ? [L * (1 - 4 * c), 0] : [-L + 2 * L * sm(c * 2 - 1), lift * Math.sin((c * 2 - 1) * Math.PI)] })
+  if (p.fall > 0) set(p.fall < 0.3   // 넘어짐 — 몸은 drawPlayer 가 눕힌다. 팔다리를 벌리고, 일어날 때는 웅크린다
+    ? { hip: 31, bend: 5, nh: [10, 36], fh: [-4, 36], nf: [6, 0], ff: [-5, 0], k: 14 }
+    : { hip: 33, bend: 1, nh: [14, 66], fh: [-12, 62], nf: [7, 7], ff: [-1, 10], k: 12 })
+  else if (act === 'shot') {   // 점프슛 — 무릎을 굽혀(dip) 공을 낮췄다가 뛰며 이마 위로, 정점에서 손목을 꺾어 놓고 팔을 뻗은 채(팔로 스루) 내려온다
+    const t = p.t, q = holding ? pose(p) : null
+    set({ abs: true, hip: kf(t, [[0, 36], [0.05, 32.5], [0.1, 37]]), bend: kf(t, [[0, 2], [0.06, 3.5], [0.18, 0.4], [0.36, -1.6]]),
+      nh: q || [15, 98], fh: q ? [q[0] - 5, q[1] - 4] : [5, 84], k: 40,
+      nf: kf(t, [[0, [2, 0]], [0.06, [3, 0]], [0.14, [0, 4]], [0.36, [3, 8]]]), ff: kf(t, [[0, [-2, 0]], [0.06, [-3, 0]], [0.14, [-2, 3]], [0.36, [0, 6]]]) })
+  }
+  else if (act === 'lay') {   // 레이업 — 한 발로 뛰어 반대 무릎을 끌어올리고 공을 든 손을 림으로 쭉 뻗는다. 다른 팔은 옆으로 벌려 균형
+    const u = Math.min(1, p.t / p.dur)
+    set({ abs: true, hip: 37, bend: kf(u, [[0, 3.5], [1, 1]]), nh: holding ? pose(p) : [16, 96], fh: kf(u, [[0, [-5, 52]], [0.6, [-11, 70]], [1, [-10, 76]]]), k: 40,
+      nf: kf(u, [[0, [5, 2]], [0.35, [10, 16]], [1, [9, 19]]]), ff: kf(u, [[0, [-4, 0]], [0.3, [-6, 2]], [1, [-3, 1]]]) })
+  }
+  else if (act === 'dunk') {   // 덩크 — 웅크렸다 터지듯 뛰어 다리를 접고, 공을 들어 올렸다가 림에 내리꽂는다. 종류마다 팔 · 다리가 다르다
+    const q = pose(p), st = p.style
+    if (p.t < DUNK_G) { const g0 = sm(p.t / DUNK_G); set({ abs: true, hip: 37 - 6 * g0, bend: 2 + 4 * g0, nh: q, fh: [q[0] - 5, q[1] - 3], nf: [5, 0], ff: [-4, 0], k: 45 }) }
+    else {
+      const u = du(p), legs = DUNK_LEGS[st] || DUNK_LEGS.two
+      set({ abs: true, hip: 37, k: 45, nh: q, nf: kf(u, legs[0]), ff: kf(u, legs[1]),
+        bend: st === 'tomahawk' ? kf(u, [[0, 4], [0.55, -4], [0.9, 5]]) : st === 'reverse' ? kf(u, [[0, 2], [0.6, -3], [1, -1]]) : kf(u, [[0, 5], [0.5, 0], [0.92, 3]]),
+        fh: st === 'tomahawk' ? kf(u, [[0, [6, 60]], [0.55, [15, 72]], [1, [10, 64]]])   // 반대 팔은 앞으로 내밀어 균형
+          : st === 'windmill' ? [4 - q[0], 144 - q[1]]   // 공과 엇갈려 반대쪽을 돈다
+          : [q[0] - 5, q[1] - 3] })   // 두 손으로
+    }
+  }
+  else if (act === 'hang') {   // 림에 매달려 — 두 손은 림, 다리는 흔들리다 멎는다
+    const q = pose(p), sw = Math.sin(p.t * 15) * Math.exp(-p.t * 4) * 7
+    set({ abs: true, hip: 37, bend: -1.5, nh: q, fh: [q[0] - 3 * Math.sign(q[0]), q[1]], nf: [2 + sw, 0], ff: [-1 + sw * 0.8, 0], k: 40 })
+  }
+  else if (act === 'land') set({ hip: 36, bend: 2, nh: [13, 62], fh: [-7, 60], nf: [4, 5], ff: [-3, 3], k: 18 })   // 덩크 · 레이업 뒤 떨어지는 중
+  else if (act === 'air') {   // 에어 워크 — 몸을 앞으로 눕혀 날아간다. 다리는 뒤로 차며 달린다
+    const [b0, b1] = gait(12, 10)
+    set({ hip: 37, bend: 8, nh: holding ? 'ball' : [16, 60], fh: [12, 50], nf: [b1[0] - 5, b1[1] + 6], ff: [b0[0] - 8, b0[1] + 4], k: 25 })
+  }
+  else if (act === 'rush') { const [b0, b1] = gait(15, 9); set({ hip: 34, bend: 9, nh: [22, 54], fh: [19, 50], nf: b1, ff: b0, k: 25 }) }   // 불도저 — 숙이고 두 팔을 앞으로
+  else if (act === 'spin') set({ hip: 34, bend: 0, nh: [17, 63], fh: [-17, 63], nf: [3, 0], ff: [-2, 4], k: 30 })   // 회오리 — 두 팔을 벌려 돈다
+  else if (act === 'cross') {   // 크로스오버 — 낮게 웅크려 옆으로 크게 디디며 공을 반대 손으로
+    const u = Math.min(1, p.t / 0.26)
+    set({ hip: 31.5, bend: 4.5, nh: 'ball', fh: [12, 48], k: 30, nf: kf(u, [[0, [4, 0]], [0.5, [13, 6]], [1, [10, 0]]]), ff: kf(u, [[0, [-4, 0]], [0.5, [-9, 2]], [1, [-8, 0]]]) })
+  }
+  else if (cut?.p === p) {   // 궁극기 — 웅크려 기를 모았다가 두 팔을 펴며 터뜨린다(공이 있으면 머리 위로). 다 펴면 떨며 버틴다
+    const t = cut.t, tr = t > 0.45 ? Math.sin(tnow * 48) * 0.7 : 0
+    set({ hip: kf(t, [[0, 36], [0.2, 31], [0.42, 38]]), bend: kf(t, [[0, 1], [0.2, 5], [0.42, -2.5]]), nf: [7, 0], ff: [-7, 0], hd: [0, t > 0.4 ? 1.5 : -1], k: 26,
+      nh: holding ? 'ball' : kf(t, [[0, [9, 40]], [0.2, [5, 52]], [0.42, [21, 84 + tr]]]), fh: kf(t, [[0, [-8, 40]], [0.2, [-3, 52]], [0.42, [-19, 82 - tr]]]) })
+  }
+  else if (air) set({ hip: 37, bend: -0.5, nh: holding ? 'ball' : [6, 100], fh: [-1, 97], nf: [3, p.vh > 0 ? 2 : 7], ff: [-3, p.vh > 0 ? 1 : 5], k: 18 })   // 블록 · 리바운드 · 점프볼 — 두 팔을 머리 위로
+  else if (p.reach > 0) set({ hip: 31.5, bend: 6, nh: [27, 46], fh: [-7, 52], nf: [13, 0], ff: [-9, 0], k: 32 })   // 스틸 — 앞발을 내디디며 낮게 손을 뻗는다
+  else if (p.throw > 0) { const e = sm(Math.min(1, (1 - p.throw / 0.22) * 2.2)); set({ hip: 35, bend: 2.5 + e, nh: [11 + 13 * e, 50], fh: [8 + 11 * e, 48], nf: [8, 0], ff: [-5, 0], k: 30 }) }   // 패스 — 두 손으로 밀어 낸다
+  else if (p.stun > 0 && !(p.ice > 0)) set({ hip: 35, bend: -2.5, nh: [12 + 4 * Math.sin(tnow * 22), 56], fh: [-12, 58 + 3 * Math.sin(tnow * 19)], k: 20 })   // 휘청 — 뒤로 젖히고 팔을 휘젓는다
+  else if (p.cheer > 0 && !holding) { const pump = Math.abs(Math.sin(tnow * 8)); set({ hip: 36.5 - pump, bend: -1.5, nh: [10, 80 + 14 * pump], fh: [10, 52], hd: [0, 1.5], k: 18 }) }   // 득점 — 주먹을 치켜든다
+  else if (!holding && o && o.team !== p.team && dist(p, o) < 70) {   // 수비 자세 — 낮고 넓게 서서 한 손은 높이 한 손은 낮게. 움직일 때는 발을 엇갈리지 않고 미끄러지듯
+    const w = Math.sin(tnow * 7 + p.i), mv = a > 0.06, lift = s => Math.max(0, Math.sin(s)) * 3
+    set({ hip: 32.5, bend: 3, nh: [16, 71 + w * 1.5], fh: [14, 42 - w], k: 12, nf: mv ? [7 + 3 * Math.sin(ph), lift(ph)] : [7, 0], ff: mv ? [-6 + 3 * Math.sin(ph + 1.3), lift(ph + 1.3)] : [-6, 0] })
+  }
+  else if (a > 0.06) {   // 걷기 · 달리기 — 빠를수록 보폭이 크고 몸을 숙이며, 팔꿈치를 굽혀 크게 흔든다. 디딜 때 몸이 살짝 내려간다
+    const cad = 1.5 + 1.3 * a, L = Math.min(18, (Math.abs(p.vx) + 0.35 * Math.abs(p.vz)) / (4 * cad)), [ff, nf] = gait(L, 3 + 7 * run), s = L > 0.5 ? nf[0] / L : 0, sw = 2 + 4 * run
+    // 팔은 제 쪽 옆에서 — 앞으로 갈 때 팔꿈치를 굽혀 올라오고 뒤로 갈 때 내려간다(몸을 가로지르지 않게). 가까운 다리가 뒤면 가까운 팔이 앞
+    set({ nf, ff, hip: 36.2 - 1.4 * run - 1.5 * run * (0.5 + 0.5 * Math.cos(p.run * Math.PI * 4)), bend: p.vx * p.dir < -30 ? 0 : 0.8 + 3.2 * run, k: 16,
+      nh: [14.5 - s * (1.5 + 3.5 * run), 37 + 7 * run - s * sw], fh: [-14.5 + s * (1.5 + 3.5 * run), 37 + 7 * run + s * sw] })
+    if (holding) set({ nh: 'ball', fh: [11, 46], bend: R.bend + 1.5 })   // 드리블하며 달린다 — 다른 팔로 공을 감싼다
+  }
+  else if (holding) set({ hip: 34 - 0.8 * (1 - Math.abs(Math.cos(p.dp))), bend: 2.4, nh: 'ball', fh: [11, 46], nf: [5, 0], ff: [-4, 0], k: 14 })   // 제자리 드리블 — 무릎을 굽히고 공이 바닥을 칠 때 몸도 살짝
+  if (p.sq > 0 && !air) { R.hip -= p.sq * 30; R.bend += p.sq * 12 }   // 착지 — 무릎으로 받는다
+  if (!R.abs) {   // 몸에 붙은 손 — 숙이고 웅크린 만큼 따라간다
+    const rel = h => [h[0] + R.bend * (h[1] - 37) / 23, h[1] + R.hip - 37]
+    if (R.nh !== 'ball') R.nh = rel(R.nh)
+    R.fh = rel(R.fh)
+  }
+  return R
+}
+// 덩크 다리 — [가까운 발, 먼 발] 키프레임(몸 밑 기준). 투핸드 · 360 은 무릎을 접고, 토마호크는 앞뒤로, 윈드밀은 크게 벌리고, 리버스는 뒤로 찬다
+const DUNK_LEGS = {
+  two: [[[0, [3, 0]], [0.3, [9, 21]], [0.85, [8, 18]], [1, [4, 6]]], [[0, [-3, 0]], [0.3, [3, 15]], [0.85, [2, 14]], [1, [-1, 4]]]],
+  tomahawk: [[[0, [3, 0]], [0.35, [7, 22]], [1, [5, 8]]], [[0, [-3, 0]], [0.35, [-9, 12]], [1, [-3, 4]]]],
+  windmill: [[[0, [3, 0]], [0.4, [12, 14]], [1, [6, 6]]], [[0, [-3, 0]], [0.4, [-11, 7]], [1, [-4, 3]]]],
+  reverse: [[[0, [3, 0]], [0.4, [-4, 14]], [1, [-2, 6]]], [[0, [-3, 0]], [0.4, [-10, 10]], [1, [-5, 4]]]],
+}
+DUNK_LEGS.spin = DUNK_LEGS.two
+
+/** 자세를 부드럽게 따라간다. 손은 화면 왼쪽 · 오른쪽 팔(h-1 · h1)로 기억해 몸을 돌 때도 손이 건너간다.
+ *  한 프레임에 한 번만 움직인다(바닥 반사 · 궁극기 때 다시 그려도). 얼면 그대로 멈춘다. [자세, 이번에 움직였나] */
+function settle(p, R, f, fs, bh) {
+  const fresh = p.pzN !== drawN && !reflecting, e = s => fresh && !(p.ice > 0) ? 1 - Math.exp(-drawDt * s) : 0
+  const tg = { hip: R.hip, bend: R.bend, sh: R.sh, sl: R.sl, hd: R.hd, [`h${fs}`]: R.nh === 'ball' ? bh : [fs * R.nh[0], R.nh[1]], [`h${-fs}`]: [fs * R.fh[0], R.fh[1]], f1: [f * R.nf[0], R.nf[1]], f0: [f * R.ff[0], R.ff[1]] }
+  const Z = p.pz ||= structuredClone(tg), kd = e(R.k), kb = e(45), kf_ = e(Math.max(R.k, 30)), kh = e(9)
+  if (fresh) p.pzN = drawN
+  for (const key in tg) {
+    const m = key === `h${fs}` && R.nh === 'ball' ? kb : key[0] === 'f' ? kf_ : key === 'hd' ? kh : kd, a = Z[key], b = tg[key]
+    if (Array.isArray(b)) { a[0] += (b[0] - a[0]) * m; a[1] += (b[1] - a[1]) * m } else Z[key] = a + (b - a) * m
+  }
+  return [Z, fresh]
+}
+
+/** 궁극기 — 발밑에서 퍼지는 고리 · 솟는 빛기둥 · 돌며 올라가는 불티 */
+function aura(fx, fy, u) {
+  const k = Math.min(1, cut.t / 0.25), c = '255,214,90'
+  g.save(); g.globalCompositeOperation = 'lighter'
+  for (let i = 0; i < 3; i++) { const r = (cut.t * 1.6 + i / 3) % 1; g.strokeStyle = `rgba(${c},${(1 - r) * 0.85 * k})`; g.lineWidth = 2.5; oval(fx, fy, (14 + r * 46) * u, (5 + r * 16) * u); g.stroke() }
+  const pg = g.createLinearGradient(0, fy, 0, fy - 130 * u)
+  pg.addColorStop(0, `rgba(${c},${0.5 * k})`); pg.addColorStop(1, `rgba(${c},0)`)
+  g.fillStyle = pg; g.beginPath(); g.ellipse(fx, fy - 65 * u, 24 * u, 65 * u, 0, 0, Math.PI * 2); g.fill()
+  g.fillStyle = `rgba(${c},${0.9 * k})`; g.beginPath()
+  for (let i = 0; i < 14; i++) {
+    const q = (tnow * 0.9 + i / 14) % 1, an = tnow * 5 + i * 2.4, r = (16 + 8 * Math.sin(i)) * u * (1 - q * 0.4), sx = fx + Math.cos(an) * r, sy = fy - q * 120 * u + Math.sin(an) * r * 0.3
+    g.moveTo(sx + 1.8 * u, sy); g.arc(sx, sy, 1.8 * u * (1 - q) + 0.3, 0, Math.PI * 2)
+  }
+  g.fill()
+  g.restore()
+}
+/** 집중선 — 화면 가장자리에서 그 선수 쪽으로 가늘어지는 흰 줄(매 프레임 조금씩 흔들린다) */
+function focus(cx, cy, k) {
+  g.fillStyle = `rgba(255,255,255,${0.32 * k})`; g.beginPath()
+  for (let i = 0; i < 48; i++) {
+    const a = (i + rnd() * 0.6) / 48 * Math.PI * 2, r0 = 170 + rnd() * 90, w = 0.008 + rnd() * 0.016
+    g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0 * 0.8); g.lineTo(cx + Math.cos(a - w) * 1100, cy + Math.sin(a - w) * 1100); g.lineTo(cx + Math.cos(a + w) * 1100, cy + Math.sin(a + w) * 1100)
+  }
+  g.fill()
+}
+
 /** 선수 한 명. refl = 바닥 반사용(그림자 · 표시 · 공은 빼고 몸만) */
 function drawPlayer(p, refl) {
   const [x, y, u] = P(p.x, p.z, p.h), [fx, fy] = P(p.x, p.z), T = TEAMS[sides[p.team]], big = p.big > 0 ? 1.4 : 1, F = myT ? -1 : 1   // F = 화면이 뒤집혔으면 -1
@@ -1108,95 +1346,76 @@ function drawPlayer(p, refl) {
     }
     if (p.slow > 0) { g.strokeStyle = 'rgba(120,190,255,.85)'; g.lineWidth = 2; oval(fx, fy + 2, 18 * u, 6.5 * u); g.stroke() }
     if (p.hot > 0 || p.ghost > 0) { g.fillStyle = p.hot > 0 ? 'rgba(255,120,30,.35)' : 'rgba(90,230,200,.3)'; oval(fx, fy, 26 * u, 10 * u); g.fill() }
-    if (p.ult >= 1) { g.fillStyle = `rgba(255,210,63,${0.3 + 0.2 * Math.sin(tnow * 9)})`; oval(fx, fy, 24 * u, 9 * u); g.fill() }   // 궁극기 준비
-    const rs = 16 * u * Math.max(0.5, 1 - p.h / 160) * big, sg = g.createRadialGradient(fx, fy, 0, fx, fy, rs)   // 부드러운 그림자 — 높이 뜰수록 작고 옅게
-    sg.addColorStop(0, `rgba(0,0,0,${0.45 - Math.min(0.25, p.h / 400)})`); sg.addColorStop(1, 'rgba(0,0,0,0)')
-    g.save(); g.translate(fx, fy); g.scale(1, 0.34); g.translate(-fx, -fy); g.fillStyle = sg; g.beginPath(); g.arc(fx, fy, rs, 0, Math.PI * 2); g.fill(); g.restore()
+    if (ultReady(p)) { g.fillStyle = skillOf(p).def ? `rgba(127,232,255,${0.3 + 0.2 * Math.sin(tnow * 9)})` : `rgba(255,210,63,${0.3 + 0.2 * Math.sin(tnow * 9)})`; oval(fx, fy, 24 * u, 9 * u); g.fill() }   // 지금 쓸 수 있는 궁극기
+    if (cut?.p === p) aura(fx, fy, u)
+    const rs = 16 * u * Math.max(0.5, 1 - p.h / 160) * big   // 그림자 — 높이 뜰수록 작고 옅게
+    g.globalAlpha = 0.45 - Math.min(0.25, p.h / 400); g.drawImage(SHADOW, fx - rs, fy - rs * 0.34, rs * 2, rs * 0.68); g.globalAlpha = 1
     if (ctls[p.team] === p) { g.strokeStyle = PC[p.team]; g.lineWidth = 3; oval(fx, fy, 19 * u * big, 7 * u * big); g.stroke() }   // 사람이 움직이는 선수
   }
 
-  // 몸 좌표 — at(옆, 키 높이). 윗몸일수록 달리는 쪽으로 기울어진다(기울기는 실제 속도를 따른다)
-  const v = Math.hypot(p.vx, p.vz), a = p.h > 0 || p.fall ? 0 : Math.min(1, v / SPD), ph = p.run * 15, f = F * p.fd, fs = f >= 0 ? 1 : -1
-  const kh = 1 - Math.exp(-drawDt * 20), kj = 1 - Math.exp(-drawDt * 28), kb = 1 - Math.exp(-drawDt * 45), kp = 1 - Math.exp(-drawDt * 80)   // 손 · 관절 · 공 쪽 손 · 동작 손이 따라가는 빠르기
-  const lean = p.fall ? 0 : clamp(F * p.vx / SPD, -1.3, 1.3) * 0.16, at = (px, hh) => [px * u + lean * hh * u, -hh * u]
-  const holding = ball.owner === p, posing = holding && (p.act === 'dunk' || p.act === 'lay' || p.act === 'shot')
-  const up = p.act === 'shot' || p.act === 'dunk' || p.h > 0 && !holding
-  const guard = !holding && ball.owner && ball.owner.team !== p.team && dist(p, ball.owner) < 70   // 공 가진 상대 앞의 수비
+  const f = F * p.fd, fs = f >= 0 ? 1 : -1, holding = ball.owner === p
+  const [bx, by] = P(ball.x, ball.z, Math.max(ball.h, p.h + 26)), bh = [(bx - x) / u / big, (y - by) / u / big + 5]   // 공 쪽 손 — 공 위에(무릎 아래로는 안 내려간다)
+  const [Z, fresh] = settle(p, rig(p, holding), f, fs, bh), kj = fresh ? 1 - Math.exp(-drawDt * 28) : 0   // kj = 팔꿈치 · 무릎이 따라가는 빠르기
+  const at = (px, hh) => [(px + Z.sl * hh) * u, -hh * u]   // 발바닥 기준 — 손 · 발
+  const up = (px, hh) => { const r = hh - 37, yy = Z.hip + r + Z.sh * clamp((hh - 45) / 15, 0, 1); return [(px + fs * Z.bend * r / 23 + Z.sl * yy) * u, -yy * u] }   // 윗몸 — 엉덩이를 축으로 숙이고 엉덩이 높이를 따라 내려온다
   g.save()
-  g.translate(x, y - Math.abs(Math.sin(ph)) * 2.5 * u * a)   // 걸을 때 몸이 오르내린다
+  g.translate(x, y)
   if (big > 1) g.scale(big, big)   // 자이언트
   if (p.ghost > 0) g.globalAlpha *= 0.55   // 팬텀 — 반투명
   let turn = 1   // 도는 중 등이 보이면 음수 — 등번호는 거울처럼 뒤집히지 않게 다시 뒤집는다
   if (p.act === 'spin' || p.act === 'dunk' && p.style === 'spin') {   // 회오리 · 360 덩크 — 제자리에서 돈다
-    const c = Math.cos(p.act === 'spin' ? p.t / 0.45 * Math.PI * 4 : Math.min(1, p.t / p.dur) * Math.PI * 2)
+    const c = Math.cos(p.act === 'spin' ? p.t / 0.45 * Math.PI * 4 : du(p) * Math.PI * 2)
     g.scale(turn = Math.abs(c) < 0.15 ? 0.15 * Math.sign(c || 1) : c, 1)
   }
-  if (p.fall > 0) g.rotate(-F * p.dir * 1.35)   // 넘어졌다
-  else if (p.sq > 0) g.scale(1 + p.sq * 1.2, 1 - p.sq * 1.2)   // 착지 — 잠깐 눌린다
+  if (p.fall > 0) {   // 넘어짐 — 0.22초에 걸쳐 뒤로 넘어가 바닥에서 한 번 튀고, 마지막 0.3초에 일어난다
+    const e = Math.max(0, (p.f0 || 1) - p.fall), k = e < 0.22 ? 1 - (1 - e / 0.22) ** 3 : p.fall < 0.3 ? sm(p.fall / 0.3) : 1, b = e > 0.22 && e < 0.38 ? Math.sin((e - 0.22) / 0.16 * Math.PI) * 0.07 : 0
+    g.rotate(-F * p.dir * 1.35 * (k - b))
+  }
+  else if (p.sq > 0) g.scale(1 + p.sq * 0.5, 1 - p.sq * 0.5)   // 착지 — 잠깐 눌린다
   g.lineCap = 'round'; g.lineJoin = 'round'
-  // 다리 — 엉덩이 · 무릎 · 발. 걸음마다 발이 앞뒤로 오가고 뒤로 갈 때 들린다. 공중에서는 접는다. 먼 다리는 어둡게
-  const leg = (k, col) => {
-    const hip = at(k ? 2.6 : -2.6, 37), s = Math.sin(ph + k * Math.PI)
-    const foot = p.h > 0 || p.act === 'dunk' || p.act === 'lay' ? [hip[0] + f * (k ? 7 : -2) * u, (k ? -13 : -7) * u]
-      : [(k ? 2.6 : -2.6) * u * (1 - Math.abs(f)) + f * s * 10 * u * a, -Math.max(0, -Math.cos(ph + k * Math.PI)) * 7 * u * a]
-    const [knee, end] = joint(p, `k${k}`, hip, foot, 19 * u, 18.5 * u, [hip[0] + f * 14 * u, hip[1] + 18 * u], u, kj)
-    line([hip, knee, end], 7.8 * u, EDGE); line([hip, knee], 6.4 * u, col); line([knee, end], 5.2 * u, col)
+  const leg = (k, col) => {   // 엉덩이 · 무릎 · 발 — 무릎은 앞으로 꺾인다. 먼 다리는 어둡게
+    const hp = up((k ? 2.6 : -2.6) * (1 - Math.abs(f)), 37), ft = at(...Z[`f${k}`])
+    const [knee, end] = joint(p, `k${k}`, hp, ft, 19 * u, 18.5 * u, [hp[0] + f * 14 * u, hp[1] + 18 * u], u, kj)
+    line([hp, knee, end], 7.8 * u, EDGE); line([hp, knee], 6.4 * u, col); line([knee, end], 5.2 * u, col)
     line([[end[0], end[1] - 5 * u], [end[0], end[1] - 1.8 * u]], 4.8 * u, '#f2f2f2')   // 양말
     g.fillStyle = '#fafafa'; oval(end[0] + f * 2.2 * u, end[1] - 1.5 * u, 4.8 * u, 2.3 * u); g.fill()   // 운동화
     g.strokeStyle = EDGE; g.lineWidth = 0.8 * u; g.stroke()
     g.fillStyle = T.dark; g.fillRect(end[0] + f * 2.2 * u - 4.8 * u, end[1] - 0.5 * u, 9.6 * u, 1.1 * u)
   }
-  // 팔 — 어깨는 왼쪽 · 오른쪽 그대로이고 몸이 향한 쪽이 앞 팔. 손은 목표 자리를, 팔꿈치는 아래 · 뒤를 부드럽게 따라간다
-  const arm = (side, target, col, k) => {
-    const s0 = at(side * 7.4, 60), hand = ease(p, `h${side}`, target, u, k)
-    const [el, end] = joint(p, `e${side}`, s0, hand, 13.5 * u, 13 * u, [s0[0] - f * 10 * u, s0[1] + 16 * u], u, kj)
+  const arm = (s, col) => {   // s = 화면 왼쪽(-1) · 오른쪽(1) 팔. 어깨는 윗몸을 따라가고, 팔꿈치는 아래 · 뒤로 꺾인다
+    const s0 = up(s * 7.4, 60), hd = at(...Z[`h${s}`])
+    const [el, end] = joint(p, `e${s}`, s0, hd, 13.5 * u, 13 * u, [s0[0] - f * 10 * u, s0[1] + 16 * u], u, kj)
     line([s0, el, end], 6.2 * u, EDGE); line([s0, el], 5 * u, col); line([el, end], 4.3 * u, col)
     g.fillStyle = col; oval(end[0], end[1], 2.5 * u, 2.5 * u); g.fill()
   }
-  const sw = Math.sin(ph) * 9 * u * a, rise = Math.abs(Math.sin(ph)) * 3 * u * a
-  let near, far   // 손 자리
-  if (posing) {   // 덩크 · 레이업 · 슛 — 공을 든 손은 pose() 길을 따라간다(윈드밀은 한 바퀴, 토마호크는 뒤로 젖혔다 내리꽂기)
-    const [fw, hh] = pose(p)
-    near = at(fs * fw, hh)
-    far = p.act === 'dunk' && p.style === 'windmill' ? at(-fs * 8, 72) : p.act === 'dunk' && p.style === 'tomahawk' ? at(fs * 12, 74) : p.act === 'lay' ? at(fs * 4, 60) : at(fs * (fw - 5), hh - 4)
-  }
-  else if (up) { near = at(fs * 3, 90); far = at(-fs * 2, 88) }   // 놓은 뒤 · 블록 · 림에 매달리기 — 머리 위로
-  else if (holding && p.act === 'air') { near = at(fs * 10, 52); far = at(fs * 8, 50) }   // 가슴 앞에 두 손으로
-  else if (holding) {   // 공 쪽 손은 튀어 오르는 공을 따라 오르내린다(무릎 아래로는 안 내려간다). 다른 손은 공을 감싼다
-    near = [F * (ball.x - p.x) * u / big, ((ball.z - p.z) * 0.7 - (Math.max(ball.h, 26) + 5) * u) / big]
-    far = at(fs * 11, 46)   // 다른 팔은 몸 앞으로 내밀어 공을 감싼다(몸에 가려 손만 보인다)
-  }
-  else if (p.reach > 0) { near = at(fs * 26, 48); far = at(-fs * 6, 38) }   // 스틸 — 손을 뻗는다
-  else if (guard) { near = at(fs * 17, 70); far = at(fs * 13, 42) }   // 수비 — 한 손은 들어 앞을 막고 한 손은 낮게(옆에서 보니 둘 다 몸 앞)
-  else { near = [at(fs * 9.5, 35)[0] + fs * sw, -(35 * u + rise)]; far = [at(-fs * 8.5, 35)[0] - fs * sw, -(35 * u + rise)] }   // 몸 옆에 늘어뜨리고, 걸을 때는 다리와 엇갈려 흔든다
-  arm(-fs, far, shade, posing ? kp : kh)
+  arm(-fs, shade)   // 먼 팔 — 몸 뒤
   leg(0, shade)
   leg(1, skin)
-  shape([at(-8.8, 42), at(8.8, 42), at(10.4, 27), at(1, 26), at(0, 29), at(-1, 26), at(-10.4, 27)], T.dark, EDGE, 0.9 * u)   // 반바지
-  line([at(-9.6, 41), at(-10.3, 28)], 1.4 * u, T.color); line([at(9.6, 41), at(10.3, 28)], 1.4 * u, T.color)
-  const [, jt] = at(0, 64), [, jb] = at(0, 40), jg = g.createLinearGradient(0, jt, 0, jb)   // 상의 — 아래로 갈수록 살짝 어둡게
+  shape([up(-8.8, 42), up(8.8, 42), up(10.4, 27), up(1, 26), up(0, 29), up(-1, 26), up(-10.4, 27)], T.dark, EDGE, 0.9 * u)   // 반바지
+  line([up(-9.6, 41), up(-10.3, 28)], 1.4 * u, T.color); line([up(9.6, 41), up(10.3, 28)], 1.4 * u, T.color)
+  const [, jt] = up(0, 64), [, jb] = up(0, 40), jg = g.createLinearGradient(0, jt, 0, jb)   // 상의 — 아래로 갈수록 살짝 어둡게
   jg.addColorStop(0, T.color); jg.addColorStop(0.55, T.color); jg.addColorStop(1, T.dark)
-  shape([at(-3.6, 64), at(-9.6, 62.5), at(-7.8, 54), at(-8.4, 40.5), at(8.4, 40.5), at(7.8, 54), at(9.6, 62.5), at(3.6, 64), at(0, 58.5)], jg, EDGE, 0.9 * u)   // 민소매 상의
+  shape([up(-3.6, 64), up(-9.6, 62.5), up(-7.8, 54), up(-8.4, 40.5), up(8.4, 40.5), up(7.8, 54), up(9.6, 62.5), up(3.6, 64), up(0, 58.5)], jg, EDGE, 0.9 * u)   // 민소매 상의
   g.globalAlpha *= 0.85
-  line([at(-3.6, 64), at(0, 58.5), at(3.6, 64)], 1 * u, '#fff'); line([at(-9.6, 62.5), at(-7.8, 54)], 1 * u, '#fff'); line([at(9.6, 62.5), at(7.8, 54)], 1 * u, '#fff')
+  line([up(-3.6, 64), up(0, 58.5), up(3.6, 64)], 1 * u, '#fff'); line([up(-9.6, 62.5), up(-7.8, 54)], 1 * u, '#fff'); line([up(9.6, 62.5), up(7.8, 54)], 1 * u, '#fff')
   g.globalAlpha /= 0.85
   g.fillStyle = '#fff'; g.font = `800 ${8.5 * u}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'
-  g.save(); g.translate(...at(0, 50)); if (turn < 0) g.scale(-1, 1); g.fillText(p.f.num, 0, 0); g.restore()
-  line([at(0, 62), at(0, 67)], 5.2 * u, skin)   // 목
-  const [hx, hy] = at(0, 75)
-  if (p.f.head) head(p, f, hx, hy, u)
-  else { g.fillStyle = skin; oval(hx, hy, 8 * u, 9 * u); g.fill() }
-  arm(fs, near, skin, posing ? kp : holding ? kb : kh)
+  g.save(); g.translate(...up(0, 50)); if (turn < 0) g.scale(-1, 1); g.fillText(p.f.num, 0, 0); g.restore()
+  line([up(0, 62), up(0, 67)], 5.2 * u, skin)   // 목
+  const [hx, hy] = up(0, 75), hdx = hx + Z.hd[0] * u, hdy = hy - Z.hd[1] * u   // 머리 — 몸보다 살짝 늦게 따라온다
+  if (p.f.head) head(p, f, hdx, hdy, u)
+  else { g.fillStyle = skin; oval(hdx, hdy, 8 * u, 9 * u); g.fill() }
+  arm(fs, skin)   // 가까운 팔 — 몸 앞
   if (p.ice > 0) { g.fillStyle = 'rgba(170,225,255,.55)'; g.strokeStyle = '#e8f7ff'; g.lineWidth = 1.5; g.fillRect(-15 * u, -92 * u, 30 * u, 94 * u); g.strokeRect(-15 * u, -92 * u, 30 * u, 94 * u) }   // 얼음
   g.restore()
   if (refl) return
   g.textAlign = 'center'; g.textBaseline = 'middle'
   if (p.conf > 0) { g.fillStyle = '#c58bff'; g.font = `900 ${16 * u}px system-ui, sans-serif`; g.fillText('?', x, y - 100 * u * big) }
-  if (p.fall > 0) {   // 머리 위로 별이 돈다
+  if (p.fall > 0.3 && (p.f0 || 1) - p.fall > 0.25) {   // 누워 있는 동안 머리 위로 별이 돈다
     g.fillStyle = '#ffd23f'; g.font = `${11 * u}px system-ui, sans-serif`
     for (let i = 0; i < 3; i++) { const t = tnow * 7 + i * 2.1; g.fillText('★', x - F * p.dir * 73 * u * big + Math.cos(t) * 12 * u, y - 26 * u + Math.sin(t) * 4 * u) }
   } else if (ctls[p.team] === p) {   // 1P · 2P(온라인 상대)
-    const tx = x + lean * 75 * u, ty = y - 96 * u * big
+    const tx = x + up(0, 96)[0] * big, ty = y - 96 * u * big
     g.fillStyle = PC[p.team]; g.beginPath(); g.moveTo(tx - 6, ty - 4); g.lineTo(tx + 6, ty - 4); g.lineTo(tx, ty + 4); g.fill()
     g.font = '800 13px system-ui, sans-serif'; g.fillText(p.team ? '2P' : '1P', tx, ty - 13)
   }
@@ -1252,35 +1471,42 @@ function hud() {
   // 내 팀 궁극기 게이지 — 얼굴 둘레가 차오른다. 지금 움직이는 선수의 궁극기 이름을 옆에
   const mine = team(myT), x0 = W / 2 - 150, ctl = ctls[myT]
   mine.forEach((p, i) => {
-    const cx = x0 + i * 46, cy = H - 24, ready = p.ult >= 1
+    const cx = x0 + i * 46, cy = H - 24, ready = p.ult >= 1, hue = skillOf(p).def ? 190 : 45, w = Math.sin(tnow * 10)
     g.fillStyle = 'rgba(0,0,0,.6)'; oval(cx, cy, 19, 19); g.fill()
     face(p.f, cx - 15, cy - 15, 30)
-    g.lineWidth = 3.5; g.strokeStyle = ready ? `hsl(${45 + 10 * Math.sin(tnow * 10)} 100% ${60 + 15 * Math.sin(tnow * 10)}%)` : '#6f9bff'
+    g.lineWidth = 3.5; g.strokeStyle = !ready ? '#6f9bff' : ultReady(p) ? `hsl(${hue + 10 * w} 100% ${62 + 14 * w}%)` : `hsla(${hue} 60% 70% / .55)`   // 다 찼어도 때가 아니면 흐리게
     g.beginPath(); g.arc(cx, cy, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p.ult); g.stroke()
     if (p === ctl) { g.strokeStyle = '#ffd23f'; g.lineWidth = 2; oval(cx, cy, 22, 22); g.stroke() }
     if (offense !== myT && p.acc) { g.fillStyle = '#5fff9a'; oval(cx + 15, cy - 15, 5, 5); g.fill() }   // 수비 가속이 남았다
   })
   if (ctl) {
     g.textAlign = 'left'; g.textBaseline = 'middle'; g.font = '800 15px system-ui, sans-serif'
-    g.fillStyle = ctl.ult >= 1 ? '#ffd23f' : '#e9edf5'
-    g.fillText(`${skillOf(ctl).name}${ctl.ult >= 1 ? ' — 준비!' : ` ${Math.floor(ctl.ult * 100)}%`}`, x0 + 5 * 46 - 10, H - 24)
+    const sk = skillOf(ctl), now = ultReady(ctl)
+    g.fillStyle = now ? sk.def ? '#9ff0ff' : '#ffd23f' : '#e9edf5'
+    g.fillText(`${sk.name}(${sk.def ? '수비' : '공격'})${ctl.ult < 1 ? ` ${Math.floor(ctl.ult * 100)}%` : now ? ' — 준비!' : sk.def ? ' — 수비 때' : ' — 공을 잡으면'}`, x0 + 5 * 46 - 10, H - 24)
   }
 }
 
-function cutIn() {   // 궁극기 컷인 — 팀 색 띠가 왼쪽에서 들어와 얼굴 · 기술 이름을 보여 주고 오른쪽으로 빠진다
-  const { p, t } = cut, T = TEAMS[sides[p.team]], k = Math.min(1, t / 0.15), out = Math.max(0, (t - 0.72) / 0.18)
-  g.fillStyle = `rgba(0,0,0,${0.5 * (1 - out)})`; g.fillRect(0, 50, W, H - 50)
-  g.save(); g.translate((k - 1) * W + out * W, 0)
-  g.fillStyle = T.dark; g.beginPath(); g.moveTo(0, 176); g.lineTo(W, 146); g.lineTo(W, 376); g.lineTo(0, 406); g.fill()
-  g.fillStyle = T.color; g.beginPath(); g.moveTo(0, 190); g.lineTo(W, 160); g.lineTo(W, 362); g.lineTo(0, 392); g.fill()
-  g.fillStyle = 'rgba(255,255,255,.35)'
-  for (let i = 0; i < 16; i++) g.fillRect(((i * 137 + t * 2600) % (W + 240)) - 240, 175 + (i * 53) % 210, 90 + (i * 31) % 120, 2)   // 속도선
-  g.fillStyle = '#fff'; oval(185, 276, 104, 104); g.fill()
-  face(p.f, 85, 176, 200)
-  text('ULTIMATE', 620, 205, 22, '#fff', T.dark)
-  text(p.f.name, 620, 250, 36, '#fff', '#120a06')
-  text(`${skillOf(p).name}!`, 620, 318, 58)
-  text(skillOf(p).desc, 620, 362, 18, '#fff', T.dark)
+/** 궁극기 컷인 — 선수가 기를 모은 뒤(0.16초) 팀 색 띠가 튀어 들어와(easeOutBack) 얼굴 · 기술 이름을 보여 주고 빠진다. 띠는 선수를 가리지 않게 위나 아래로 */
+function cutIn() {
+  const { p, t } = cut, T = TEAMS[sides[p.team]], sk = skillOf(p)
+  if (t < 0.16) return
+  const x = Math.min(1, (t - 0.16) / 0.2), k = 1 + 2.70158 * (x - 1) ** 3 + 1.70158 * (x - 1) ** 2, out = sm(clamp((t - 0.74) / 0.14, 0, 1))
+  const [, py] = P(p.x, p.z, p.h + 45)
+  g.save(); g.translate((k - 1) * W + out * W * 1.1, py > H / 2 + 20 ? 64 : 318)   // 선수가 아래쪽이면 띠는 위로
+  g.fillStyle = T.dark; g.beginPath(); g.moveTo(0, 22); g.lineTo(W, 0); g.lineTo(W, 136); g.lineTo(0, 158); g.fill()
+  g.fillStyle = T.color; g.beginPath(); g.moveTo(0, 32); g.lineTo(W, 10); g.lineTo(W, 126); g.lineTo(0, 148); g.fill()
+  g.fillStyle = 'rgba(255,255,255,.3)'
+  for (let i = 0; i < 14; i++) g.fillRect(((i * 137 + t * 2600) % (W + 240)) - 240, 20 + (i * 47) % 116, 80 + (i * 31) % 120, 2)   // 속도선
+  const sx = (t - 0.3) * 2600 % (W + 400) - 200   // 빛이 한 번 쓸고 지나간다
+  g.fillStyle = 'rgba(255,255,255,.2)'; g.beginPath(); g.moveTo(sx, 10); g.lineTo(sx + 60, 10); g.lineTo(sx - 20, 150); g.lineTo(sx - 80, 150); g.fill()
+  g.fillStyle = '#fff'; oval(150, 79, 66, 66); g.fill()
+  g.strokeStyle = sk.def ? '#7fe8ff' : '#ffd23f'; g.lineWidth = 5; g.stroke()
+  face(p.f, 86, 15, 128)
+  text(`${sk.def ? 'DEFENSE' : 'OFFENSE'} ULTIMATE · ${p.f.name}`, 560, 38, 17, '#fff', T.dark)
+  const pop = 1 + 0.3 * Math.max(0, 1 - (t - 0.22) / 0.14)   // 기술 이름은 크게 튀어나왔다 자리 잡는다
+  g.save(); g.translate(560, 84); g.scale(pop, pop); text(`${sk.name}!`, 0, 0, 50, sk.def ? '#9ff0ff' : '#ffd23f'); g.restore()
+  text(sk.desc, 560, 126, 15, '#fff', T.dark)
   g.restore()
 }
 
@@ -1288,7 +1514,9 @@ function selectScreen() {
   const bg = g.createLinearGradient(0, 0, 0, H)
   bg.addColorStop(0, '#3a2414'); bg.addColorStop(1, '#1d120a')
   g.fillStyle = bg; g.fillRect(0, 0, W, H)
-  text(net ? `ONLINE 1:1 · 방 ${net.code}` : '★ TEAM SELECT ★', W / 2, 42, 34, '#8ef08a', '#0d2a10')
+  text(net ? `ONLINE 1:1 · 방 ${net.code}` : '★ TEAM SELECT ★', W / 2, 38, 34, '#8ef08a', '#0d2a10')
+  g.font = '700 12px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillStyle = '#ffe08a'; g.fillText('■ 공격 궁극기 — 공을 잡았을 때', W / 2 - 110, 66); g.fillStyle = '#9ff0ff'; g.fillText('■ 수비 궁극기 — 수비 때', W / 2 + 110, 66)
   const tag = (cx, cy, label, color, dx = 0) => { g.fillStyle = color; g.fillRect(cx + dx, cy, 40, 24); g.fillStyle = '#2a1400'; g.font = '900 15px system-ui, sans-serif'; g.fillText(label, cx + dx + 20, cy + 13) }
   CARDS.forEach(([cx, cy], i) => {
     const T = TEAMS[i], c = g.createLinearGradient(cx, cy, cx, cy + CARD_H)
@@ -1299,7 +1527,7 @@ function selectScreen() {
       face(f, x, y, 76)
       g.textAlign = 'center'; g.textBaseline = 'middle'
       g.fillStyle = '#fff'; g.font = '700 12px system-ui, sans-serif'; g.fillText(f.name.length > 6 ? `${f.name.slice(0, 6)}…` : f.name, x + 38, y + 88)
-      g.fillStyle = '#ffe08a'; g.font = '700 10.5px system-ui, sans-serif'; g.fillText(SKILLS[i][j].name, x + 38, y + 104)
+      g.fillStyle = SKILLS[i][j].def ? '#9ff0ff' : '#ffe08a'; g.font = '700 10.5px system-ui, sans-serif'; g.fillText(SKILLS[i][j].name, x + 38, y + 104)
     })
     text(T.name, cx + CARD_W / 2, cy + 168, 32, '#fff', '#120a06')
     const theirs = net?.peer && net.pick === i
@@ -1324,14 +1552,18 @@ function draw() {
   }
   g.save()
   if (shake) g.translate((rnd() - 0.5) * shake, (rnd() - 0.5) * shake)
+  const zk = cut ? sm(Math.min(1, cut.t / 0.22)) * (1 - sm(clamp((cut.t - 0.72) / 0.18, 0, 1))) : 0   // 궁극기 — 카메라가 그 선수에게 다가갔다가 터질 때 물러난다
+  let zx = 0, zy = 0
+  if (zk) { [zx, zy] = P(cut.p.x, cut.p.z, cut.p.h + 45); const z = 1 + 0.3 * zk; g.translate(zx, zy); g.scale(z, z); g.translate(-zx, -zy) }
   backdrop(); court()
-  // 바닥에 비친 선수 — 발밑을 축으로 뒤집어 눌러 흐리게(코트 안에서만)
-  g.save()
-  g.beginPath(); [[0, 0], [CL, 0], [CL, CW], [0, CW]].forEach(([wx, wz], i) => { const [sx, sy] = P(wx, wz); i ? g.lineTo(sx, sy) : g.moveTo(sx, sy) }); g.clip()
-  reflecting = true
-  for (const p of ps) { const [, fy] = P(p.x, p.z); g.save(); g.globalAlpha = 0.14; g.translate(0, fy * 1.55); g.scale(1, -0.55); drawPlayer(p, true); g.restore() }
-  reflecting = false
-  g.restore()
+  if (dpr >= 1.5) {   // 바닥에 비친 선수 — 발밑을 축으로 뒤집어 눌러 흐리게(코트 안에서만). 해상도를 낮춘 느린 기기는 뺀다
+    g.save()
+    g.beginPath(); [[0, 0], [CL, 0], [CL, CW], [0, CW]].forEach(([wx, wz], i) => { const [sx, sy] = P(wx, wz); i ? g.lineTo(sx, sy) : g.moveTo(sx, sy) }); g.clip()
+    reflecting = true
+    for (const p of ps) { const [, fy] = P(p.x, p.z); g.save(); g.globalAlpha = 0.14; g.translate(0, fy * 1.55); g.scale(1, -0.55); drawPlayer(p, true); g.restore() }
+    reflecting = false
+    g.restore()
+  }
   const items = [...ps.map(p => [p.z, () => drawPlayer(p)]), ...HOOP.map(h => [h.z - 0.5, () => drawHoop(h)])]
   if (!ball.owner) items.push([ball.z + 0.1, drawBall])
   for (const [, d] of items.sort((a, b) => a[0] - b[0])) d()
@@ -1339,9 +1571,14 @@ function draw() {
   for (const q of parts) { const [x, y, u] = P(q.x, q.z, q.h); g.globalAlpha = Math.min(1, q.t * 2.5); g.fillStyle = q.c; oval(x, y, 2 * u, 2 * u); g.fill() }
   g.globalCompositeOperation = 'source-over'
   g.globalAlpha = 1
-  lights()
+  if (zk) {   // 궁극기 — 둘레는 어둡게 하고 집중선, 그 선수만 밝게 다시 그린다
+    g.fillStyle = `rgba(4,6,14,${0.62 * zk})`; g.fillRect(-W, -H, W * 3, H * 3)
+    focus(zx, zy, zk)
+    drawPlayer(cut.p)
+  }
   g.restore()
-  g.fillStyle = VIGNETTE; g.fillRect(0, 50, W, H - 50)   // 가장자리를 어둡게
+  overlay()
+  if (flash > 0) { g.fillStyle = `rgba(255,250,235,${Math.min(0.8, flash * 3.6)})`; g.fillRect(0, 50, W, H - 50) }   // 궁극기가 터지는 순간 번쩍
   hud()
   if (cut) cutIn()
   if (msg && !cut) { const k = Math.min(1, (msg.t0 - msg.t) * 8); g.globalAlpha = Math.min(1, msg.t * 3); text(msg.text, W / 2, 230, 58 * (0.6 + 0.4 * k)); g.globalAlpha = 1 }   // 튀어나오듯 커진다
@@ -1357,18 +1594,22 @@ function draw() {
   }
 }
 
-const VIGNETTE = (() => { const v = g.createRadialGradient(W / 2, H / 2 + 30, H * 0.3, W / 2, H / 2, W * 0.62); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.42)'); return v })()
 let flashes = []
-let last = 0, ulShown = -1, drawDt = 0, reflecting = false   // reflecting = 바닥 반사를 그리는 중(관절을 움직이지 않는다)
+let last = 0, ulShown = -1, ulNow = false, drawDt = 0, drawN = 0, reflecting = false, flash = 0, ema = 16, slowT = 0   // reflecting = 바닥 반사를 그리는 중(자세를 움직이지 않는다) · flash = 궁극기 번쩍임
 function frame(t) {
-  const dt = Math.min(0.05, (t - last) / 1000 || 0)
-  last = t; drawDt = dt
+  const ms = t - last, dt = Math.min(0.05, ms / 1000 || 0)
+  last = t; drawDt = dt; drawN++
   if (net && !net.host && PLAY.has(mode)) { watch(dt); guestInput() }   // 들어온 사람은 받은 장면을 그리고 버튼을 보낸다
   else update(dt)
   if (net?.host && net.peer && PLAY.has(mode) && (mode !== 'over' || wait > -2) && tnow - net.at >= (direct() ? 1 / 15 : 1 / 10)) { net.at = tnow; stream(snap()) }
   draw()
-  const ul = (mode === 'play' || mode === 'dead') && ctls[myT] ? Math.floor(ctls[myT].ult * 50) / 50 : 0   // 휴대폰 궁극기 버튼 둘레 게이지
-  if (ul !== ulShown) { ulShown = ul; ulBtn.style.setProperty('--g', ul); ulBtn.classList.toggle('ready', ul >= 1) }
+  // 느린 기기 — 경기 중 1.5초 넘게 45fps 밑이면 해상도를 한 단계 낮춘다(2 → 1.5 → 1.25 → 1). 다시 올리지는 않는다
+  if (ms > 0 && ms < 100 && (mode === 'play' || mode === 'dead')) {
+    ema += (ms - ema) * 0.08; slowT = ema > 22 ? slowT + ms / 1000 : 0
+    if (slowT > 1.5 && dpr > 1) { resize(dpr > 1.5 ? 1.5 : dpr > 1.25 ? 1.25 : 1); slowT = 0; ema = 16 }
+  }
+  const c = (mode === 'play' || mode === 'dead') && ctls[myT], ul = c ? Math.floor(c.ult * 50) / 50 : 0, now = !!c && ultReady(c)   // 휴대폰 궁극기 버튼 — 둘레 게이지, 지금 쓸 수 있으면 빛난다
+  if (ul !== ulShown || now !== ulNow) { ulShown = ul; ulNow = now; ulBtn.style.setProperty('--g', ul); ulBtn.classList.toggle('ready', now) }
   requestAnimationFrame(frame)
 }
 requestAnimationFrame(frame)
@@ -1410,7 +1651,7 @@ await loadData()
 const kr = data.players.filter(p => p.server === 'kr')
 TEAMS.forEach((T, ti) => {
   T.five = [1, 2, 3, 4, 5].map((pos, i) => {
-    const list = kr.filter(p => p.pos === pos), p = list[ti % list.length], f = { name: p ? p.short || p.name : `${pos}번`, num: NUMS[i], img: null }
+    const list = kr.filter(p => p.pos === pos), p = list[ti % list.length], f = { name: p ? p.short || p.name : `${pos}번`, num: NBA_NUM[p?.id] ?? NUMS[i], img: null }
     if (p?.img) {
       f.img = new Image()
       f.img.onload = () => { try { f.head = cutHead(f.img); [f.skin, f.shade] = skinOf(f.img) } catch {} }   // 실패하면 동그란 머리 · 기본 피부색
@@ -1429,7 +1670,7 @@ function showTab(ti) {
     const sk = SKILLS[ti][j], card = Object.assign(document.createElement('div'), { className: 'slam-skill' })
     card.innerHTML = '<img alt=""><div><small></small><b></b><p></p></div>'
     if (f.img) card.querySelector('img').src = f.img.src
-    card.querySelector('small').textContent = `${POS[j + 1]} · ${f.name}`
+    card.querySelector('small').textContent = `${POS[j + 1]} · ${f.name} · ${sk.def ? '수비 궁극기 — 수비 때' : '공격 궁극기 — 공을 잡았을 때'}`
     card.querySelector('b').textContent = sk.name
     card.querySelector('p').textContent = `${sk.desc}${sk.need ? ' (골대 가까이에서만)' : ''}`
     return card
