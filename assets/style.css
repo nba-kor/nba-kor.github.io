@@ -1381,11 +1381,16 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .slam-pad { display: none; justify-content: space-between; align-items: center; gap: 16px; margin-top: 12px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .slam-stick { width: 132px; height: 132px; border-radius: 50%; background: #ffffff12; border: 2px solid #ffffff2a; display: grid; place-items: center; }
 .slam-stick span { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); opacity: .85; pointer-events: none; }
-.slam-btns { display: flex; gap: 14px; }
-.slam-btns button { width: 78px; height: 78px; border-radius: 50%; padding: 0; font-weight: 800; font-size: 15px; line-height: 1.15; }
-.slam-btns small { font-size: 11px; font-weight: 600; color: var(--muted); }
-#btn-b { background: var(--accent); border-color: transparent; color: #1a1200; }
-#btn-b small { color: #4a3300; }
+.slam-btns { display: grid; grid-template-columns: repeat(2, 66px); gap: 10px; }
+.slam-btns button { width: 66px; height: 66px; border-radius: 50%; padding: 0; font-weight: 800; font-size: 14px; line-height: 1.15; }
+.slam-btns small { font-size: 10px; font-weight: 600; color: var(--muted); }
+#btn-sh { background: var(--accent); border-color: transparent; color: #1a1200; }
+#btn-sh small { color: #4a3300; }
+/* 궁극기 — 둘레가 게이지만큼 차고(--g = 0~1, slam.js), 다 차면 금색으로 빛난다 */
+#btn-ul { border: 0; background: radial-gradient(closest-side, var(--panel-2) 80%, transparent 82%), conic-gradient(#ffd23f calc(var(--g, 0) * 360deg), #ffffff1f 0); }
+#btn-ul.ready { background: #ffd23f; color: #1a1200; animation: slam-glow .7s ease-in-out infinite alternate; }
+@keyframes slam-glow { to { box-shadow: 0 0 0 4px #ffd23f66, 0 0 22px #ffd23f; } }
+@media (prefers-reduced-motion: reduce) { #btn-ul.ready { animation: none; box-shadow: 0 0 0 4px #ffd23f66; } }
 .slam-help { margin: 10px 0 0; color: var(--muted); font-size: 13.5px; }
 .slam-help kbd { display: inline-block; min-width: 20px; padding: 0 5px; margin: 0 1px; border: 1px solid var(--muted); border-radius: 4px; font: 600 12px/18px ui-monospace, Menlo, Consolas, monospace; text-align: center; color: var(--text); }
 @media (pointer: coarse) {
@@ -1397,5 +1402,6 @@ dialog, .ac-body { overscroll-behavior: contain; }
   .slam-pad { position: absolute; inset: auto 8px 8px; margin: 0; pointer-events: none; }
   .slam-pad > * { pointer-events: auto; opacity: .7; }
   .slam-stick { width: 110px; height: 110px; }
-  .slam-btns button { width: 64px; height: 64px; }
+  .slam-btns { grid-template-columns: repeat(2, 54px); gap: 8px; }
+  .slam-btns button { width: 54px; height: 54px; font-size: 12px; }
 }
