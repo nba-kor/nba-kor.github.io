@@ -138,7 +138,7 @@ function start() {
   showTab(sides[myT])
   ps = [0, 1].flatMap(t => TEAMS[sides[t]].five.map((f, i) => ({
     team: t, i, f, x: 0, z: 0, h: 0, vh: 0, dir: side(t), run: 0, mv: false, act: null, t: 0,
-    cool: 0, stun: 0, fall: 0, think: 0, cut: 0, block: 0, reach: 0, ult: rnd() * 0.3, boost: 0, cdx: 0, dp: 0, hand: 1, sq: 0, kb: null, sure: false, trail: [], tt: 0,
+    cool: 0, stun: 0, fall: 0, think: 0, cut: 0, block: 0, reach: 0, ult: rnd() * 0.3, boost: 0, acc: 1, cdx: 0, dp: 0, hand: 1, sq: 0, kb: null, sure: false, trail: [], tt: 0,
     ghost: 0, hot: 0, slow: 0, ice: 0, big: 0, conf: 0, mirror: 0, wt: 0, poster: false, four: false, hook: false, vx: 0, vz: 0, fd: side(t), joints: {},
   })))
   score = [0, 0]; clock = GAME; shot = SHOT; offense = 0
@@ -169,6 +169,7 @@ function tipOff(dt) {
 function grab(p, why) {
   const turn = p.team !== offense
   if (turn || ball.rebound) shot = SHOT
+  if (turn) fresh(1 - p.team)
   offense = p.team
   Object.assign(ball, { st: 'held', owner: p, to: null, rebound: false, sure: false, oop: false, chain: null, safe: false })
   if (p.act === 'rush') p.act = null
@@ -187,7 +188,7 @@ function made(t, pts, text, by) {
   h.shake = Math.max(h.shake, 0.3)
   if (by) by.ult = Math.min(1, by.ult + 0.3)
   Object.assign(ball, { st: 'drop', owner: null, x: h.x, z: h.z, h: RIM - 4, vx: 0, vz: 0, vh: -60 })
-  offense = 1 - t
+  offense = 1 - t; fresh(t)
   mode = 'dead'; wait = 1.2
 }
 
@@ -302,7 +303,10 @@ function blackhole(p) {   // 공격 방향 반대쪽 한 점으로 — 골밑이
 
 function jump(p) { if (p.h === 0 && !p.act) p.vh = JUMP * st(p).jump }
 const canMove = p => !p.act && p.h === 0 && p.stun <= 0 && !p.kb
-const speed = p => SPD * (ball.owner === p ? 0.92 : 1)
+const speed = p => SPD * (ball.owner === p ? 0.85 : 1)   // 공을 들면 조금 느리다
+// 수비 가속 — 수비로 바뀔 때마다 선수마다 한 번(acc). 1초 동안 빨라진다
+const fresh = t => { for (const q of team(t)) q.acc = 1 }
+function accel(p) { p.acc = 0; p.boost = Math.max(p.boost, 1); burst(p.x, p.z, 4, 10, '#e3cfa3') }
 
 /** 방향(dx, dz — 길이 1 이하)으로 달린다. 속도는 바로 붙지 않고 0.2초쯤에 걸쳐 붙고 줄어든다 — 출발 · 멈춤 · 방향 전환이 부드럽다 */
 function step(p, dx, dz, spd, dt) {
@@ -526,7 +530,7 @@ function user(p, [x, z], input, dt) {
     return
   }
   if (input.sh) jump(p)
-  if (input.dr) { const o = ball.owner; if (o && o.team !== p.team && dist(p, o) < 34) steal(p, o); else p.reach = 0.2 }
+  if (input.dr) { const o = ball.owner; if (o && o.team !== p.team && dist(p, o) < 34) steal(p, o); else if (p.team !== offense && p.acc && canMove(p)) accel(p); else p.reach = 0.2 }   // 스틸이 안 닿으면 가속
   if (input.pa) ctls[p.team] = nearest(team(p.team), ball)   // 공에 가장 가까운 선수로 바꾼다
 }
 
@@ -558,6 +562,7 @@ function ai(p, dt) {
   toward(p, man.x + (h.x - man.x) / d * gap, man.z + (h.z - man.z) / d * gap, SPD * 0.93, dt)
   if (Math.abs(ball.x - p.x) > 14) p.dir = Math.sign(ball.x - p.x)   // 공을 본다 — 공이 바로 앞이면 그대로(좌우로 떨지 않게)
   if (man !== ball.owner) return
+  if (p.acc && dist(p, man) > 50 && dist(man, h) < dist(p, h)) return accel(p)   // 제쳐졌으면 가속으로 따라간다
   if (!ctls[p.team] && p.ult >= 1 && dist(p, man) < 220 && rnd() < dt * 0.5) ultimate(p)
   else if (dist(p, man) < 32 && rnd() < dt * 0.4) steal(p, man)
 }
@@ -648,7 +653,7 @@ function moveBall(dt, view) {
 const BTN = ['dr', 'pa', 'sh', 'ul'], PLAY = new Set(['tip', 'play', 'dead', 'over'])
 const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }]
 // 장면에 싣는 선수 값(x · z · h 뒤에) · 공 값(잡은 선수 · 받을 선수 · 골대 번호 뒤에)
-const SYNC = ['vx', 'vz', 'vh', 'dir', 'run', 'act', 't', 'dur', 'style', 'hand', 'clutch', 'fall', 'sq', 'big', 'ice', 'ghost', 'hot', 'slow', 'mirror', 'conf', 'ult', 'reach', 'boost', 'kb']
+const SYNC = ['vx', 'vz', 'vh', 'dir', 'run', 'act', 't', 'dur', 'style', 'hand', 'clutch', 'fall', 'sq', 'big', 'ice', 'ghost', 'hot', 'slow', 'mirror', 'conf', 'ult', 'reach', 'boost', 'kb', 'acc']
 const BSYNC = ['st', 'x', 'z', 'h', 'vx', 'vz', 'vh', 'sure', 'oop', 'safe', 'sx', 'sz', 'sh', 't', 'T', 'arc', 'sp']
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v ?? 0
 let rq = 0, rn = [0, 0, 0, 0]   // 방장: 받은 상대 입력의 마지막 순번 · 버튼마다 누른 횟수
@@ -1243,6 +1248,7 @@ function hud() {
     g.lineWidth = 3.5; g.strokeStyle = ready ? `hsl(${45 + 10 * Math.sin(tnow * 10)} 100% ${60 + 15 * Math.sin(tnow * 10)}%)` : '#6f9bff'
     g.beginPath(); g.arc(cx, cy, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p.ult); g.stroke()
     if (p === ctl) { g.strokeStyle = '#ffd23f'; g.lineWidth = 2; oval(cx, cy, 22, 22); g.stroke() }
+    if (offense !== myT && p.acc) { g.fillStyle = '#5fff9a'; oval(cx + 15, cy - 15, 5, 5); g.fill() }   // 수비 가속이 남았다
   })
   if (ctl) {
     g.textAlign = 'left'; g.textBaseline = 'middle'; g.font = '800 15px system-ui, sans-serif'
