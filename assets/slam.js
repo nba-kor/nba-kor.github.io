@@ -16,7 +16,7 @@ cv.width = W * DPR; cv.height = H * DPR; g.scale(DPR, DPR)
 const CL = 940, CW = 500, RIM = 100                 // 코트 길이 · 너비 · 림 높이(월드 단위 = 0.1피트)
 const HOOP = [{ x: 52, z: 250, shake: 0 }, { x: 888, z: 250, shake: 0 }]
 const S = 1.45, TOP = 150                            // 화면 배율 · 코트 먼 쪽 줄의 화면 y
-const GAME = 180, SHOT = 30, SPD = 175, GRAV = 1100, JUMP = 360
+const GAME = 90, SHOT = 30, SPD = 175, GRAV = 1100, JUMP = 360
 const TEAMS = [
   { name: 'VIPERS_T', color: '#d6323a', dark: '#7d1520' },
   { name: 'VIPERS_N', color: '#1f9d6b', dark: '#0d5a3c' },
@@ -27,6 +27,17 @@ const NUMS = [1, 7, 10, 23, 34]
 const ULT_FILL = 1 / 32                                                        // 초당 — 32초면 찬다
 const SPOT = [[270, 0], [210, -150], [210, 150], [75, -100], [65, 100]]   // 공격 골대에서 [뒤로, 옆으로] — 포지션 1~5
 const SKIN = '#b9825a'
+// 포지션 1~5 능력치 — 보통(1)에 곱하는 값. dunk = 덩크가 되는 골대 거리(그 밖 140 까지는 레이업)
+const STATS = [
+  { note: '가장 빠르고 스틸 · 패스가 좋다. 덩크는 골대 바로 앞에서만', spd: 1.08, mid: 1, three: 1.05, dunk: 55, jump: 0.95, block: 0.7, steal: 1.4, reb: 0.8, pass: 1.2 },
+  { note: '3점 · 중거리가 가장 잘 들어간다', spd: 1.04, mid: 1.12, three: 1.3, dunk: 65, jump: 1, block: 0.8, steal: 1.1, reb: 0.85, pass: 1 },
+  { note: '점프가 높고 멀리서도 덩크(윈드밀 · 360 · 토마호크)', spd: 1, mid: 1.05, three: 1, dunk: 110, jump: 1.1, block: 1, steal: 1, reb: 1, pass: 1 },
+  { note: '힘이 좋아 리바운드 · 골밑 덩크가 강하다', spd: 0.95, mid: 0.95, three: 0.75, dunk: 105, jump: 1.05, block: 1.2, steal: 0.85, reb: 1.3, pass: 0.95 },
+  { note: '블록 · 리바운드 최고, 느리고 3점은 약하다', spd: 0.9, mid: 0.85, three: 0.5, dunk: 115, jump: 1, block: 1.5, steal: 0.7, reb: 1.5, pass: 0.9 },
+]
+const st = p => STATS[p.i]
+const DUNK_STYLES = [['two', 'reverse'], ['two', 'reverse'], ['windmill', 'spin', 'tomahawk', 'reverse'], ['tomahawk', 'two'], ['two', 'tomahawk']]   // 포지션마다 나오는 덩크
+const DUNK_MSG = { two: 'SLAM DUNK!', tomahawk: 'TOMAHAWK!', windmill: 'WINDMILL!', spin: '360 DUNK!', reverse: 'REVERSE DUNK!' }
 const CARDS = [[40, 80], [490, 80], [40, 305], [490, 305]], CARD_W = 430, CARD_H = 205
 
 let mode = 'load', pick = 0, sides = [0, 1]          // sides = [1P 팀, CPU 팀] (TEAMS 번호)
@@ -42,7 +53,7 @@ const team = t => ps.filter(p => p.team === t)
 const nearest = (list, o) => list.reduce((a, b) => dist(b, o) < dist(a, o) ? b : a)
 const open = p => Math.min(...ps.filter(q => q.team !== p.team).map(q => dist(q, p)))   // 가장 가까운 수비까지
 const say = (text, t = 1.1) => { msg = { text, t, t0: t } }
-const guarded = o => o.act === 'air' || o.act === 'cross' || o.act === 'dunk' || o.act === 'spin' || o.sure || o.ghost > 0   // 이 동작 중에는 스틸이 안 된다
+const guarded = o => o.act === 'air' || o.act === 'cross' || o.act === 'dunk' || o.act === 'lay' || o.act === 'spin' || o.sure || o.ghost > 0   // 이 동작 중에는 스틸이 안 된다
 /** 월드 → 화면. 가까울수록(z 가 클수록) 크게 — [x, y, 월드 1 의 픽셀] */
 function P(x, z, h = 0) { const u = S * (0.8 + 0.4 * z / CW); return [W / 2 + (x - camX) * u, TOP + z * 0.7 - h * u, u] }
 
@@ -154,7 +165,8 @@ function made(t, pts, text, by) {
   score[t] += pts
   say(text || (pts === 3 ? '3 POINTS!' : '2 POINTS'))
   const h = goal(t)
-  burst(h.x, h.z, RIM, 28, ['#ffd23f', '#ff9d00', '#fff'])
+  burst(h.x, h.z, RIM, 40, ['#ffd23f', '#ff9d00', '#fff'])
+  rings.push({ x: h.x, z: h.z, t: 0, c: '255,210,63' })
   h.shake = Math.max(h.shake, 0.3)
   if (by) by.ult = Math.min(1, by.ult + 0.3)
   Object.assign(ball, { st: 'drop', owner: null, x: h.x, z: h.z, h: RIM - 4, vx: 0, vz: 0, vh: -60 })
@@ -243,13 +255,13 @@ function freeze(p, r, t) { for (const q of opp(p)) if (dist(q, p) < r) Object.as
 function sureShot(p) { p.sure = true; shoot(p) }
 function oop(p) {   // 골대에 가장 가까운 동료에게 높이 띄운다 — 가로챌 수 없다
   pass(p, nearest(team(p.team).filter(m => m !== p), goal(p.team)))
-  Object.assign(ball, { oop: true, safe: true })
+  Object.assign(ball, { oop: 'ult', safe: true })
   say('ALLEY-OOP!')
 }
 function chain(p) {   // 동료 넷을 아무 순서로 — 빠르고 가로챌 수 없다
   const rest = team(p.team).filter(m => m !== p).sort(() => rnd() - 0.5)
   pass(p, rest.shift())
-  Object.assign(ball, { chain: rest, safe: true })
+  Object.assign(ball, { chain: rest, safe: true, oop: false })
   say('CHAIN PASS!')
 }
 function blink(p) {
@@ -269,13 +281,13 @@ function blackhole(p) {   // 공격 방향 반대쪽 한 점으로 — 골밑이
 
 // ---------------------------------------------------------------- 동작
 
-function jump(p) { if (p.h === 0 && !p.act) p.vh = JUMP }
+function jump(p) { if (p.h === 0 && !p.act) p.vh = JUMP * st(p).jump }
 const canMove = p => !p.act && p.h === 0 && p.stun <= 0 && !p.kb
 const speed = p => SPD * (ball.owner === p ? 0.92 : 1)
 
 /** 방향(dx, dz — 길이 1 이하)으로 달린다. 속도는 바로 붙지 않고 0.2초쯤에 걸쳐 붙고 줄어든다 — 출발 · 멈춤 · 방향 전환이 부드럽다 */
 function step(p, dx, dz, spd, dt) {
-  spd *= (p.boost > 0 ? 1.45 : 1) * (p.ghost > 0 ? 1.3 : 1) * (p.big > 0 ? 1.15 : 1) * (p.slow > 0 ? 0.45 : 1)   // 궁극기 효과
+  spd *= st(p).spd * (p.boost > 0 ? 1.45 : 1) * (p.ghost > 0 ? 1.3 : 1) * (p.big > 0 ? 1.15 : 1) * (p.slow > 0 ? 0.45 : 1)   // 궁극기 효과
   const k = 1 - Math.exp(-dt * 11)
   p.vx += (dx * spd - p.vx) * k; p.vz += (dz * spd * 0.85 - p.vz) * k
   p.x += p.vx * dt; p.z += p.vz * dt
@@ -291,7 +303,8 @@ function toward(p, tx, tz, spd, dt) {   // 가까워질수록 천천히 — 도�
 const stop = p => { p.vx = p.vz = 0; p.mv = false }
 
 function pass(p, m) {
-  Object.assign(ball, { st: 'pass', owner: null, to: m, x: p.x + p.dir * 12, z: p.z, h: 40, tried: new Set([p]), oop: false, chain: null, safe: false })
+  const h = goal(p.team), dm = dist(m, h), lob = dm < 170 && (m.cut > 0 || dm < 120) && dm < dist(p, h) - 40   // 골밑으로 들어가는 동료 — 높이 띄우는 앨리웁
+  Object.assign(ball, { st: 'pass', owner: null, to: m, x: p.x + p.dir * 12, z: p.z, h: 40, tried: new Set([p]), oop: lob && 'lob', chain: null, safe: false, sp: 560 * st(p).pass })
   p.cool = 0.25
 }
 /** 스틱 방향에 가장 가까운 동료. 방향이 없으면 비어 있고 골대에 가까운 동료 */
@@ -315,53 +328,69 @@ function crossover(p, ax, az) {
   for (const q of team(1 - p.team)) if (dist(q, p) < 45 && rnd() < 0.4) { knock(q, 0, 0, 0.9); say('ANKLES!', 0.7) }
 }
 
-function dunkFrom(p, mega) {
-  Object.assign(p, { act: 'dunk', t: 0, from: { x: p.x, z: p.z }, dur: mega ? 0.6 : 0.4, peak: mega ? 130 : 88, vx: 0, vz: 0 })
+function dunkFrom(p, mega) {   // 덩크 종류는 포지션마다 — 윈드밀 · 360 은 조금 더 오래 난다
+  const list = DUNK_STYLES[p.i], style = mega ? 'two' : list[Math.floor(rnd() * list.length)], long = style === 'windmill' || style === 'spin'
+  Object.assign(p, { act: 'dunk', t: 0, from: { x: p.x, z: p.z }, dur: mega ? 0.6 : long ? 0.5 : 0.42, peak: mega ? 130 : long ? 96 : 88, vx: 0, vz: 0, style, mega })
   p.dir = Math.sign(goal(p.team).x - p.x) || p.dir
+  if (style === 'reverse') p.dir = -p.dir   // 리버스 — 골대를 등지고 머리 너머로
 }
 function shoot(p) {
   if (p.act || p.h > 0) return
-  const h = goal(p.team)
+  const h = goal(p.team), d = dist(p, h)
   p.dir = Math.sign(h.x - p.x) || p.dir
-  if (dist(p, h) < (p.big > 0 ? 200 : 90)) dunkFrom(p, false)   // 자이언트는 멀리서도 덩크
-  else Object.assign(p, { act: 'shot', t: 0, rel: false, vh: JUMP * (p.sure ? 1.15 : 1), vx: 0, vz: 0 })
+  p.clutch = p.decided = false
+  if (d < (p.big > 0 ? 200 : st(p).dunk)) dunkFrom(p, false)   // 덩크 거리는 포지션마다(자이언트는 멀리서도)
+  else if (d < 140 && !p.sure) Object.assign(p, { act: 'lay', t: 0, from: { x: p.x, z: p.z }, dur: 0.42, vx: 0, vz: 0 })   // 그 안쪽은 레이업
+  else Object.assign(p, { act: 'shot', t: 0, rel: false, vh: JUMP * st(p).jump * (p.sure ? 1.15 : 1), vx: 0, vz: 0 })
   // 가까운 수비는 조금 늦게 뛰어 막으러 온다(1P 가 움직이는 선수는 직접 뛴다)
   if (!p.sure) for (const q of ps) if (q.team !== p.team && q !== ctl && dist(q, p) < 60 && rnd() < 0.75) q.block = 0.05 + rnd() * 0.22
 }
 const blocker = (p, r) => ps.find(q => q.team !== p.team && q.h > 22 && dist(q, p) < r)
 
 function letGo(p) {   // 점프슛을 놓는 순간
-  const h = goal(p.team), d = dist(p, h), sure = p.sure || p.hot > 0, { four, hook } = p
-  p.sure = p.four = p.hook = false
-  if (!sure) { const b = blocker(p, 40); if (b && rnd() < 0.45) return swat(p, b) }
-  let pr = d < 160 ? 0.62 : d < 237 ? 0.5 : d < 300 ? 0.38 : 0.12
-  const c = open(p)
-  pr *= c < 30 ? 0.55 : c < 55 ? 0.8 : 1
-  const three = d > 237 || Math.abs(p.z - h.z) > 220
+  const h = goal(p.team), d = dist(p, h), sure = p.sure || p.hot > 0, { four, hook, clutch } = p
+  p.sure = p.four = p.hook = p.clutch = false
+  if (!sure) { const b = blocker(p, 40); if (b && rnd() < 0.45 * st(b).block * (clutch ? 0.35 : 1)) return swat(p, b) }   // 더블 클러치는 먼저 뛴 수비를 피한다
+  const c = open(p), three = d > 237 || Math.abs(p.z - h.z) > 220
+  const pr = Math.min(0.92, (d < 160 ? 0.62 : d < 237 ? 0.5 : d < 300 ? 0.38 : 0.12) * (c < 30 ? 0.55 : c < 55 ? 0.8 : 1) * (three ? st(p).three : st(p).mid) * (clutch ? 0.85 : 1))
   Object.assign(ball, {
     st: 'shot', owner: null, x: p.x + p.dir * 6, z: p.z, h: p.h + 74, t: 0, T: 0.7 + d / 900, make: sure || rnd() < pr, pts: three ? (four ? 4 : 3) : 2, team: p.team, hoop: h,
-    arc: hook ? 150 + d * 0.4 : 60 + d * 0.3, sure, by: p, msg: four && three ? '4 POINTS!' : hook ? 'SKY HOOK!' : sure && three ? 'DEEP THREE!' : '',
+    arc: hook ? 150 + d * 0.4 : 60 + d * 0.3, sure, by: p, msg: four && three ? '4 POINTS!' : hook ? 'SKY HOOK!' : sure && three ? 'DEEP THREE!' : clutch ? 'DOUBLE CLUTCH!' : '',
   })
   Object.assign(ball, { sx: ball.x, sz: ball.z, sh: ball.h })
 }
+function layIn(p) {   // 레이업 — 림 바로 앞에서 살짝 올려 놓는다
+  const h = goal(p.team), clutch = p.clutch, c = open(p), [x, z, bh] = hand(p)
+  p.clutch = false
+  const b = blocker(p, 38)
+  if (b && rnd() < 0.35 * st(b).block * (clutch ? 0.35 : 1)) return swat(p, b)
+  const pr = 0.8 * st(p).mid * (c < 25 ? 0.75 : c < 45 ? 0.9 : 1) * (clutch ? 0.92 : 1)
+  Object.assign(ball, { st: 'shot', owner: null, x, z, h: bh, sx: x, sz: z, sh: bh, t: 0, T: 0.32, make: rnd() < pr, pts: 2, team: p.team, hoop: h, arc: 16, sure: false, by: p, msg: clutch ? 'DOUBLE CLUTCH!' : '' })
+}
+/** 더블 클러치 — 공중에서 슛을 한 번 더: 공을 내렸다 반대 손으로 다시 올려 늦게 놓는다 */
+function clutch(p) {
+  if (p.clutch || p.sure || p.rel) return
+  p.clutch = true; p.hand = -p.hand
+  if (p.act === 'lay') p.dur += 0.16
+}
 function slam(p) {    // 덩크가 림에 닿는 순간
-  const sure = p.sure || p.big > 0, mega = p.dur > 0.5, h = goal(p.team)
-  p.sure = p.poster = false
-  if (!sure) { const b = blocker(p, 34); if (b && rnd() < 0.3) return swat(p, b) }
+  const sure = p.sure || p.big > 0, mega = p.mega, lob = p.lob, h = goal(p.team)
+  p.sure = p.poster = p.lob = false
+  if (!sure) { const b = blocker(p, 34); if (b && rnd() < 0.3 * st(b).block) return swat(p, b) }
   h.shake = 0.6
   shake = Math.max(shake, mega ? 18 : 8)
   if (mega) {   // 충격파 — 골밑 상대가 다 넘어진다
     rings.push({ x: h.x, z: h.z, t: 0 })
     for (const q of team(1 - p.team)) { const d = dist(q, h); if (d < 170) knock(q, (q.x - h.x) / (d || 1) * 300, (q.z - h.z) / (d || 1) * 300, 1.3) }
   }
-  if (sure || rnd() < 0.9) return made(p.team, 2, mega ? 'MEGA SLAM!' : 'SLAM DUNK!', p)
+  if (sure || rnd() < (lob ? 0.85 : 0.9)) return made(p.team, 2, mega ? 'MEGA SLAM!' : lob ? 'ALLEY-OOP!' : DUNK_MSG[p.style], p)
   miss(h)
 }
 
 function steal(p, o) {
   if (p.cool > 0) return
   p.cool = 0.5; p.reach = 0.2
-  if (!guarded(o) && rnd() < (p.team === 0 ? 0.32 : 0.2)) { grab(p, 'STEAL!'); p.ult = Math.min(1, p.ult + 0.2) }
+  if (!guarded(o) && rnd() < (p.team === 0 ? 0.32 : 0.2) * st(p).steal) { grab(p, 'STEAL!'); p.ult = Math.min(1, p.ult + 0.2) }
   else p.stun = 0.3
 }
 
@@ -416,6 +445,15 @@ function body(p, dt) {
     p.x += p.vx * dt; p.z += p.vz * dt; p.dir = Math.sign(tg.x - p.x) || p.dir; p.run += dt * 2
     return
   }
+  if (p.act === 'lay') {   // 레이업 — 림 앞까지 떠 가서 끝에 놓는다
+    p.t += dt
+    const u = Math.min(1, p.t / p.dur), k = Math.min(1, u * 1.3), tx = h.x - side(p.team) * 34
+    p.x = p.from.x + (tx - p.from.x) * k; p.z = p.from.z + (h.z - p.from.z) * k
+    p.h = 66 * Math.sin(Math.min(1, u) * Math.PI / 2)
+    airMind(p)
+    if (u >= 1) { p.act = 'land'; p.vh = 0; if (ball.owner === p) layIn(p) }
+    return
+  }
   if (p.act === 'dunk') {
     p.t += dt
     const u = Math.min(1, p.t / p.dur)
@@ -424,7 +462,7 @@ function body(p, dt) {
     if (u >= 1) { p.act = 'land'; p.vh = 0; if (ball.owner === p) slam(p) }
     return
   }
-  if (p.act === 'shot' && !p.rel && (p.t += dt) >= 0.3) { p.rel = true; if (ball.owner === p) letGo(p) }
+  if (p.act === 'shot') { airMind(p); if (!p.rel && (p.t += dt) >= (p.clutch ? 0.5 : 0.3)) { p.rel = true; if (ball.owner === p) letGo(p) } }
   if (p.h > 0 || p.vh > 0) {
     p.vh -= GRAV * dt; p.h += p.vh * dt
     if (p.h <= 0) {
@@ -435,6 +473,15 @@ function body(p, dt) {
   }
 }
 
+// CPU — 슛 · 레이업으로 떴는데 블록이 오면 더블 클러치나 점프 패스
+function airMind(p) {
+  if (p.team === 0 || p.decided || p.t < 0.12 || ball.owner !== p || p.sure) return
+  p.decided = true
+  if (!blocker(p, 50)) return
+  if (rnd() < 0.45) clutch(p)
+  else if (rnd() < 0.4) { pass(p, mateFor(p)); say('JUMP PASS!', 0.7) }
+}
+
 // ---------------------------------------------------------------- 1P · CPU
 
 function user(dt) {
@@ -442,6 +489,11 @@ function user(dt) {
   if (canMove(p)) step(p, ax, az, speed(p), dt)
   else if (!p.act) stop(p)   // 대시 · 덩크 같은 동작은 body() 가 속도를 맡는다
   if (cut || input.ul && ultimate(p)) return
+  if (ball.owner === p && (p.act === 'shot' || p.act === 'lay')) {   // 공중 — 슛을 한 번 더 누르면 더블 클러치, 패스면 점프 패스
+    if (input.sh) clutch(p)
+    else if (input.pa) { pass(p, mateFor(p, ax, az)); say('JUMP PASS!', 0.7) }
+    return
+  }
   if (ball.owner === p) {
     if (input.dr) crossover(p, ax, az)
     else if (input.pa) pass(p, mateFor(p, ax, az))
@@ -461,7 +513,7 @@ function ai(p, dt) {
     if ((p.wt -= dt) <= 0) { p.wt = 0.7; p.wx = rnd() * CL; p.wz = rnd() * CW }
     return toward(p, p.wx, p.wz, SPD * 0.8, dt)
   }
-  const mine = team(p.team).sort((a, b) => dist(a, ball) - dist(b, ball))
+  const mine = team(p.team).sort((a, b) => dist(a, ball) / st(a).reb - dist(b, ball) / st(b).reb)   // 리바운드 좋은 선수가 먼저 쫓는다
   if (ball.st === 'loose' && mine.indexOf(p) < 2) {   // 굴러다니는 공은 팀마다 가까운 둘이 쫓는다
     if (dist(p, ball) < 30 && ball.h > 45 && ball.h < 130) jump(p)
     return toward(p, ball.x, ball.z, SPD, dt)
@@ -473,7 +525,7 @@ function ai(p, dt) {
   if (p.team === offense) {
     const h = goal(p.team), s = side(p.team), [back, lat] = SPOT[p.i]
     if (p.cut > 0) { p.cut -= dt; return toward(p, h.x - s * 45, h.z + p.cz, SPD, dt) }   // 골밑으로 컷인
-    if (ball.owner?.team === p.team && rnd() < dt * 0.15) { p.cut = 1.3; p.cz = (rnd() - 0.5) * 80 }
+    if (ball.owner?.team === p.team && rnd() < dt * (p.i >= 2 ? 0.25 : 0.12)) { p.cut = 1.3; p.cz = (rnd() - 0.5) * 80 }   // 포워드 · 센터가 더 자주 파고든다(앨리웁)
     return toward(p, h.x - s * back, h.z + lat, SPD * 0.9, dt)
   }
   // 대인 수비 — 자기 사람과 골대 사이. 공 가진 사람은 붙어서 가끔 스틸, CPU 는 게이지가 차면 스틸 대시
@@ -495,15 +547,25 @@ function handle(p, dt) {
   if (p.ult >= 1 && skillOf(p).cpu(d, c) && rnd() < 0.6 && ultimate(p)) return
   if (p.hot > 0 && d > 90 && d < 420) return shoot(p)   // 핫 핸드 동안은 보이면 쏜다
   if (c < 30 && p.cdx <= 0 && rnd() < 0.35) return crossover(p, 0, 0)
-  if (d < 90 || shot < 2.5 || d < 300 && c > 55 && rnd() < (d < 237 ? 0.5 : 0.3)) shoot(p)
-  else if (rnd() < (c < 28 ? 0.5 : 0.18)) pass(p, mateFor(p))
+  if (d < 140 || shot < 2.5 || d < 300 && c > 55 && rnd() < (d < 237 ? 0.5 * st(p).mid : 0.3 * st(p).three)) shoot(p)
+  else if (rnd() < (c < 28 ? 0.5 : 0.18) * st(p).pass) pass(p, mateFor(p))
 }
 
 // ---------------------------------------------------------------- 공
 
 /** 공 자리 — 들고 있으면 손, 움직이면 바닥까지 튕긴다(|cos| 라 바닥에서 꺾여 올라온다) */
+/** 손에 든 공(= 앞 손) 자리 — 몸 기준 [앞으로, 위로]. 덩크는 종류마다 길이 다르고, 슛 · 레이업은 더블 클러치면 내렸다 다시 올린다 */
+function pose(p) {
+  const u = Math.min(1, p.t / (p.dur || 1)), dip = s => p.clutch ? Math.sin(clamp(s, 0, 1) * Math.PI) : 0
+  if (p.act === 'shot') { const k = dip((p.t - 0.16) / 0.34); return [4 + 8 * k, 94 - 38 * k] }
+  if (p.act === 'lay') { const k = dip((u - 0.3) / 0.55); return [8 + 6 * u, 50 + 46 * u - 36 * k] }
+  if (p.style === 'windmill') { const th = u < 0.7 ? u / 0.7 * Math.PI : Math.PI * (1 + (u - 0.7)); return [-Math.sin(th) * 26, 60 - Math.cos(th) * 26] }   // 아래 → 뒤 → 위 → 앞으로 한 바퀴
+  if (p.style === 'tomahawk') return u < 0.6 ? [8 - 20 * u / 0.6, 60 + 34 * u / 0.6] : [-12 + 30 * (u - 0.6) / 0.4, 94 - 10 * (u - 0.6) / 0.4]   // 머리 뒤로 젖혔다 내리꽂는다
+  if (p.style === 'reverse') return [-6 - 6 * u, 90 + 6 * u]   // 등진 채 머리 너머로
+  return [4 + 10 * u, 92 - 4 * u]   // 투핸드 · 360
+}
 function hand(p) {
-  if (p.act === 'shot' || p.act === 'dunk') return [p.x + p.dir * 4, p.z, p.h + 94]   // 머리 위 — 두 손 위
+  if (p.act === 'shot' || p.act === 'dunk' || p.act === 'lay') { const [fw, up] = pose(p); return [p.x + p.fd * fw, p.z, p.h + up + 4] }
   if (p.act === 'air') return [p.x + p.dir * 12, p.z, p.h + 50]   // 가슴 앞에 두 손으로
   if (p.act === 'cross') return [p.x + p.fd * 10, p.z + p.hand * (16 * Math.min(1, p.t / 0.26) - 8), 6]   // 낮게 몸 앞을 가로지른다
   return [p.x + p.fd * 12, p.z + p.hand * 5, 2 + 32 * Math.abs(Math.cos(p.dp))]   // 몸이 도는 만큼 공도 앞으로 돌아온다
@@ -516,20 +578,20 @@ function moveBall(dt) {
   if (ball.st === 'held') {
     [ball.x, ball.z, ball.h] = hand(ball.owner)
   } else if (ball.st === 'pass') {   // 받는 사람을 따라간다. 지나가는 길의 상대는 한 번씩 가로챌 기회
-    const m = ball.to, dx = m.x - ball.x, dz = m.z - ball.z, d = Math.hypot(dx, dz), v = (ball.safe ? 900 : 560) * dt
+    const m = ball.to, dx = m.x - ball.x, dz = m.z - ball.z, d = Math.hypot(dx, dz), v = (ball.safe ? 900 : ball.sp || 560) * dt
     if (d <= v + 8) {
       const { oop, chain } = ball
       grab(m)
-      if (oop) Object.assign(m, { act: 'air', t: 0, sure: true })   // 앨리웁 — 받자마자 골대로 날아간다
-      else if (chain?.length) { pass(m, chain.shift()); Object.assign(ball, { chain, safe: true }) }
+      if (chain?.length) { pass(m, chain.shift()); Object.assign(ball, { chain, safe: true, oop: false }) }
       else if (chain) { Object.assign(m, { act: null, h: 0, vh: 0, sure: true }); shoot(m) }   // 체인 패스의 마지막 — 꼭 넣는다
+      else if (oop) Object.assign(m, { act: 'air', t: 0, [oop === 'ult' ? 'sure' : 'lob']: true })   // 앨리웁 — 받자마자 골대로 날아가 덩크(궁극기면 꼭 들어간다)
       return
     }
     ball.x += dx / d * v; ball.z += dz / d * v; ball.h += ((ball.oop ? 120 : 40) - ball.h) * Math.min(1, dt * 6)
     if (!ball.safe) for (const q of ps) {
       if (q.team === m.team || ball.tried.has(q) || dist(q, ball) >= 18 || q.stun > 0) continue
       ball.tried.add(q)
-      if (rnd() < 0.3) return grab(q, 'STEAL!')
+      if (rnd() < (ball.oop ? 0.1 : 0.3) * st(q).steal) return grab(q, 'STEAL!')   // 높이 띄운 앨리웁은 잘 안 잘린다
     }
   } else if (ball.st === 'shot') {
     ball.t += dt
@@ -544,7 +606,7 @@ function moveBall(dt) {
     ball.x += ball.vx * dt; ball.z += ball.vz * dt
     if (ball.x < 0 || ball.x > CL) { ball.vx *= -0.6; ball.x = clamp(ball.x, 0, CL) }
     if (ball.z < 0 || ball.z > CW) { ball.vz *= -0.6; ball.z = clamp(ball.z, 0, CW) }
-    if (ball.st === 'loose') for (const p of ps) if (p.cool <= 0 && p.stun <= 0 && dist(p, ball) < 20 && ball.h < 52 + p.h) return grab(p)
+    if (ball.st === 'loose') for (const p of ps) if (p.cool <= 0 && p.stun <= 0 && dist(p, ball) < 20 * st(p).reb && ball.h < 52 + p.h) return grab(p)   // 리바운드 좋은 선수는 손이 길다
   }
 }
 
@@ -585,6 +647,8 @@ function update(rdt) {
   for (const r of rings) r.t += dt
   rings = rings.filter(r => r.t < 0.6)
   for (const h of HOOP) h.shake = Math.max(0, h.shake - rdt)
+  for (const f of flashes) f.t -= rdt
+  flashes = flashes.filter(f => f.t > 0)
   if (ps.length) camX = clamp(camX + (ball.x - camX) * Math.min(1, rdt * 4), 300, CL - 300)
   for (const k in input) input[k] = false
 }
@@ -613,12 +677,36 @@ function backdrop() {
     g.fillStyle = c.c; g.fillRect(x - 6, y + 4, 12, 10)
     g.fillStyle = '#d9a77c'; oval(x, y, 5, 5); g.fill()
   }
-  g.fillStyle = '#0e1422'; g.fillRect(0, 110, W, 26)
-  g.font = '800 15px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
-  for (let i = -2; i < 7; i++) {
-    g.fillStyle = i % 2 ? '#f5a623' : '#e9edf5'
-    g.fillText(i % 2 ? 'SUPER SLAM' : 'TNAB VIPERS', W / 2 + (i * 260 - camX) * 1.05, 123)
+  if (rnd() < (msg ? 0.6 : 0.08)) flashes.push({ x: rnd() * W, y: 60 + rnd() * 46, t: 0.12 })   // 카메라 플래시 — 득점 때 많이
+  g.globalCompositeOperation = 'lighter'
+  for (const f of flashes) {
+    const r = 14 * f.t / 0.12, fg = g.createRadialGradient(f.x, f.y, 0, f.x, f.y, r)
+    fg.addColorStop(0, 'rgba(255,255,255,.95)'); fg.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = fg; g.fillRect(f.x - r, f.y - r, r * 2, r * 2)
   }
+  g.globalCompositeOperation = 'source-over'
+  // 전광판 — 글자가 천천히 흐르고 빛난다
+  const led = g.createLinearGradient(0, 110, 0, 136)
+  led.addColorStop(0, '#0b1020'); led.addColorStop(1, '#151c30')
+  g.fillStyle = led; g.fillRect(0, 110, W, 26)
+  g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(0, 110, W, 1)
+  g.font = '800 15px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  const roll = (tnow * 30) % 520
+  for (let i = -3; i < 8; i++) {
+    g.fillStyle = i % 2 ? '#f5a623' : '#e9edf5'; g.shadowColor = g.fillStyle; g.shadowBlur = 8
+    g.fillText(i % 2 ? 'SUPER SLAM' : 'TNAB VIPERS', W / 2 + (i * 260 - camX) * 1.05 - roll, 123)
+  }
+  g.shadowBlur = 0
+}
+/** 천장 조명 — 위에서 코트로 떨어지는 빛줄기(화면에 고정) */
+function lights() {
+  g.globalCompositeOperation = 'lighter'
+  for (const lx of [W * 0.22, W * 0.5, W * 0.78]) {
+    const lg = g.createLinearGradient(0, 50, 0, H)
+    lg.addColorStop(0, 'rgba(255,245,215,.09)'); lg.addColorStop(1, 'rgba(255,245,215,0)')
+    g.fillStyle = lg; g.beginPath(); g.moveTo(lx - 30, 50); g.lineTo(lx + 30, 50); g.lineTo(lx + 170, H); g.lineTo(lx - 170, H); g.fill()
+  }
+  g.globalCompositeOperation = 'source-over'
 }
 
 function court() {
@@ -642,6 +730,15 @@ function court() {
   poly([[0, 0], [CL, 0], [CL, CW], [0, CW]], null, line, true)
   poly([[CL / 2, 0], [CL / 2, CW]], null, line)
   poly(arc(CL / 2, 250, 60, 0, Math.PI * 2, 40), 'rgba(245,166,35,.35)', line)
+  const [cx, cy, cu] = P(CL / 2, 250)   // 센터 로고 — 바닥에 눕힌 글자
+  g.save(); g.translate(cx, cy); g.scale(1, 0.42); g.globalAlpha = 0.3
+  g.font = `900 ${34 * cu}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.fillText('VIPERS', 0, 0)
+  g.restore()
+  for (const lx of [CL * 0.22, CL * 0.5, CL * 0.78]) {   // 조명이 비친 광택
+    const [gx, gy, gu] = P(lx, 210), R = 230 * gu, sg = g.createRadialGradient(gx, gy, 0, gx, gy, R)
+    sg.addColorStop(0, 'rgba(255,240,210,.2)'); sg.addColorStop(1, 'rgba(255,240,210,0)')
+    g.save(); g.translate(gx, gy); g.scale(1, 0.38); g.translate(-gx, -gy); g.fillStyle = sg; g.beginPath(); g.arc(gx, gy, R, 0, Math.PI * 2); g.fill(); g.restore()
+  }
   for (const r of rings) {   // 충격파 — 블랙홀은 안으로 빨려 든다
     const k = r.in ? 1 - r.t / 0.6 : r.t / 0.6, [rx, ry, u] = P(r.x, r.z), R = (30 + (r.big ? 420 : 220) * k) * u
     g.strokeStyle = `rgba(${r.c || '255,220,120'},${r.in ? k : 1 - k})`; g.lineWidth = 6 * (1 - k) + 1
@@ -653,17 +750,28 @@ function drawHoop(h) {
   const s = h.x < CL / 2 ? -1 : 1, bx = h.x + s * 12, px = h.x + s * 70, wob = Math.sin(tnow * 70) * 4 * h.shake
   g.lineWidth = 6; g.lineCap = 'round'
   poly([[px, 250, 0], [px, 250, 135], [bx, 250, 122]], null, '#4a505c')
-  g.lineCap = 'butt'; g.lineWidth = 2
-  poly([[bx, 222, 134 + wob / 3], [bx, 278, 134 + wob / 3], [bx, 278, 92 + wob / 3], [bx, 222, 92 + wob / 3]], 'rgba(240,244,250,.9)', '#2b2f38', true)
-  poly([[bx, 239, 118], [bx, 261, 118], [bx, 261, 100], [bx, 239, 100]], null, '#d6323a', true)
+  g.lineCap = 'butt'; g.lineWidth = 2.5
+  const w = wob / 3
+  poly([[bx, 220, 136 + w], [bx, 280, 136 + w], [bx, 280, 92 + w], [bx, 220, 92 + w]], 'rgba(200,228,255,.32)', '#f4f8ff', true)   // 유리 백보드
+  poly([[bx, 222, 134 + w], [bx, 236, 134 + w], [bx, 228, 96 + w]], 'rgba(255,255,255,.18)', null, true)   // 유리 반짝임
+  g.lineWidth = 2
+  poly([[bx, 239, 118], [bx, 261, 118], [bx, 261, 100], [bx, 239, 100]], null, '#ff6a2a', true)
+  poly([[bx, 220, 92 + w], [bx, 280, 92 + w], [bx, 280, 88 + w], [bx, 220, 88 + w]], '#1c2433', null, true)   // 아래 패드
+  const [sx, sy, su] = P(bx, 250, 146)   // 백보드 위 샷클락
+  g.fillStyle = '#05070c'; g.fillRect(sx - 11 * su, sy - 6 * su, 22 * su, 11 * su)
+  g.fillStyle = '#ff3b2f'; g.font = `700 ${8 * su}px ui-monospace, Menlo, Consolas, monospace`; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.shadowColor = '#ff3b2f'; g.shadowBlur = 6; g.fillText(String(Math.ceil(shot)).padStart(2, '0'), sx, sy); g.shadowBlur = 0
   const [x, y0, u] = P(h.x, h.z, RIM), y = y0 + wob
-  g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1.2
-  for (let i = 0; i < 8; i++) {   // 그물 — 흔들릴 때는 아래가 출렁인다
-    const t = i / 8 * Math.PI * 2
-    g.beginPath(); g.moveTo(x + Math.cos(t) * 15 * u, y + Math.sin(t) * 5 * u); g.lineTo(x + Math.cos(t) * 8 * u + wob, y + (22 + wob) * u); g.stroke()
+  g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 1.1
+  for (let i = 0; i < 12; i++) {   // 그물 — 흔들릴 때는 아래가 출렁인다
+    const t = i / 12 * Math.PI * 2, sway = Math.sin(tnow * 9 + i) * h.shake * 3
+    g.beginPath(); g.moveTo(x + Math.cos(t) * 15 * u, y + Math.sin(t) * 5 * u); g.lineTo(x + Math.cos(t) * 8 * u + wob + sway, y + (22 + wob) * u); g.stroke()
   }
-  g.strokeStyle = '#ff5a1f'; g.lineWidth = 3
+  for (const k of [0.45, 0.8]) { g.beginPath(); g.ellipse(x + wob * k, y + (22 + wob) * u * k, (15 - 7 * k) * u, (5 - 2 * k) * u, 0, 0, Math.PI * 2); g.stroke() }
+  g.strokeStyle = '#d4410f'; g.lineWidth = 4
   oval(x, y, 15 * u, 5 * u); g.stroke()
+  g.strokeStyle = '#ff9a5a'; g.lineWidth = 1.4   // 림 위쪽 빛
+  g.beginPath(); g.ellipse(x, y - 1, 15 * u, 5 * u, 0, Math.PI * 1.1, Math.PI * 1.9); g.stroke()
 }
 
 /** 두 마디 팔다리 — a 에서 b 로, 관절은 bend(±1) 쪽으로 꺾인다. 닿지 않으면 쭉 편다. [관절, 끝] */
@@ -680,70 +788,88 @@ function joint(p, key, a, b, l1, l2, pole, u, k) {
 }
 function ease(p, key, [tx, ty], u, k) {
   const m = p.joints[key] ||= [tx / u, ty / u]
-  m[0] += (tx / u - m[0]) * k; m[1] += (ty / u - m[1]) * k
+  if (!reflecting) { m[0] += (tx / u - m[0]) * k; m[1] += (ty / u - m[1]) * k }   // 바닥 반사를 그릴 때는 그대로
   return [m[0] * u, m[1] * u]
 }
 function line(pts, w, c) { g.strokeStyle = c; g.lineWidth = w; g.beginPath(); pts.forEach(([a, b], i) => i ? g.lineTo(a, b) : g.moveTo(a, b)); g.stroke() }
-function shape(pts, c) { g.fillStyle = c; g.beginPath(); pts.forEach(([a, b], i) => i ? g.lineTo(a, b) : g.moveTo(a, b)); g.closePath(); g.fill() }
+function shape(pts, c, edge, ew) {
+  g.fillStyle = c; g.beginPath(); pts.forEach(([a, b], i) => i ? g.lineTo(a, b) : g.moveTo(a, b)); g.closePath(); g.fill()
+  if (edge) { g.strokeStyle = edge; g.lineWidth = ew; g.stroke() }
+}
+const EDGE = 'rgba(25,12,6,.38)'   // 팔다리 · 옷 윤곽선
 
-function drawPlayer(p) {
+/** 선수 한 명. refl = 바닥 반사용(그림자 · 표시 · 공은 빼고 몸만) */
+function drawPlayer(p, refl) {
   const [x, y, u] = P(p.x, p.z, p.h), [fx, fy] = P(p.x, p.z), T = TEAMS[sides[p.team]], big = p.big > 0 ? 1.4 : 1
   const skin = p.f.skin || SKIN, shade = p.f.shade || '#8f5f3e'
-  p.trail.forEach((s, j) => {   // 잔상
-    const [gx, gy, gu] = P(s.x, s.z, s.h)
-    g.globalAlpha = 0.3 * (1 - j / p.trail.length); g.fillStyle = T.color
-    g.fillRect(gx - 9 * gu, gy - 62 * gu, 18 * gu, 56 * gu); oval(gx, gy - 74 * gu, 9 * gu, 10 * gu); g.fill()
-  })
-  g.globalAlpha = 1
-  if (p.mirror > 0) for (const dz of [-38, 38]) {   // 미러 이미지 — 양옆의 분신
-    const [mx, my, mu] = P(p.x + Math.sin(tnow * 6 + dz) * 8, p.z + dz, p.h)
-    g.globalAlpha = 0.45; g.fillStyle = T.color; g.fillRect(mx - 9 * mu, my - 62 * mu, 18 * mu, 56 * mu)
-    if (p.f.head) g.drawImage(p.f.head, mx - 12 * mu, my - 88 * mu, 24.5 * mu, 26 * mu)
+  if (!refl) {
+    p.trail.forEach((s, j) => {   // 잔상
+      const [gx, gy, gu] = P(s.x, s.z, s.h)
+      g.globalAlpha = 0.3 * (1 - j / p.trail.length); g.fillStyle = T.color
+      g.fillRect(gx - 9 * gu, gy - 62 * gu, 18 * gu, 56 * gu); oval(gx, gy - 74 * gu, 9 * gu, 10 * gu); g.fill()
+    })
     g.globalAlpha = 1
+    if (p.mirror > 0) for (const dz of [-38, 38]) {   // 미러 이미지 — 양옆의 분신
+      const [mx, my, mu] = P(p.x + Math.sin(tnow * 6 + dz) * 8, p.z + dz, p.h)
+      g.globalAlpha = 0.45; g.fillStyle = T.color; g.fillRect(mx - 9 * mu, my - 62 * mu, 18 * mu, 56 * mu)
+      if (p.f.head) g.drawImage(p.f.head, mx - 12 * mu, my - 88 * mu, 24.5 * mu, 26 * mu)
+      g.globalAlpha = 1
+    }
+    if (p.slow > 0) { g.strokeStyle = 'rgba(120,190,255,.85)'; g.lineWidth = 2; oval(fx, fy + 2, 18 * u, 6.5 * u); g.stroke() }
+    if (p.hot > 0 || p.ghost > 0) { g.fillStyle = p.hot > 0 ? 'rgba(255,120,30,.35)' : 'rgba(90,230,200,.3)'; oval(fx, fy, 26 * u, 10 * u); g.fill() }
+    if (p.ult >= 1) { g.fillStyle = `rgba(255,210,63,${0.3 + 0.2 * Math.sin(tnow * 9)})`; oval(fx, fy, 24 * u, 9 * u); g.fill() }   // 궁극기 준비
+    const rs = 16 * u * Math.max(0.5, 1 - p.h / 160) * big, sg = g.createRadialGradient(fx, fy, 0, fx, fy, rs)   // 부드러운 그림자 — 높이 뜰수록 작고 옅게
+    sg.addColorStop(0, `rgba(0,0,0,${0.45 - Math.min(0.25, p.h / 400)})`); sg.addColorStop(1, 'rgba(0,0,0,0)')
+    g.save(); g.translate(fx, fy); g.scale(1, 0.34); g.translate(-fx, -fy); g.fillStyle = sg; g.beginPath(); g.arc(fx, fy, rs, 0, Math.PI * 2); g.fill(); g.restore()
+    if (p === ctl) { g.strokeStyle = '#ffd23f'; g.lineWidth = 3; oval(fx, fy, 19 * u * big, 7 * u * big); g.stroke() }
   }
-  if (p.slow > 0) { g.strokeStyle = 'rgba(120,190,255,.85)'; g.lineWidth = 2; oval(fx, fy + 2, 18 * u, 6.5 * u); g.stroke() }
-  if (p.hot > 0 || p.ghost > 0) { g.fillStyle = p.hot > 0 ? 'rgba(255,120,30,.35)' : 'rgba(90,230,200,.3)'; oval(fx, fy, 26 * u, 10 * u); g.fill() }
-  if (p.ult >= 1) { g.fillStyle = `rgba(255,210,63,${0.3 + 0.2 * Math.sin(tnow * 9)})`; oval(fx, fy, 24 * u, 9 * u); g.fill() }   // 궁극기 준비
-  const sh = Math.max(0.5, 1 - p.h / 160) * big
-  g.fillStyle = 'rgba(0,0,0,.3)'; oval(fx, fy, 14 * u * sh, 4.6 * u * sh); g.fill()
-  if (p === ctl) { g.strokeStyle = '#ffd23f'; g.lineWidth = 3; oval(fx, fy, 19 * u * big, 7 * u * big); g.stroke() }
 
   // 몸 좌표 — at(옆, 키 높이). 윗몸일수록 달리는 쪽으로 기울어진다(기울기는 실제 속도를 따른다)
   const v = Math.hypot(p.vx, p.vz), a = p.h > 0 || p.fall ? 0 : Math.min(1, v / SPD), ph = p.run * 15, f = p.fd, fs = f >= 0 ? 1 : -1
-  const kh = 1 - Math.exp(-drawDt * 20), kj = 1 - Math.exp(-drawDt * 28), kb = 1 - Math.exp(-drawDt * 45)   // 손 · 관절 · 공 쪽 손이 따라가는 빠르기
+  const kh = 1 - Math.exp(-drawDt * 20), kj = 1 - Math.exp(-drawDt * 28), kb = 1 - Math.exp(-drawDt * 45), kp = 1 - Math.exp(-drawDt * 80)   // 손 · 관절 · 공 쪽 손 · 동작 손이 따라가는 빠르기
   const lean = p.fall ? 0 : clamp(p.vx / SPD, -1.3, 1.3) * 0.16, at = (px, hh) => [px * u + lean * hh * u, -hh * u]
-  const holding = ball.owner === p, up = p.act === 'shot' || p.act === 'dunk' || p.h > 0 && !holding
+  const holding = ball.owner === p, posing = holding && (p.act === 'dunk' || p.act === 'lay' || p.act === 'shot')
+  const up = p.act === 'shot' || p.act === 'dunk' || p.h > 0 && !holding
   const guard = !holding && ball.owner && ball.owner.team !== p.team && dist(p, ball.owner) < 70   // 공 가진 상대 앞의 수비
   g.save()
   g.translate(x, y - Math.abs(Math.sin(ph)) * 2.5 * u * a)   // 걸을 때 몸이 오르내린다
   if (big > 1) g.scale(big, big)   // 자이언트
-  if (p.ghost > 0) g.globalAlpha = 0.55   // 팬텀 — 반투명
-  if (p.act === 'spin') { const c = Math.cos(p.t / 0.45 * Math.PI * 4); g.scale(Math.abs(c) < 0.15 ? 0.15 : c, 1) }   // 회오리 — 제자리에서 두 바퀴
+  if (p.ghost > 0) g.globalAlpha *= 0.55   // 팬텀 — 반투명
+  let turn = 1   // 도는 중 등이 보이면 음수 — 등번호는 거울처럼 뒤집히지 않게 다시 뒤집는다
+  if (p.act === 'spin' || p.act === 'dunk' && p.style === 'spin') {   // 회오리 · 360 덩크 — 제자리에서 돈다
+    const c = Math.cos(p.act === 'spin' ? p.t / 0.45 * Math.PI * 4 : Math.min(1, p.t / p.dur) * Math.PI * 2)
+    g.scale(turn = Math.abs(c) < 0.15 ? 0.15 * Math.sign(c || 1) : c, 1)
+  }
   if (p.fall > 0) g.rotate(-p.dir * 1.35)   // 넘어졌다
   else if (p.sq > 0) g.scale(1 + p.sq * 1.2, 1 - p.sq * 1.2)   // 착지 — 잠깐 눌린다
   g.lineCap = 'round'; g.lineJoin = 'round'
   // 다리 — 엉덩이 · 무릎 · 발. 걸음마다 발이 앞뒤로 오가고 뒤로 갈 때 들린다. 공중에서는 접는다. 먼 다리는 어둡게
   const leg = (k, col) => {
     const hip = at(k ? 2.6 : -2.6, 37), s = Math.sin(ph + k * Math.PI)
-    const foot = p.h > 0 || p.act === 'dunk' ? [hip[0] + f * (k ? 7 : -2) * u, (k ? -13 : -7) * u]
+    const foot = p.h > 0 || p.act === 'dunk' || p.act === 'lay' ? [hip[0] + f * (k ? 7 : -2) * u, (k ? -13 : -7) * u]
       : [(k ? 2.6 : -2.6) * u * (1 - Math.abs(f)) + f * s * 10 * u * a, -Math.max(0, -Math.cos(ph + k * Math.PI)) * 7 * u * a]
     const [knee, end] = joint(p, `k${k}`, hip, foot, 19 * u, 18.5 * u, [hip[0] + f * 14 * u, hip[1] + 18 * u], u, kj)
-    line([hip, knee], 6.4 * u, col); line([knee, end], 5.2 * u, col)
+    line([hip, knee, end], 7.8 * u, EDGE); line([hip, knee], 6.4 * u, col); line([knee, end], 5.2 * u, col)
     line([[end[0], end[1] - 5 * u], [end[0], end[1] - 1.8 * u]], 4.8 * u, '#f2f2f2')   // 양말
     g.fillStyle = '#fafafa'; oval(end[0] + f * 2.2 * u, end[1] - 1.5 * u, 4.8 * u, 2.3 * u); g.fill()   // 운동화
+    g.strokeStyle = EDGE; g.lineWidth = 0.8 * u; g.stroke()
     g.fillStyle = T.dark; g.fillRect(end[0] + f * 2.2 * u - 4.8 * u, end[1] - 0.5 * u, 9.6 * u, 1.1 * u)
   }
   // 팔 — 어깨는 왼쪽 · 오른쪽 그대로이고 몸이 향한 쪽이 앞 팔. 손은 목표 자리를, 팔꿈치는 아래 · 뒤를 부드럽게 따라간다
   const arm = (side, target, col, k) => {
     const s0 = at(side * 7.4, 60), hand = ease(p, `h${side}`, target, u, k)
     const [el, end] = joint(p, `e${side}`, s0, hand, 13.5 * u, 13 * u, [s0[0] - f * 10 * u, s0[1] + 16 * u], u, kj)
-    line([s0, el], 5 * u, col); line([el, end], 4.3 * u, col)
+    line([s0, el, end], 6.2 * u, EDGE); line([s0, el], 5 * u, col); line([el, end], 4.3 * u, col)
     g.fillStyle = col; oval(end[0], end[1], 2.5 * u, 2.5 * u); g.fill()
   }
   const sw = Math.sin(ph) * 9 * u * a, rise = Math.abs(Math.sin(ph)) * 3 * u * a
   let near, far   // 손 자리
-  if (p.act === 'dunk') { near = at(fs * 12, 102); far = at(fs * 5, 97) }   // 림으로 뻗는다
-  else if (up) { near = at(fs * 3, 90); far = at(-fs * 2, 88) }   // 슛 · 블록 — 머리 위로
+  if (posing) {   // 덩크 · 레이업 · 슛 — 공을 든 손은 pose() 길을 따라간다(윈드밀은 한 바퀴, 토마호크는 뒤로 젖혔다 내리꽂기)
+    const [fw, hh] = pose(p)
+    near = at(fs * fw, hh)
+    far = p.act === 'dunk' && p.style === 'windmill' ? at(-fs * 8, 72) : p.act === 'dunk' && p.style === 'tomahawk' ? at(fs * 12, 74) : p.act === 'lay' ? at(fs * 4, 60) : at(fs * (fw - 5), hh - 4)
+  }
+  else if (up) { near = at(fs * 3, 90); far = at(-fs * 2, 88) }   // 놓은 뒤 · 블록 · 림에 매달리기 — 머리 위로
   else if (holding && p.act === 'air') { near = at(fs * 10, 52); far = at(fs * 8, 50) }   // 가슴 앞에 두 손으로
   else if (holding) {   // 공 쪽 손은 튀어 오르는 공을 따라 오르내린다(무릎 아래로는 안 내려간다). 다른 손은 공을 감싼다
     near = [(ball.x - p.x) * u / big, ((ball.z - p.z) * 0.7 - (Math.max(ball.h, 26) + 5) * u) / big]
@@ -752,25 +878,27 @@ function drawPlayer(p) {
   else if (p.reach > 0) { near = at(fs * 26, 48); far = at(-fs * 6, 38) }   // 스틸 — 손을 뻗는다
   else if (guard) { near = at(fs * 17, 70); far = at(fs * 13, 42) }   // 수비 — 한 손은 들어 앞을 막고 한 손은 낮게(옆에서 보니 둘 다 몸 앞)
   else { near = [at(fs * 9.5, 35)[0] + fs * sw, -(35 * u + rise)]; far = [at(-fs * 8.5, 35)[0] - fs * sw, -(35 * u + rise)] }   // 몸 옆에 늘어뜨리고, 걸을 때는 다리와 엇갈려 흔든다
-  arm(-fs, far, shade, kh)
+  arm(-fs, far, shade, posing ? kp : kh)
   leg(0, shade)
   leg(1, skin)
-  shape([at(-8.8, 42), at(8.8, 42), at(10.4, 27), at(1, 26), at(0, 29), at(-1, 26), at(-10.4, 27)], T.dark)   // 반바지
+  shape([at(-8.8, 42), at(8.8, 42), at(10.4, 27), at(1, 26), at(0, 29), at(-1, 26), at(-10.4, 27)], T.dark, EDGE, 0.9 * u)   // 반바지
   line([at(-9.6, 41), at(-10.3, 28)], 1.4 * u, T.color); line([at(9.6, 41), at(10.3, 28)], 1.4 * u, T.color)
-  shape([at(-3.6, 64), at(-9.6, 62.5), at(-7.8, 54), at(-8.4, 40.5), at(8.4, 40.5), at(7.8, 54), at(9.6, 62.5), at(3.6, 64), at(0, 58.5)], T.color)   // 민소매 상의
+  const [, jt] = at(0, 64), [, jb] = at(0, 40), jg = g.createLinearGradient(0, jt, 0, jb)   // 상의 — 아래로 갈수록 살짝 어둡게
+  jg.addColorStop(0, T.color); jg.addColorStop(0.55, T.color); jg.addColorStop(1, T.dark)
+  shape([at(-3.6, 64), at(-9.6, 62.5), at(-7.8, 54), at(-8.4, 40.5), at(8.4, 40.5), at(7.8, 54), at(9.6, 62.5), at(3.6, 64), at(0, 58.5)], jg, EDGE, 0.9 * u)   // 민소매 상의
   g.globalAlpha *= 0.85
   line([at(-3.6, 64), at(0, 58.5), at(3.6, 64)], 1 * u, '#fff'); line([at(-9.6, 62.5), at(-7.8, 54)], 1 * u, '#fff'); line([at(9.6, 62.5), at(7.8, 54)], 1 * u, '#fff')
   g.globalAlpha /= 0.85
   g.fillStyle = '#fff'; g.font = `800 ${8.5 * u}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'
-  g.fillText(p.f.num, ...at(0, 50))
+  g.save(); g.translate(...at(0, 50)); if (turn < 0) g.scale(-1, 1); g.fillText(p.f.num, 0, 0); g.restore()
   line([at(0, 62), at(0, 67)], 5.2 * u, skin)   // 목
   const [hx, hy] = at(0, 75)   // 머리 — 배경을 지운 얼굴 그림(cutHead)
   if (p.f.head) g.drawImage(p.f.head, hx - 12.25 * u, hy - 13.2 * u, 24.5 * u, 26 * u)
   else { g.fillStyle = skin; oval(hx, hy, 8 * u, 9 * u); g.fill() }
-  arm(fs, near, skin, holding && !up ? kb : kh)
+  arm(fs, near, skin, posing ? kp : holding ? kb : kh)
   if (p.ice > 0) { g.fillStyle = 'rgba(170,225,255,.55)'; g.strokeStyle = '#e8f7ff'; g.lineWidth = 1.5; g.fillRect(-15 * u, -92 * u, 30 * u, 94 * u); g.strokeRect(-15 * u, -92 * u, 30 * u, 94 * u) }   // 얼음
   g.restore()
-  g.globalAlpha = 1
+  if (refl) return
   g.textAlign = 'center'; g.textBaseline = 'middle'
   if (p.conf > 0) { g.fillStyle = '#c58bff'; g.font = `900 ${16 * u}px system-ui, sans-serif`; g.fillText('?', x, y - 100 * u * big) }
   if (p.fall > 0) {   // 머리 위로 별이 돈다
@@ -796,11 +924,14 @@ function drawBall() {
   g.fillStyle = 'rgba(0,0,0,.3)'; oval(fx, fy, 6 * u * sh, 2 * u * sh); g.fill()
   g.save(); g.translate(x, y)
   if (ball.h < 4) g.scale(1.15, 0.8)   // 바닥에 닿는 순간 찌그러진다
+  const bg = g.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r)   // 위 왼쪽에서 빛을 받은 공
+  bg.addColorStop(0, '#ffb27a'); bg.addColorStop(0.55, '#e3681f'); bg.addColorStop(1, '#8c3a0e')
+  g.fillStyle = bg; oval(0, 0, r, r); g.fill()
   g.rotate(ball.rot)
-  g.fillStyle = '#e8742a'; oval(0, 0, r, r); g.fill()
-  g.strokeStyle = '#6e2f0c'; g.lineWidth = 1.2; g.stroke()
-  g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0); g.moveTo(0, -r); g.lineTo(0, r); g.stroke()
-  g.beginPath(); g.ellipse(0, 0, r * 0.5, r, 0, 0, Math.PI * 2); g.stroke()
+  g.strokeStyle = 'rgba(60,22,4,.85)'; g.lineWidth = 1.1
+  g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0); g.stroke()
+  g.beginPath(); g.arc(-r * 1.25, 0, r * 0.95, -0.9, 0.9); g.stroke()
+  g.beginPath(); g.arc(r * 1.25, 0, r * 0.95, Math.PI - 0.9, Math.PI + 0.9); g.stroke()
   g.restore()
 }
 
@@ -890,12 +1021,23 @@ function draw() {
   g.save()
   if (shake) g.translate((rnd() - 0.5) * shake, (rnd() - 0.5) * shake)
   backdrop(); court()
+  // 바닥에 비친 선수 — 발밑을 축으로 뒤집어 눌러 흐리게(코트 안에서만)
+  g.save()
+  g.beginPath(); [[0, 0], [CL, 0], [CL, CW], [0, CW]].forEach(([wx, wz], i) => { const [sx, sy] = P(wx, wz); i ? g.lineTo(sx, sy) : g.moveTo(sx, sy) }); g.clip()
+  reflecting = true
+  for (const p of ps) { const [, fy] = P(p.x, p.z); g.save(); g.globalAlpha = 0.14; g.translate(0, fy * 1.55); g.scale(1, -0.55); drawPlayer(p, true); g.restore() }
+  reflecting = false
+  g.restore()
   const items = [...ps.map(p => [p.z, () => drawPlayer(p)]), ...HOOP.map(h => [h.z - 0.5, () => drawHoop(h)])]
   if (!ball.owner) items.push([ball.z + 0.1, drawBall])
   for (const [, d] of items.sort((a, b) => a[0] - b[0])) d()
-  for (const q of parts) { const [x, y, u] = P(q.x, q.z, q.h); g.globalAlpha = Math.min(1, q.t * 2.5); g.fillStyle = q.c; g.fillRect(x - 1.6 * u, y - 1.6 * u, 3.2 * u, 3.2 * u) }
+  g.globalCompositeOperation = 'lighter'   // 빛나는 파편
+  for (const q of parts) { const [x, y, u] = P(q.x, q.z, q.h); g.globalAlpha = Math.min(1, q.t * 2.5); g.fillStyle = q.c; oval(x, y, 2 * u, 2 * u); g.fill() }
+  g.globalCompositeOperation = 'source-over'
   g.globalAlpha = 1
+  lights()
   g.restore()
+  g.fillStyle = VIGNETTE; g.fillRect(0, 50, W, H - 50)   // 가장자리를 어둡게
   hud()
   if (cut) cutIn()
   if (msg && !cut) { const k = Math.min(1, (msg.t0 - msg.t) * 8); g.globalAlpha = Math.min(1, msg.t * 3); text(msg.text, W / 2, 230, 58 * (0.6 + 0.4 * k)); g.globalAlpha = 1 }   // 튀어나오듯 커진다
@@ -910,7 +1052,9 @@ function draw() {
   }
 }
 
-let last = 0, ulShown = -1, drawDt = 0
+const VIGNETTE = (() => { const v = g.createRadialGradient(W / 2, H / 2 + 30, H * 0.3, W / 2, H / 2, W * 0.62); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.42)'); return v })()
+let flashes = []
+let last = 0, ulShown = -1, drawDt = 0, reflecting = false   // reflecting = 바닥 반사를 그리는 중(관절을 움직이지 않는다)
 function frame(t) {
   const dt = Math.min(0.05, (t - last) / 1000 || 0)
   last = t; drawDt = dt
@@ -989,4 +1133,10 @@ tabs.replaceChildren(...TEAMS.map((T, ti) => {
   return b
 }))
 showTab(0)
+// 포지션 특성 표 — STATS 의 설명
+document.getElementById('pos-table').replaceChildren(...STATS.map((S, i) => {
+  const tr = document.createElement('tr'), th = Object.assign(document.createElement('th'), { textContent: POS[i + 1] }), td = Object.assign(document.createElement('td'), { textContent: S.note })
+  tr.append(th, td)
+  return tr
+}))
 mode = 'select'

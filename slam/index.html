@@ -27,7 +27,7 @@
 </header>
 
 <main class="slam">
-  <h1>슈퍼 슬램 <small>5:5 오락실 농구 · 1P vs CPU · 3분 · 궁극기</small></h1>
+  <h1>슈퍼 슬램 <small>5:5 오락실 농구 · 1P vs CPU · 1분 30초 · 궁극기</small></h1>
   <div class="slam-stage">
     <canvas id="slam" aria-label="슈퍼 슬램 게임 화면"></canvas>
     <div class="slam-pad">
@@ -48,17 +48,22 @@
         <tr><th>이동</th><td class="kb"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> · WASD</td><td colspan="2">휴대폰은 왼쪽 스틱</td></tr>
         <tr><th>드리블</th><td class="kb"><kbd>Z</kbd> · <kbd>J</kbd></td><td>짧게 치고 나가며 수비를 제쳐요(가끔 넘어뜨려요)</td><td>스틸</td></tr>
         <tr><th>패스</th><td class="kb"><kbd>X</kbd> · <kbd>K</kbd></td><td>방향키를 누른 쪽 동료에게</td><td>공에 가까운 선수로 바꾸기</td></tr>
-        <tr><th>슛</th><td class="kb"><kbd>C</kbd> · <kbd>L</kbd> · 스페이스</td><td>슛 — 골대 가까이면 덩크</td><td>블록 점프</td></tr>
+        <tr><th>슛</th><td class="kb"><kbd>C</kbd> · <kbd>L</kbd> · 스페이스</td><td>슛 — 골대 가까이면 덩크(포지션마다 거리 · 종류가 달라요), 그보다 조금 멀면 레이업</td><td>블록 점프</td></tr>
+        <tr><th>더블 클러치</th><td class="kb">공중에서 <kbd>C</kbd></td><td>슛 · 레이업으로 뜬 뒤 슛을 한 번 더 — 공을 내렸다 다시 올려 블록을 피해요(조금 덜 들어가요)</td><td>–</td></tr>
+        <tr><th>점프 패스</th><td class="kb">공중에서 <kbd>X</kbd></td><td>슛으로 뜬 뒤 패스 — 막으러 뛴 수비를 속여요</td><td>–</td></tr>
+        <tr><th>앨리웁</th><td class="kb"><kbd>X</kbd></td><td>골밑으로 파고드는 동료에게 패스하면 높이 띄워 받자마자 덩크</td><td>–</td></tr>
         <tr><th>궁극기</th><td class="kb"><kbd>V</kbd> · <kbd>U</kbd></td><td>그 선수의 궁극기(아래 팀별 표)</td><td>스틸 대시 — 공 가진 상대에게 날아가 뺏어요</td></tr>
       </tbody>
     </table>
     <p class="slam-help">궁극기 게이지는 화면 아래 얼굴 둘레예요. 32초면 차고, 득점 · 스틸 · 블록하면 더 빨리 차요. 휴대폰은 가로로 돌리면 크게 보여요.</p>
+    <h2>포지션 특성</h2>
+    <table class="slam-keys"><tbody id="pos-table"></tbody></table>
     <h2>팀별 궁극기</h2>
     <div class="slam-tabs" role="tablist" aria-label="팀" id="skill-tabs"></div>
     <div class="slam-skills" role="tabpanel" id="skills"></div>
   </section>
 </main>
 
-<script type="module" src="/assets/slam.js?v=3b9120ea"></script>
+<script type="module" src="/assets/slam.js?v=40609f23"></script>
 </body>
 </html>
