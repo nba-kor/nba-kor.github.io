@@ -1380,7 +1380,18 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .slam h1 { margin: 4px 0 10px; font-size: 20px; }
 .slam h1 small { font-size: 13px; font-weight: 500; color: var(--muted); }
 .slam-stage { position: relative; }
-.slam canvas { display: block; width: min(100%, calc((100dvh - 110px) * 16 / 9));   /* 가로 휴대폰에서도 머리(90px) 아래로 한 화면에 */ aspect-ratio: 16 / 9; margin: 0 auto; border-radius: 10px; background: #0b0e14; touch-action: none; user-select: none; -webkit-user-select: none; }
+.slam-screen { position: relative; width: min(100%, calc((100dvh - 110px) * 16 / 9)); margin: 0 auto; }   /* 가로 휴대폰에서도 머리(90px) 아래로 한 화면에 */
+.slam canvas { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; background: #0b0e14; touch-action: none; user-select: none; -webkit-user-select: none; }
+/* 전체 화면 — 위 줄의 시계(TIME) 왼쪽. 되는 브라우저는 진짜 전체 화면, 아이폰은 화면을 꽉 채운 칸(.full) */
+.slam-fs { position: absolute; top: 1.2%; right: 11.5%; width: max(26px, 3.8%); height: auto; aspect-ratio: 1; padding: 5px; border-radius: 8px; border: 0; background: #ffffff14; color: #fff; opacity: .75; }
+.slam-fs:hover { opacity: 1; }
+.slam-fs svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2.4; }
+.slam-fs .off, .slam-stage.full .slam-fs .on { display: none; }
+.slam-stage.full .slam-fs .off { display: inline; }
+.slam-stage.full { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; justify-content: center; padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); background: #000; touch-action: none; }
+.slam-stage.full .slam-screen { width: min(100%, calc(100dvh * 16 / 9)); }
+.slam-stage.full canvas { border-radius: 0; }
+.slam-stage.full .slam-pad { padding: 0 16px; }
 .slam-pad { display: none; justify-content: space-between; align-items: center; gap: 16px; margin-top: 12px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .slam-stick { width: 132px; height: 132px; border-radius: 50%; background: #ffffff12; border: 2px solid #ffffff2a; display: grid; place-items: center; }
 .slam-stick span { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); opacity: .85; pointer-events: none; }

@@ -111,6 +111,17 @@ stick.addEventListener('pointermove', e => stick.hasPointerCapture(e.pointerId) 
 stick.addEventListener('pointerup', release)
 stick.addEventListener('pointercancel', release)
 for (const k of ['dr', 'pa', 'sh', 'ul']) document.getElementById(`btn-${k}`).addEventListener('pointerdown', e => { e.preventDefault(); press(k) })
+// 전체 화면 — 되는 브라우저는 진짜 전체 화면(휴대폰은 가로로 돌린다), 안 되는 아이폰은 화면을 꽉 채운 칸(.full)
+const stage = cv.closest('.slam-stage'), fsBtn = document.getElementById('btn-fs')
+const setFull = on => { stage.classList.toggle('full', on); fsBtn.setAttribute('aria-label', on ? '전체 화면 끄기' : '전체 화면') }
+fsBtn.addEventListener('click', async () => {
+  fsBtn.blur()   // 버튼에 포커스가 남으면 키 입력을 게임이 못 받는다
+  if (document.fullscreenElement) return document.exitFullscreen()
+  const on = !stage.classList.contains('full')
+  if (on && stage.requestFullscreen) try { await stage.requestFullscreen({ navigationUI: 'hide' }); screen.orientation?.lock?.('landscape').catch(() => {}) } catch {}
+  setFull(on)
+})
+document.addEventListener('fullscreenchange', () => setFull(!!document.fullscreenElement))
 
 // ---------------------------------------------------------------- 경기 흐름
 
@@ -798,6 +809,14 @@ function shape(pts, c, edge, ew) {
 }
 const EDGE = 'rgba(25,12,6,.38)'   // 팔다리 · 옷 윤곽선
 
+/** 머리 — 배경을 지운 얼굴 그림(cutHead). 얼굴 그림은 거의 다 왼쪽을 보고 있어서 오른쪽으로 갈 때 뒤집는다.
+ *  fd 가 0.1초쯤에 걸쳐 바뀌니 그동안 얼굴이 좁아졌다 넓어지며 고개를 돌린다 */
+function head(p, x, y, u) {
+  if (!p.f.head) return
+  const f = p.fd, sx = Math.abs(f) < 0.3 ? (f < 0 ? 0.3 : -0.3) : -f
+  g.save(); g.translate(x, y); g.scale(sx, 1); g.drawImage(p.f.head, -12.25 * u, -13.2 * u, 24.5 * u, 26 * u); g.restore()
+}
+
 /** 선수 한 명. refl = 바닥 반사용(그림자 · 표시 · 공은 빼고 몸만) */
 function drawPlayer(p, refl) {
   const [x, y, u] = P(p.x, p.z, p.h), [fx, fy] = P(p.x, p.z), T = TEAMS[sides[p.team]], big = p.big > 0 ? 1.4 : 1
@@ -812,7 +831,7 @@ function drawPlayer(p, refl) {
     if (p.mirror > 0) for (const dz of [-38, 38]) {   // 미러 이미지 — 양옆의 분신
       const [mx, my, mu] = P(p.x + Math.sin(tnow * 6 + dz) * 8, p.z + dz, p.h)
       g.globalAlpha = 0.45; g.fillStyle = T.color; g.fillRect(mx - 9 * mu, my - 62 * mu, 18 * mu, 56 * mu)
-      if (p.f.head) g.drawImage(p.f.head, mx - 12 * mu, my - 88 * mu, 24.5 * mu, 26 * mu)
+      head(p, mx, my - 75 * mu, mu)
       g.globalAlpha = 1
     }
     if (p.slow > 0) { g.strokeStyle = 'rgba(120,190,255,.85)'; g.lineWidth = 2; oval(fx, fy + 2, 18 * u, 6.5 * u); g.stroke() }
@@ -892,8 +911,8 @@ function drawPlayer(p, refl) {
   g.fillStyle = '#fff'; g.font = `800 ${8.5 * u}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'
   g.save(); g.translate(...at(0, 50)); if (turn < 0) g.scale(-1, 1); g.fillText(p.f.num, 0, 0); g.restore()
   line([at(0, 62), at(0, 67)], 5.2 * u, skin)   // 목
-  const [hx, hy] = at(0, 75)   // 머리 — 배경을 지운 얼굴 그림(cutHead)
-  if (p.f.head) g.drawImage(p.f.head, hx - 12.25 * u, hy - 13.2 * u, 24.5 * u, 26 * u)
+  const [hx, hy] = at(0, 75)
+  if (p.f.head) head(p, hx, hy, u)
   else { g.fillStyle = skin; oval(hx, hy, 8 * u, 9 * u); g.fill() }
   arm(fs, near, skin, posing ? kp : holding ? kb : kh)
   if (p.ice > 0) { g.fillStyle = 'rgba(170,225,255,.55)'; g.strokeStyle = '#e8f7ff'; g.lineWidth = 1.5; g.fillRect(-15 * u, -92 * u, 30 * u, 94 * u); g.strokeRect(-15 * u, -92 * u, 30 * u, 94 * u) }   // 얼음

@@ -22,7 +22,7 @@
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=ac20c8b5">
+<link rel="stylesheet" href="/assets/style.css?v=791cb789">
 </head>
 <body>
 
@@ -43,7 +43,10 @@
 <main class="slam">
   <h1>슈퍼 슬램 <small>5:5 오락실 농구 · 1P vs CPU · 1분 30초 · 궁극기</small></h1>
   <div class="slam-stage">
-    <canvas id="slam" aria-label="슈퍼 슬램 게임 화면"></canvas>
+    <div class="slam-screen">
+      <canvas id="slam" aria-label="슈퍼 슬램 게임 화면"></canvas>
+      <button type="button" class="slam-fs" id="btn-fs" aria-label="전체 화면"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="on" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path class="off" d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg></button>
+    </div>
     <div class="slam-pad">
       <div class="slam-stick" id="stick"><span></span></div>
       <div class="slam-btns">
@@ -69,7 +72,7 @@
         <tr><th>궁극기</th><td class="kb"><kbd>V</kbd> · <kbd>U</kbd></td><td>그 선수의 궁극기(아래 팀별 표)</td><td>스틸 대시 — 공 가진 상대에게 날아가 뺏어요</td></tr>
       </tbody>
     </table>
-    <p class="slam-help">궁극기 게이지는 화면 아래 얼굴 둘레예요. 32초면 차고, 득점 · 스틸 · 블록하면 더 빨리 차요. 휴대폰은 가로로 돌리면 크게 보여요.</p>
+    <p class="slam-help">궁극기 게이지는 화면 아래 얼굴 둘레예요. 32초면 차고, 득점 · 스틸 · 블록하면 더 빨리 차요. 화면 위 시계 왼쪽 버튼을 누르면 전체 화면이에요(휴대폰은 가로로 돌아가요).</p>
     <h2>포지션 특성</h2>
     <table class="slam-keys"><tbody id="pos-table"></tbody></table>
     <h2>팀별 궁극기</h2>
@@ -78,6 +81,6 @@
   </section>
 </main>
 
-<script type="module" src="/assets/slam.js?v=d0854a9d"></script>
+<script type="module" src="/assets/slam.js?v=561054b8"></script>
 </body>
 </html>
