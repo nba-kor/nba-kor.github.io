@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>슈퍼 슬램 · TNAB Vipers</title>
+<link rel="icon" href="/assets/icon.png?v=2" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icon.png?v=2">
+<meta name="theme-color" content="#0d1117">
+<meta name="robots" content="noindex">   <!-- 메뉴에서 숨긴 페이지(관리자 메뉴에서만) -->
+<script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
+<link rel="stylesheet" href="/assets/style.css?v=b05f5469">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><img src="/assets/icon.png?v=2" alt="">TNAB <span>Vipers</span></div>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/arena/">아레나 운영</a>
+    <a href="/tactics/" data-group="/tactics/ /tiers/ /combos/ /potentials/">전략·공략</a>
+    <a href="/videos/">영상 자료실</a>
+    <a href="/me/">마이페이지</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="rc-auth" id="auth" aria-live="polite"></div>
+</header>
+
+<main class="slam">
+  <h1>슈퍼 슬램 <small>5:5 오락실 농구 · 1P vs CPU · 3분</small></h1>
+  <div class="slam-stage">
+    <canvas id="slam" aria-label="슈퍼 슬램 게임 화면"></canvas>
+    <div class="slam-pad">
+      <div class="slam-stick" id="stick"><span></span></div>
+      <div class="slam-btns">
+        <button type="button" id="btn-a">패스<br><small>스틸</small></button>
+        <button type="button" id="btn-b">슛<br><small>블록</small></button>
+      </div>
+    </div>
+  </div>
+  <p class="slam-help keys">이동 <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd>(WASD) · 패스 · 스틸 <kbd>Z</kbd>(J) · 슛 · 블록 <kbd>X</kbd>(K, 스페이스)</p>
+  <p class="slam-help">골대 가까이에서 슛을 누르면 덩크. 패스는 방향키를 누른 쪽 동료에게 가요. 수비할 때 공에서 멀리서 패스 버튼을 누르면 공에 가까운 선수로 바뀌어요. 휴대폰은 가로로 돌리면 크게 보여요.</p>
+</main>
+
+<script type="module" src="/assets/slam.js?v=88993bd4"></script>
+</body>
+</html>

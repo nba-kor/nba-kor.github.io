@@ -1371,3 +1371,31 @@ label.ac-pick { cursor: pointer; }
 /* 모달이 떠 있는 동안 뒤 페이지는 스크롤하지 않는다 — 모달 안 스크롤이 끝에 닿아도 뒤로 넘어가지 않게 */
 html:has(dialog:modal) { overflow: hidden; scrollbar-gutter: stable; }
 dialog, .ac-body { overscroll-behavior: contain; }
+
+/* ---------- 슈퍼 슬램 (assets/slam.js) — 숨긴 메뉴의 오락실 농구 ---------- */
+.slam { max-width: 1100px; margin: 0 auto; padding: 12px 16px 32px; }
+.slam h1 { margin: 4px 0 10px; font-size: 20px; }
+.slam h1 small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.slam-stage { position: relative; }
+.slam canvas { display: block; width: min(100%, calc((100dvh - 110px) * 16 / 9));   /* 가로 휴대폰에서도 머리(90px) 아래로 한 화면에 */ aspect-ratio: 16 / 9; margin: 0 auto; border-radius: 10px; background: #0b0e14; touch-action: none; user-select: none; -webkit-user-select: none; }
+.slam-pad { display: none; justify-content: space-between; align-items: center; gap: 16px; margin-top: 12px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.slam-stick { width: 132px; height: 132px; border-radius: 50%; background: #ffffff12; border: 2px solid #ffffff2a; display: grid; place-items: center; }
+.slam-stick span { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); opacity: .85; pointer-events: none; }
+.slam-btns { display: flex; gap: 14px; }
+.slam-btns button { width: 78px; height: 78px; border-radius: 50%; padding: 0; font-weight: 800; font-size: 15px; line-height: 1.15; }
+.slam-btns small { font-size: 11px; font-weight: 600; color: var(--muted); }
+#btn-b { background: var(--accent); border-color: transparent; color: #1a1200; }
+#btn-b small { color: #4a3300; }
+.slam-help { margin: 10px 0 0; color: var(--muted); font-size: 13.5px; }
+.slam-help kbd { display: inline-block; min-width: 20px; padding: 0 5px; margin: 0 1px; border: 1px solid var(--muted); border-radius: 4px; font: 600 12px/18px ui-monospace, Menlo, Consolas, monospace; text-align: center; color: var(--text); }
+@media (pointer: coarse) {
+  .slam-pad { display: flex; }
+  .slam-help.keys { display: none; }
+}
+/* 휴대폰을 가로로 — 스틱 · 버튼을 화면 아래 양쪽 구석에 겹친다 */
+@media (pointer: coarse) and (orientation: landscape) {
+  .slam-pad { position: absolute; inset: auto 8px 8px; margin: 0; pointer-events: none; }
+  .slam-pad > * { pointer-events: auto; opacity: .7; }
+  .slam-stick { width: 110px; height: 110px; }
+  .slam-btns button { width: 64px; height: 64px; }
+}
