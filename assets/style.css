@@ -80,6 +80,9 @@ html.gated body > :not(.gate) { display: none !important; }
 .top nav a[aria-current] { background: var(--accent); color: #1a1200; }
 .top .spacer { flex: 1; }
 .top .menu-btn { display: none; width: 38px; height: 38px; padding: 0; font-size: 20px; }
+/* 메뉴가 여섯 개라 ☰ 로 접히기 전(561~760px)에는 간격을 줄여 한 줄에 둔다 */
+@media (min-width: 561px) and (max-width: 760px) { .top { gap: 10px; } .top nav { gap: 0; } .top nav a { padding: 6px 7px; } }
+@media (min-width: 561px) and (max-width: 600px) { .top { gap: 8px; } .top nav a { padding: 6px 5px; } }
 
 /* ---------- 버튼 / 입력 ---------- */
 button, a.btn, select, input[type="text"], input[type="search"], input[type="password"] {
