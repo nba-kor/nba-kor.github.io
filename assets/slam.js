@@ -121,7 +121,11 @@ stick.addEventListener('pointercancel', release)
 for (const k of ['dr', 'pa', 'sh', 'ul']) document.getElementById(`btn-${k}`).addEventListener('pointerdown', e => { e.preventDefault(); press(k) })
 // 전체 화면 — 되는 브라우저는 진짜 전체 화면(휴대폰은 가로로 돌린다), 안 되는 아이폰은 화면을 꽉 채운 칸(.full)
 const stage = cv.closest('.slam-stage'), fsBtn = document.getElementById('btn-fs')
-const setFull = on => { stage.classList.toggle('full', on); fsBtn.setAttribute('aria-label', on ? '전체 화면 끄기' : '전체 화면') }
+const vp = document.querySelector('meta[name=viewport]'), vp0 = vp.content
+const setFull = on => {
+  stage.classList.toggle('full', on); fsBtn.setAttribute('aria-label', on ? '전체 화면 끄기' : '전체 화면')
+  vp.content = on ? `${vp0}, minimum-scale=1, maximum-scale=1` : vp0   // 아이폰 — 확대돼 있던 화면을 1배로 되돌린다(.full 은 핀치가 막혀 스스로 못 줄인다)
+}
 fsBtn.addEventListener('click', async () => {
   fsBtn.blur()   // 버튼에 포커스가 남으면 키 입력을 게임이 못 받는다
   if (document.fullscreenElement) return document.exitFullscreen()
