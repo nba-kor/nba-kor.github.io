@@ -121,11 +121,17 @@ stick.addEventListener('pointercancel', release)
 for (const k of ['dr', 'pa', 'sh', 'ul']) document.getElementById(`btn-${k}`).addEventListener('pointerdown', e => { e.preventDefault(); press(k) })
 // 전체 화면 — 되는 브라우저는 진짜 전체 화면(휴대폰은 가로로 돌린다), 안 되는 아이폰은 화면을 꽉 채운 칸(.full)
 const stage = cv.closest('.slam-stage'), fsBtn = document.getElementById('btn-fs')
-const vp = document.querySelector('meta[name=viewport]'), vp0 = vp.content
-const setFull = on => {
-  stage.classList.toggle('full', on); fsBtn.setAttribute('aria-label', on ? '전체 화면 끄기' : '전체 화면')
-  vp.content = on ? `${vp0}, minimum-scale=1, maximum-scale=1` : vp0   // 아이폰 — 확대돼 있던 화면을 1배로 되돌린다(.full 은 핀치가 막혀 스스로 못 줄인다)
+// 아이폰은 가로로 돌리면 화면을 확대해 버리고(.full 은 핀치가 막혀 못 줄인다) meta 의 maximum-scale 도 듣지 않는다 —
+// 그래서 .full 을 지금 보이는 칸(visualViewport)에 놓고 확대된 만큼 줄여, 확대돼 있어도 확대 안 된 화면처럼 보이게 한다
+const vv = window.visualViewport
+function fit() {
+  const s = stage.style, on = vv && stage.classList.contains('full'), k = on ? vv.scale : 1
+  s.left = on ? `${vv.offsetLeft}px` : ''; s.top = on ? `${vv.offsetTop}px` : ''
+  s.width = on ? `${vv.width * k}px` : ''; s.height = on ? `${vv.height * k}px` : ''
+  s.transform = on && k !== 1 ? `scale(${1 / k})` : ''
 }
+vv?.addEventListener('resize', fit); vv?.addEventListener('scroll', fit)
+const setFull = on => { stage.classList.toggle('full', on); fsBtn.setAttribute('aria-label', on ? '전체 화면 끄기' : '전체 화면'); fit() }
 fsBtn.addEventListener('click', async () => {
   fsBtn.blur()   // 버튼에 포커스가 남으면 키 입력을 게임이 못 받는다
   if (document.fullscreenElement) return document.exitFullscreen()

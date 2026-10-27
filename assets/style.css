@@ -1388,8 +1388,8 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .slam-fs svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2.4; }
 .slam-fs .off, .slam-stage.full .slam-fs .on { display: none; }
 .slam-stage.full .slam-fs .off { display: inline; }
-.slam-stage.full { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; justify-content: center; padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); background: #000; touch-action: none; }
-.slam-stage.full .slam-screen { width: min(100%, calc(100dvh * 16 / 9)); }
+.slam-stage.full { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; justify-content: center; padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left); background: #000; touch-action: none; transform-origin: 0 0; container-type: size; }   /* 크기 · 자리는 slam.js 의 fit() */
+.slam-stage.full .slam-screen { width: min(100%, calc(100dvh * 16 / 9)); width: min(100%, calc(100cqh * 16 / 9)); }   /* cqh = 이 칸의 높이(옛 사파리는 dvh) */
 .slam-stage.full canvas { border-radius: 0; }
 .slam-stage.full .slam-pad { padding: 0 16px; }
 .slam-pad { display: none; justify-content: space-between; align-items: center; gap: 16px; margin-top: 12px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
