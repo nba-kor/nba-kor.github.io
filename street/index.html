@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>스트리트 3:3 · TNAB Vipers</title>
+<link rel="icon" href="/assets/icon.png?v=2" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icon.png?v=2">
+<meta name="theme-color" content="#0d1117">
+<meta name="description" content="하프코트 3:3 길거리 농구 「스트리트 3:3」 — 내 선수 한 명으로 CPU 와 11점 먼저. 크로스오버 · 스텝백 · 스크린 · 앨리웁, 슛은 초록 칸에서 놓기. 키보드 · 휴대폰 터치로 바로 플레이.">
+<link rel="canonical" href="https://nba-kor.github.io/street/">
+<!-- 카카오톡 · 디스코드 · 트위터 미리보기. 이미지를 바꾸면 ?v= 도 올린다(카카오는 URL 로 캐시한다) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TNAB Vipers">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:url" content="https://nba-kor.github.io/street/">
+<meta property="og:title" content="스트리트 3:3 · TNAB Vipers">
+<meta property="og:description" content="하프코트 3:3 길거리 농구 「스트리트 3:3」 — 내 선수 한 명으로 CPU 와 11점 먼저. 크로스오버 · 스텝백 · 스크린 · 앨리웁, 슛은 초록 칸에서 놓기. 키보드 · 휴대폰 터치로 바로 플레이.">
+<meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
+<meta name="twitter:card" content="summary_large_image">
+<script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
+<link rel="stylesheet" href="/assets/style.css?v=55848ec5">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><img src="/assets/icon.png?v=2" alt="">TNAB <span>Vipers</span></div>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/arena/">아레나 운영</a>
+    <a href="/tactics/" data-group="/tactics/ /tiers/ /combos/ /potentials/">전략·공략</a>
+    <a href="/videos/">영상 자료실</a>
+    <a href="/slam/" data-group="/slam/ /street/">게임</a>
+    <a href="/me/">마이페이지</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="rc-auth" id="auth" aria-live="polite"></div>
+  <div class="subnav" role="navigation" aria-label="게임">
+    <a href="/slam/">슈퍼 슬램</a><a href="/street/">스트리트 3:3</a>
+  </div>
+</header>
+
+<main class="slam street">
+  <h1>스트리트 3:3 <small>하프코트 길거리 농구 · 1P vs CPU · 11점 먼저 · 3분</small></h1>
+  <div class="slam-stage">
+    <div class="slam-screen">
+      <canvas id="street" aria-label="스트리트 3:3 게임 화면"></canvas>
+    </div>
+    <div class="slam-pad">
+      <div class="slam-stick" id="stick"><span></span></div>
+      <div class="slam-btns">
+        <button type="button" id="btn-sk">기술<br><small>컷 · 스틸</small></button>
+        <button type="button" id="btn-sc">스크린</button>
+        <button type="button" id="btn-pa">패스<br><small>달라 · 스위치</small></button>
+        <button type="button" id="btn-sh">슛<br><small>블록</small></button>
+      </div>
+    </div>
+  </div>
+  <section class="slam-guide">
+    <h2>조작법 <small>내 선수 한 명만 끝까지 — 동료 둘은 CPU</small></h2>
+    <table class="slam-keys">
+      <thead><tr><th>버튼</th><th class="kb">키보드</th><th>공을 가졌을 때</th><th>공이 없을 때(공격)</th><th>수비할 때</th></tr></thead>
+      <tbody>
+        <tr><th>이동</th><td class="kb"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> · WASD</td><td colspan="2">휴대폰은 왼쪽 스틱. 위가 골대</td><td>스틱을 놓으면 맡은 선수 앞으로 천천히 가요</td></tr>
+        <tr><th>슛</th><td class="kb"><kbd>C</kbd> · <kbd>L</kbd> · 스페이스</td><td>누르고 있다가 게이지가 초록 칸일 때 놓기(PERFECT). 골대 가까이면 레이업 · 덩크</td><td>점프 — 리바운드</td><td>블록 · 리바운드 점프</td></tr>
+        <tr><th>패스</th><td class="kb"><kbd>X</kbd> · <kbd>K</kbd></td><td>스틱 쪽 동료에게(안 밀면 더 빈 동료). 골밑으로 들어가는 동료에게는 앨리웁</td><td>공 달라고 부르기</td><td>스위치 — 공 가진 상대를 맡아요(이미 맡았으면 가까운 상대와 바꾸기)</td></tr>
+        <tr><th>기술</th><td class="kb"><kbd>Z</kbd> · <kbd>J</kbd></td><td>스틱 옆으로 크로스오버, 골대 쪽 스핀, 뒤로(안 밀면) 스텝백 — 수비가 넘어지기도 해요(ANKLE BREAKER)</td><td>컷 — 스틱 쪽으로 치고 들어가요. 골밑으로 컷하면 동료가 앨리웁을 띄워요</td><td>스틸 — 헛손질하면 잠깐 멈칫</td></tr>
+        <tr><th>스크린</th><td class="kb"><kbd>V</kbd> · <kbd>U</kbd></td><td>동료를 불러 내 수비 옆에 스크린</td><td>그 자리에 스크린 — 부딪힌 수비가 걸려요</td><td>–</td></tr>
+      </tbody>
+    </table>
+    <h2>규칙</h2>
+    <ul class="slam-help">
+      <li>11점 먼저 넣거나 3분이 지나면 끝(같으면 먼저 넣는 쪽이 이겨요). 3점 라인 안은 1점, 밖은 2점, 덩크 · 레이업도 1점.</li>
+      <li>공격 12초 — 림에 맞으면 다시 12초. 넘기면 상대 공.</li>
+      <li>넣으면 상대가 꼭대기에서 체크 볼. 수비 리바운드 · 스틸 뒤에는 3점 라인 밖으로 빼야(CLEAR) 슛을 쏠 수 있어요.</li>
+      <li>공이 튀면 떨어질 자리가 바닥에 동그라미로 떠요. 공이 하얗게 빛날 때 뛰면 잡아요.</li>
+      <li>수비가 붙을수록 초록 칸이 좁아지고, 스텝백 바로 뒤에는 넓어져요.</li>
+    </ul>
+    <h2>포지션 특성 <small>팀마다 가드 · 포워드 · 센터</small></h2>
+    <table class="slam-keys"><tbody id="pos-table"></tbody></table>
+  </section>
+</main>
+
+<script type="module" src="/assets/street.js?v=40df1270"></script>
+</body>
+</html>

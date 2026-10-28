@@ -1406,6 +1406,11 @@ dialog, .ac-body { overscroll-behavior: contain; }
 @keyframes slam-glow { to { box-shadow: 0 0 0 4px #ffd23f66, 0 0 22px #ffd23f; } }
 @media (prefers-reduced-motion: reduce) { #btn-ul.ready { animation: none; box-shadow: 0 0 0 4px #ffd23f66; } }
 .slam-help { margin: 10px 0 0; color: var(--muted); font-size: 13.5px; }
+/* 스트리트 3:3 (assets/street.js) — 슬램 칸을 그대로 쓰고 캔버스만 정사각형(하프코트를 위에서) */
+.street .slam-screen { width: min(100%, calc(100dvh - 110px)); }
+.street canvas { aspect-ratio: 1; }
+.street ul.slam-help { padding-left: 20px; }
+.street ul.slam-help li { margin: 3px 0; }
 .slam kbd { display: inline-block; min-width: 20px; padding: 0 5px; margin: 0 1px; border: 1px solid var(--muted); border-radius: 4px; font: 600 12px/18px ui-monospace, Menlo, Consolas, monospace; text-align: center; color: var(--text); }
 /* 아래 설명 — 조작법 표 · 팀별 궁극기 탭 */
 .slam-guide { margin-top: 20px; }

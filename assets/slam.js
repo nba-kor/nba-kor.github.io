@@ -6,6 +6,7 @@
 import { mountTop, POS, copyLink } from './app.js?v=fb02b445'
 import { loadData, data, startAuth, me as who, loggedIn, h, ago } from './board.js?v=4233415a'
 import { sb, api } from './auth.js?v=1fbb8e2f'
+import { TEAMS, NUMS, NBA_NUM, lineup } from './vipers.js?v=2902cdc5'
 
 mountTop('/slam/')
 startAuth('', () => {})   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
@@ -18,27 +19,6 @@ const CL = 940, CW = 500, RIM = 100                 // 코트 길이 · 너비 �
 const HOOP = [{ x: 52, z: 250, shake: 0 }, { x: 888, z: 250, shake: 0 }]
 const S = 1.45, TOP = 150                            // 화면 배율 · 코트 먼 쪽 줄의 화면 y
 const GAME = 90, SHOT = 30, SPD = 175, GRAV = 1100, JUMP = 360
-const TEAMS = [
-  { name: 'VIPERS_T', color: '#d6323a', dark: '#7d1520', trim: '#18181c' },   // trim = 보조색(테두리 · 허리 · 옆 줄)
-  { name: 'VIPERS_N', color: '#1f9d6b', dark: '#0d5a3c', trim: '#f2c14e' },
-  { name: 'VIPERS_A', color: '#2f6fd0', dark: '#173c7a', trim: '#f4f6fb' },
-  { name: 'VIPERS_B', color: '#8b4fd0', dark: '#4a2483', trim: '#cfd4de' },
-]
-const NUMS = [1, 7, 10, 23, 34]   // 실제 등번호를 모르는 선수(덩크 시티에만 있는 선수)는 포지션 번호
-// 등번호 — 실제 NBA 등번호(가장 잘 알려진 번호). 선수 id 로 — 국내 서버에 아직 없는 선수(upcoming)도 들어오면 바로 쓴다
-const NBA_NUM = {
-  lkdqq: 77, bl: 1, weisblk: 0, sga: 2, klfd: 30, hcyh: 17, 'tyrese-haliburton': 0,
-  djse: 17, bk: 1, sskl: 30, klks: 11, clarkson: '00', kl: 11,
-  hwd: 20, dlz: 10, james: 23, ml: 24, wjs: 22, kjm: 23, durant: 35, blqz: 13, 'jimmy-butler': 22,
-  nwsj: 41, mkds: 24, yns: 34, wsblk: 1, kmlyhx: '00', lke: 1,
-  yjq: 15, bm: 13, pts: 52, dqq: 12, nejq: 27, ebd: 21, bldml: 6, kpl: 15, 'brook-lopez': 11, 'anthony-davis': 3,
-  'derrick-rose': 1, 'rajon-rondo': 9, 'jamal-murray': 27, 'jeremy-lin': 17, 'jason-kidd': 5, 'jrue-holiday': 21, 'kyrie-irving': 11, 'chris-paul': 3, 'tony-parker': 9,
-  'dwyane-wade': 3, 'ray-allen': 20, 'manu-ginobili': 20, 'anthony-edwards': 5, 'allen-iverson': 3, 'zach-lavine': 8, 'james-harden': 13, 'tyler-herro': 14, 'tracy-mcgrady': 1, 'cj-mccollum': 3,
-  'dillon-brooks': 24, 'metta-world-peace': 37, 'mikal-bridges': 25, 'brandon-ingram': 14, 'jaylen-brown': 7, 'kawhi-leonard': 2, 'paul-pierce': 34,
-  'dennis-rodman': 91, 'draymond-green': 23, 'lauri-markkanen': 23, 'blake-griffin': 32, 'aaron-gordon': 50, 'jaren-jackson-jr': 13, 'jayson-tatum': 0,
-  'karl-malone': 32, 'karl-anthony-towns': 32, 'tim-duncan': 21, 'pascal-siakam': 43,
-  'myles-turner': 33, 'ben-wallace': 3, 'victor-wembanyama': 1, 'shaquille-o-neal': 34, 'alonzo-mourning': 33, 'pau-gasol': 16, 'hakeem-olajuwon': 34,
-}
 const ULT_FILL = 1 / 32                                                        // 초당 — 32초면 찬다
 const SPOT = [[270, 0], [210, -150], [210, 150], [75, -100], [65, 100]]   // 공격 골대에서 [뒤로, 옆으로] — 포지션 1~5
 const SKIN = '#b9825a'
@@ -1691,12 +1671,11 @@ function skinOf(img) {
   return [`rgb(${r},${gg},${b})`, `rgb(${r * 0.78 | 0},${gg * 0.78 | 0},${b * 0.78 | 0})`]
 }
 
-// 팀마다 포지션 1~5 에서 한 명씩 — 팀끼리 겹치지 않게 포지션 목록의 같은 순번
 await loadData()
 const kr = data.players.filter(p => p.server === 'kr')
 TEAMS.forEach((T, ti) => {
-  T.five = [1, 2, 3, 4, 5].map((pos, i) => {
-    const list = kr.filter(p => p.pos === pos), p = list[ti % list.length], f = { name: p ? p.short || p.name : `${pos}번`, num: NBA_NUM[p?.id] ?? NUMS[i], img: null, gear: gearOf(p?.id || `${ti}-${pos}`) }
+  T.five = lineup(kr, ti).map((p, i) => {
+    const pos = i + 1, f = { name: p ? p.short || p.name : `${pos}번`, num: NBA_NUM[p?.id] ?? NUMS[i], img: null, gear: gearOf(p?.id || `${ti}-${pos}`) }
     if (p?.img) {
       f.img = new Image()
       f.img.onload = () => { try { f.head = cutHead(f.img); [f.skin, f.shade] = skinOf(f.img) } catch {} }   // 실패하면 동그란 머리 · 기본 피부색
