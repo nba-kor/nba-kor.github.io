@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/icon.png?v=2" type="image/png">
 <link rel="apple-touch-icon" href="/assets/icon.png?v=2">
 <meta name="theme-color" content="#0d1117">
-<meta name="description" content="하프코트 3:3 길거리 농구 「스트리트 3:3」 — 내 선수 한 명으로 CPU 와 11점 먼저. 크로스오버 · 스텝백 · 스크린 · 앨리웁, 슛은 초록 칸에서 놓기. 키보드 · 휴대폰 터치로 바로 플레이.">
+<meta name="description" content="하프코트 3D 길거리 농구 「스트리트 3:3」 — 덩크 시티처럼 내 선수 한 명으로 CPU 와 11점 먼저. 크로스오버 · 스텝백 · 스크린 · 앨리웁 · 덩크, 슛은 초록 칸에서 놓기. 키보드 · 휴대폰 터치로 바로 플레이.">
 <link rel="canonical" href="https://nba-kor.github.io/street/">
 <!-- 카카오톡 · 디스코드 · 트위터 미리보기. 이미지를 바꾸면 ?v= 도 올린다(카카오는 URL 로 캐시한다) -->
 <meta property="og:type" content="website">
@@ -15,14 +15,14 @@
 <meta property="og:locale" content="ko_KR">
 <meta property="og:url" content="https://nba-kor.github.io/street/">
 <meta property="og:title" content="스트리트 3:3 · TNAB Vipers">
-<meta property="og:description" content="하프코트 3:3 길거리 농구 「스트리트 3:3」 — 내 선수 한 명으로 CPU 와 11점 먼저. 크로스오버 · 스텝백 · 스크린 · 앨리웁, 슛은 초록 칸에서 놓기. 키보드 · 휴대폰 터치로 바로 플레이.">
+<meta property="og:description" content="하프코트 3D 길거리 농구 「스트리트 3:3」 — 덩크 시티처럼 내 선수 한 명으로 CPU 와 11점 먼저. 크로스오버 · 스텝백 · 스크린 · 앨리웁 · 덩크, 슛은 초록 칸에서 놓기. 키보드 · 휴대폰 터치로 바로 플레이.">
 <meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=55848ec5">
+<link rel="stylesheet" href="/assets/style.css?v=d76e64d8">
 </head>
 <body>
 
@@ -44,10 +44,12 @@
 </header>
 
 <main class="slam street">
-  <h1>스트리트 3:3 <small>하프코트 길거리 농구 · 1P vs CPU · 11점 먼저 · 3분</small></h1>
+  <h1>스트리트 3:3 <small>하프코트 3D 길거리 농구 · 1P vs CPU · 11점 먼저 · 3분</small></h1>
   <div class="slam-stage">
     <div class="slam-screen">
+      <canvas id="street3d" aria-hidden="true"></canvas>
       <canvas id="street" aria-label="스트리트 3:3 게임 화면"></canvas>
+      <button type="button" class="slam-fs" id="btn-fs" aria-label="전체 화면"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="on" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path class="off" d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg></button>
     </div>
     <div class="slam-pad">
       <div class="slam-stick" id="stick"><span></span></div>
@@ -64,7 +66,7 @@
     <table class="slam-keys">
       <thead><tr><th>버튼</th><th class="kb">키보드</th><th>공을 가졌을 때</th><th>공이 없을 때(공격)</th><th>수비할 때</th></tr></thead>
       <tbody>
-        <tr><th>이동</th><td class="kb"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> · WASD</td><td colspan="2">휴대폰은 왼쪽 스틱. 위가 골대</td><td>스틱을 놓으면 맡은 선수 앞으로 천천히 가요</td></tr>
+        <tr><th>이동</th><td class="kb"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> · WASD</td><td colspan="2">휴대폰은 왼쪽 스틱. 위(화면 안쪽)가 골대</td><td>스틱을 놓으면 맡은 선수 앞으로 천천히 가요</td></tr>
         <tr><th>슛</th><td class="kb"><kbd>C</kbd> · <kbd>L</kbd> · 스페이스</td><td>누르고 있다가 게이지가 초록 칸일 때 놓기(PERFECT). 골대 가까이면 레이업 · 덩크</td><td>점프 — 리바운드</td><td>블록 · 리바운드 점프</td></tr>
         <tr><th>패스</th><td class="kb"><kbd>X</kbd> · <kbd>K</kbd></td><td>스틱 쪽 동료에게(안 밀면 더 빈 동료). 골밑으로 들어가는 동료에게는 앨리웁</td><td>공 달라고 부르기</td><td>스위치 — 공 가진 상대를 맡아요(이미 맡았으면 가까운 상대와 바꾸기)</td></tr>
         <tr><th>기술</th><td class="kb"><kbd>Z</kbd> · <kbd>J</kbd></td><td>스틱 옆으로 크로스오버, 골대 쪽 스핀, 뒤로(안 밀면) 스텝백 — 수비가 넘어지기도 해요(ANKLE BREAKER)</td><td>컷 — 스틱 쪽으로 치고 들어가요. 골밑으로 컷하면 동료가 앨리웁을 띄워요</td><td>스틸 — 헛손질하면 잠깐 멈칫</td></tr>
@@ -84,6 +86,6 @@
   </section>
 </main>
 
-<script type="module" src="/assets/street.js?v=40df1270"></script>
+<script type="module" src="/assets/street.js?v=e87e9f6b"></script>
 </body>
 </html>

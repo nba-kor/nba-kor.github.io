@@ -6,7 +6,7 @@
 import { mountTop, POS, copyLink } from './app.js?v=fb02b445'
 import { loadData, data, startAuth, me as who, loggedIn, h, ago } from './board.js?v=4233415a'
 import { sb, api } from './auth.js?v=1fbb8e2f'
-import { TEAMS, NUMS, NBA_NUM, lineup } from './vipers.js?v=2902cdc5'
+import { TEAMS, NUMS, NBA_NUM, lineup, cutHead, skinOf, SKIN } from './vipers.js?v=f00202a9'
 
 mountTop('/slam/')
 startAuth('', () => {})   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
@@ -21,7 +21,6 @@ const S = 1.45, TOP = 150                            // 화면 배율 · 코트 
 const GAME = 90, SHOT = 30, SPD = 175, GRAV = 1100, JUMP = 360
 const ULT_FILL = 1 / 32                                                        // 초당 — 32초면 찬다
 const SPOT = [[270, 0], [210, -150], [210, 150], [75, -100], [65, 100]]   // 공격 골대에서 [뒤로, 옆으로] — 포지션 1~5
-const SKIN = '#b9825a'
 // 포지션 1~5 능력치 — 보통(1)에 곱하는 값. dunk = 덩크가 되는 골대 거리(그 밖 140 까지는 레이업)
 const STATS = [
   { note: '가장 빠르고 스틸 · 패스가 좋다. 덩크는 골대 바로 앞에서만', spd: 1.08, mid: 1, three: 1.05, dunk: 55, jump: 0.95, block: 0.7, steal: 1.4, reb: 0.8, pass: 1.2 },
@@ -1638,38 +1637,6 @@ function frame(t) {
   requestAnimationFrame(frame)
 }
 requestAnimationFrame(frame)
-
-// 얼굴 배지(둥근 그림)에서 머리만 — 바깥 고리에서 시작해 노란 배경색만 번져 지우고(flood fill), 흰 고리 · 아래 옷은 머리 모양 타원으로 잘라 낸다
-function cutHead(img) {
-  const c = Object.assign(document.createElement('canvas'), { width: 180, height: 180 }), x = c.getContext('2d', { willReadFrequently: true })
-  x.drawImage(img, 0, 0, 180, 180)
-  const d = x.getImageData(0, 0, 180, 180), px = d.data, seen = new Uint8Array(180 * 180), q = []
-  const bg = k => { const i = k * 4, r = px[i], gg = px[i + 1], b = px[i + 2]; return r > 228 && gg > 165 && gg < 238 && b < 185 && r - b > 70 }
-  for (let k = 0; k < 180 * 180; k++) { const r = Math.hypot(k % 180 - 90, (k / 180 | 0) - 90); if (r > 74 && r < 84 && bg(k)) { seen[k] = 1; q.push(k) } }
-  while (q.length) {
-    const k = q.pop(), cx = k % 180
-    px[k * 4 + 3] = 0
-    for (const n of [cx > 0 ? k - 1 : -1, cx < 179 ? k + 1 : -1, k - 180, k + 180]) if (n >= 0 && n < 180 * 180 && !seen[n] && bg(n)) { seen[n] = 1; q.push(n) }
-  }
-  x.putImageData(d, 0, 0)
-  const h = Object.assign(document.createElement('canvas'), { width: 124, height: 132 }), hx = h.getContext('2d')
-  hx.beginPath(); hx.ellipse(62, 66, 60, 64, 0, 0, Math.PI * 2); hx.clip()
-  hx.drawImage(c, 28, 18, 124, 132, 0, 0, 124, 132)
-  return h
-}
-/** 몸 피부색 — 양 광대의 색 가운데 밝은 쪽(수염 · 그늘을 피한다). [피부, 먼 팔다리용 어두운 색] */
-function skinOf(img) {
-  const c = Object.assign(document.createElement('canvas'), { width: 180, height: 180 }), x = c.getContext('2d', { willReadFrequently: true })
-  x.drawImage(img, 0, 0, 180, 180)
-  const got = []
-  for (const cx of [66, 114]) {
-    const px = x.getImageData(cx - 5, 84, 10, 12).data
-    for (let i = 0; i < px.length; i += 4) { const [r, gg, b] = px.slice(i, i + 3); if (r > gg && gg > b && r - b > 25 && r > 60 && r < 252) got.push([r, gg, b]) }
-  }
-  if (!got.length) return [SKIN, '#8f5f3e']
-  const [r, gg, b] = got.sort((m, n) => m[0] + m[1] + m[2] - n[0] - n[1] - n[2])[Math.floor(got.length * 0.65)]
-  return [`rgb(${r},${gg},${b})`, `rgb(${r * 0.78 | 0},${gg * 0.78 | 0},${b * 0.78 | 0})`]
-}
 
 await loadData()
 const kr = data.players.filter(p => p.server === 'kr')
