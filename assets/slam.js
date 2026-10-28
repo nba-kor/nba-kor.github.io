@@ -175,7 +175,7 @@ function start() {
   ps = [0, 1].flatMap(t => TEAMS[sides[t]].five.map((f, i) => ({
     team: t, i, f, x: 0, z: 0, h: 0, vh: 0, dir: side(t), run: 0, mv: false, act: null, t: 0,
     cool: 0, stun: 0, fall: 0, think: 0, cut: 0, block: 0, reach: 0, ult: rnd() * 0.3, boost: 0, acc: 1, cheer: 0, throw: 0, f0: 1, vh0: 0, cdx: 0, dp: 0, hand: 1, sq: 0, kb: null, sure: false, trail: [], tt: 0,
-    ghost: 0, hot: 0, slow: 0, ice: 0, big: 0, conf: 0, mirror: 0, wt: 0, poster: false, four: false, hook: false, vx: 0, vz: 0, fd: side(t), joints: {},
+    ghost: 0, wall: 0, slow: 0, ice: 0, big: 0, conf: 0, mirror: 0, wt: 0, poster: false, four: false, hook: false, vx: 0, vz: 0, fd: side(t), joints: {},
   })))
   score = [0, 0]; clock = GAME; shot = SHOT; offense = 0
   cut = null; parts = []; rings = []; shake = 0
@@ -277,13 +277,13 @@ const SKILLS = [
   [   // VIPERS_T — 힘으로
     { name: '앵클 브레이커', desc: '주변 수비가 넘어지고 빨라진다', cpu: close, fx: p => { down(p, 110, 1.6); p.boost = 2.5; say('ANKLE BREAKER!') } },
     { name: '딥 쓰리', desc: '어디서 던져도 꼭 들어가는 슛', cpu: far, fx: p => sureShot(p) },
-    { name: '에어 워크', desc: '골대까지 날아가 덩크', cpu: drive, fx: p => Object.assign(p, { act: 'air', t: 0, sure: true }) },
+    { name: '체이스 다운', def: true, desc: '빨라져서 쫓아가고, 5초 동안 뛰어서 막으면 두 배 거리에서도 꼭 막는다', cpu: (d, g) => g < 320, fx: p => { p.wall = 5; p.boost = 2.5; say('CHASE DOWN!') } },
     { name: '불도저', def: true, reach: 320, desc: '공 가진 상대에게 돌진해 둘레까지 밀쳐 넘어뜨리고 공을 뺏는다', cpu: d => d < 260, fx: p => { Object.assign(p, { act: 'rush', t: 0 }); say('BULLDOZER!') } },
     { name: '메가 슬램', desc: '골밑에서 충격파 덩크', need: 300, cpu: d => d < 280, fx: p => { p.sure = true; dunkFrom(p, true) } },
   ],
   [   // VIPERS_N — 기술로
     { name: '팬텀 드리블', desc: '4초 동안 뺏기지 않고 수비를 통과한다', cpu: close, fx: p => { p.ghost = 4; say('PHANTOM!') } },
-    { name: '핫 핸드', desc: '6초 동안 점프슛이 다 들어간다', cpu: d => d < 380, fx: p => { p.hot = 6; say('ON FIRE!') } },
+    { name: '픽포켓', def: true, reach: 320, desc: '공 가진 상대 앞으로 순간이동해 공을 낚아챈다 — 뺏긴 상대는 잠깐 멈칫한다', cpu: d => d < 280, fx: p => pickpocket(p) },
     { name: '앨리웁 쇼', desc: '골밑 동료에게 띄워 주면 그대로 덩크', cpu: any, fx: p => oop(p) },
     { name: '회오리 스핀', def: true, reach: 150, desc: '돌면서 둘레 상대를 날려 버린다 — 휘말린 상대는 공을 놓친다', cpu: d => d < 110, fx: p => { Object.assign(p, { act: 'spin', t: 0 }); fumbleNear(p, 150); push(p, p, 140, 300, 1.1); say('TORNADO!') } },
     { name: '스카이 훅', desc: '아무도 못 막는 높은 훅슛', need: 330, cpu: d => d < 300, fx: p => { p.hook = true; sureShot(p) } },
@@ -328,6 +328,15 @@ function chain(p) {   // 동료 넷을 아무 순서로 — 빠르고 가로챌 
   pass(p, rest.shift())
   Object.assign(ball, { chain: rest, safe: true, oop: false })
   say('CHAIN PASS!')
+}
+function pickpocket(p) {   // 공 가진 상대 앞(그 상대가 가는 골대 쪽)으로 순간이동해 낚아챈다
+  const o = ball.owner
+  if (!o || o.team === p.team || o.sure || o.ghost > 0) return
+  burst(p.x, p.z, 40, 14, ['#7fffc8', '#fff'])
+  Object.assign(p, { x: o.x + side(o.team) * 26, z: o.z, act: null })
+  burst(p.x, p.z, 40, 14, ['#7fffc8', '#fff'])
+  o.stun = 0.8
+  grab(p, 'PICKPOCKET!')
 }
 function blink(p) {
   const h = goal(p.team)
@@ -413,15 +422,15 @@ function shoot(p) {
   else if (d < 140 && !p.sure) Object.assign(p, { act: 'lay', t: 0, from: { x: p.x, z: p.z }, dur: 0.42, vx: 0, vz: 0 })   // 그 안쪽은 레이업
   else Object.assign(p, { act: 'shot', t: 0, rel: false, vh: 0, vh0: JUMP * st(p).jump * (p.sure ? 1.15 : 1), vx: 0, vz: 0 })   // SHOT_DIP 초 무릎을 굽혔다 뛴다
   // 가까운 수비는 조금 늦게 뛰어 막으러 온다(1P 가 움직이는 선수는 직접 뛴다)
-  if (!p.sure) for (const q of ps) if (q.team !== p.team && ctls[q.team] !== q && dist(q, p) < 60 && rnd() < 0.75) q.block = 0.05 + rnd() * 0.22
+  if (!p.sure) for (const q of ps) if (q.team !== p.team && ctls[q.team] !== q && (q.wall > 0 ? dist(q, p) < 120 : dist(q, p) < 60 && rnd() < 0.75)) q.block = 0.05 + rnd() * 0.22
 }
-const blocker = (p, r) => ps.find(q => q.team !== p.team && q.h > 22 && dist(q, p) < r)
+const blocker = (p, r) => ps.find(q => q.team !== p.team && q.h > 22 && dist(q, p) < r * (q.wall > 0 ? 2 : 1))   // 체이스 다운(wall)은 두 배 거리에서 꼭 막는다
 const SHOT_DIP = 0.06
 
 function letGo(p) {   // 점프슛을 놓는 순간
-  const h = goal(p.team), d = dist(p, h), sure = p.sure || p.hot > 0, { four, hook, clutch } = p
+  const h = goal(p.team), d = dist(p, h), sure = p.sure, { four, hook, clutch } = p
   p.sure = p.four = p.hook = p.clutch = false
-  if (!sure) { const b = blocker(p, 40); if (b && rnd() < 0.45 * st(b).block * (clutch ? 0.35 : 1)) return swat(p, b) }   // 더블 클러치는 먼저 뛴 수비를 피한다
+  if (!sure) { const b = blocker(p, 40); if (b && (b.wall > 0 || rnd() < 0.45 * st(b).block * (clutch ? 0.35 : 1))) return swat(p, b) }   // 더블 클러치는 먼저 뛴 수비를 피한다
   const c = open(p), three = d > 237 || Math.abs(p.z - h.z) > 220
   const pr = Math.min(0.92, (d < 160 ? 0.62 : d < 237 ? 0.5 : d < 300 ? 0.38 : 0.12) * (c < 30 ? 0.55 : c < 55 ? 0.8 : 1) * (three ? st(p).three : st(p).mid) * (clutch ? 0.85 : 1))
   const [bx, bz, bh] = hand(p)
@@ -435,7 +444,7 @@ function layIn(p) {   // 레이업 — 림 바로 앞에서 살짝 올려 놓는
   const h = goal(p.team), clutch = p.clutch, c = open(p), [x, z, bh] = hand(p)
   p.clutch = false
   const b = blocker(p, 38)
-  if (b && rnd() < 0.35 * st(b).block * (clutch ? 0.35 : 1)) return swat(p, b)
+  if (b && (b.wall > 0 || rnd() < 0.35 * st(b).block * (clutch ? 0.35 : 1))) return swat(p, b)
   const pr = 0.8 * st(p).mid * (c < 25 ? 0.75 : c < 45 ? 0.9 : 1) * (clutch ? 0.92 : 1)
   Object.assign(ball, { st: 'shot', owner: null, x, z, h: bh, sx: x, sz: z, sh: bh, t: 0, T: 0.32, make: rnd() < pr, pts: 2, team: p.team, hoop: h, arc: 16, sure: false, by: p, msg: clutch ? 'DOUBLE CLUTCH!' : '' })
 }
@@ -448,7 +457,7 @@ function clutch(p) {
 function slam(p) {    // 덩크가 림에 닿는 순간
   const sure = p.sure || p.big > 0, mega = p.mega, lob = p.lob, h = goal(p.team)
   p.sure = p.poster = p.lob = false
-  if (!sure) { const b = blocker(p, 34); if (b && rnd() < 0.3 * st(b).block) { p.act = 'land'; return swat(p, b) } }   // 막히면 매달리지 않고 떨어진다
+  if (!sure) { const b = blocker(p, 34); if (b && (b.wall > 0 || rnd() < 0.3 * st(b).block)) { p.act = 'land'; return swat(p, b) } }   // 막히면 매달리지 않고 떨어진다
   h.shake = 0.6
   shake = Math.max(shake, mega ? 18 : 8)
   if (mega) {   // 충격파 — 골밑 상대가 다 넘어진다
@@ -490,7 +499,7 @@ function fire(p, off) {
 
 // 몸 — 쿨타임 · 게이지 · 점프 · 동작. 동작 중 공을 뺏겼으면(ball.owner 가 아니면) 놓지 않는다
 function body(p, dt) {
-  for (const k of ['cool', 'stun', 'fall', 'boost', 'cdx', 'sq', 'reach', 'ghost', 'hot', 'slow', 'ice', 'big', 'conf', 'mirror', 'cheer', 'throw']) p[k] = Math.max(0, p[k] - dt)
+  for (const k of ['cool', 'stun', 'fall', 'boost', 'cdx', 'sq', 'reach', 'ghost', 'wall', 'slow', 'ice', 'big', 'conf', 'mirror', 'cheer', 'throw']) p[k] = Math.max(0, p[k] - dt)
   p.ult = Math.min(1, p.ult + dt * ULT_FILL * (ctls[p.team] ? 1 : 0.8))   // CPU 는 조금 느리게 찬다
   look(p, dt)
   if (p.kb) { p.x += p.kb.vx * dt; p.z += p.kb.vz * dt; if ((p.kb.t -= dt) <= 0) p.kb = null }
@@ -553,9 +562,9 @@ function body(p, dt) {
   }
 }
 
-/** 보이기만 하는 것 — 핫 핸드 불꽃 · 드리블 박자 · 몸 돌리기 · 잔상. 온라인으로 들어온 사람 화면은 이것만 돌린다(watch) */
+/** 보이기만 하는 것 — 체이스 다운 불꽃 · 드리블 박자 · 몸 돌리기 · 잔상. 온라인으로 들어온 사람 화면은 이것만 돌린다(watch) */
 function look(p, dt) {
-  if (p.hot > 0 && rnd() < dt * 30) parts.push({ x: p.x + (rnd() - 0.5) * 16, z: p.z, h: 30 + rnd() * 50, vx: 0, vz: 0, vh: 260, t: 0.3, c: rnd() < 0.5 ? '#ff7a1a' : '#ffd23f' })   // 핫 핸드 — 불꽃
+  if (p.wall > 0 && rnd() < dt * 30) parts.push({ x: p.x + (rnd() - 0.5) * 16, z: p.z, h: 30 + rnd() * 50, vx: 0, vz: 0, vh: 260, t: 0.3, c: rnd() < 0.5 ? '#ff7a1a' : '#ffd23f' })   // 체이스 다운 — 불꽃
   const a = Math.hypot(p.vx, p.vz) / SPD
   if (ball.owner === p) p.dp += dt * (7 + 4 * Math.min(1, a))
   if (p.act === 'air' || p.act === 'rush') p.run += dt * 3.4   // 걸음 박자(바퀴) — 날아가는 동안에도 다리는 달린다
@@ -644,7 +653,6 @@ function handle(p, dt) {
   if ((p.think -= dt) > 0) return
   p.think = 0.3 + rnd() * 0.4
   if (p.ult >= 1 && !skillOf(p).def && skillOf(p).cpu(d, c) && rnd() < 0.6 && ultimate(p)) return
-  if (p.hot > 0 && d > 90 && d < 420) return shoot(p)   // 핫 핸드 동안은 보이면 쏜다
   if (c < 30 && p.cdx <= 0 && rnd() < 0.35) return crossover(p, 0, 0)
   if (d < 140 || shot < 2.5 || d < 300 && c > 55 && rnd() < (d < 237 ? 0.5 * st(p).mid : 0.3 * st(p).three)) shoot(p)
   else if (rnd() < (c < 28 ? 0.5 : 0.18) * st(p).pass) pass(p, mateFor(p))
@@ -737,7 +745,7 @@ function moveBall(dt, view) {
 const BTN = ['dr', 'pa', 'sh', 'ul'], PLAY = new Set(['tip', 'play', 'dead', 'over'])
 const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }]
 // 장면에 싣는 선수 값(x · z · h 뒤에) · 공 값(잡은 선수 · 받을 선수 · 골대 번호 뒤에)
-const SYNC = ['vx', 'vz', 'vh', 'dir', 'act', 't', 'dur', 'style', 'hand', 'clutch', 'fall', 'f0', 'sq', 'big', 'ice', 'ghost', 'hot', 'slow', 'mirror', 'conf', 'ult', 'reach', 'boost', 'kb', 'acc', 'cheer', 'throw']
+const SYNC = ['vx', 'vz', 'vh', 'dir', 'act', 't', 'dur', 'style', 'hand', 'clutch', 'fall', 'f0', 'sq', 'big', 'ice', 'ghost', 'wall', 'slow', 'mirror', 'conf', 'ult', 'reach', 'boost', 'kb', 'acc', 'cheer', 'throw']
 const BSYNC = ['st', 'x', 'z', 'h', 'vx', 'vz', 'vh', 'sure', 'oop', 'safe', 'sx', 'sz', 'sh', 't', 'T', 'arc', 'sp']
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v ?? 0
 let rq = 0, rn = [0, 0, 0, 0]   // 방장: 받은 상대 입력의 마지막 순번 · 버튼마다 누른 횟수
@@ -1345,7 +1353,7 @@ function drawPlayer(p, refl) {
       g.globalAlpha = 1
     }
     if (p.slow > 0) { g.strokeStyle = 'rgba(120,190,255,.85)'; g.lineWidth = 2; oval(fx, fy + 2, 18 * u, 6.5 * u); g.stroke() }
-    if (p.hot > 0 || p.ghost > 0) { g.fillStyle = p.hot > 0 ? 'rgba(255,120,30,.35)' : 'rgba(90,230,200,.3)'; oval(fx, fy, 26 * u, 10 * u); g.fill() }
+    if (p.wall > 0 || p.ghost > 0) { g.fillStyle = p.wall > 0 ? 'rgba(255,120,30,.35)' : 'rgba(90,230,200,.3)'; oval(fx, fy, 26 * u, 10 * u); g.fill() }
     if (ultReady(p)) { g.fillStyle = skillOf(p).def ? `rgba(127,232,255,${0.3 + 0.2 * Math.sin(tnow * 9)})` : `rgba(255,210,63,${0.3 + 0.2 * Math.sin(tnow * 9)})`; oval(fx, fy, 24 * u, 9 * u); g.fill() }   // 지금 쓸 수 있는 궁극기
     if (cut?.p === p) aura(fx, fy, u)
     const rs = 16 * u * Math.max(0.5, 1 - p.h / 160) * big   // 그림자 — 높이 뜰수록 작고 옅게
