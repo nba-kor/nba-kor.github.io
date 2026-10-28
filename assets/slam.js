@@ -19,10 +19,10 @@ const HOOP = [{ x: 52, z: 250, shake: 0 }, { x: 888, z: 250, shake: 0 }]
 const S = 1.45, TOP = 150                            // 화면 배율 · 코트 먼 쪽 줄의 화면 y
 const GAME = 90, SHOT = 30, SPD = 175, GRAV = 1100, JUMP = 360
 const TEAMS = [
-  { name: 'VIPERS_T', color: '#d6323a', dark: '#7d1520' },
-  { name: 'VIPERS_N', color: '#1f9d6b', dark: '#0d5a3c' },
-  { name: 'VIPERS_A', color: '#2f6fd0', dark: '#173c7a' },
-  { name: 'VIPERS_B', color: '#8b4fd0', dark: '#4a2483' },
+  { name: 'VIPERS_T', color: '#d6323a', dark: '#7d1520', trim: '#18181c' },   // trim = 보조색(테두리 · 허리 · 옆 줄)
+  { name: 'VIPERS_N', color: '#1f9d6b', dark: '#0d5a3c', trim: '#f2c14e' },
+  { name: 'VIPERS_A', color: '#2f6fd0', dark: '#173c7a', trim: '#f4f6fb' },
+  { name: 'VIPERS_B', color: '#8b4fd0', dark: '#4a2483', trim: '#cfd4de' },
 ]
 const NUMS = [1, 7, 10, 23, 34]   // 실제 등번호를 모르는 선수(덩크 시티에만 있는 선수)는 포지션 번호
 // 등번호 — 실제 NBA 등번호(가장 잘 알려진 번호). 선수 id 로 — 국내 서버에 아직 없는 선수(upcoming)도 들어오면 바로 쓴다
@@ -174,7 +174,7 @@ function start() {
   showTab(sides[myT])
   ps = [0, 1].flatMap(t => TEAMS[sides[t]].five.map((f, i) => ({
     team: t, i, f, x: 0, z: 0, h: 0, vh: 0, dir: side(t), run: 0, mv: false, act: null, t: 0,
-    cool: 0, stun: 0, fall: 0, think: 0, cut: 0, block: 0, reach: 0, ult: rnd() * 0.3, boost: 0, acc: 1, cheer: 0, throw: 0, f0: 1, vh0: 0, cdx: 0, dp: 0, hand: 1, sq: 0, kb: null, sure: false, trail: [], tt: 0,
+    cool: 0, stun: 0, fall: 0, think: 0, cut: 0, block: 0, reach: 0, ult: rnd() * 0.3, boost: 0, acc: 1, cheer: 0, ch: null, wow: 0, sad: 0, throw: 0, f0: 1, vh0: 0, cdx: 0, dp: 0, hand: 1, sq: 0, kb: null, sure: false, trail: [], tt: 0,
     ghost: 0, wall: 0, slow: 0, ice: 0, big: 0, conf: 0, mirror: 0, wt: 0, poster: false, four: false, hook: false, vx: 0, vz: 0, fd: side(t), joints: {},
   })))
   score = [0, 0]; clock = GAME; shot = SHOT; offense = 0
@@ -222,7 +222,8 @@ function made(t, pts, text, by) {
   burst(h.x, h.z, RIM, 40, ['#ffd23f', '#ff9d00', '#fff'])
   rings.push({ x: h.x, z: h.z, t: 0, c: '255,210,63' })
   h.shake = Math.max(h.shake, 0.3)
-  if (by) { by.ult = Math.min(1, by.ult + 0.3); by.cheer = 1.2 }   // 넣은 선수는 주먹을 치켜든다
+  if (by) { by.ult = Math.min(1, by.ult + 0.3); by.cheer = 1.2; by.ch = by.act === 'hang' ? 'flex' : pts >= 3 ? 'three' : 'pump' }   // 넣은 선수는 세리머니
+  for (const q of team(1 - t)) { const wow = by?.act === 'hang' && dist(q, h) < 170; q.wow = wow ? 1.1 : 0; q.sad = wow ? 0 : 1.3 }   // 덩크를 당한 골밑 수비는 놀라고, 나머지는 실망
   Object.assign(ball, { st: 'drop', owner: null, x: h.x, z: h.z, h: RIM - 4, vx: 0, vz: 0, vh: -60 })
   offense = 1 - t; fresh(t)
   mode = 'dead'; wait = 1.2
@@ -245,7 +246,7 @@ function miss(h) {
 
 function swat(p, b) {
   Object.assign(ball, { st: 'loose', owner: null, x: p.x, z: p.z, h: p.h + 70, vx: -side(p.team) * (120 + rnd() * 120), vz: (rnd() - 0.5) * 200, vh: 60, rebound: false })
-  b.ult = Math.min(1, b.ult + 0.2)
+  b.ult = Math.min(1, b.ult + 0.2); b.cheer = 1.3; b.ch = 'wag'; p.sad = 1   // 막은 선수는 손가락을 흔들고(무톰보), 막힌 선수는 실망
   toBall()
   shake = Math.max(shake, 5)
   say('BLOCK!')
@@ -499,7 +500,7 @@ function fire(p, off) {
 
 // 몸 — 쿨타임 · 게이지 · 점프 · 동작. 동작 중 공을 뺏겼으면(ball.owner 가 아니면) 놓지 않는다
 function body(p, dt) {
-  for (const k of ['cool', 'stun', 'fall', 'boost', 'cdx', 'sq', 'reach', 'ghost', 'wall', 'slow', 'ice', 'big', 'conf', 'mirror', 'cheer', 'throw']) p[k] = Math.max(0, p[k] - dt)
+  for (const k of ['cool', 'stun', 'fall', 'boost', 'cdx', 'sq', 'reach', 'ghost', 'wall', 'slow', 'ice', 'big', 'conf', 'mirror', 'cheer', 'wow', 'sad', 'throw']) p[k] = Math.max(0, p[k] - dt)
   p.ult = Math.min(1, p.ult + dt * ULT_FILL * (ctls[p.team] ? 1 : 0.8))   // CPU 는 조금 느리게 찬다
   look(p, dt)
   if (p.kb) { p.x += p.kb.vx * dt; p.z += p.kb.vz * dt; if ((p.kb.t -= dt) <= 0) p.kb = null }
@@ -745,7 +746,7 @@ function moveBall(dt, view) {
 const BTN = ['dr', 'pa', 'sh', 'ul'], PLAY = new Set(['tip', 'play', 'dead', 'over'])
 const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }]
 // 장면에 싣는 선수 값(x · z · h 뒤에) · 공 값(잡은 선수 · 받을 선수 · 골대 번호 뒤에)
-const SYNC = ['vx', 'vz', 'vh', 'dir', 'act', 't', 'dur', 'style', 'hand', 'clutch', 'fall', 'f0', 'sq', 'big', 'ice', 'ghost', 'wall', 'slow', 'mirror', 'conf', 'ult', 'reach', 'boost', 'kb', 'acc', 'cheer', 'throw']
+const SYNC = ['vx', 'vz', 'vh', 'dir', 'act', 't', 'dur', 'style', 'hand', 'clutch', 'fall', 'f0', 'sq', 'big', 'ice', 'ghost', 'wall', 'slow', 'mirror', 'conf', 'ult', 'reach', 'boost', 'kb', 'acc', 'cheer', 'ch', 'wow', 'sad', 'throw']
 const BSYNC = ['st', 'x', 'z', 'h', 'vx', 'vz', 'vh', 'sure', 'oop', 'safe', 'sx', 'sz', 'sh', 't', 'T', 'arc', 'sp']
 const r2 = v => typeof v === 'number' ? Math.round(v * 100) / 100 : v ?? 0
 let rq = 0, rn = [0, 0, 0, 0]   // 방장: 받은 상대 입력의 마지막 순번 · 버튼마다 누른 횟수
@@ -910,7 +911,7 @@ function watch(rdt) {
     if (!scripted && (p.nh > 0 || p.vh > 0)) { p.vh -= GRAV * dt; p.nh = Math.max(0, p.nh + p.vh * dt) }
     p.x += (p.nx - p.x) * k; p.z += (p.nz - p.z) * k; p.h += (p.nh - p.h) * k
     if (p.act) p.t += dt
-    for (const q of ['sq', 'cheer', 'throw', 'reach']) p[q] = Math.max(0, p[q] - dt)
+    for (const q of ['sq', 'cheer', 'wow', 'sad', 'throw', 'reach']) p[q] = Math.max(0, p[q] - dt)
     look(p, dt)
   }
   if (mode === 'tip') { tip.t += dt; ball.h = 60 + 300 * tip.t - 250 * tip.t ** 2 }
@@ -1265,7 +1266,14 @@ function rig(p, holding) {
   else if (p.reach > 0) set({ hip: 31.5, bend: 6, nh: [27, 46], fh: [-7, 52], nf: [13, 0], ff: [-9, 0], k: 32 })   // 스틸 — 앞발을 내디디며 낮게 손을 뻗는다
   else if (p.throw > 0) { const e = sm(Math.min(1, (1 - p.throw / 0.22) * 2.2)); set({ hip: 35, bend: 2.5 + e, nh: [11 + 13 * e, 50], fh: [8 + 11 * e, 48], nf: [8, 0], ff: [-5, 0], k: 30 }) }   // 패스 — 두 손으로 밀어 낸다
   else if (p.stun > 0 && !(p.ice > 0)) set({ hip: 35, bend: -2.5, nh: [12 + 4 * Math.sin(tnow * 22), 56], fh: [-12, 58 + 3 * Math.sin(tnow * 19)], k: 20 })   // 휘청 — 뒤로 젖히고 팔을 휘젓는다
-  else if (p.cheer > 0 && !holding) { const pump = Math.abs(Math.sin(tnow * 8)); set({ hip: 36.5 - pump, bend: -1.5, nh: [10, 80 + 14 * pump], fh: [10, 52], hd: [0, 1.5], k: 18 }) }   // 득점 — 주먹을 치켜든다
+  else if (p.cheer > 0 && !holding) {   // 세리머니 — 덩크는 두 팔 알통, 3점은 두 팔을 V 로, 블록은 손가락을 흔들고(무톰보), 그 밖은 주먹을 치켜든다
+    const w = Math.sin(tnow * 8), pump = Math.abs(w)
+    set(p.ch === 'flex' ? { hip: 35 - pump * 0.6, bend: -1, nh: [15, 68 + 3 * pump], fh: [-14, 68 + 3 * pump], nf: [7, 0], ff: [-6, 0], hd: [0, 1.5], k: 16 }
+      : p.ch === 'three' ? { hip: 36.5, bend: -2, nh: [16, 93], fh: [-14, 91], hd: [0, 2], k: 14 }
+      : p.ch === 'wag' ? { hip: 36, bend: -1, nh: [9 + 5 * Math.sin(tnow * 16), 90], fh: [9, 48], hd: [0, 1], k: 24 }
+      : { hip: 36.5 - pump, bend: -1.5, nh: [10, 80 + 14 * pump], fh: [10, 52], hd: [0, 1.5], k: 18 })
+  }
+  else if (p.wow > 0 && !holding) set({ hip: 36.5, bend: -3.5, nh: [19, 68], fh: [-15, 68], nf: [4, 0], ff: [-6, 0], hd: [-1, 2], k: 18 })   // 놀람 — 뒤로 젖히며 두 팔을 벌린다(머리 위에 !)
   else if (!holding && o && o.team !== p.team && dist(p, o) < 70) {   // 수비 자세 — 낮고 넓게 서서 한 손은 높이 한 손은 낮게. 움직일 때는 발을 엇갈리지 않고 미끄러지듯
     const w = Math.sin(tnow * 7 + p.i), mv = a > 0.06, lift = s => Math.max(0, Math.sin(s)) * 3
     set({ hip: 32.5, bend: 3, nh: [16, 71 + w * 1.5], fh: [14, 42 - w], k: 12, nf: mv ? [7 + 3 * Math.sin(ph), lift(ph)] : [7, 0], ff: mv ? [-6 + 3 * Math.sin(ph + 1.3), lift(ph + 1.3)] : [-6, 0] })
@@ -1278,6 +1286,10 @@ function rig(p, holding) {
     if (holding) set({ nh: 'ball', fh: [11, 46], bend: R.bend + 1.5 })   // 드리블하며 달린다 — 다른 팔로 공을 감싼다
   }
   else if (holding) set({ hip: 34 - 0.8 * (1 - Math.abs(Math.cos(p.dp))), bend: 2.4, nh: 'ball', fh: [11, 46], nf: [5, 0], ff: [-4, 0], k: 14 })   // 제자리 드리블 — 무릎을 굽히고 공이 바닥을 칠 때 몸도 살짝
+  if (p.sad > 0 && !holding && !act && !air && !(p.fall > 0) && !(p.cheer > 0)) {   // 실망 — 고개를 떨구고, 서 있으면 무릎을 짚는다
+    if (a < 0.06) set({ hip: 31.5, bend: 10, nh: [14, 26], fh: [3, 26], nf: [6, 0], ff: [-5, 0], k: 8 })
+    R.hd = [0, -2.5]
+  }
   if (p.sq > 0 && !air) { R.hip -= p.sq * 30; R.bend += p.sq * 12 }   // 착지 — 무릎으로 받는다
   if (!R.abs) {   // 몸에 붙은 손 — 숙이고 웅크린 만큼 따라간다
     const rel = h => [h[0] + R.bend * (h[1] - 37) / 23, h[1] + R.hip - 37]
@@ -1335,6 +1347,24 @@ function focus(cx, cy, k) {
   g.fill()
 }
 
+// 체형 — 포지션 1~5. 가드는 날렵하게, 포워드는 어깨가 넓고 다리가 탄탄하게, 센터는 몸통이 두껍고 손발이 크게.
+// w = 몸통 · 엉덩이 폭, sh = 어깨 폭, t = 팔다리 굵기, e = 손 · 발 크기. 키와 관절 자리는 모두 같다(공 · 림 · 부딪힘은 그대로)
+const BUILD = [
+  { w: 0.86, sh: 0.9, t: 0.84, e: 1 },
+  { w: 0.9, sh: 0.94, t: 0.88, e: 1 },
+  { w: 1.04, sh: 1.08, t: 1.04, e: 1.06 },
+  { w: 1.14, sh: 1.16, t: 1.14, e: 1.12 },
+  { w: 1.26, sh: 1.22, t: 1.24, e: 1.2 },
+]
+/** 장비 — 선수마다 다르게(선수 id 로 정해져 온라인 두 화면이 같다). 팔 토시(가까운 팔) · 손목 밴드 · 양말 길이 · 운동화 색 */
+function gearOf(key) {
+  let h = 7
+  for (const c of key) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  const pick = n => { const v = h % n; h = Math.floor(h / n); return v }
+  return { sleeve: pick(5), wrist: pick(3), sock: pick(3), shoe: pick(3) }   // 토시 0 검정 · 1 흰색 · 그 밖 없음, 밴드 0 없음 · 1 흰색 · 2 보조색, 양말 0 짧게 · 1 흰 긴 · 2 검정 긴, 신발 0 흰 · 1 검정 · 2 팀색
+}
+const mix = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]
+
 /** 선수 한 명. refl = 바닥 반사용(그림자 · 표시 · 공은 빼고 몸만) */
 function drawPlayer(p, refl) {
   const [x, y, u] = P(p.x, p.z, p.h), [fx, fy] = P(p.x, p.z), T = TEAMS[sides[p.team]], big = p.big > 0 ? 1.4 : 1, F = myT ? -1 : 1   // F = 화면이 뒤집혔으면 -1
@@ -1381,35 +1411,41 @@ function drawPlayer(p, refl) {
   }
   else if (p.sq > 0) g.scale(1 + p.sq * 0.5, 1 - p.sq * 0.5)   // 착지 — 잠깐 눌린다
   g.lineCap = 'round'; g.lineJoin = 'round'
+  const B = BUILD[p.i], G = p.f.gear || {}, tu = B.t * u, eu = B.e * u
+  const shoe = ['#fafafa', '#1d1d22', T.color][G.shoe || 0], sole = G.shoe ? '#f2f2f2' : T.dark
   const leg = (k, col) => {   // 엉덩이 · 무릎 · 발 — 무릎은 앞으로 꺾인다. 먼 다리는 어둡게
-    const hp = up((k ? 2.6 : -2.6) * (1 - Math.abs(f)), 37), ft = at(...Z[`f${k}`])
+    const hp = up((k ? 2.6 : -2.6) * B.w * (1 - Math.abs(f)), 37), ft = at(...Z[`f${k}`])
     const [knee, end] = joint(p, `k${k}`, hp, ft, 19 * u, 18.5 * u, [hp[0] + f * 14 * u, hp[1] + 18 * u], u, kj)
-    line([hp, knee, end], 7.8 * u, EDGE); line([hp, knee], 6.4 * u, col); line([knee, end], 5.2 * u, col)
-    line([[end[0], end[1] - 5 * u], [end[0], end[1] - 1.8 * u]], 4.8 * u, '#f2f2f2')   // 양말
-    g.fillStyle = '#fafafa'; oval(end[0] + f * 2.2 * u, end[1] - 1.5 * u, 4.8 * u, 2.3 * u); g.fill()   // 운동화
+    line([hp, knee, end], 7.8 * tu, EDGE); line([hp, knee], 6.4 * tu, col); line([knee, end], 5.2 * tu, col)
+    const ank = [end[0], end[1] - 1.8 * u]   // 양말 — 짧게(발목) · 길게(종아리까지)
+    line([ank, G.sock ? mix(ank, knee, 0.5) : [end[0], end[1] - 5 * u]], 5 * tu, G.sock === 2 ? '#1d1d22' : '#f2f2f2')
+    g.fillStyle = shoe; oval(end[0] + f * 2.2 * eu, end[1] - 1.5 * eu, 4.8 * eu, 2.3 * eu); g.fill()   // 운동화
     g.strokeStyle = EDGE; g.lineWidth = 0.8 * u; g.stroke()
-    g.fillStyle = T.dark; g.fillRect(end[0] + f * 2.2 * u - 4.8 * u, end[1] - 0.5 * u, 9.6 * u, 1.1 * u)
+    g.fillStyle = sole; g.fillRect(end[0] + f * 2.2 * eu - 4.8 * eu, end[1] - 0.5 * u, 9.6 * eu, 1.1 * u)
   }
   const arm = (s, col) => {   // s = 화면 왼쪽(-1) · 오른쪽(1) 팔. 어깨는 윗몸을 따라가고, 팔꿈치는 아래 · 뒤로 꺾인다
-    const s0 = up(s * 7.4, 60), hd = at(...Z[`h${s}`])
+    const s0 = up(s * 7.4 * B.sh, 60), hd = at(...Z[`h${s}`])
     const [el, end] = joint(p, `e${s}`, s0, hd, 13.5 * u, 13 * u, [s0[0] - f * 10 * u, s0[1] + 16 * u], u, kj)
-    line([s0, el, end], 6.2 * u, EDGE); line([s0, el], 5 * u, col); line([el, end], 4.3 * u, col)
-    g.fillStyle = col; oval(end[0], end[1], 2.5 * u, 2.5 * u); g.fill()
+    line([s0, el, end], 6.2 * tu, EDGE); line([s0, el], 5 * tu, col); line([el, end], 4.3 * tu, col)
+    if (s === fs && G.sleeve < 2) { const c = G.sleeve ? '#f2f2f2' : '#1d1d22'; line([mix(s0, el, 0.4), el], 5 * tu, c); line([el, mix(el, end, 0.86)], 4.3 * tu, c) }   // 팔 토시
+    if (G.wrist) line([mix(el, end, 0.74), mix(el, end, 0.88)], 5.2 * tu, G.wrist === 1 ? '#f2f2f2' : T.trim)   // 손목 밴드
+    g.fillStyle = col; oval(end[0], end[1], 2.5 * eu, 2.5 * eu); g.fill()
   }
   arm(-fs, shade)   // 먼 팔 — 몸 뒤
   leg(0, shade)
   leg(1, skin)
-  shape([up(-8.8, 42), up(8.8, 42), up(10.4, 27), up(1, 26), up(0, 29), up(-1, 26), up(-10.4, 27)], T.dark, EDGE, 0.9 * u)   // 반바지
-  line([up(-9.6, 41), up(-10.3, 28)], 1.4 * u, T.color); line([up(9.6, 41), up(10.3, 28)], 1.4 * u, T.color)
+  const w = B.w, sw = B.sh
+  shape([up(-8.8 * w, 42), up(8.8 * w, 42), up(10.4 * w, 27), up(1, 26), up(0, 29), up(-1, 26), up(-10.4 * w, 27)], T.dark, EDGE, 0.9 * u)   // 반바지 — 허리 띠 · 옆 줄은 보조색
+  line([up(-9.6 * w, 40.6), up(-10.3 * w, 28)], 2 * u, T.trim); line([up(9.6 * w, 40.6), up(10.3 * w, 28)], 2 * u, T.trim)
+  line([up(-8.6 * w, 41.2), up(8.6 * w, 41.2)], 1.6 * u, T.trim)
   const [, jt] = up(0, 64), [, jb] = up(0, 40), jg = g.createLinearGradient(0, jt, 0, jb)   // 상의 — 아래로 갈수록 살짝 어둡게
   jg.addColorStop(0, T.color); jg.addColorStop(0.55, T.color); jg.addColorStop(1, T.dark)
-  shape([up(-3.6, 64), up(-9.6, 62.5), up(-7.8, 54), up(-8.4, 40.5), up(8.4, 40.5), up(7.8, 54), up(9.6, 62.5), up(3.6, 64), up(0, 58.5)], jg, EDGE, 0.9 * u)   // 민소매 상의
-  g.globalAlpha *= 0.85
-  line([up(-3.6, 64), up(0, 58.5), up(3.6, 64)], 1 * u, '#fff'); line([up(-9.6, 62.5), up(-7.8, 54)], 1 * u, '#fff'); line([up(9.6, 62.5), up(7.8, 54)], 1 * u, '#fff')
-  g.globalAlpha /= 0.85
-  g.fillStyle = '#fff'; g.font = `800 ${8.5 * u}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'
-  g.save(); g.translate(...up(0, 50)); if (turn < 0) g.scale(-1, 1); g.fillText(p.f.num, 0, 0); g.restore()
-  line([up(0, 62), up(0, 67)], 5.2 * u, skin)   // 목
+  shape([up(-3.6, 64), up(-9.6 * sw, 62.5), up(-7.8 * w, 54), up(-8.4 * w, 40.5), up(8.4 * w, 40.5), up(7.8 * w, 54), up(9.6 * sw, 62.5), up(3.6, 64), up(0, 58.5)], jg, EDGE, 0.9 * u)   // 민소매 상의
+  for (const s of [-1, 1]) shape([up(s * 7.8 * w, 54), up(s * 8.4 * w, 40.5), up(s * 6.6 * w, 40.5), up(s * 6.3 * w, 53)], T.trim)   // 옆 판 — 몸 윤곽이 보이게
+  line([up(-3.6, 64), up(0, 58.5), up(3.6, 64)], 1.4 * u, T.trim); line([up(-9.6 * sw, 62.5), up(-7.8 * w, 54)], 1.4 * u, T.trim); line([up(9.6 * sw, 62.5), up(7.8 * w, 54)], 1.4 * u, T.trim)   // 목 · 진동 둘레
+  g.font = `900 ${9 * u}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'   // 등번호 — 테두리를 둘러 어느 색 위에서도 읽히게
+  g.save(); g.translate(...up(0, 50)); if (turn < 0) g.scale(-1, 1); g.strokeStyle = T.dark; g.lineWidth = 2 * u; g.strokeText(p.f.num, 0, 0); g.fillStyle = '#fff'; g.fillText(p.f.num, 0, 0); g.restore()
+  line([up(0, 62), up(0, 67)], 5.2 * tu, skin)   // 목
   const [hx, hy] = up(0, 75), hdx = hx + Z.hd[0] * u, hdy = hy - Z.hd[1] * u   // 머리 — 몸보다 살짝 늦게 따라온다
   if (p.f.head) head(p, f, hdx, hdy, u)
   else { g.fillStyle = skin; oval(hdx, hdy, 8 * u, 9 * u); g.fill() }
@@ -1419,6 +1455,7 @@ function drawPlayer(p, refl) {
   if (refl) return
   g.textAlign = 'center'; g.textBaseline = 'middle'
   if (p.conf > 0) { g.fillStyle = '#c58bff'; g.font = `900 ${16 * u}px system-ui, sans-serif`; g.fillText('?', x, y - 100 * u * big) }
+  else if (p.wow > 0) { g.fillStyle = '#fff'; g.font = `900 ${16 * u}px system-ui, sans-serif`; g.fillText('!', x + up(0, 98)[0] * big, y - (98 + 6 * Math.min(1, (1.1 - p.wow) * 8)) * u * big) }   // 놀람 — 톡 튀어 오른다
   if (p.fall > 0.3 && (p.f0 || 1) - p.fall > 0.25) {   // 누워 있는 동안 머리 위로 별이 돈다
     g.fillStyle = '#ffd23f'; g.font = `${11 * u}px system-ui, sans-serif`
     for (let i = 0; i < 3; i++) { const t = tnow * 7 + i * 2.1; g.fillText('★', x - F * p.dir * 73 * u * big + Math.cos(t) * 12 * u, y - 26 * u + Math.sin(t) * 4 * u) }
@@ -1659,7 +1696,7 @@ await loadData()
 const kr = data.players.filter(p => p.server === 'kr')
 TEAMS.forEach((T, ti) => {
   T.five = [1, 2, 3, 4, 5].map((pos, i) => {
-    const list = kr.filter(p => p.pos === pos), p = list[ti % list.length], f = { name: p ? p.short || p.name : `${pos}번`, num: NBA_NUM[p?.id] ?? NUMS[i], img: null }
+    const list = kr.filter(p => p.pos === pos), p = list[ti % list.length], f = { name: p ? p.short || p.name : `${pos}번`, num: NBA_NUM[p?.id] ?? NUMS[i], img: null, gear: gearOf(p?.id || `${ti}-${pos}`) }
     if (p?.img) {
       f.img = new Image()
       f.img.onload = () => { try { f.head = cutHead(f.img); [f.skin, f.shade] = skinOf(f.img) } catch {} }   // 실패하면 동그란 머리 · 기본 피부색
