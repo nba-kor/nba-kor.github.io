@@ -21,6 +21,8 @@ const SLOT = Object.fromEntries(SLOTS.map(s => [s.id, s]))
 const FAS = A.extra.filter(c => c.day != null), FA_DAY = Object.fromEntries(FAS.map(c => [c.id, c.day]))
 const wants = (slots, s) => slots.includes(s.id) || slots.some(x => FA_DAY[x] === s.day)
 const clash = (x, y) => { const a = SLOT[x], b = SLOT[y]; return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
+// 배치 현황의 FA 칸 — 직접 고른 시간대가 먼저, 그날 FA 를 골랐으면 직접 고른 시간대와 안 겹치는 그날 시간대(FA 만 골랐으면 그날 전부)
+const viaFa = (slots, s) => !slots.includes(s.id) && slots.some(x => FA_DAY[x] === s.day) && !slots.some(x => SLOT[x] && clash(x, s.id))
 // 집계 순서(관리자 매뉴얼): 소유자의 참가 계정 수 많은 순 → 1순위 포지션(스코어러 > 중열 > 센터) → 계정 이름(가나다 · 영문)
 const roleRank = a => { const i = ROLES.findIndex(r => r.id === a.roles[0]); return i < 0 ? ROLES.length : i }
 const byTally = (x, y) => y.count - x.count || roleRank(x) - roleRank(y) || x.n.localeCompare(y.n, 'ko')
@@ -354,9 +356,9 @@ function membersCard(at) {
     h('td', { className: 'ar-nick' }, h('b', { className: 'ar-cnt', title: p.accounts.map(a => a.nick).join(', ') }, p.owner), p.accounts.length > 1 && h('small', {}, `계정 ${p.accounts.length}개`)),
     SLOTS.map(s => {
       const w = where.find(x => x.slot === s.id)
-      const applied = wants(p.slots, s)
       return h('td', {}, w ? h('span', { className: 'ar-badge', title: w.n }, `${w.team}팀`)
-        : applied ? h('span', { className: 'ar-want', title: '신청' }, h('span', { className: 'ar-long' }, '신청'), h('span', { className: 'ar-short' }, '○')) : h('span', { className: 'ar-dash' }, '-'))   // 휴대폰은 ○
+        : p.slots.includes(s.id) ? h('span', { className: 'ar-want', title: '신청' }, h('span', { className: 'ar-long' }, '신청'), h('span', { className: 'ar-short' }, '○'))   // 휴대폰은 ○
+        : viaFa(p.slots, s) ? h('span', { className: 'ar-want', title: 'FA (시간 미정 · 용병)' }, 'FA') : h('span', { className: 'ar-dash' }, '-'))
     }),
     h('td', {}, h('span', { className: `ar-st${where.length ? ' is-ok' : ''}` }, where.length ? '확정' : '대기'))))
   return h('section', { className: 'card ar-card' },
