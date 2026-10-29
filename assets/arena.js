@@ -38,7 +38,9 @@ let week = PLAN_PAGE ? '' : new URLSearchParams(location.search).get('w') || '' 
 let data = null      // GET /api/arena — { week, current, signups, plan, planAt, missing }
 let plan = {}        // 편성표 사본 { 시간대: [[{ u, n }]] } — 관리자가 고친다
 let accts = new Map()   // 신청한 계정 key → { u, n, owner(본계 닉네임), roles, chars, bt, slots, count(소유자의 참가 계정 수) }
-let tab = 'all', poolTab = 'all', roleTab = 'all'   // roleTab = 편성 대기 목록의 포지션 필터
+let tab = 'all'
+// 편성 대기 목록 필터 — 시간대 · 포지션, 여러 개 고르면 하나라도 맞는 계정. 비어 있으면 미배정 · 전체
+const poolPick = new Set(), rolePick = new Set()
 // 편성의 「자세히 보기」 — 칩마다 캐릭터(레벨)가 펼쳐진다. 처음엔 켜져 있고, 끄면 이 브라우저에 기억한다
 const DETAIL_KEY = 'dc.arena.detail'
 let detail = (() => { try { return localStorage.getItem(DETAIL_KEY) !== '0' } catch { return true } })()
@@ -473,19 +475,23 @@ function editor() {
   const busy = (slot, u) => SLOTS.some(s => clash(slot, s.id) && teamsOf(s.id).some(tm => tm.some(x => x.u === u)))   // 겹치는 시간대에 이미 있다
   const at = placements()
   const all = [...accts.values()].sort(byTally)
-  const bySlot = poolTab === 'all' ? all.filter(a => !at.has(key(a.u, a.n)))
-    : poolTab in FA_DAY ? all.filter(a => a.slots.includes(poolTab) && SLOTS.some(s => s.day === FA_DAY[poolTab] && !busy(s.id, a.u)))   // 그날 FA 중 아직 넣을 시간대가 남은 사람 — 1차 · 2차 둘 다(또는 1.5차) 뛰면 빠진다
-    : all.filter(a => wants(a.slots, SLOT[poolTab]) && !busy(poolTab, a.u))
-  // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션), 1순위인 계정이 먼저
+  // 시간대 필터 — 그 칸을 직접 고른 사람만(FA 는 FA 칸에서만), 겹치는 시간대에 이미 들어갔으면 뺀다.
+  // FA 는 그날 넣을 시간대가 남은 사람만 — 1차 · 2차 둘 다(또는 1.5차) 뛰면 빠진다
+  const fits = (a, id) => a.slots.includes(id) && (id in FA_DAY ? SLOTS.some(s => s.day === FA_DAY[id] && !busy(s.id, a.u)) : !busy(id, a.u))
+  const bySlot = poolPick.size ? all.filter(a => [...poolPick].some(id => fits(a, id))) : all.filter(a => !at.has(key(a.u, a.n)))
+  // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션), 고른 포지션이 1순위인 계정이 먼저
   const plays = (a, r) => a.roles.includes(r) || a.roles[0] === ALLPOS
-  const pool = roleTab === 'all' ? bySlot
-    : bySlot.filter(a => plays(a, roleTab)).sort((x, y) => (x.roles[0] !== roleTab) - (y.roles[0] !== roleTab) || byTally(x, y))
+  const pool = !rolePick.size ? bySlot
+    : bySlot.filter(a => [...rolePick].some(r => plays(a, r))).sort((x, y) => !rolePick.has(x.roles[0]) - !rolePick.has(y.roles[0]) || byTally(x, y))
+  // 누르면 켜고 끈다 · 미배정 / 전체는 모두 끈다
+  const pick = (set, id) => () => { id === 'all' ? set.clear() : set.has(id) ? set.delete(id) : set.add(id); renderPlan() }
+  const on = (set, id) => id === 'all' ? !set.size : set.has(id)
   const roleTabs = h('div', { className: 'ar-tabs ar-role-tabs' }, [{ id: 'all', label: '전체' }, ...ROLES].map(r => {
     const n = r.id === 'all' ? bySlot.length : bySlot.filter(a => plays(a, r.id)).length
-    return h('button', { type: 'button', 'aria-selected': roleTab === r.id, onclick: () => { roleTab = r.id; renderPlan() } }, `${r.label} ${n}`)
+    return h('button', { type: 'button', 'aria-selected': on(rolePick, r.id), onclick: pick(rolePick, r.id) }, `${r.label} ${n}`)
   }))
   const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '미배정' }, ...SLOTS, ...FAS].map(s =>
-    h('button', { type: 'button', 'aria-selected': poolTab === s.id, onclick: () => { poolTab = s.id; renderPlan() } }, s.short)))
+    h('button', { type: 'button', 'aria-selected': on(poolPick, s.id), onclick: pick(poolPick, s.id) }, s.short)))
   // 계정 칸만 따로 세로 스크롤(필터는 그대로) · 아래 막대를 위아래로 끌어 높이 조절
   const chips = h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요'))
   if (poolH) chips.style.height = `${poolH}px`
@@ -509,8 +515,8 @@ function editor() {
       } }, detail ? '간단히 보기' : '자세히 보기')),
     poolTabs,
     roleTabs,
-    h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름)'
-      : poolTab in FA_DAY ? `${LABEL[poolTab].split(' (')[0]} 신청 중 그날 안 겹치는 시간대가 아직 남은 사람 · 그날 1차 · 2차(또는 1.5차)를 다 뛰면 빠져요` : `${LABEL[poolTab]} 신청(+ 그날 FA) 중 겹치는 시간대에 아직 없는 사람`),
+    h('p', { className: 'rc-muted' }, !poolPick.size ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름) · 필터는 여러 개 고를 수 있어요'
+      : `${[...poolPick].map(id => TAG[id]).join(' · ')} 중 하나라도 신청한 사람 · 겹치는 시간대에 이미 들어갔으면 빠져요(FA 는 그날 넣을 시간대가 남은 사람)`),
     chips, grip)
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
