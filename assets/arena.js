@@ -281,7 +281,6 @@ function renderPlan() {
   if (PLAN_PAGE && !edit) return sec.replaceChildren(head, h('p', { className: 'card rc-note' },
     auth === 'loading' ? '로그인 확인 중…' : auth !== 'in' ? '관리자로 로그인해야 편성할 수 있어요.' : '관리자만 편성할 수 있어요.'))
   sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), teamsCard(), membersCard(at), chartCard(), mixCard()].filter(Boolean))
-  if (edit) document.documentElement.style.setProperty('--top-h', `${$('.top').offsetHeight}px`)   // 대기 목록이 머리 바로 아래에 붙는다(머리 높이는 로그인 줄에 따라 다르다)
   if (nTeams && !edit) queueShot()
 }
 
@@ -484,6 +483,9 @@ function editor() {
   }))
   const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '미배정' }, ...SLOTS, ...FAS].map(s =>
     h('button', { type: 'button', 'aria-selected': poolTab === s.id, onclick: () => { poolTab = s.id; renderPlan() } }, s.short)))
+  // 계정 칸은 따로 세로 스크롤 · 아래 모서리를 끌어 높이 조절 — 다시 그려도(배치할 때마다) 고른 높이를 이어 받는다
+  const chips = h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요'))
+  chips.style.height = $('.ar-pool .ar-chips')?.style.height || ''
   const poolBox = h('section', { className: 'card ar-pool', 'data-drop': 'pool' },
     h('div', { className: 'ar-pool-head' }, h('h3', {}, '배치할 계정'), h('small', { className: 'rc-muted' }, '끌어서 배치하거나, 눌러서 팀을 고르세요'),
       h('button', { type: 'button', className: 'ar-detail-btn', 'aria-pressed': detail, onclick: () => {
@@ -495,7 +497,7 @@ function editor() {
     roleTabs,
     h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름)'
       : poolTab in FA_DAY ? `${LABEL[poolTab].split(' (')[0]} 신청 중 그날 안 겹치는 시간대가 아직 남은 사람 · 그날 1차 · 2차(또는 1.5차)를 다 뛰면 빠져요` : `${LABEL[poolTab]} 신청(+ 그날 FA) 중 겹치는 시간대에 아직 없는 사람`),
-    h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요')))
+    chips)
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
     const box = h('div', { className: 'ar-slot ar-edit' },
@@ -515,8 +517,11 @@ function picksCard() {
   const cols = [...SLOTS, ...A.extra].sort((x, y) => (x.day ?? 9) - (y.day ?? 9))
   const isOut = s => s.slots.includes('absent')
   const rows = [...data.signups].sort((x, y) => isOut(x) - isOut(y) || x.owner.localeCompare(y.owner, 'ko'))
+  const excel = () => saveCsv([['본계정', ...cols.map(c => c.short), '참가 계정', '메모'],
+    ...rows.map(s => [s.owner, ...cols.map(c => s.slots.includes(c.id) ? 'O' : ''), s.accounts.map(a => a.nick).join(', '), s.memo])], `vipers-arena-signups-${week}.csv`)
   return h('section', { className: 'card ar-card' },
-    h('h3', {}, `신청 현황 ${rows.length}명`, h('small', { className: 'rc-muted' }, ` · 불참 ${rows.filter(isOut).length}명`)),
+    h('div', { className: 'ar-picks-head' }, h('h3', {}, `신청 현황 ${rows.length}명`, h('small', { className: 'rc-muted' }, ` · 불참 ${rows.filter(isOut).length}명`)),
+      rows.length > 0 && h('button', { type: 'button', onclick: excel }, '엑셀 저장')),
     rows.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table ar-picks' },
       h('thead', {}, h('tr', {}, h('th', {}, '#'), h('th', {}, '본계정'), cols.map(c => h('th', { title: c.label }, TAG[c.id])), h('th', {}, '참가 계정'), h('th', {}, '메모'))),
       h('tbody', {}, rows.map((s, i) => h('tr', {},
@@ -670,16 +675,21 @@ const download = (blob, name) => {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000)
 }
 
-/** 편성 명단 엑셀(CSV) — 계정 한 줄. BOM 을 붙여야 엑셀이 한글을 읽는다.
+/** 엑셀(CSV) 내려받기 — BOM 을 붙여야 엑셀이 한글을 읽는다.
  *  = + - @ 로 시작하는 닉네임은 엑셀이 수식으로 실행하므로 앞에 ' 를 붙인다 */
-function saveExcel() {
+function saveCsv(rows, name) {
   const cell = v => `"${String(v ?? '').replace(/^[=+\-@\t\r]/, "'$&").replace(/"/g, '""')}"`
+  download(new Blob(['\ufeff' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv' }), name)
+}
+
+/** 편성 명단 엑셀 — 계정 한 줄 */
+function saveExcel() {
   const rows = [['시간대', '일시', '팀', '팀장', '닉네임', '본계정', '포지션', '캐릭터']]
   for (const s of SLOTS) teamsOf(s.id).forEach((tm, i) => tm.forEach((x, j) => {
     const a = accts.get(key(x.u, x.n))
     rows.push([s.short, slotWhen(week, s), `${i + 1}팀`, j ? '' : '팀장', x.n, a?.owner, a?.roles.map(roleLabel).join(' · '), a && charNames(a.chars, a.bt)])
   }))
-  download(new Blob(['\ufeff' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv' }), `vipers-arena-${week}.csv`)
+  saveCsv(rows, `vipers-arena-${week}.csv`)
 }
 
 /** 편성표 그림 — 한 줄에 하루(1차 · 1.5차 · 2차). 팀 한 줄에 3명(얼굴 · 닉네임 · 캐릭터) */

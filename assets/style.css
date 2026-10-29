@@ -1157,11 +1157,13 @@ label.ac-pick { cursor: pointer; }
 .ar-missing li::marker { color: var(--muted); font-size: 12px; }
 
 /* 편성(관리자) — 칩을 끌어서 팀에 놓는다. 칩 색 = 첫 캐릭터 포지션 */
-.ar-pool { padding: 14px 16px; position: sticky; top: var(--top-h, 64px); z-index: 5; max-height: 42vh; overflow-y: auto; box-shadow: 0 10px 24px -12px #000; }   /* 아래 시간대로 스크롤해도 대기 목록이 보여 끌어다 놓을 수 있다 */
+.ar-pool { padding: 14px 16px; }
 .ar-pool-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
 .ar-pool-head h3 { margin: 0 !important; }
 .ar-pool > .rc-muted { margin: -4px 0 10px; font-size: 12px; }
 .ar-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 40px; }
+/* 편성 대기 목록의 계정 칸 — 따로 세로 스크롤, 오른쪽 아래 모서리를 끌어 높이 조절 */
+.ar-pool .ar-chips { height: 42vh; align-content: flex-start; overflow-y: auto; resize: vertical; padding-right: 4px; }
 .ar-chip {
   --pc: var(--muted); position: relative; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 10px 4px 4px;
   border: 1px solid var(--line); border-radius: 999px;
@@ -1323,6 +1325,8 @@ label.ac-pick { cursor: pointer; }
 .ar-pool-head { margin-bottom: 10px; }
 
 /* 아레나 편성 — 맨 아래 신청 현황(사람마다 한 줄, 고른 칸에 ✓) */
+.ar-picks-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.ar-picks-head h3 { margin: 0 !important; }
 .ar-picks td { white-space: nowrap; }
 .ar-pick { font-weight: 900; color: var(--accent); }
 .ar-picks .ar-picks-memo { min-width: 160px; text-align: left; white-space: normal; overflow-wrap: anywhere; color: var(--muted); }
@@ -1363,8 +1367,8 @@ label.ac-pick { cursor: pointer; }
   .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally, .ar-picks) :is(th, td):is(:first-child, :last-child) { display: none; }   /* # · 상태(배정은 뱃지로 보인다) */
   .ar-badge { min-width: 34px; padding: 2px 4px; font-size: 11px; }
   .ar-nick small { display: block; margin: 0 !important; }
-  /* 편성 대기 목록 — 휴대폰은 눌러서 팀을 고르니 머리에 붙여 둘 필요가 없다(붙이면 화면 절반을 가린다) */
-  .ar-pool { position: static; max-height: none; overflow: visible; box-shadow: none; }
+  /* 편성 대기 목록 — 휴대폰은 눌러서 팀을 고르니(높이 조절도 안 된다) 계정을 다 펼친다 */
+  .ar-pool .ar-chips { height: auto; overflow: visible; resize: none; }
   /* 출석 현황 — 「3주 연속」 이 두 줄로 접히지 않게, # 는 뺀다 */
   .mp-attend :is(th, td) { padding: 6px 4px; white-space: nowrap; }
   .mp-attend :is(th, td):first-child { display: none; }
