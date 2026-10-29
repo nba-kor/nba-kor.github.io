@@ -1345,6 +1345,9 @@ dbTest('Data API 권한: anon · authenticated 키나 키 없이는 팀원모집
       ['/slam_ranking?select=name&limit=1', {}],
       ['/survive_saves?select=user_id&limit=1', {}],
       ['/survive_saves', post({ user_id: someone, ach: {}, stats: {}, updated_at: 0 })],
+      ['/survive_best?select=user_id&limit=1', {}],
+      ['/survive_ranking?select=name&limit=1', {}],
+      ['/survive_best', post({ user_id: someone, map: 'park', name: 'x', hero: 'james', secs: 1, kills: 1, lvl: 1, at: 0 })],
       ['/slam_matches', post({ match: 'AAAAAAAA', at: 0, home_id: someone, home_name: 'x', home_team: 0, home_score: 1, away_id: '1', away_name: 'y', away_team: 1, away_score: 0 })],
       ['/arena_plans', post({ week: '2100-01-02', plan: {}, updated_at: 0, updated_by: someone })],
       ['/site_gate', post({ id: 1, code: '1234', token: 'x', changed_at: 0, changed_by: someone })],
@@ -1936,6 +1939,36 @@ dbTest('덩크 서바이버: 업적 · 기록은 로그인한 사람마다 — �
   assert.deepEqual(await rows(`/audit_log?select=action&user_id=eq.${a.id}&action=eq.PUT%20%2Fapi%2Fsurvive`), [], '판마다 오는 저장은 감사 로그에 안 남긴다')
 })
 
+dbTest('덩크 서바이버 랭킹: 맵마다 사람마다 최고 기록 한 줄(오래 버틴 순 → 많이 쓰러뜨린 순) · 검증 · 보기는 공개 · 로그인하면 내 순위', async () => {
+  const { api } = start()
+  const [a, b, c] = await Promise.all(['A', 'B', 'C'].map(k => person(api, { name: `랭킹${k}${RUN}` })))
+  const map = 'roof', run = (who, o) => api('POST', '/api/survive/run', { map, hero: 'james', secs: 300, kills: 900, lvl: 20, ...o }, { as: who.as })
+  assert.equal((await api('POST', '/api/survive/run', { map, hero: 'james', secs: 1, kills: 1, lvl: 1 })).status, 401)
+  for (const o of [{ map: 'moon' }, { hero: 'nobody' }, { secs: 1801 }, { secs: -1 }, { kills: 1.5 }, { lvl: '3' }, { secs: 10, kills: 5000 }]) {
+    assert.equal((await run(a, o)).status, 400, JSON.stringify(o))
+  }
+  // 로컬 DB 에는 지난 실행의 기록도 있다 — 이번 실행 것은 그보다 높게(1800초 + 처치 수로 가린다)
+  const top = (await rows(`/survive_best?select=kills&map=eq.${map}&secs=eq.1800&order=kills.desc&limit=1`))[0]?.kills ?? 0
+  const K = top + 1000
+  const r1 = await run(a, { secs: 1800, kills: K, hero: 'klfd' })
+  assert.equal(r1.status, 200, r1.text)
+  assert.deepEqual(r1.body, { best: true, mine: { rank: 1, hero: 'klfd', secs: 1800, kills: K, lvl: 20 } })
+  assert.deepEqual((await run(a, { secs: 1700, kills: K + 500 })).body.best, false, '더 짧게 버틴 판은 기록이 안 바뀐다')
+  assert.deepEqual((await run(b, { secs: 1800, kills: K + 10 })).body.mine.rank, 1, '같은 시간이면 많이 쓰러뜨린 쪽이 위')
+  assert.deepEqual((await run(c, { secs: 1800, kills: K + 10 })).body.mine.rank, 1, '똑같으면 같은 순위')
+  assert.equal((await run(a, { secs: 1800, kills: K + 20, lvl: 99 })).body.mine.rank, 1, '더 나아지면 바꾼다')
+  // 보기 — 로그인 없이. 맵마다, ID 는 내보내지 않는다
+  const v = await api('GET', '/api/survive/ranking')
+  assert.equal(v.status, 200)
+  assert.deepEqual(Object.keys(v.body.ranking), ['park', 'arena', 'roof'])
+  assert.equal(v.body.mine, undefined)
+  assert.deepEqual(v.body.ranking.roof.slice(0, 3).map(r => [r.rank, r.name, r.kills]), [[1, a.name, K + 20], [2, b.name, K + 10], [2, c.name, K + 10]])
+  assert.ok(v.body.ranking.roof.every(r => Object.keys(r).join() === 'rank,name,hero,secs,kills,lvl'))
+  const m = await api('GET', '/api/survive/ranking', undefined, { as: b.as })
+  assert.deepEqual(m.body.mine, { roof: { rank: 2, hero: 'james', secs: 1800, kills: K + 10, lvl: 20 } }, '로그인하면 내 기록 · 순위')
+  assert.deepEqual(await rows(`/audit_log?select=action&user_id=eq.${a.id}&action=eq.POST%20%2Fapi%2Fsurvive%2Frun`), [], '판마다 오는 기록은 감사 로그에 안 남긴다')
+})
+
 dbTest('감사 로그: 바꾼 요청(성공)만 누가 · 무엇을 · 무엇에 · 바뀐 내용 — 읽기 · 실패는 안 남긴다 · 함수 키로도 못 고친다 · 보기는 슈퍼관리자만(최근 것부터 · 사람별 · 더 보기)', async () => {
   const { api, idle } = start({ potentials: CAT })
   const id = uid(), as = web(id, '감사'), boss = uid(), bossAs = web(boss, '보스')
@@ -2065,6 +2098,7 @@ dbTest('본인 탈퇴: 프로필 · 신청 · 이끌던 팀 · 관리자 권한 
   assert.equal((await rest('/site_admins', post({ user_id: a.id, note: 'test' }))).status, 201)
   assert.equal((await api('PUT', '/api/arena/signup', { slots: ['sat1'], nicks: [`탈${RUN}`] }, { as: a.as })).status, 200)
   assert.equal((await api('PUT', '/api/survive', { ach: { run1: 1 }, stats: {} }, { as: a.as })).status, 200)
+  assert.equal((await api('POST', '/api/survive/run', { map: 'park', hero: 'james', secs: 60, kills: 50, lvl: 5 }, { as: a.as })).status, 200)
   const team = await create(api, a)
   assert.equal(team.status, 201)
 
@@ -2073,6 +2107,7 @@ dbTest('본인 탈퇴: 프로필 · 신청 · 이끌던 팀 · 관리자 권한 
   assert.deepEqual(await rows(`/arena_signups?select=user_id&user_id=eq.${a.id}`), [])
   assert.deepEqual(await rows(`/site_admins?select=user_id&user_id=eq.${a.id}`), [])
   assert.deepEqual(await rows(`/survive_saves?select=user_id&user_id=eq.${a.id}`), [], '덩크 서바이버 업적도 지운다')
+  assert.deepEqual(await rows(`/survive_best?select=user_id&user_id=eq.${a.id}`), [], '덩크 서바이버 랭킹 기록도 지운다')
   assert.equal((await api('GET', `/api/teams/${team.body.team.id}`)).status, 404, '이끌던 팀은 해제')
   const [kak, del] = net.out
   assert.deepEqual([kak.url, kak.headers, kak.body], ['https://kapi.kakao.com/v1/user/unlink', { authorization: 'KakaoAK kakao-admin' }, 'target_id_type=user_id&target_id=4321'])

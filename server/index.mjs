@@ -69,6 +69,8 @@ const SLAM_MATCH = /^[A-Za-z0-9_-]{8,24}$/   // 방장 브라우저가 만든 �
 const SLAM_STALE = 86_400_000   // 한쪽만 올린 결과는 하루 뒤 지운다
 const SURVIVE_KEY = /^[a-z0-9_]{1,32}$/   // 덩크 서바이버: 업적 · 기록 이름(화면 assets/survive.js 가 정한다)
 const SURVIVE_MAX = 120   // 업적 · 기록 각각 이만큼까지
+const SURVIVE_MAPS = ['park', 'arena', 'roof']   // 덩크 서바이버 맵 — 랭킹은 맵마다
+const SURVIVE_LIST = 20   // 랭킹 줄 수
 // 받는 요청 — 메서드 + 경로 조각. 예: 'POST team members' = 가입, 'DELETE team members member' = 방출 · 나가기
 const ACTIONS = new Set([
   'GET me', 'PUT me profile', 'DELETE me', 'DELETE me kakao', 'GET', 'POST', 'POST quick', 'GET team', 'DELETE team', 'POST team members', 'DELETE team members member', 'POST team extend',
@@ -543,6 +545,13 @@ function surviveSave(b) {
   if (!isObj(b) || !ok(b.ach) || !ok(b.stats)) fail(400, '요청 형식이 잘못됐어요')
   return { ach: b.ach, stats: b.stats }
 }
+/** 덩크 서바이버 한 판 — { map, hero: 캐릭터(국내 서버 선수 id), secs: 버틴 초(0~1800), kills, lvl } */
+function surviveRun(b) {
+  const int = (v, max) => Number.isSafeInteger(v) && v >= 0 && v <= max
+  if (!isObj(b) || !SURVIVE_MAPS.includes(b.map) || typeof b.hero !== 'string' || !PLAYERS.has(b.hero) || !int(b.secs, 1800) || !int(b.lvl, 1000)
+    || !int(b.kills, 1_000_000) || b.kills > b.secs * 200 + 50) fail(400, '요청 형식이 잘못됐어요')   // 1초에 200명 넘게는 못 쓰러뜨린다
+  return { map: b.map, hero: b.hero, secs: b.secs, kills: b.kills, lvl: b.lvl }
+}
 /** 두 저장을 합친다 — 업적은 둘 다(먼저 단 시각), 기록은 큰 쪽. 그래서 옛 기기가 올려도 줄지 않는다 */
 function mergeSurvive(a, b) {
   const ach = { ...a.ach }, stats = { ...a.stats }
@@ -679,11 +688,11 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   /**
    * 감사 로그(audit_log) — 바꾼 요청(GET 이 아니고 성공)마다 누가 · 무엇을(메서드 · 경로 · 한글 이름) · 무엇에(target) · 바뀐 내용 줄(detail, 60줄까지).
    * 본문은 통째로 안 남긴다(비밀번호를 싣는 요청이 있다) — target · detail 은 처리하는 쪽이 note() 로 골라 붙인다.
-   * 응답 뒤에 넣고, 실패해도 요청에는 영향이 없다(함수 로그만). 접근 비밀번호 입력(POST /api/gate)은 바꾸는 일이 아니라, 덩크 서바이버 저장은 판마다 와서 뺀다
+   * 응답 뒤에 넣고, 실패해도 요청에는 영향이 없다(함수 로그만). 접근 비밀번호 입력(POST /api/gate)은 바꾸는 일이 아니라, 덩크 서바이버 저장 · 기록은 판마다 와서 뺀다
    */
   function audit(request, status) {
     const { pathname } = new URL(request.url), action = `${request.method} ${pathname}`
-    if (request.method === 'GET' || status >= 300 || action === 'POST /api/gate' || action === 'PUT /api/survive') return
+    if (request.method === 'GET' || status >= 300 || action === 'POST /api/gate' || action === 'PUT /api/survive' || action === 'POST /api/survive/run') return
     const user = actors.get(request), { target = null, detail = [] } = notes.get(request) || {}
     const lines = detail.length > 60 ? [...detail.slice(0, 59), `…외 ${detail.length - 59}줄`] : detail
     waitUntil(db('/audit_log', { method: 'POST', body: {
@@ -1030,8 +1039,32 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
 
   // ------------------------------------------------ 덩크 서바이버(/survive/) — 업적 · 기록을 계정에(로그인). 비로그인은 그 브라우저(localStorage)에만
   // 화면이 들고 있던 것과 합쳐 저장하고 합친 것을 돌려준다. 감사 로그에는 안 남긴다(판이 끝날 때마다 온다).
-  // ponytail: 업적은 화면이 정한다 — 화면 코드를 고치면 업적을 다 열 수 있다(순위가 없어 남에게 해가 없다). 같은 사람이 동시에 두 번 올리면 한쪽이 묻힐 수 있지만 다음 저장이 다시 합친다
-  async function survive(request, t) {
+  // 랭킹(/api/survive/ranking — 공개, 로그인했으면 내 순위도) · 한 판 올리기(/api/survive/run — 로그인). 사람마다 맵마다 최고 기록 한 줄(오래 버틴 순, 같으면 많이 쓰러뜨린 순)
+  // ponytail: 업적 · 기록은 화면이 정한다 — 화면 코드를 고치면 업적을 열거나 기록을 지어낼 수 있다(서버는 말이 되는 범위만 본다). 막으려면 서버가 판을 돌려야 한다.
+  // 같은 사람이 동시에 두 번 올리면 한쪽이 묻힐 수 있지만 다음 저장이 다시 합친다
+  async function survive(request, sub, t) {
+    if (sub === 'ranking') {
+      if (request.method !== 'GET') fail(404, '없는 주소예요')
+      const user = request.headers.has('authorization') ? await identity(request) : null
+      const [top, mine] = await Promise.all([
+        db(`/survive_ranking?select=map,rank,name,hero,secs,kills,lvl&rank=lte.${SURVIVE_LIST}&order=map.asc,rank.asc,at.asc`),
+        user ? db(`/survive_ranking?select=map,rank,hero,secs,kills,lvl&user_id=eq.${enc(user.id)}`) : [],
+      ])
+      const by = rows => Object.fromEntries(SURVIVE_MAPS.map(m => [m, rows.filter(r => r.map === m).map(({ map, ...r }) => r)]))
+      return [200, { ranking: by(top), ...(user && { mine: Object.fromEntries(mine.map(({ map, ...r }) => [map, r])) }) }]
+    }
+    if (sub === 'run') {
+      if (request.method !== 'POST') fail(404, '없는 주소예요')
+      const user = await identity(request)
+      if (await hit(`sv ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
+      const r = surviveRun(await readJson(request)), name = await nameOf(user), key = `user_id=eq.${enc(user.id)}&map=eq.${r.map}`
+      const [old] = await db(`/survive_best?select=secs,kills&${key}`)
+      const best = !old || r.secs > old.secs || (r.secs === old.secs && r.kills > old.kills)
+      if (best) await db('/survive_best', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { user_id: user.id, ...r, name, at: t } })
+      else await db(`/survive_best?${key}`, { method: 'PATCH', body: { name } })   // 이름은 늘 지금 이름
+      const [me] = await db(`/survive_ranking?select=rank,hero,secs,kills,lvl&${key}`)
+      return [200, { best, mine: me }]
+    }
     if (!['GET', 'PUT'].includes(request.method)) fail(404, '없는 주소예요')
     const user = await identity(request)
     const [row] = await db(`/survive_saves?select=ach,stats&user_id=eq.${enc(user.id)}`)
@@ -1189,6 +1222,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (led) await disband(led.team_id)
     await db(`/site_admins?user_id=eq.${enc(id)}`, { method: 'DELETE' })
     await db(`/survive_saves?user_id=eq.${enc(id)}`, { method: 'DELETE' })
+    await db(`/survive_best?user_id=eq.${enc(id)}`, { method: 'DELETE' })
     await db(`/recruit_profiles?discord_user_id=eq.${enc(id)}`, { method: 'DELETE' })
     return !!led
   }
@@ -1246,7 +1280,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const b = pathname.match(BOARD_PATH)
     if (b) return board(request, b, now())
     if (pathname === '/api/slam') return slam(request, now())
-    if (pathname === '/api/survive') return survive(request, now())
+    const sv = pathname.match(/^\/api\/survive(?:\/(ranking|run))?$/)
+    if (sv) return survive(request, sv[1], now())
     const a = pathname.match(/^\/api\/arena(?:\/(signup|plan|mine))?$/)
     if (a) return arena(request, a[1], now())
     const mb = pathname.match(/^\/api\/members(?:\/([^/]+))?$/)
