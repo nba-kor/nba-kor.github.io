@@ -506,19 +506,26 @@ function editor() {
       h('div', { className: 'ar-drop is-new', 'data-drop': `${s.id}:new` }, '+ 새 팀 — 여기에 놓기'))
     return box
   }))
-  return [poolBox, status, grid, memoCard()]
+  return [poolBox, status, grid, picksCard()]
 }
 
-/** 편성 페이지 맨 아래 — 신청할 때 남긴 메모(사유불참은 사유). 신청 순서대로 */
-function memoCard() {
-  const rows = data.signups.filter(s => s.memo)
-  return h('section', { className: 'card ar-card ar-memos' },
-    h('h3', {}, `신청 메모 ${rows.length}개`),
-    rows.length ? h('ul', {}, rows.map(s => h('li', {},
-      h('b', {}, s.owner),
-      h('span', { className: 'ar-memo-slots' }, s.slots.map(id => h('span', {}, TAG[id] || LABEL[id]))),
-      h('p', {}, s.memo))))
-      : h('p', { className: 'rc-muted' }, '메모를 남긴 신청이 없어요'))
+/** 편성 페이지 맨 아래 — 신청 현황. 신청한 사람마다 한 줄: 고른 시간대 · FA · 불참(고른 그대로) · 참가 계정 · 메모(불참은 사유).
+ *  칸은 요일 순(토 1 · 1.5 · 2 · FA → 일 … → 불참), 줄은 불참이 맨 아래 · 그 밖은 본계정 가나다 */
+function picksCard() {
+  const cols = [...SLOTS, ...A.extra].sort((x, y) => (x.day ?? 9) - (y.day ?? 9))
+  const isOut = s => s.slots.includes('absent')
+  const rows = [...data.signups].sort((x, y) => isOut(x) - isOut(y) || x.owner.localeCompare(y.owner, 'ko'))
+  return h('section', { className: 'card ar-card' },
+    h('h3', {}, `신청 현황 ${rows.length}명`, h('small', { className: 'rc-muted' }, ` · 불참 ${rows.filter(isOut).length}명`)),
+    rows.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table ar-picks' },
+      h('thead', {}, h('tr', {}, h('th', {}, '#'), h('th', {}, '본계정'), cols.map(c => h('th', { title: c.label }, TAG[c.id])), h('th', {}, '참가 계정'), h('th', {}, '메모'))),
+      h('tbody', {}, rows.map((s, i) => h('tr', {},
+        h('td', {}, i + 1),
+        h('td', { className: 'ar-nick' }, h('b', {}, s.owner)),
+        cols.map(c => h('td', {}, s.slots.includes(c.id) ? h('span', { className: 'ar-pick', title: c.label }, '✓') : '')),
+        h('td', { className: 'ar-nick' }, s.accounts.map(a => a.nick).join(', ') || '-'),
+        h('td', { className: 'ar-picks-memo' }, s.memo))))))
+      : h('p', { className: 'rc-muted' }, '아직 신청이 없어요'))
 }
 
 function chip(a, from, lead = false) {

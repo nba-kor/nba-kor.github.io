@@ -1307,12 +1307,10 @@ label.ac-pick { cursor: pointer; }
 /* 편성 대기 목록 머리 — 휴대폰에서 줄이 접혀도 「자세히 보기」 와 아래 탭 사이를 띄운다 */
 .ar-pool-head { margin-bottom: 10px; }
 
-/* 아레나 편성 — 맨 아래 신청 메모 */
-.ar-memos ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.ar-memos li { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; padding: 9px 12px; border-radius: 10px; background: var(--panel-2); font-size: 13.5px; }
-.ar-memos li p { flex: 1 1 260px; margin: 0; overflow-wrap: anywhere; }
-.ar-memo-slots { display: inline-flex; flex-wrap: wrap; gap: 3px; }
-.ar-memo-slots span { --sc: var(--muted); padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 800; color: var(--sc); border: 1px solid color-mix(in srgb, var(--sc) 55%, transparent); }
+/* 아레나 편성 — 맨 아래 신청 현황(사람마다 한 줄, 고른 칸에 ✓) */
+.ar-picks td { white-space: nowrap; }
+.ar-pick { font-weight: 900; color: var(--accent); }
+.ar-picks .ar-picks-memo { min-width: 160px; text-align: left; white-space: normal; overflow-wrap: anywhere; color: var(--muted); }
 
 /* 아레나 편성 — 포지션 필터 · 칩 첫 줄(계정 + 주력 포지션) */
 .ar-role-tabs { margin-top: -4px; }
@@ -1345,9 +1343,9 @@ label.ac-pick { cursor: pointer; }
   /* 멤버별 배치 현황 — 시간대 머리는 토1 · 토1.5, 칸을 좁게 */
   .ar-long, .ar-tally .ar-more .ar-long { display: none; }
   .ar-short { display: inline; }
-  .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally) :is(th, td) { padding: 6px 2px; font-size: 11.5px; white-space: nowrap; }
-  .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally) .ar-nick { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
-  .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally) :is(th, td):is(:first-child, :last-child) { display: none; }   /* # · 상태(배정은 뱃지로 보인다) */
+  .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally, .ar-picks) :is(th, td) { padding: 6px 2px; font-size: 11.5px; white-space: nowrap; }
+  .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally, .ar-picks) .ar-nick { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
+  .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally, .ar-picks) :is(th, td):is(:first-child, :last-child) { display: none; }   /* # · 상태(배정은 뱃지로 보인다) */
   .ar-badge { min-width: 34px; padding: 2px 4px; font-size: 11px; }
   .ar-nick small { display: block; margin: 0 !important; }
   /* 편성 대기 목록 — 휴대폰은 눌러서 팀을 고르니 머리에 붙여 둘 필요가 없다(붙이면 화면 절반을 가린다) */
