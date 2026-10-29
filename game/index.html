@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>게임 · TNAB Vipers</title>
+<link rel="icon" href="/assets/icon.png?v=2" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icon.png?v=2">
+<meta name="theme-color" content="#0d1117">
+<meta name="description" content="TNAB Vipers 미니 게임 — 5:5 오락실 농구 「슈퍼 슬램」과 하프코트 3D 길거리 농구 「스트리트 3:3」. 키보드 · 휴대폰 터치로 바로 플레이.">
+<link rel="canonical" href="https://nba-kor.github.io/game/">
+<!-- 카카오톡 · 디스코드 · 트위터 미리보기. 이미지를 바꾸면 ?v= 도 올린다(카카오는 URL 로 캐시한다) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TNAB Vipers">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:url" content="https://nba-kor.github.io/game/">
+<meta property="og:title" content="게임 · TNAB Vipers">
+<meta property="og:description" content="TNAB Vipers 미니 게임 — 5:5 오락실 농구 「슈퍼 슬램」과 하프코트 3D 길거리 농구 「스트리트 3:3」. 키보드 · 휴대폰 터치로 바로 플레이.">
+<meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
+<meta name="twitter:card" content="summary_large_image">
+<script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
+<link rel="stylesheet" href="/assets/style.css?v=d76e64d8">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><img src="/assets/icon.png?v=2" alt="">TNAB <span>Vipers</span></div>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/arena/">아레나 운영</a>
+    <a href="/tactics/" data-group="/tactics/ /tiers/ /combos/ /potentials/">전략·공략</a>
+    <a href="/videos/">영상 자료실</a>
+    <a href="/game/" data-group="/game/ /slam/ /street/">게임</a>
+    <a href="/me/">마이페이지</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="rc-auth" id="auth" aria-live="polite"></div>
+</header>
+
+<!-- 머리 메뉴 「게임」이 먼저 오는 곳 — 게임을 고르면 그 페이지로 간다 -->
+<main class="home">
+  <h1>게임</h1>
+  <nav class="cats" aria-label="게임">
+    <a class="cat" href="/slam/">
+      <svg class="cat-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3 2.6 3 10.2 0 12.8M18.4 5.6c-3 2.6-3 10.2 0 12.8"/></svg><b>슈퍼 슬램</b><small>5:5 오락실 농구 · 1P vs CPU · 온라인 1:1 · 궁극기</small>
+    </a>
+    <a class="cat" href="/street/">
+      <svg class="cat-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2.5" width="16" height="9" rx="1.5"/><path d="M8.5 11.5h7l-1.2 9h-4.6zM9 14.5h6M9.6 17.5h4.8"/></svg><b>스트리트 3:3</b><small>하프코트 3D 길거리 농구 · 1P vs CPU · 11점 먼저</small>
+    </a>
+  </nav>
+</main>
+
+<script type="module">
+import { mountTop } from '/assets/app.js?v=fb02b445'
+import { startAuth } from '/assets/board.js?v=4233415a'
+mountTop('/game/')
+startAuth('', () => {})   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
+</script>
+</body>
+</html>
