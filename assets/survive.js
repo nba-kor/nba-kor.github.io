@@ -928,7 +928,7 @@ function step(dt) {
     let sp = press?.R && inside(b, pl.x, pl.y, press.R) ? 0.3 : 1
     for (const o of guard) {
       if (o.k === 'zone') { if (inside(b, o.x, o.y, o.R)) sp = 0.3 }
-      else if ((b.x - o.x) ** 2 + (b.y - o.y) ** 2 < (o.r + 9) ** 2) {
+      else if ((b.x - o.x) ** 2 + (b.y - o.y) ** 2 < (o.r + 24) ** 2) {   // 손이 크게 휘둘러 잡는다 — 몸 판정보다 넉넉히
         b.dead = true; fx({ k: 'flash', x: b.x, y: b.y - 18, R: 30, col: '#ffe2c0', T: 0.25 })
         for (let i = 0; i < 5; i++) { const a = rnd() * TAU; part(b.x, b.y - 18, Math.cos(a) * 120, Math.sin(a) * 80 - 60, i % 2 ? '#ffd23f' : '#fff', 0.3, 2) }
         break
