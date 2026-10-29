@@ -7,7 +7,7 @@
 import { mountTop, faceOf } from './app.js?v=fb02b445'
 import { api } from './auth.js?v=1fbb8e2f'
 import { loadData, P, startAuth, auth, me, h } from './board.js?v=4233415a'
-import { cutHead, skinOf, NBA_NUM } from './vipers.js?v=90fdd92d'
+import { cutHead, skinOf, NBA_NUM } from './vipers.js?v=c92ed58c'
 
 mountTop('/survive/')
 
@@ -535,7 +535,7 @@ cv.addEventListener('pointermove', e => {
 const lift = e => { if (e.pointerId === joy.id) { joy.on = false; joy.id = null; joy.x = joy.y = 0 } }
 cv.addEventListener('pointerup', lift); cv.addEventListener('pointercancel', lift)
 pauseBtn.addEventListener('click', () => { pauseBtn.blur(); pause() })
-// 전체 화면 — 슈퍼 슬램과 같다. 이 게임은 세워도 눕혀도 되니 방향은 묶지 않는다
+// 전체 화면 — 덩크 아케이드과 같다. 이 게임은 세워도 눕혀도 되니 방향은 묶지 않는다
 function fit() {
   const s = stage.style, on = vv && stage.classList.contains('full'), k = on ? vv.scale : 1
   s.left = on ? `${vv.offsetLeft}px` : ''; s.top = on ? `${vv.offsetTop}px` : ''

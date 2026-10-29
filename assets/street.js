@@ -1,4 +1,4 @@
-// 스트리트 3:3 — 하프코트 3D 길거리 농구(1P vs CPU). 머리 메뉴 「게임」의 둘째(첫째는 슈퍼 슬램).
+// 스트리트 3:3 — 하프코트 3D 길거리 농구(1P vs CPU). 머리 메뉴 「게임」의 둘째(첫째는 덩크 아케이드).
 // 덩크 시티 · 슬램덩크 모바일처럼 — 하프라인 뒤 높은 카메라가 골대를 보고, 선수는 만화풍 3D(셀 셰이딩 + 윤곽선, 얼굴은 덩크 시티 얼굴 그림).
 // 코트 배치는 전술판(court.js)과 같은 하프코트 — 단위도 같다(0.1피트, 골대가 위 y=0 쪽). 3D 는 three.js(CDN), 점수판 · 글자는 위에 겹친 2D 캔버스.
 // 움직임은 덩크 시티 3:3 에서 빌렸다 — 고른 선수 한 명만 끝까지 움직이고 동료 둘은 CPU. 슛은 누르고 있다 초록 칸에서 놓고,
@@ -9,7 +9,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js'
 import { mountTop, faceOf } from './app.js?v=fb02b445'
 import { loadData, data, startAuth } from './board.js?v=4233415a'
-import { TEAMS, NUMS, NBA_NUM, lineup, cutHead, skinOf, SKIN } from './vipers.js?v=90fdd92d'
+import { TEAMS, NUMS, NBA_NUM, lineup, cutHead, skinOf, SKIN } from './vipers.js?v=c92ed58c'
 
 mountTop('/street/')
 startAuth('', () => {})   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
@@ -119,7 +119,7 @@ for (const k of ['sh', 'pa', 'sk', 'sc']) {
   b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); press(k) })
   if (k === 'sh') { b.addEventListener('pointerup', lift); b.addEventListener('pointercancel', lift) }
 }
-// 전체 화면 — 슈퍼 슬램과 같다(되는 브라우저는 진짜 전체 화면 · 휴대폰은 가로로, 안 되는 아이폰은 화면을 꽉 채운 칸 .full 을 보이는 칸에 맞춘다)
+// 전체 화면 — 덩크 아케이드과 같다(되는 브라우저는 진짜 전체 화면 · 휴대폰은 가로로, 안 되는 아이폰은 화면을 꽉 채운 칸 .full 을 보이는 칸에 맞춘다)
 const stage = glC.closest('.slam-stage'), fsBtn = document.getElementById('btn-fs'), vv = window.visualViewport
 function fit() {
   const s = stage.style, on = vv && stage.classList.contains('full'), k = on ? vv.scale : 1

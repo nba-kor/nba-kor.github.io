@@ -1375,7 +1375,7 @@ label.ac-pick { cursor: pointer; }
 html:has(dialog:modal) { overflow: hidden; scrollbar-gutter: stable; }
 dialog, .ac-body { overscroll-behavior: contain; }
 
-/* ---------- 슈퍼 슬램 (assets/slam.js) — 숨긴 메뉴의 오락실 농구 ---------- */
+/* ---------- 덩크 아케이드 (assets/slam.js) — 숨긴 메뉴의 오락실 농구 ---------- */
 .slam { max-width: 1100px; margin: 0 auto; padding: 12px 16px 32px; }
 .slam h1 { margin: 4px 0 10px; font-size: 20px; }
 .slam h1 small { font-size: 13px; font-weight: 500; color: var(--muted); }

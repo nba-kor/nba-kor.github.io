@@ -1879,7 +1879,7 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   await rest(`/site_admins?user_id=eq.${boss.id}`, { method: 'DELETE' })
 })
 
-dbTest('슈퍼 슬램: 두 사람이 서로를 가리키는 같은 결과를 올려야 기록 · 다르면 409 · 검증 · 보기는 공개(최근 대전 · 랭킹)', async () => {
+dbTest('덩크 아케이드: 두 사람이 서로를 가리키는 같은 결과를 올려야 기록 · 다르면 409 · 검증 · 보기는 공개(최근 대전 · 랭킹)', async () => {
   let clock = futureBase()
   const { api } = start({ now: () => clock })
   const [a, b, c] = await Promise.all(['A', 'B', 'C'].map(k => person(api, { name: `슬램${k}${RUN}` })))

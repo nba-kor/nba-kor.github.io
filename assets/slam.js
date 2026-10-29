@@ -1,4 +1,4 @@
-// 슈퍼 슬램 — 5:5 풀코트 오락실 농구(1P vs CPU). 머리 메뉴의 「게임」.
+// 덩크 아케이드 — 5:5 풀코트 오락실 농구(1P vs CPU). 머리 메뉴의 「게임」.
 // 90년대 오락실 농구(Super Slams) 느낌만 빌린 새 게임이다. 원작 롬 · 그림 · 팀 이름은 쓰지 않는다 — 롬은 저작물이라 이 공개 사이트에 둘 수 없다.
 // 선수 얼굴은 덩크 시티 선수(data/players.json). 1P 는 오른쪽 골대를 공격한다. 온라인 1:1 · 대전 기록은 아래 「온라인 1:1」. 궁극기는 20명이 다 다르다(SKILLS) — 게이지가 차면 쓴다.
 // 키: 방향키 · WASD 이동, 드리블 Z · J, 패스 X · K, 슛 C · L · 스페이스, 궁극기 V · U. 수비 때는 스틸 · 선수 바꾸기 · 블록 · 수비 궁극기. 휴대폰은 캔버스 아래 스틱 · 버튼.
@@ -6,7 +6,7 @@
 import { mountTop, POS, copyLink } from './app.js?v=fb02b445'
 import { loadData, data, startAuth, me as who, loggedIn, h, ago } from './board.js?v=4233415a'
 import { sb, api } from './auth.js?v=1fbb8e2f'
-import { TEAMS, NUMS, NBA_NUM, lineup, cutHead, skinOf, SKIN } from './vipers.js?v=90fdd92d'
+import { TEAMS, NUMS, NBA_NUM, lineup, cutHead, skinOf, SKIN } from './vipers.js?v=c92ed58c'
 
 mountTop('/slam/')
 startAuth('', () => {})   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
@@ -1055,7 +1055,7 @@ function backdrop() {
     g.fillStyle = led; g.fillRect(0, 110, W + LED_P, 26)
     g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(0, 110, W + LED_P, 1)
     g.font = '800 15px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'
-    for (let i = -2; i < 5; i++) { g.fillStyle = i % 2 ? '#f5a623' : '#e9edf5'; g.shadowColor = g.fillStyle; g.shadowBlur = 8; g.fillText(i % 2 ? 'SUPER SLAM' : 'TNAB VIPERS', W / 2 + i * 273, 123) }
+    for (let i = -2; i < 5; i++) { g.fillStyle = i % 2 ? '#f5a623' : '#e9edf5'; g.shadowColor = g.fillStyle; g.shadowBlur = 8; g.fillText(i % 2 ? 'DUNK ARCADE' : 'TNAB VIPERS', W / 2 + i * 273, 123) }
   })
   g.drawImage(ledC, -(((camX * 1.05 + tnow * 30) % LED_P + LED_P) % LED_P), 110, W + LED_P, 26)
 }
