@@ -42,6 +42,9 @@ let tab = 'all', poolTab = 'all', roleTab = 'all'   // roleTab = 편성 대기 �
 // 편성의 「자세히 보기」 — 칩마다 캐릭터(레벨)가 펼쳐진다. 처음엔 켜져 있고, 끄면 이 브라우저에 기억한다
 const DETAIL_KEY = 'dc.arena.detail'
 let detail = (() => { try { return localStorage.getItem(DETAIL_KEY) !== '0' } catch { return true } })()
+// 편성 대기 목록의 계정 칸 높이(px) — 아래 막대를 끌어 바꾸고 이 브라우저에 기억한다. 0 = 기본(CSS)
+const POOL_H_KEY = 'dc.arena.poolH'
+let poolH = (() => { try { return +localStorage.getItem(POOL_H_KEY) || 0 } catch { return 0 } })()
 let draft = null     // 신청 폼 상태 — 다시 그려도 남는다. 신청 · 취소하면 서버 값으로 다시 채운다
 
 async function load() {
@@ -483,9 +486,20 @@ function editor() {
   }))
   const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '미배정' }, ...SLOTS, ...FAS].map(s =>
     h('button', { type: 'button', 'aria-selected': poolTab === s.id, onclick: () => { poolTab = s.id; renderPlan() } }, s.short)))
-  // 계정 칸은 따로 세로 스크롤 · 아래 모서리를 끌어 높이 조절 — 다시 그려도(배치할 때마다) 고른 높이를 이어 받는다
+  // 계정 칸만 따로 세로 스크롤(필터는 그대로) · 아래 막대를 위아래로 끌어 높이 조절
   const chips = h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요'))
-  chips.style.height = $('.ar-pool .ar-chips')?.style.height || ''
+  if (poolH) chips.style.height = `${poolH}px`
+  const grip = h('div', { className: 'ar-grip', title: '위아래로 끌어 높이 조절', 'aria-hidden': 'true' })
+  grip.onpointerdown = e => {
+    e.preventDefault()
+    const y0 = e.clientY, h0 = chips.offsetHeight
+    grip.setPointerCapture(e.pointerId)
+    grip.onpointermove = m => { poolH = Math.max(80, Math.round(h0 + m.clientY - y0)); chips.style.height = `${poolH}px` }
+    grip.onpointerup = grip.onpointercancel = () => {
+      grip.onpointermove = null
+      try { localStorage.setItem(POOL_H_KEY, poolH) } catch {}
+    }
+  }
   const poolBox = h('section', { className: 'card ar-pool', 'data-drop': 'pool' },
     h('div', { className: 'ar-pool-head' }, h('h3', {}, '배치할 계정'), h('small', { className: 'rc-muted' }, '끌어서 배치하거나, 눌러서 팀을 고르세요'),
       h('button', { type: 'button', className: 'ar-detail-btn', 'aria-pressed': detail, onclick: () => {
@@ -497,7 +511,7 @@ function editor() {
     roleTabs,
     h('p', { className: 'rc-muted' }, poolTab === 'all' ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름)'
       : poolTab in FA_DAY ? `${LABEL[poolTab].split(' (')[0]} 신청 중 그날 안 겹치는 시간대가 아직 남은 사람 · 그날 1차 · 2차(또는 1.5차)를 다 뛰면 빠져요` : `${LABEL[poolTab]} 신청(+ 그날 FA) 중 겹치는 시간대에 아직 없는 사람`),
-    chips)
+    chips, grip)
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
     const box = h('div', { className: 'ar-slot ar-edit' },

@@ -1162,8 +1162,12 @@ label.ac-pick { cursor: pointer; }
 .ar-pool-head h3 { margin: 0 !important; }
 .ar-pool > .rc-muted { margin: -4px 0 10px; font-size: 12px; }
 .ar-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 40px; }
-/* 편성 대기 목록의 계정 칸 — 따로 세로 스크롤, 오른쪽 아래 모서리를 끌어 높이 조절 */
-.ar-pool .ar-chips { height: 42vh; align-content: flex-start; overflow-y: auto; resize: vertical; padding-right: 4px; }
+/* 편성 대기 목록의 계정 칸 — 따로 세로 스크롤(끝에 닿아도 페이지가 같이 밀리지 않게), 아래 막대(.ar-grip)를 끌어 높이 조절 */
+.ar-pool .ar-chips { height: 42vh; align-content: flex-start; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.ar-grip { display: flex; align-items: center; justify-content: center; height: 16px; margin-top: 6px; border-radius: 6px; cursor: ns-resize; touch-action: none; }
+.ar-grip::before { content: ''; width: 44px; height: 4px; border-radius: 2px; background: var(--muted); opacity: .6; }
+.ar-grip:hover { background: var(--panel-2); }
+.ar-grip:hover::before { opacity: 1; }
 .ar-chip {
   --pc: var(--muted); position: relative; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 10px 4px 4px;
   border: 1px solid var(--line); border-radius: 999px;
@@ -1368,7 +1372,8 @@ label.ac-pick { cursor: pointer; }
   .ar-badge { min-width: 34px; padding: 2px 4px; font-size: 11px; }
   .ar-nick small { display: block; margin: 0 !important; }
   /* 편성 대기 목록 — 휴대폰은 눌러서 팀을 고르니(높이 조절도 안 된다) 계정을 다 펼친다 */
-  .ar-pool .ar-chips { height: auto; overflow: visible; resize: none; }
+  .ar-pool .ar-chips { height: auto !important; overflow: visible; }   /* 막대로 바꾼 높이(인라인)도 무시 */
+  .ar-grip { display: none; }
   /* 출석 현황 — 「3주 연속」 이 두 줄로 접히지 않게, # 는 뺀다 */
   .mp-attend :is(th, td) { padding: 6px 4px; white-space: nowrap; }
   .mp-attend :is(th, td):first-child { display: none; }

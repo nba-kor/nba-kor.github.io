@@ -41,15 +41,15 @@ const WEAP = {
   three: { name: '3점슛', note: '멀리 있는 수비에게 높이 쏴 떨어진 자리를 스플래시', cd: 2.2, dmg: 22, ups: [{ n: 1 }, { area: 0.2 }, { dmg: 10 }, { n: 1 }, { cd: -0.4 }, { dmg: 12 }, { n: 1, area: 0.2 }] },
   dunk: { name: '덩크', note: '뛰어올라 내리꽂으면 둘레에 충격파 — 밀쳐 낸다', cd: 3.2, dmg: 26, ups: [{ area: 0.15 }, { dmg: 10 }, { cd: -0.5 }, { area: 0.15 }, { dmg: 12 }, { n: 1 }, { dmg: 18, area: 0.15 }] },
   bounce: { name: '바운스 패스', note: '맞으면 옆 수비에게 튕겨 간다', cd: 1.6, dmg: 9, pierce: 1, bounce: 3, ups: [{ bounce: 1 }, { dmg: 4 }, { n: 1 }, { bounce: 2 }, { dmg: 5 }, { cd: -0.3 }, { bounce: 2, dmg: 6 }] },
-  block: { name: '블록슛', note: '두 손이 몸 둘레를 돌며 쳐 낸다', cd: 2.2, dmg: 12, n: 2, dur: 3.2, ups: [{ n: 1 }, { area: 0.25, spd: 0.25 }, { dmg: 5 }, { n: 1 }, { dur: 1 }, { n: 1 }, { dmg: 8, dur: 1 }] },
-  press: { name: '풀코트 프레스', note: '둘레의 수비를 계속 압박 — 피해를 주고 느리게', cd: 0.45, dmg: 4, ups: [{ area: 0.15 }, { dmg: 2 }, { area: 0.15 }, { cd: -0.09 }, { dmg: 2 }, { area: 0.15 }, { dmg: 4 }] },
+  block: { name: '블록슛', note: '두 손이 몸 둘레를 돌며 쳐 낸다 — 날아오는 호루라기도 막는다', cd: 2.2, dmg: 12, n: 2, dur: 3.2, ups: [{ n: 1 }, { area: 0.25, spd: 0.25 }, { dmg: 5 }, { n: 1 }, { dur: 1 }, { n: 1 }, { dmg: 8, dur: 1 }] },
+  press: { name: '풀코트 프레스', note: '둘레의 수비를 계속 압박 — 피해를 주고 느리게, 안에 들어온 호루라기도 느리게', cd: 0.45, dmg: 4, ups: [{ area: 0.15 }, { dmg: 2 }, { area: 0.15 }, { cd: -0.09 }, { dmg: 2 }, { area: 0.15 }, { dmg: 4 }] },
   alley: { name: '앨리웁', note: '하늘에서 공이 떨어져 그 자리를 내리찍는다', cd: 2.6, dmg: 18, n: 2, ups: [{ n: 1 }, { dmg: 6 }, { area: 0.2 }, { n: 1 }, { cd: -0.5 }, { n: 1 }, { dmg: 12 }] },
   fade: { name: '스텝백 슛', note: '보는 쪽으로 꿰뚫는 슛', cd: 0.95, dmg: 8, pierce: 2, ups: [{ n: 1 }, { dmg: 4 }, { n: 1 }, { pierce: 2 }, { n: 1 }, { dmg: 5 }, { cd: -0.3 }] },
   cross: { name: '크로스오버', note: '옆으로 길게 휘둘러 베는 드리블', cd: 1.4, dmg: 13, ups: [{ n: 1 }, { dmg: 5 }, { area: 0.15 }, { dmg: 5 }, { cd: -0.3 }, { area: 0.2 }, { dmg: 9 }] },
   nolook: { name: '노룩 패스', note: '던지면 되돌아오는 패스 — 오가며 계속 맞힌다', cd: 1.8, dmg: 10, ups: [{ dmg: 4 }, { n: 1 }, { area: 0.25 }, { dmg: 5 }, { n: 1 }, { spd: 0.3 }, { n: 1 }] },
   hook: { name: '스카이훅', note: '높이 떴다 떨어지는 큰 공 — 여럿을 꿰뚫는다', cd: 1.7, dmg: 18, pierce: 3, ups: [{ n: 1 }, { dmg: 6 }, { area: 0.2 }, { pierce: 2 }, { n: 1 }, { dmg: 8 }, { n: 1 }] },
   buzzer: { name: '버저비터', note: '화면 안 수비에게 번개처럼 꽂힌다', cd: 2.8, dmg: 20, n: 2, ups: [{ n: 1 }, { dmg: 8 }, { area: 0.25 }, { n: 1 }, { cd: -0.5 }, { n: 1 }, { dmg: 14 }] },
-  screen: { name: '스크린', note: '근처에 동료가 스크린을 서서 걸린 수비를 묶고 때린다', cd: 4, dmg: 6, dur: 2.5, ups: [{ n: 1 }, { dmg: 3 }, { dur: 1 }, { area: 0.2 }, { n: 1 }, { dmg: 4 }, { dur: 1, area: 0.2 }] },
+  screen: { name: '스크린', note: '근처에 동료가 스크린을 서서 걸린 수비를 묶고 때린다 — 안에 들어온 호루라기도 느리게', cd: 4, dmg: 6, dur: 2.5, ups: [{ n: 1 }, { dmg: 3 }, { dur: 1 }, { area: 0.2 }, { n: 1 }, { dmg: 4 }, { dur: 1, area: 0.2 }] },
 }
 const GAP = { pass: 0.09, three: 0.18, dunk: 0.36, bounce: 0.12, alley: 0.14, fade: 0.07, cross: 0.14, nolook: 0.16, hook: 0.12, buzzer: 0.1, screen: 0.1 }   // 한 번에 여러 개면 사이 간격
 const UP = { n: v => `개수 +${v}`, dmg: v => `피해 +${v}`, cd: v => `쿨타임 ${v}초`, area: v => `범위 +${Math.round(v * 100)}%`, spd: v => `속도 +${Math.round(v * 100)}%`, dur: v => `지속 +${v}초`, pierce: v => `관통 +${v}`, bounce: v => `튕김 +${v}` }
@@ -76,7 +76,7 @@ const FILL = { drink: { name: '스포츠 드링크', note: '체력 40% 회복' }
 const FOES = {
   rookie: { r: 12, hp: 9, spd: 62, dmg: 7, xp: 1 },
   fan: { r: 10, hp: 5, spd: 95, dmg: 5, xp: 1 },
-  ref: { r: 12, hp: 18, spd: 57, dmg: 7, xp: 2 },   // 심판 — 멀리서 호루라기를 던진다
+  ref: { r: 12, hp: 18, spd: 57, dmg: 7, xp: 2 },   // 심판 — 멀리서 호루라기를 던진다. 20분부터 나온다
   big: { r: 18, hp: 52, spd: 47, dmg: 12, xp: 3 },
   mascot: { r: 26, hp: 420, spd: 55, dmg: 16, xp: 25 },   // 정예 — 아이템을 떨어뜨린다
   boss: { r: 32, hp: 1300, spd: 66, dmg: 22, xp: 120 },   // 올스타 수비수 — 5분마다, 멈칫(갈 길이 붉게) 하고 돌진. 트로피 상자를 떨어뜨린다
@@ -786,7 +786,7 @@ function spawner(dt) {
     G.spawnT = Math.max(0.09, 0.55 - m * 0.02)
     const n = Math.min(want - G.foes.length, 1 + (m / 1.8 | 0))
     for (let i = 0; i < n; i++) {
-      const w = [['rookie', 1], ['fan', m >= 1 ? 0.5 + m * 0.03 : 0], ['ref', m >= 3 ? 0.3 : 0], ['big', m >= 3 ? 0.25 + m * 0.025 : 0]]
+      const w = [['rookie', 1], ['fan', m >= 1 ? 0.5 + m * 0.03 : 0], ['ref', m >= 20 ? 0.1 + (m - 20) * 0.035 : 0], ['big', m >= 3 ? 0.25 + m * 0.025 : 0]]
       let q = rnd() * w.reduce((s, x) => s + x[1], 0), type = 'rookie'
       for (const [k, v] of w) if ((q -= v) < 0) { type = k; break }
       spawn(type)
@@ -921,10 +921,22 @@ function step(dt) {
   if (!dead) { spawner(dt); weapons(dt) }
   foes(dt)
   shots(dt)
-  // 심판 호루라기
+  // 심판 호루라기 — 블록슛 손에 막히고, 프레스 · 스크린 바닥 안에서는 느리게(사라지는 시간도 같이 늦춰 결국 날아온다)
+  const press = G.weapons.find(w => w.id === 'press'), guard = G.eshots.length ? G.shots.filter(b => b.k === 'orb' || b.k === 'zone') : []
+  const inside = (b, x, y, R) => ((b.x - x) / R) ** 2 + ((b.y - y) / (R * 0.8)) ** 2 < 1   // 바닥은 납작한 타원
   for (const b of G.eshots) {
-    b.t += dt; b.a += dt * 10
-    if (G.freeze <= 0) { b.x += b.vx * dt; b.y += b.vy * dt }
+    let sp = press?.R && inside(b, pl.x, pl.y, press.R) ? 0.3 : 1
+    for (const o of guard) {
+      if (o.k === 'zone') { if (inside(b, o.x, o.y, o.R)) sp = 0.3 }
+      else if ((b.x - o.x) ** 2 + (b.y - o.y) ** 2 < (o.r + 9) ** 2) {
+        b.dead = true; fx({ k: 'flash', x: b.x, y: b.y - 18, R: 30, col: '#ffe2c0', T: 0.25 })
+        for (let i = 0; i < 5; i++) { const a = rnd() * TAU; part(b.x, b.y - 18, Math.cos(a) * 120, Math.sin(a) * 80 - 60, i % 2 ? '#ffd23f' : '#fff', 0.3, 2) }
+        break
+      }
+    }
+    if (b.dead) continue
+    b.t += dt * sp; b.a += dt * 10 * sp
+    if (G.freeze <= 0) { b.x += b.vx * dt * sp; b.y += b.vy * dt * sp }
     if ((b.x - pl.x) ** 2 + (b.y - pl.y) ** 2 < (pl.r + 5) ** 2) { ouch(b.dmg); b.dead = true }
     if (b.t > b.life) b.dead = true
   }
