@@ -1343,6 +1343,8 @@ dbTest('Data API 권한: anon · authenticated 키나 키 없이는 팀원모집
       ['/slam_reports?select=match&limit=1', {}],
       ['/slam_matches?select=match&limit=1', {}],
       ['/slam_ranking?select=name&limit=1', {}],
+      ['/survive_saves?select=user_id&limit=1', {}],
+      ['/survive_saves', post({ user_id: someone, ach: {}, stats: {}, updated_at: 0 })],
       ['/slam_matches', post({ match: 'AAAAAAAA', at: 0, home_id: someone, home_name: 'x', home_team: 0, home_score: 1, away_id: '1', away_name: 'y', away_team: 1, away_score: 0 })],
       ['/arena_plans', post({ week: '2100-01-02', plan: {}, updated_at: 0, updated_by: someone })],
       ['/site_gate', post({ id: 1, code: '1234', token: 'x', changed_at: 0, changed_by: someone })],
@@ -1913,6 +1915,27 @@ dbTest('슈퍼 슬램: 두 사람이 서로를 가리키는 같은 결과를 올
   assert.deepEqual(await rows(`/slam_reports?select=user_id&match=eq.${match}`), [])
 })
 
+dbTest('덩크 서바이버: 업적 · 기록은 로그인한 사람마다 — 합쳐서 저장(업적은 먼저 단 시각, 기록은 큰 쪽) · 검증 · 감사 로그 없음', async () => {
+  const { api } = start()
+  const [a, b] = await Promise.all(['A', 'B'].map(k => person(api, { name: `서바${k}${RUN}` })))
+  const save = (who, body) => api('PUT', '/api/survive', body, { as: who.as })
+  assert.equal((await api('GET', '/api/survive')).status, 401)
+  assert.equal((await save({ as: {} }, { ach: {}, stats: {} })).status, 401)
+  assert.deepEqual((await api('GET', '/api/survive', undefined, { as: a.as })).body, { ach: {}, stats: {} }, '처음엔 빈 저장')
+  for (const body of [null, { ach: {} }, { ach: [], stats: {} }, { ach: { 'Bad-Key': 1 }, stats: {} }, { ach: {}, stats: { kills: -1 } }, { ach: {}, stats: { kills: 1.5 } },
+    { ach: {}, stats: { kills: '9' } }, { ach: Object.fromEntries(Array.from({ length: 121 }, (_, i) => [`a${i}`, 1])), stats: {} }]) {
+    assert.equal((await save(a, body)).status, 400, JSON.stringify(body)?.slice(0, 80))
+  }
+  const one = await save(a, { ach: { run1: 500, surv5: 900 }, stats: { kills: 300, best_0: 320 } })
+  assert.equal(one.status, 200, one.text)
+  // 옛 기기(업적 하나 · 작은 기록)가 올려도 줄지 않는다 — 업적은 먼저 단 시각, 기록은 큰 쪽
+  const two = await save(a, { ach: { run1: 100, lv20: 2000 }, stats: { kills: 120, runs: 4 } })
+  assert.deepEqual(two.body, { ach: { run1: 100, surv5: 900, lv20: 2000 }, stats: { kills: 300, best_0: 320, runs: 4 } })
+  assert.deepEqual((await api('GET', '/api/survive', undefined, { as: a.as })).body, two.body)
+  assert.deepEqual((await api('GET', '/api/survive', undefined, { as: b.as })).body, { ach: {}, stats: {} }, '남의 저장은 안 보인다')
+  assert.deepEqual(await rows(`/audit_log?select=action&user_id=eq.${a.id}&action=eq.PUT%20%2Fapi%2Fsurvive`), [], '판마다 오는 저장은 감사 로그에 안 남긴다')
+})
+
 dbTest('감사 로그: 바꾼 요청(성공)만 누가 · 무엇을 · 무엇에 · 바뀐 내용 — 읽기 · 실패는 안 남긴다 · 함수 키로도 못 고친다 · 보기는 슈퍼관리자만(최근 것부터 · 사람별 · 더 보기)', async () => {
   const { api, idle } = start({ potentials: CAT })
   const id = uid(), as = web(id, '감사'), boss = uid(), bossAs = web(boss, '보스')
@@ -2041,6 +2064,7 @@ dbTest('본인 탈퇴: 프로필 · 신청 · 이끌던 팀 · 관리자 권한 
   a.as = web(a.id, 'kakao')   // 새 토큰 — 같은 토큰은 60초 기억해서 카카오를 붙이기 전 신원이 남아 있다
   assert.equal((await rest('/site_admins', post({ user_id: a.id, note: 'test' }))).status, 201)
   assert.equal((await api('PUT', '/api/arena/signup', { slots: ['sat1'], nicks: [`탈${RUN}`] }, { as: a.as })).status, 200)
+  assert.equal((await api('PUT', '/api/survive', { ach: { run1: 1 }, stats: {} }, { as: a.as })).status, 200)
   const team = await create(api, a)
   assert.equal(team.status, 201)
 
@@ -2048,6 +2072,7 @@ dbTest('본인 탈퇴: 프로필 · 신청 · 이끌던 팀 · 관리자 권한 
   assert.deepEqual(await rows(`/recruit_profiles?select=discord_user_id&discord_user_id=eq.${a.id}`), [])
   assert.deepEqual(await rows(`/arena_signups?select=user_id&user_id=eq.${a.id}`), [])
   assert.deepEqual(await rows(`/site_admins?select=user_id&user_id=eq.${a.id}`), [])
+  assert.deepEqual(await rows(`/survive_saves?select=user_id&user_id=eq.${a.id}`), [], '덩크 서바이버 업적도 지운다')
   assert.equal((await api('GET', `/api/teams/${team.body.team.id}`)).status, 404, '이끌던 팀은 해제')
   const [kak, del] = net.out
   assert.deepEqual([kak.url, kak.headers, kak.body], ['https://kapi.kakao.com/v1/user/unlink', { authorization: 'KakaoAK kakao-admin' }, 'target_id_type=user_id&target_id=4321'])

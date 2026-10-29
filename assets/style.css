@@ -1411,6 +1411,161 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .street .slam-fs { right: 1.2%; z-index: 1; }
 .street ul.slam-help { padding-left: 20px; }
 .street ul.slam-help li { margin: 3px 0; }
+/* 덩크 서바이버 (assets/survive.js) — 슬램 칸을 빌려 쓰되 화면은 어떤 비율이든 꽉 채운다(세운 휴대폰도). 메뉴 · 상자는 캔버스 위 HTML(#sv-ui) */
+.sv-screen { position: relative; height: clamp(320px, calc(100dvh - 130px), 64vw); container-type: size; overflow: hidden; border-radius: 10px; background: #0b0e14; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+@media (orientation: portrait) { .sv-screen { height: clamp(420px, calc(100dvh - 150px), 900px); } }
+.slam-stage.full .sv-screen { width: 100%; height: 100%; border-radius: 0; }
+.sv canvas#sv { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; border-radius: 0; }
+.sv-top { position: absolute; top: calc(2cqmin + 6px); right: 8px; z-index: 3; display: flex; gap: 6px; }
+.sv-icon, .sv .sv-top .slam-fs { position: static; width: 34px; height: 34px; padding: 7px; border-radius: 9px; border: 0; background: #0b0e14a8; color: #fff; opacity: .85; touch-action: manipulation; }
+.sv-icon svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; }
+.sv-icon[hidden] { display: none; }
+.sv-ui { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; overflow: auto; overscroll-behavior: contain; padding: 14px; color: #fff; background: radial-gradient(ellipse at 50% 40%, #0b0e1488, #05070be6); font-size: clamp(12px, 2.6cqmin, 15px); }
+.sv-ui[hidden] { display: none; }
+.sv-ui.is-box { background: radial-gradient(ellipse at 50% 45%, #1a2240cc, #05070bf0); overflow: hidden; }
+.sv-note { margin: 0; color: #c9d1e0; font-size: .92em; text-align: center; }
+.sv-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; }
+.sv-btn { padding: .65em 1.3em; border-radius: 999px; border: 2px solid #ffffff38; background: #ffffff14; color: #fff; font-weight: 800; font-size: 1em; }
+.sv-btn:hover { background: #ffffff26; }
+.sv-btn.is-main { border: 0; background: linear-gradient(#ffe066, #f59f00); color: #1a1200; box-shadow: 0 4px 0 #a15c00; padding: .75em 1.6em; }
+.sv-btn.is-main:hover { filter: brightness(1.08); }
+.sv-btn:disabled { opacity: .45; filter: grayscale(1); cursor: not-allowed; }
+/* 첫 화면 */
+.sv-title { display: grid; justify-items: center; gap: 6px; text-align: center; }
+.sv-logo { margin: 0; display: grid; font: italic 900 clamp(34px, 12cqmin, 92px)/.9 system-ui, sans-serif; letter-spacing: -.02em; }
+.sv-logo span:first-child { background: linear-gradient(#fff3b0, #ffb400 55%, #ff6a00); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 .06em 0 #7a2a00); }
+.sv-logo span:last-child { font-size: .5em; letter-spacing: .18em; color: #7ff3ff; text-shadow: 0 0 .4em #22e4ff; }
+.sv-sub { margin: 4px 0 0; font-weight: 700; }
+/* 캐릭터 · 맵 · 업적 · 일시정지 · 결과 판 */
+.sv-panel { width: min(100%, 460px); padding: 16px; border-radius: 16px; background: #10151fe8; border: 1px solid #ffffff22; box-shadow: 0 10px 40px #0008; text-align: center; }
+.sv-panel.sv-wide { width: min(100%, 860px); }
+.sv-h { margin: 0 0 10px; font: italic 900 1.5em/1.1 system-ui, sans-serif; }
+.sv-big { font-size: 2.6em; color: #ff6b6b; }
+.sv-over.is-win .sv-big { color: #ffd23f; }
+.sv-chars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.sv-char { position: relative; display: grid; justify-items: center; gap: 1px; padding: 8px 2px 6px; border-radius: 12px; border: 2px solid transparent; background: #ffffff10; color: #fff; }
+.sv-char img { width: min(64px, 70%); aspect-ratio: 1; border-radius: 50%; background: #ffffff18; }
+.sv-char b { font-size: .9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.sv-char small { color: #c9d1e0; font-size: .78em; }
+.sv-char[aria-pressed="true"], .sv-map[aria-pressed="true"] { border-color: #ffd23f; background: #ffd23f24; }
+.sv-char.is-locked img { filter: grayscale(1) brightness(.35); }
+.sv-char.is-locked::after { content: ''; position: absolute; top: 20%; left: 50%; translate: -50% 0; width: 1.5em; height: 1.7em; background: #ffd23f; -webkit-mask: var(--lock) center / contain no-repeat; mask: var(--lock) center / contain no-repeat; }
+.sv { --lock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 24'%3E%3Cpath d='M4 10V7a6 6 0 0 1 12 0v3h1a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2zm3 0h6V7a3 3 0 0 0-6 0z'/%3E%3C/svg%3E"); }
+.sv-pick { display: flex; gap: 12px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #ffffff0d; text-align: left; }
+.sv-pick > img { width: 52px; height: 52px; flex: none; }
+.sv-pick b { font-size: 1.1em; }
+.sv-pick b small { color: #c9d1e0; font-weight: 600; }
+.sv-pick p { margin: 4px 0 0; font-size: .92em; color: #dfe5ee; }
+.sv-pick em { font-style: normal; font-weight: 800; color: #ffd23f; }
+.sv-lockmsg { color: #ff9b9b !important; }
+.sv-maps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sv-map { display: grid; gap: 3px; padding: 6px 6px 8px; border-radius: 12px; border: 2px solid transparent; background: #ffffff10; color: #fff; text-align: left; }
+.sv-map canvas { width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 8px; }
+.sv-map small { color: #c9d1e0; font-size: .82em; }
+.sv-map .sv-best { color: #7ff3ff; font-weight: 700; }
+/* 세운 화면 — 캐릭터는 다섯 줄 그대로 작게, 맵은 한 줄에 하나(그림 왼쪽) */
+@container (orientation: portrait) { .sv-chars { gap: 4px; } .sv-char { padding: 6px 1px 4px; } .sv-char b { font-size: .78em; } .sv-char small { font-size: .7em; } .sv-maps { grid-template-columns: 1fr; } .sv-map { grid-template-columns: 42% 1fr; align-items: center; column-gap: 8px; } .sv-map canvas { grid-row: span 3; } .sv-panel { padding: 12px 10px; } }
+.sv-achs { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 6px; text-align: left; }
+.sv-achs li { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 10px; background: #ffffff0b; opacity: .72; }
+.sv-achs li.is-done { opacity: 1; background: linear-gradient(90deg, #ffd23f22, #ffffff0b); }
+.sv-achs li > div { flex: 1; min-width: 0; display: grid; }
+.sv-achs small { color: #c9d1e0; font-size: .85em; }
+.sv-achs .sv-reward { color: #7ff3ff; font-weight: 700; }
+.sv-achs img { width: 30px; height: 30px; border-radius: 50%; flex: none; }
+.sv-achs li:not(.is-done) img { filter: grayscale(1) brightness(.6); }
+.sv-medal { font-size: 1.3em; color: #ffd23f; }
+.sv-build { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-top: 10px; }
+.sv-build span { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border-radius: 999px; background: #ffffff10; font-size: .85em; }
+.sv-build img { width: 22px; height: 22px; }
+.sv-stats { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0 0; }
+.sv-stats div { display: grid; }
+.sv-stats dt { color: #c9d1e0; font-size: .82em; }
+.sv-stats dd { margin: 0; font: 900 1.4em/1.2 system-ui, sans-serif; }
+.sv-got { margin-top: 12px; padding: 10px; border-radius: 12px; background: #ffd23f1a; border: 1px solid #ffd23f55; }
+.sv-got ul { list-style: none; margin: 4px 0 0; padding: 0; }
+.sv-got em { font-style: normal; color: #7ff3ff; font-weight: 800; }
+.sv-unlock { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+.sv-unlock img { width: 56px; height: 56px; border-radius: 50%; border: 3px solid #ffd23f; animation: sv-pop .6s cubic-bezier(.2, 1.6, .4, 1) both; }
+/* 업적 알림 */
+.sv-toasts { position: absolute; bottom: 12px; left: 50%; translate: -50% 0; z-index: 4; display: grid; gap: 6px; pointer-events: none; }
+.sv-toast { display: flex; align-items: center; gap: 8px; padding: 5px 14px 5px 5px; border-radius: 999px; background: linear-gradient(90deg, #1b2233f2, #2a2f45f2); border: 1px solid #ffd23f99; box-shadow: 0 6px 20px #0008; color: #fff; font-size: 13px; white-space: nowrap; animation: sv-toast 4.2s ease forwards; }
+.sv-toast img { width: 34px; height: 34px; border-radius: 50%; }
+.sv-toast .sv-medal { width: 34px; text-align: center; }
+.sv-toast div { display: grid; line-height: 1.25; }
+.sv-toast small { color: #ffd23f; font-size: 11px; font-weight: 700; }
+.sv-toast .sv-reward { color: #7ff3ff; }
+@keyframes sv-toast { 0% { opacity: 0; translate: 0 12px; } 8%, 85% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: 0 8px; } }
+/* 레벨 업 상자 — 떨어져 흔들리다 열리면 카드 셋. 잭팟은 금빛 · 빛살 · 꽃가루 */
+.sv-box { position: relative; display: grid; justify-items: center; gap: 1.6cqmin; width: 100%; }
+.sv-box-title { margin: 0; font: italic 900 6cqmin/1 system-ui, sans-serif; color: #7ff3ff; text-shadow: 0 0 .5em #22e4ff, 0 .08em 0 #0008; }
+.sv-box.is-chest .sv-box-title { color: #ffd23f; text-shadow: 0 0 .5em #ffb400; }
+.sv-chest { position: relative; width: 22cqmin; height: 17cqmin; animation: sv-drop .45s cubic-bezier(.3, 1.6, .5, 1) both, sv-shake .45s .45s ease-in-out infinite; }
+.sv-base { position: absolute; inset: 36% 0 0; border-radius: 6% 6% 14% 14%; background: linear-gradient(#b8742a, #7a4512); box-shadow: inset 0 0 0 .8cqmin #4a2508, inset 0 -2cqmin 0 #0003; }
+.sv-base::before { content: ''; position: absolute; inset: 0 42%; background: linear-gradient(#ffe066, #c98a1f); box-shadow: inset 0 0 0 .4cqmin #7a4b12; }
+.sv-lid { position: absolute; inset: 0 -3% 60%; border-radius: 45% 45% 8% 8% / 70% 70% 8% 8%; background: linear-gradient(#d18a3a, #9a5a1c); box-shadow: inset 0 0 0 .8cqmin #4a2508; transform-origin: 10% 100%; }
+.sv-lid::before { content: ''; position: absolute; inset: 0 42%; background: linear-gradient(#ffe066, #c98a1f); }
+.sv-lock { position: absolute; left: 50%; top: 34%; width: 4.4cqmin; height: 4.4cqmin; translate: -50% 0; border-radius: 1cqmin; background: #ffd23f; box-shadow: inset 0 0 0 .5cqmin #7a4b12; }
+.sv-glow { position: absolute; left: 50%; top: 40%; width: 10%; aspect-ratio: 1; border-radius: 50%; translate: -50% -50%; scale: 0; background: radial-gradient(#fff, #fff6c8 30%, #ffd23f88 55%, transparent 70%); }
+.sv-box.is-open .sv-chest { animation: sv-pop .35s ease-out both, sv-fade .3s .35s ease-in forwards; }
+.sv-box.is-open .sv-lid { animation: sv-lid .55s ease-out forwards; }
+.sv-box.is-open .sv-lock { opacity: 0; transition: opacity .2s; }
+.sv-box.is-open .sv-glow { animation: sv-burst .8s ease-out forwards; }
+.sv-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 2cqmin; width: 100%; }
+.sv-card { position: relative; display: grid; justify-items: center; align-content: start; gap: .3em; width: min(29cqw, 210px); min-height: 34cqmin; padding: 1.4em .7em 1em; border-radius: 14px; border: 2px solid #ffffff30; background: linear-gradient(#232b40, #151a28); color: #fff; opacity: 0; scale: .3; translate: 0 -16cqmin; pointer-events: none; transition: transform .12s, border-color .12s; }
+.sv-card img { width: min(56px, 11cqmin); height: auto; aspect-ratio: 1; }
+.sv-card small { padding: 1px 8px; border-radius: 999px; background: #ffffff1c; font-size: .8em; font-weight: 800; color: #ffd23f; }
+.sv-card-w small { color: #ffb366; }
+.sv-card-p small { color: #8fc8ff; }
+.sv-card b { font-size: 1.12em; }
+.sv-card span { color: #c9d1e0; font-size: .86em; line-height: 1.35; }
+.sv-card kbd { position: absolute; top: 6px; left: 6px; min-width: 18px; padding: 0 4px; border: 1px solid #ffffff55; border-radius: 4px; font: 700 11px/16px ui-monospace, monospace; color: #c9d1e0; }
+@media (pointer: coarse) { .sv-card kbd { display: none; } }
+.sv-box.is-open .sv-card { animation: sv-card .5s calc(.12s + var(--i) * .09s) cubic-bezier(.2, 1.4, .4, 1) forwards; }
+.sv-box.is-ready:not(.is-jackpot) .sv-card { pointer-events: auto; cursor: pointer; }
+.sv-box.is-ready .sv-card:hover, .sv-box.is-ready .sv-card:focus-visible { transform: translateY(-5px); border-color: #ffd23f; outline: none; box-shadow: 0 0 0 3px #ffd23f55, 0 10px 24px #0008; }
+.sv-hint { margin: 0; color: #c9d1e0; opacity: 0; }
+.sv-box.is-ready .sv-hint { opacity: 1; transition: opacity .3s; }
+.sv-jack { display: none; margin: 0; font: italic 900 11cqmin/1 system-ui, sans-serif; letter-spacing: .02em; background: linear-gradient(90deg, #fff3b0, #ffb400, #ff6a00, #ffd23f, #fff3b0) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 .05em 0 #7a2a00) drop-shadow(0 0 .25em #ffb400); }
+.sv-box.is-jackpot.is-open .sv-jack { display: block; animation: sv-jack .6s cubic-bezier(.2, 1.8, .4, 1) both, sv-shine 1.2s linear infinite; }
+.sv-box.is-jackpot.is-open .sv-box-title { display: none; }
+.sv-box.is-jackpot .sv-chest { filter: drop-shadow(0 0 2.5cqmin #ffd23f); animation: sv-drop .45s cubic-bezier(.3, 1.6, .5, 1) both, sv-shake .16s .45s linear infinite; }
+.sv-box.is-jackpot .sv-base { background: linear-gradient(#ffe066, #d99a1f); }
+.sv-box.is-jackpot .sv-lid { background: linear-gradient(#fff3b0, #f2c14e); }
+.sv-box.is-jackpot.is-open .sv-chest { display: none; }
+.sv-box.is-jackpot.is-open .sv-card { border-color: #ffd23f; box-shadow: 0 0 0 3px #ffd23f66, 0 0 30px #ffb40088; background: linear-gradient(#3a3216, #1d1a10); }
+.sv-box.is-jackpot.is-open .sv-card::after { content: '획득!'; position: absolute; top: -10px; right: -8px; padding: 3px 9px; border-radius: 8px; rotate: 12deg; background: #e63946; color: #fff; font-weight: 900; font-size: .9em; box-shadow: 0 3px 0 #8a1c25; animation: sv-pop .4s calc(.5s + var(--i) * .12s) cubic-bezier(.2, 1.8, .4, 1) both; }
+.sv-rays { position: absolute; left: 50%; top: 45%; width: 180cqmax; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; background: repeating-conic-gradient(#ffd23f40 0 9deg, transparent 9deg 18deg); -webkit-mask: radial-gradient(circle, #000 8%, transparent 55%); mask: radial-gradient(circle, #000 8%, transparent 55%); opacity: 0; pointer-events: none; }
+.sv-box.is-jackpot.is-open .sv-rays { opacity: 1; animation: sv-spin 8s linear infinite; transition: opacity .4s; }
+.sv-confetti { position: absolute; inset: -20cqh 0 0; pointer-events: none; overflow: visible; }
+.sv-confetti i { position: absolute; top: 0; left: var(--x); width: 1.2cqmin; height: 2.2cqmin; background: var(--c); opacity: 0; }
+.sv-box.is-open .sv-confetti i { animation: sv-fall var(--t) var(--d) linear forwards; }
+.sv-flash { position: absolute; inset: 0; z-index: 5; background: #fff; pointer-events: none; animation: sv-flash .6s ease-out forwards; }
+@keyframes sv-drop { from { translate: 0 -40cqh; } to { translate: 0 0; } }
+@keyframes sv-shake { 0%, 100% { rotate: 0deg; } 25% { rotate: -6deg; } 75% { rotate: 6deg; } }
+@keyframes sv-fade { to { opacity: 0; scale: .7; } }
+@keyframes sv-pop { 0% { scale: .6; } 60% { scale: 1.15; } 100% { scale: 1; } }
+@keyframes sv-lid { to { rotate: -120deg; translate: -10% -40%; opacity: 0; } }
+@keyframes sv-burst { 0% { scale: 0; opacity: 1; } 100% { scale: 18; opacity: 0; } }
+@keyframes sv-card { to { opacity: 1; scale: 1; translate: 0 0; } }
+@keyframes sv-jack { from { scale: .2; rotate: -12deg; } to { scale: 1; rotate: -4deg; } }
+@keyframes sv-shine { to { background-position: -200% 0; } }
+@keyframes sv-spin { to { rotate: 360deg; } }
+@keyframes sv-fall { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 1; transform: translateY(140cqh) rotate(var(--r)); } }
+@keyframes sv-flash { from { opacity: .9; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .sv-chest, .sv-box.is-jackpot .sv-chest { animation: none; }
+  .sv-box.is-open .sv-rays, .sv-box.is-jackpot.is-open .sv-jack { animation: none; }
+  .sv-box.is-open .sv-confetti i { animation: none; }
+}
+/* 아래 설명 표 — 얼굴 · 아이콘 */
+.sv-table tbody th { display: flex; align-items: center; gap: 8px; }
+.sv-face { width: 30px; height: 30px; border-radius: 50%; flex: none; }
+.sv-ico { width: 30px; height: 30px; flex: none; }
+.sv-ui button { touch-action: manipulation; }
+.sv #sv-guide-achs .sv-achs li { background: var(--panel); border: 1px solid var(--line); color: var(--text); }
+.sv #sv-guide-achs .sv-achs small { color: var(--muted); }
+.sv #sv-guide-achs .sv-achs .sv-reward { color: var(--accent); }
+@media (pointer: coarse) { .sv .kb { display: none; } }
 .slam kbd { display: inline-block; min-width: 20px; padding: 0 5px; margin: 0 1px; border: 1px solid var(--muted); border-radius: 4px; font: 600 12px/18px ui-monospace, Menlo, Consolas, monospace; text-align: center; color: var(--text); }
 /* 아래 설명 — 조작법 표 · 팀별 궁극기 탭 */
 .slam-guide { margin-top: 20px; }

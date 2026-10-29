@@ -6,7 +6,7 @@
 import { mountTop, POS, copyLink } from './app.js?v=fb02b445'
 import { loadData, data, startAuth, me as who, loggedIn, h, ago } from './board.js?v=4233415a'
 import { sb, api } from './auth.js?v=1fbb8e2f'
-import { TEAMS, NUMS, NBA_NUM, lineup, cutHead, skinOf, SKIN } from './vipers.js?v=f00202a9'
+import { TEAMS, NUMS, NBA_NUM, lineup, cutHead, skinOf, SKIN } from './vipers.js?v=90fdd92d'
 
 mountTop('/slam/')
 startAuth('', () => {})   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다

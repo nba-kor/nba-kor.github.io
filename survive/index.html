@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>덩크 서바이버 · TNAB Vipers</title>
+<link rel="icon" href="/assets/icon.png?v=2" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icon.png?v=2">
+<meta name="theme-color" content="#0d1117">
+<meta name="description" content="뱀파이어 서바이버즈류 농구 생존 게임 「덩크 서바이버」 — 몰려오는 수비를 피해 30분 버티기. 덩크 시티 선수 10명(업적으로 해금), 농구 스킬 13가지, 레벨 업 랜덤 상자와 잭팟, 맵 3개. 키보드 · 휴대폰 터치로 바로 플레이.">
+<link rel="canonical" href="https://nba-kor.github.io/survive/">
+<!-- 카카오톡 · 디스코드 · 트위터 미리보기. 이미지를 바꾸면 ?v= 도 올린다(카카오는 URL 로 캐시한다) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TNAB Vipers">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:url" content="https://nba-kor.github.io/survive/">
+<meta property="og:title" content="덩크 서바이버 · TNAB Vipers">
+<meta property="og:description" content="뱀파이어 서바이버즈류 농구 생존 게임 「덩크 서바이버」 — 몰려오는 수비를 피해 30분 버티기. 덩크 시티 선수 10명(업적으로 해금), 농구 스킬 13가지, 레벨 업 랜덤 상자와 잭팟, 맵 3개. 키보드 · 휴대폰 터치로 바로 플레이.">
+<meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
+<meta name="twitter:card" content="summary_large_image">
+<script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
+<link rel="stylesheet" href="/assets/style.css?v=496c117e">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><img src="/assets/icon.png?v=2" alt="">TNAB <span>Vipers</span></div>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/arena/">아레나 운영</a>
+    <a href="/tactics/" data-group="/tactics/ /tiers/ /combos/ /potentials/">전략·공략</a>
+    <a href="/videos/">영상 자료실</a>
+    <a href="/game/" data-group="/game/ /slam/ /street/ /survive/">게임</a>
+    <a href="/me/">마이페이지</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="rc-auth" id="auth" aria-live="polite"></div>
+  <div class="subnav" role="navigation" aria-label="게임">
+    <a href="/slam/">슈퍼 슬램</a><a href="/street/">스트리트 3:3</a><a href="/survive/">덩크 서바이버</a>
+  </div>
+</header>
+
+<main class="slam sv">
+  <h1>덩크 서바이버 <small>뱀파이어 서바이버즈류 · 30분 생존 · 캐릭터 10명 · 업적 · 랜덤 상자</small></h1>
+  <div class="slam-stage">
+    <div class="sv-screen">
+      <canvas id="sv" aria-label="덩크 서바이버 게임 화면"></canvas>
+      <div class="sv-top">
+        <button type="button" class="sv-icon" id="sv-pause" aria-label="일시정지" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button>
+        <button type="button" class="sv-icon slam-fs" id="btn-fs" aria-label="전체 화면"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="on" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path class="off" d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg></button>
+      </div>
+      <div class="sv-toasts" id="sv-toasts" aria-live="polite"></div>
+      <div class="sv-ui" id="sv-ui"><p class="sv-note">불러오는 중…</p></div>
+    </div>
+  </div>
+  <section class="slam-guide">
+    <h2>조작법 <small>공격은 알아서 — 피해 다니기만 하면 돼요</small></h2>
+    <table class="slam-keys">
+      <tbody>
+        <tr><th>이동</th><td><span class="kb"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> · WASD — </span>휴대폰은 화면 아무 데나 누르고 끌기(누른 자리가 스틱 가운데)</td></tr>
+        <tr><th>레벨 업 상자</th><td>셋 중 하나를 누르기<span class="kb"> · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></span>. 잭팟이 터지면 셋 다 가져요</td></tr>
+        <tr><th>일시정지</th><td>오른쪽 위 ‖ 버튼<span class="kb"> · <kbd>Esc</kbd> · <kbd>P</kbd></span> — 다른 탭으로 가도 멈춰요</td></tr>
+      </tbody>
+    </table>
+    <h2>규칙</h2>
+    <ul class="slam-help">
+      <li>스킬은 쿨타임마다 저절로 나가요. 수비를 쓰러뜨리면 떨어지는 경험치(보석)를 주워 레벨을 올려요.</li>
+      <li>레벨이 오를 때마다 랜덤 상자 — 새 스킬 · 스킬 레벨 업 · 아이템 셋 중 하나. 스킬 · 아이템은 6칸씩, 스킬은 Lv 8 · 아이템은 Lv 5 까지.</li>
+      <li>5분마다 올스타 수비수(보스)가 나와요. 멈칫(붉게)한 뒤 돌진하니 옆으로 피하세요. 쓰러뜨리면 트로피 상자(잭팟 확률 50%).</li>
+      <li>마스코트는 드링크(회복) · 호루라기(경험치 모으기) · 타임아웃(수비 멈춤) · 버저(화면 정리)를 떨어뜨려요.</li>
+      <li>30분을 버티면 클리어. 업적을 달성하면 캐릭터가 열려요 — 로그인하면 업적이 계정에 저장돼 다른 기기에서도 이어져요(안 하면 이 브라우저에만).</li>
+    </ul>
+    <h2>캐릭터 <small>르브론은 처음부터, 나머지 9명은 업적으로</small></h2>
+    <table class="slam-keys sv-table"><thead><tr><th>선수</th><th>시작 스킬</th><th>특성</th><th>여는 법</th></tr></thead><tbody id="sv-guide-chars"></tbody></table>
+    <h2>스킬 <small>최고 Lv 8</small></h2>
+    <table class="slam-keys sv-table"><tbody id="sv-guide-skills"></tbody></table>
+    <h2>아이템 <small>지니고 있으면 계속 — 최고 Lv 5</small></h2>
+    <table class="slam-keys sv-table"><tbody id="sv-guide-items"></tbody></table>
+    <h2>업적</h2>
+    <div id="sv-guide-achs"></div>
+  </section>
+</main>
+
+<script type="module" src="/assets/survive.js?v=81acdeba"></script>
+</body>
+</html>

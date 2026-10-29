@@ -1,4 +1,4 @@
-// 바이퍼스 네 팀 · 선수 고르기 · 등번호 — 슈퍼 슬램(slam.js) · 스트리트 3:3(street.js)이 같이 쓴다
+// 바이퍼스 네 팀 · 선수 고르기 · 등번호 — 슈퍼 슬램(slam.js) · 스트리트 3:3(street.js)이 같이 쓴다. 얼굴 자르기 · 피부색 · 등번호는 덩크 서바이버(survive.js)도
 export const TEAMS = [
   { name: 'VIPERS_T', color: '#d6323a', dark: '#7d1520', trim: '#18181c' },   // trim = 보조색(테두리 · 허리 · 옆 줄)
   { name: 'VIPERS_N', color: '#1f9d6b', dark: '#0d5a3c', trim: '#f2c14e' },
