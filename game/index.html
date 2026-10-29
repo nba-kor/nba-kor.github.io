@@ -22,7 +22,7 @@
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=179b999e">
+<link rel="stylesheet" href="/assets/style.css?v=32bc0b7d">
 </head>
 <body>
 
@@ -40,20 +40,39 @@
   <div class="rc-auth" id="auth" aria-live="polite"></div>
 </header>
 
-<!-- 머리 메뉴 「게임」이 먼저 오는 곳 — 게임을 고르면 그 페이지로 간다 -->
-<main class="home">
-  <h1>게임</h1>
-  <nav class="cats" aria-label="게임">
-    <a class="cat" href="/slam/">
-      <svg class="cat-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3 2.6 3 10.2 0 12.8M18.4 5.6c-3 2.6-3 10.2 0 12.8"/></svg><b>덩크 아케이드</b><small>5:5 오락실 농구 · 1P vs CPU · 온라인 1:1 · 궁극기</small>
+<!-- 머리 메뉴 「게임」이 먼저 오는 곳 — 게임마다 실제 화면(assets/games/*.jpg, 800×450) · 설명 · 특징. 카드를 누르면 그 게임으로 -->
+<main class="home games">
+  <h1>게임 <small>설치 없이 브라우저에서 바로 — 키보드 · 휴대폰 터치</small></h1>
+  <div class="game-list">
+    <a class="game-card" href="/slam/">
+      <img src="/assets/games/slam.jpg?v=1" alt="덩크 아케이드 경기 화면" width="800" height="450">
+      <div class="game-body">
+        <h2>덩크 아케이드</h2>
+        <p>90년대 오락실 농구 느낌의 5:5 풀코트 대결. 덩크 시티 선수 20명이 저마다 다른 궁극기를 쓰고, 덩크 · 앨리웁 · 더블 클러치로 1분 30초 승부를 가려요. 로그인하면 친구와 온라인 1:1.</p>
+        <ul class="game-tags"><li>5:5 풀코트</li><li>1P vs CPU</li><li>온라인 1:1</li><li>궁극기</li></ul>
+        <span class="game-play">플레이 →</span>
+      </div>
     </a>
-    <a class="cat" href="/street/">
-      <svg class="cat-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2.5" width="16" height="9" rx="1.5"/><path d="M8.5 11.5h7l-1.2 9h-4.6zM9 14.5h6M9.6 17.5h4.8"/></svg><b>스트리트 3:3</b><small>하프코트 3D 길거리 농구 · 1P vs CPU · 11점 먼저</small>
+    <a class="game-card" href="/street/">
+      <img src="/assets/games/street.jpg?v=1" alt="스트리트 3:3 경기 화면" width="800" height="450" loading="lazy">
+      <div class="game-body">
+        <h2>스트리트 3:3</h2>
+        <p>하프코트 3D 길거리 농구. 덩크 시티처럼 내 선수 한 명을 끝까지 움직이고 동료 둘은 CPU — 게이지가 초록 칸일 때 슛을 놓고, 크로스오버 · 스텝백 · 스크린 · 앨리웁으로 11점 먼저.</p>
+        <ul class="game-tags"><li>3D</li><li>3:3 하프코트</li><li>11점 먼저</li><li>슛 타이밍</li></ul>
+        <span class="game-play">플레이 →</span>
+      </div>
     </a>
-    <a class="cat" href="/survive/">
-      <svg class="cat-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.3 4.9 5.2.6-3.9 3.6 1 5.2L12 14.8l-4.6 2.5 1-5.2-3.9-3.6 5.2-.6z"/><path d="M5 21h14"/></svg><b>덩크 서바이버</b><small>몰려오는 수비를 피해 30분 버티기 · 캐릭터 10명 · 업적</small>
+    <a class="game-card" href="/survive/">
+      <span class="game-new">NEW</span>
+      <img src="/assets/games/survive.jpg?v=1" alt="덩크 서바이버 경기 화면" width="800" height="450" loading="lazy">
+      <div class="game-body">
+        <h2>덩크 서바이버</h2>
+        <p>몰려오는 수비를 피해 30분을 버티는 생존 게임. 스킬은 알아서 나가고, 레벨이 오를 때마다 랜덤 상자 — 잭팟이면 셋 다! 업적으로 캐릭터 10명을 열고, 맵마다 랭킹에 도전해요.</p>
+        <ul class="game-tags"><li>생존</li><li>최대 30분</li><li>업적 · 캐릭터 해금</li><li>랭킹</li></ul>
+        <span class="game-play">플레이 →</span>
+      </div>
     </a>
-  </nav>
+  </div>
 </main>
 
 <script type="module">
