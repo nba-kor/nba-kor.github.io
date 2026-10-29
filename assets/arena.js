@@ -340,27 +340,27 @@ function missingCard() {
     names.length ? h('ol', { className: 'ar-missing' }, names.map(n => h('li', {}, n))) : h('p', { className: 'rc-muted' }, '모두 신청했어요'))
 }
 
-/** 멤버(계정)별 배치 현황 — 행 = 계정, 칸 = 시간대마다 몇 팀 */
+/** 멤버별 배치 현황 — 행 = 사람(본계정), 칸 = 시간대마다 몇 팀. 한 사람은 한 시간대에 한 팀뿐이라(겹치는 시간대 규칙) 부계정 배치도 그 줄에 — 뱃지에 마우스를 올리면 뛰는 계정 */
 function membersCard(at) {
-  const order = [...accts.values()].map(a => ({ a, where: at.get(key(a.u, a.n)) || [] }))
-  const rank = x => x.where.length ? SLOTS.findIndex(s => s.id === x.where[0].slot) * 100 + x.where[0].team : 1e6
-  order.sort((x, y) => rank(x) - rank(y) || byTally(x.a, y.a))
-  const body = order.map(({ a, where }, i) => h('tr', {},
+  const order = data.signups.filter(s => s.accounts.length).map(s => ({ s, where: s.accounts.flatMap(a => (at.get(key(s.userId, a.nick)) || []).map(w => ({ ...w, n: a.nick }))) }))
+  const rank = x => Math.min(1e6, ...x.where.map(w => SLOTS.findIndex(s => s.id === w.slot) * 100 + w.team))
+  order.sort((x, y) => rank(x) - rank(y) || byOwner(x.s, y.s))
+  const body = order.map(({ s: p, where }, i) => h('tr', {},
     h('td', {}, i + 1),
-    h('td', { className: 'ar-nick' }, nickEl(a), a.owner !== a.n && h('small', {}, a.owner)),
+    h('td', { className: 'ar-nick' }, h('b', { className: 'ar-cnt', title: p.accounts.map(a => a.nick).join(', ') }, p.owner), p.accounts.length > 1 && h('small', {}, `계정 ${p.accounts.length}개`)),
     SLOTS.map(s => {
       const w = where.find(x => x.slot === s.id)
-      const applied = wants(a.slots, s)
-      return h('td', {}, w ? h('span', { className: 'ar-badge' }, `${w.team}팀`)
+      const applied = wants(p.slots, s)
+      return h('td', {}, w ? h('span', { className: 'ar-badge', title: w.n }, `${w.team}팀`)
         : applied ? h('span', { className: 'ar-want', title: '신청' }, h('span', { className: 'ar-long' }, '신청'), h('span', { className: 'ar-short' }, '○')) : h('span', { className: 'ar-dash' }, '-'))   // 휴대폰은 ○
     }),
     h('td', {}, h('span', { className: `ar-st${where.length ? ' is-ok' : ''}` }, where.length ? '확정' : '대기'))))
   return h('section', { className: 'card ar-card' },
     h('h3', {}, '멤버별 배치 현황'),
     body.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table' },
-      h('thead', {}, h('tr', {}, h('th', {}, '#'), h('th', {}, '닉네임'), SLOTS.map(s => h('th', {}, h('span', { className: 'ar-long' }, s.short), h('span', { className: 'ar-short' }, TAG[s.id]))), h('th', {}, '상태'))),
+      h('thead', {}, h('tr', {}, h('th', {}, '#'), h('th', {}, '본계정'), SLOTS.map(s => h('th', {}, h('span', { className: 'ar-long' }, s.short), h('span', { className: 'ar-short' }, TAG[s.id]))), h('th', {}, '상태'))),
       h('tbody', {}, body)))
-      : h('p', { className: 'rc-muted' }, '아직 신청한 계정이 없어요.'))
+      : h('p', { className: 'rc-muted' }, '아직 참가 신청이 없어요.'))
 }
 
 /** 팀별 편성 명단 — 탭: 전체 · 시간대 */
