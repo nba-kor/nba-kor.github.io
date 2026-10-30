@@ -10,6 +10,17 @@ const arena = await arenaCfg()
 const CHOICE = Object.fromEntries([...arena.slots.map(s => [s.id, s.short]), ...arena.extra.map(c => [c.id, c.label])])
 
 const card = (title, ...kids) => h('section', { className: 'card mp-card' }, h('h2', {}, title), ...kids)
+// 관리자 · 마스터 카드 — 제목 줄을 누르면 접고 편다. 처음엔 펼쳐 두고, 접은 카드는 이 브라우저에 기억한다
+const FOLD_KEY = 'dc.me.fold'
+const folded = (() => { try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY)) || []) } catch { return new Set() } })()
+function fold(id, title, ...kids) {
+  const el = h('details', { className: 'card mp-card mp-fold', id, open: !folded.has(id) }, h('summary', {}, h('h2', {}, title)), ...kids)
+  el.ontoggle = () => {
+    el.open ? folded.delete(id) : folded.add(id)
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify([...folded])) } catch {}
+  }
+  return el
+}
 const errBox = () => h('p', { className: 'rc-form-err', role: 'alert', hidden: true })
 const show = (box, msg) => { box.textContent = msg; box.hidden = !msg }
 
@@ -139,17 +150,23 @@ function quitCard() {
 
 // ------------------------------------------------ 관리자 — 숨긴 메뉴
 
-const adminCard = () => card('관리자 메뉴',
+// 아래 카드로 가는 링크 — 접혀 있으면 펴고 간다
+const jump = (href, text) => h('a', { href, onclick: () => { const t = $(href); if (t) t.open = true } }, text)
+const adminCard = () => fold('admin', '관리자 메뉴',
   h('ul', { className: 'mp-admin' },
     h('li', {}, h('a', { href: '/arena/plan/' }, '아레나 편성'), h('small', {}, '신청한 계정을 끌어서 시간대별 팀에 배치')),
-    h('li', {}, h('a', { href: '#attendance' }, '아레나 출석 현황'), h('small', {}, '몇 주 연속 참석 · 몇 주째 미참석 — 아래')),
-    h('li', {}, h('a', { href: '#members' }, '멤버 관리'), h('small', {}, '관리자 임명 · 해제 · 탈퇴 — 아래')),
+    h('li', {}, jump('#attendance', '아레나 출석 현황'), h('small', {}, '몇 주 연속 참석 · 몇 주째 미참석 — 아래')),
+    h('li', {}, jump('#members', '멤버 관리'), h('small', {}, '관리자 임명 · 해제 · 탈퇴 — 아래')),
     h('li', {}, h('a', { href: '/recruit/' }, '팀원모집'), h('small', {}, '당분간 메뉴에서 숨겨 둔 기능 — 주소로는 누구나 들어올 수 있어요')),
-    me.master && h('li', {}, h('a', { href: '#audit' }, '변경 기록'), h('small', {}, '누가 언제 무엇을 바꿨는지 — 아래(슈퍼관리자만)'))))
+    me.master && h('li', {}, jump('#audit', '변경 기록'), h('small', {}, '누가 언제 무엇을 바꿨는지 — 아래(슈퍼관리자만)'))))
 
 // ------------------------------------------------ 관리자 — 멤버 관리(프로필이 있는 사람). 슈퍼관리자(마스터) · 본인은 못 바꾼다 — 서버도 막는다
 
 const ROLE_KO = { master: '슈퍼관리자', admin: '관리자', member: '멤버' }
+// 출석 상태 — 연속 미참석(attend.missed) 2주 경고 · 3주 위험 · 4주 이상 강제탈퇴 대상. 탈퇴는 관리자가 멤버 관리의 「탈퇴」 로 한다
+const STATUS = [[4, 'out', '강제탈퇴'], [3, 'risk', '위험'], [2, 'warn', '경고'], [0, 'ok', '정상']]
+const statusOf = m => STATUS.find(([n]) => m.attend.missed >= n)
+const statusTag = m => { const [, id, label] = statusOf(m); return h('span', { className: `mp-status is-${id}`, title: m.attend.missed ? `${m.attend.missed}주째 미참석${m.attend.missed >= 4 ? ' · 「탈퇴」 로 내보낼 대상' : ''}` : '' }, label) }
 // 멤버 목록(GET /api/members) — 출석 현황 · 멤버 관리가 같이 쓴다. 바꾸면 다시 읽어 두 카드를 다시 그린다
 const memberStore = {
   list: null, error: '', subs: new Set(),
@@ -186,12 +203,10 @@ function attendanceCard() {
       h('h3', { className: 'mp-sub' }, `참석 중 ${going.length}명`),
       going.length ? table(going, [['연속', m => h('b', { className: 'mp-streak' }, `${m.attend.streak}주 연속`)], ['총 참석', m => `${m.attend.total}회`]]) : h('p', { className: 'rc-muted' }, '없어요'),
       h('h3', { className: 'mp-sub' }, `미참석 ${away.length}명`),
-      away.length ? table(away, [['미참석', m => m.attend.missed ? h('b', { className: 'mp-missed' }, `${m.attend.missed}주째`) : '-'], ['총 참석', m => `${m.attend.total}회`], ['최근 신청', last]]) : h('p', { className: 'rc-muted' }, '없어요'))
+      away.length ? table(away, [['미참석', m => m.attend.missed ? h('b', { className: 'mp-missed' }, `${m.attend.missed}주째`) : '-'], ['상태', statusTag], ['총 참석', m => `${m.attend.total}회`], ['최근 신청', last]]) : h('p', { className: 'rc-muted' }, '없어요'))
   })
-  const el = card('아레나 출석 현황', box,
-    h('p', { className: 'rc-muted' }, '출석 = 그 주에 참가 신청(사유불참 빼고). 이번 주에 아직 신청하지 않았으면 지난주까지로 세요. 가입하기 전 주는 미참석으로 세지 않아요. 관리자만 보여요.'))
-  el.id = 'attendance'
-  return el
+  return fold('attendance', '아레나 출석 현황', box,
+    h('p', { className: 'rc-muted' }, '출석 = 그 주에 참가 신청(사유불참 빼고). 이번 주에 아직 신청하지 않았으면 지난주까지로 세요. 가입하기 전 주는 미참석으로 세지 않아요. 연속 미참석 2주 경고 · 3주 위험 · 4주 이상 강제탈퇴 대상. 관리자만 보여요.'))
 }
 
 function membersCard() {
@@ -204,19 +219,21 @@ function membersCard() {
     try { await api(`/members/${m.userId}`, { method, withToken: true, body }); await memberStore.load() }
     catch (e) { alert(e.message) }
   }
-  const buttons = m => m.role === 'master' ? h('span', { className: 'rc-muted' }, '-')
+  // 출석 상태 뱃지 + 버튼 — 휴대폰은 세로로 쌓는다
+  const buttons = m => h('span', { className: 'mp-acts' }, statusTag(m),
+    m.role === 'master' ? h('span', { className: 'rc-muted' }, '-')
     : m.userId === me.id ? h('span', { className: 'rc-muted' }, '나')
-    : h('span', { className: 'mp-acts' },
-      m.role === 'admin'
+    : [m.role === 'admin'
         ? h('button', { type: 'button', onclick: () => act(m, 'PUT', { role: 'member' }, `「${m.main}」 님을 일반 멤버로 바꿀까요?`) }, '멤버로')
         : h('button', { type: 'button', onclick: () => act(m, 'PUT', { role: 'admin' }, `「${m.main}」 님을 관리자로 임명할까요?\n아레나 편성 · 멤버 관리를 할 수 있게 돼요.`) }, '관리자로'),
-      h('button', { type: 'button', className: 'danger', onclick: () => act(m, 'DELETE', undefined, `「${m.main}」 님을 탈퇴시킬까요?\n프로필 · 게임 계정 · 아레나 신청이 지워져요. 다시 로그인하면 새로 가입할 수 있어요.`) }, '탈퇴'))
+      h('button', { type: 'button', className: 'danger', onclick: () => act(m, 'DELETE', undefined, `「${m.main}」 님을 탈퇴시킬까요?\n프로필 · 게임 계정 · 아레나 신청이 지워져요. 다시 로그인하면 새로 가입할 수 있어요.`) }, '탈퇴')])
   function paint() {
     const k = q.value.trim().toLowerCase()
     const rows = list.filter(m => !k || `${m.main} ${m.name}`.toLowerCase().includes(k))
-    head.textContent = `${list.length}명 · 관리자 ${list.filter(m => m.role !== 'member').length}명`
+    const n = id => list.filter(m => statusOf(m)[1] === id).length
+    head.textContent = [`${list.length}명 · 관리자 ${list.filter(m => m.role !== 'member').length}명`, ...STATUS.slice(0, 3).map(([, id, label]) => n(id) && `${label} ${n(id)}명`)].filter(Boolean).join(' · ')
     box.replaceChildren(rows.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table mp-members' },
-      h('thead', {}, h('tr', {}, ['#', '본계정', '등급', '계정', '최근 신청', ''].map(t => h('th', {}, t)))),
+      h('thead', {}, h('tr', {}, ['#', '본계정', '등급', '계정', '최근 신청', '상태 · 관리'].map(t => h('th', {}, t)))),
       h('tbody', {}, rows.map((m, i) => h('tr', {},
         h('td', {}, i + 1),
         h('td', { className: 'ar-nick' }, h('b', {}, m.main), m.name !== m.main && h('small', {}, m.name)),
@@ -227,10 +244,8 @@ function membersCard() {
       : h('p', { className: 'rc-muted' }, k ? '찾는 멤버가 없어요' : '아직 멤버가 없어요'))
   }
   watchMembers(box, l => { list = l; paint() })
-  const el = card('멤버 관리', h('div', { className: 'mp-members-head' }, q, head), box,
-    h('p', { className: 'rc-muted' }, '멤버 = 프로필(게임 계정)을 등록한 사람. 슈퍼관리자는 바꾸거나 탈퇴시킬 수 없어요. 탈퇴하면 프로필 · 게임 계정 · 아레나 신청 · 관리자 권한이 지워져요.'))
-  el.id = 'members'
-  return el
+  return fold('members', '멤버 관리', h('div', { className: 'mp-members-head' }, q, head), box,
+    h('p', { className: 'rc-muted' }, '멤버 = 프로필(게임 계정)을 등록한 사람. 슈퍼관리자는 바꾸거나 탈퇴시킬 수 없어요. 탈퇴하면 프로필 · 게임 계정 · 아레나 신청 · 관리자 권한이 지워져요. 상태 = 아레나 연속 미참석(2주 경고 · 3주 위험 · 4주 이상 강제탈퇴 대상).'))
 }
 
 // ------------------------------------------------ 마스터 — 사이트 접근 비밀번호 보기 · 바꾸기
@@ -262,7 +277,7 @@ function gateCard() {
   }
   // 숫자 6자리 — 카톡으로 알려 주고 휴대폰으로 치기 쉽게. 직접 정한 글자도 된다
   const random = () => { input.value = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1e6).padStart(6, '0'); err.hidden = true }
-  return card('사이트 접근 비밀번호',
+  return fold('gate', '사이트 접근 비밀번호',
     h('div', { className: 'rc-gate-admin' },
       now,
       h('div', { className: 'rc-gate-row' }, input, h('button', { type: 'button', onclick: random }, '랜덤 생성'), h('button', { type: 'button', className: 'primary', onclick: save }, '바꾸기')),
@@ -304,10 +319,8 @@ function auditCard() {
     more.hidden = !next
   }
   load()
-  const el = card('변경 기록', filter, box, err, h('div', { className: 'rc-actions' }, more),
+  return fold('audit', '변경 기록', filter, box, err, h('div', { className: 'rc-actions' }, more),
     h('p', { className: 'rc-muted' }, '프로필 · 아레나 신청 · 편성 · 멤버 관리 · 게시판 · 접근 비밀번호 등 사이트에서 무언가를 바꾼 일이 최근 것부터 나와요. 이름을 누르면 그 사람 기록만 봐요. 슈퍼관리자만 보여요.'))
-  el.id = 'audit'
-  return el
 }
 
 startAuth('', render)

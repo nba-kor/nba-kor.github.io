@@ -1242,7 +1242,7 @@ label.ac-pick { cursor: pointer; }
 .mp-role { padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
 .mp-role.is-master { color: var(--bg); background: var(--text); border-color: var(--text); }
 .mp-role.is-admin { color: var(--text); border-color: var(--text); }
-.mp-acts { display: inline-flex; gap: 4px; }
+.mp-acts { display: inline-flex; align-items: center; gap: 4px; }
 .mp-acts button { padding: 3px 10px; font-size: 12px; white-space: nowrap; }
 #members { scroll-margin-top: 110px; }
 @media (max-width: 560px) {   /* 좁으면 계정 · 최근 신청을 빼고 버튼을 세로로 — 버튼이 화면 밖으로 밀리지 않게 */
@@ -1259,6 +1259,19 @@ label.ac-pick { cursor: pointer; }
 .mp-streak { color: var(--accent); }
 .mp-missed { color: var(--muted); }
 #attendance { scroll-margin-top: 110px; }
+/* 마이페이지 — 출석 상태 뱃지(연속 미참석 2주 경고 · 3주 위험 · 4주 이상 강제탈퇴 대상) */
+.mp-status { --c: #3fb950; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; white-space: nowrap; color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.mp-status.is-warn { --c: #f2cc60; }
+.mp-status.is-risk { --c: #ff8a3d; }
+.mp-status.is-out { --c: var(--def); color: #1a0000; background: var(--c); }
+/* 마이페이지 — 관리자 · 마스터 카드는 제목 줄을 눌러 접는다 */
+.mp-fold > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; user-select: none; }
+.mp-fold > summary::-webkit-details-marker { display: none; }
+.mp-fold > summary h2 { flex: 1; margin: 0; }
+.mp-fold > summary::after { content: '▾'; color: var(--muted); font-size: 16px; transition: rotate .15s; }
+.mp-fold:not([open]) > summary::after { rotate: -90deg; }
+.mp-fold[open] > summary { margin-bottom: 14px; }
+#audit { scroll-margin-top: 110px; }
 
 /* 아레나 편성 — 칩: 부계정이면 본계정 닉네임 줄, 「자세히 보기」 면 캐릭터 */
 .ar-chip-body { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
