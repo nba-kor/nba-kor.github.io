@@ -739,10 +739,11 @@ async function saveXlsx(btn, name, fill) {
 
 const solid = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } })
 const LINE = { style: 'thin', color: { argb: 'FFC9CED6' } }
-/** 시트 하나 — cols = [[머리, 너비, 가운데?]], rows = 값 줄들, merges = [[첫 줄, 열, 끝 줄]](데이터 줄 1부터 · 세로로), shade = 옅게 칠할 데이터 줄. 머리 줄은 고정 */
+/** 시트 하나 — cols = [[머리, 너비, 가운데?]], rows = 값 줄들, merges = [[첫 줄, 열, 끝 줄]](데이터 줄 1부터 · 세로로), shade = 옅게 칠할 데이터 줄. 머리 줄은 고정 · 열마다 필터 */
 function addSheet(wb, name, cols, rows, { merges = [], shade = new Set() } = {}) {
   const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1 }] })
   ws.columns = cols.map(([header, width]) => ({ header, width }))
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } }
   ws.addRows(rows)
   ws.eachRow((row, r) => {
     row.height = r === 1 ? 24 : 20
@@ -761,22 +762,25 @@ function addSheet(wb, name, cols, rows, { merges = [], shade = new Set() } = {})
 const picksSheet = wb => addSheet(wb, '신청 현황', [['본계정', 16], ...PICK_COLS.map(c => [c.short, 8, 1]), ['참가 계정', 36], ['메모', 40]],
   signupOrder().map(s => [s.owner, ...PICK_COLS.map(c => s.slots.includes(c.id) ? 'O' : ''), s.accounts.map(a => a.nick).join(', '), s.memo]))
 
-/** 참가자 상세 시트 — 계정의 캐릭터마다 한 줄(1열 닉네임 · 2열 캐릭터 · 레벨), 닉네임과 계정 정보는 캐릭터 수만큼 병합.
+/** 참가자 상세 시트 — 계정의 캐릭터마다 한 줄(1열 참가 계정 · 2열 캐릭터 · 레벨), 계정 정보는 캐릭터 수만큼 병합.
+ *  신청 시간대는 신청 현황처럼 칸마다 O — 병합하지 않고 줄마다 넣어 열 필터로 걸러도 그 계정의 캐릭터 줄이 다 남는다.
  *  신청 현황 · 편성 명단의 내용(본계정 · 신청 시간대 · 메모 · 배정 팀)이 다 들어간다. 사람 순서는 신청 현황과 같고 한 사람씩 번갈아 옅게 칠한다. 사유불참은 계정이 없어 한 줄 */
 function detailSheet(wb) {
   const at = placements(), rows = [], merges = [], shade = new Set()
+  const cols = [['참가 계정', 18], ['캐릭터', 16], ['레벨', 7, 1], ['구분', 8, 1], ['본계정', 16], ['포지션', 16, 1], ...PICK_COLS.map(c => [c.short, 8, 1]), ['배정', 26], ['메모', 40]]
+  const merged = [1, 4, 5, 6, cols.length - 1, cols.length]   // 계정 정보 칸 — 시간대 칸은 병합하지 않는다
   signupOrder().forEach((s, p) => {
-    const first = rows.length + 1, slots = s.slots.map(id => SHORT[id]).join(' · ')
-    if (!s.accounts.length) rows.push([s.owner, '', '', '', s.owner, '', slots, '', s.memo])
+    const first = rows.length + 1, picks = PICK_COLS.map(c => s.slots.includes(c.id) ? 'O' : '')
+    if (!s.accounts.length) rows.push([s.owner, '', '', '', s.owner, '', ...picks, '', s.memo])
     for (const x of s.accounts) {
       const a = accts.get(key(s.userId, x.nick)), top = rows.length + 1
       const placed = (at.get(key(a.u, a.n)) || []).map(w => { const tm = plan[w.slot][w.team - 1]; return `${SHORT[w.slot]} ${w.team}팀${tm[0].u === a.u && tm[0].n === a.n ? '(팀장)' : ''}` }).join(' · ')
-      for (const id of a.chars) rows.push([a.n, P(id).name, a.bt?.[id] ? `${a.bt[id]}렙` : '-', a.n === s.owner ? '본계정' : '부계정', s.owner, a.roles.map(roleLabel).join(' / '), slots, placed, s.memo])
-      if (rows.length > top) for (const c of [1, 4, 5, 6, 7, 8, 9]) merges.push([top, c, rows.length])
+      for (const id of a.chars) rows.push([a.n, P(id).name, a.bt?.[id] ? `${a.bt[id]}렙` : '-', a.n === s.owner ? '본계정' : '부계정', s.owner, a.roles.map(roleLabel).join(' / '), ...picks, placed, s.memo])
+      if (rows.length > top) for (const c of merged) merges.push([top, c, rows.length])
     }
     if (p % 2) for (let r = first; r <= rows.length; r++) shade.add(r)
   })
-  addSheet(wb, '참가자 상세', [['닉네임', 18], ['캐릭터', 16], ['레벨', 7, 1], ['구분', 8, 1], ['본계정', 16], ['포지션', 16, 1], ['신청 시간대', 30], ['배정', 26], ['메모', 40]], rows, { merges, shade })
+  addSheet(wb, '참가자 상세', cols, rows, { merges, shade })
 }
 
 /** 편성 명단 엑셀 — 첫 시트는 계정 한 줄(팀마다 번갈아 옅게), 둘째는 참가자 상세 */
@@ -792,7 +796,7 @@ function saveExcel(e) {
         if (n % 2 === 0) shade.add(rows.length)
       })
     })
-    addSheet(wb, '편성 명단', [['시간대', 10, 1], ['일시', 24], ['팀', 6, 1], ['팀장', 6, 1], ['닉네임', 18], ['본계정', 16], ['포지션', 16, 1], ['캐릭터', 44]], rows, { shade })
+    addSheet(wb, '편성 명단', [['시간대', 10, 1], ['일시', 24], ['팀', 6, 1], ['팀장', 6, 1], ['참가 계정', 18], ['본계정', 16], ['포지션', 16, 1], ['캐릭터', 44]], rows, { shade })
     detailSheet(wb)
   })
 }
