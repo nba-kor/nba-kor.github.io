@@ -22,6 +22,8 @@
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
+<!-- three.js 확장(모델 읽기)이 'three' 로 부른다 — plaza.js 와 같은 주소로 맞춰 한 벌만 뜨게 -->
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" } }</script>
 <link rel="stylesheet" href="/assets/style.css?v=4173242f">
 </head>
 <body>
@@ -74,7 +76,7 @@
         <tr><th>이동</th><td class="kb"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> · WASD</td><td>휴대폰은 왼쪽 스틱. 위(화면 안쪽)가 골대</td></tr>
         <tr><th>슛</th><td class="kb"><kbd>스페이스</kbd> · <kbd>C</kbd></td><td>골대 바로 앞이면 덩크, 가까우면 레이업, 멀면 점프슛 — 멀수록 잘 안 들어가요</td></tr>
         <tr><th>점프</th><td class="kb"><kbd>X</kbd></td><td>두 팔을 쭉 뻗고 뛰어요</td></tr>
-        <tr><th>몸짓</th><td class="kb"><kbd>1</kbd>~<kbd>7</kbd></td><td>화면 위 버튼 — 손 인사 · 박수 · 알통 · 환호 · 춤 · 꾸벅 · 앉기(움직일 때까지)</td></tr>
+        <tr><th>몸짓</th><td class="kb"><kbd>1</kbd>~<kbd>7</kbd></td><td>화면 오른쪽 버튼(세운 휴대폰은 화면 아래) — 손 인사 · 박수 · 끄덕 · 환호 · 춤 · 꾸벅 · 앉기(움직일 때까지)</td></tr>
         <tr><th>채팅</th><td class="kb"><kbd>Enter</kbd></td><td>화면 아래 칸에 쓰고 Enter — 머리 위 말풍선과 왼쪽 위 채팅 줄에 떠요</td></tr>
       </tbody>
     </table>
@@ -82,12 +84,13 @@
     <ul class="slam-help">
       <li>로그인하면 같은 광장에 있는 사람들이 보여요. 로그인하지 않으면 혼자 연습만 할 수 있어요.</li>
       <li>채팅은 저장되지 않아요 — 그때 광장에 있는 사람만 봐요. 나갔다 들어오면 사라져요.</li>
-      <li>오른쪽 위 「캐릭터」에서 선수 얼굴과 유니폼 색을 바꿔요. 등에는 내 이름이 들어가요.</li>
+      <li>오른쪽 위 「캐릭터」에서 덩크 시티 선수와 유니폼 색을 골라요. 선수에 따라 몸 · 피부 · 머리색 · 등번호가 바뀌고 이름표 옆에 그 선수 얼굴이 떠요. 등에는 내 이름이 들어가요.</li>
+      <li>캐릭터 모델: <a href="https://kenney.nl/assets/mini-characters-1" rel="noopener">Kenney Mini Characters</a> (CC0)</li>
       <li>친구끼리 따로 모이려면 주소 끝에 <code>?room=방이름</code> 을 붙여 같은 주소로 들어오세요(영문 · 숫자).</li>
     </ul>
   </section>
 </main>
 
-<script type="module" src="/assets/plaza.js?v=70afd79f"></script>
+<script type="module" src="/assets/plaza.js?v=344bb354"></script>
 </body>
 </html>
