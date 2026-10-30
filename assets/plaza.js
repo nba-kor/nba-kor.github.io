@@ -75,7 +75,7 @@ function study(g) {
     const pos = o.geometry.attributes.position
     for (let i = 0; i < pos.count; i++) { P.fromBufferAttribute(pos, i); if (Math.abs(P.x) < 0.1 && P.y > hp.y - 0.32 && P.y < hp.y - 0.12) box.expandByPoint(P) }
   })
-  const R = 0.165, cy = (box.min.y + box.max.y) / 2
+  const R = 0.14, cy = (box.min.y + box.max.y) / 2   // 머리 반지름(미터)
   const unturn = o => o.getWorldQuaternion(new THREE.Quaternion()).invert()   // 붙인 것이 모델 축을 따르게
   return { g, R, hipY: at(bone('Hips')).y,
     head: { pos: local(head, new THREE.Vector3(0, hp.y + R * 0.92, hp.z + 0.03)), q: unturn(head) },
