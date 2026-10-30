@@ -544,14 +544,16 @@ function editor() {
   return [poolBox, status, grid, picksCard()]
 }
 
-/** 편성 페이지 맨 아래 — 신청 현황. 신청한 사람마다 한 줄: 고른 시간대 · FA · 불참(고른 그대로) · 참가 계정 · 메모(불참은 사유).
- *  칸은 요일 순(토 1 · 1.5 · 2 · FA → 일 … → 불참), 줄은 불참이 맨 아래 · 그 밖은 본계정 가나다 */
+// 신청 현황 칸은 요일 순(토 1 · 1.5 · 2 · FA → 일 … → 불참), 줄은 불참이 맨 아래 · 그 밖은 본계정 가나다 — 화면 표 · 엑셀이 같이 쓴다
+const PICK_COLS = [...SLOTS, ...A.extra].sort((x, y) => (x.day ?? 9) - (y.day ?? 9))
+const SHORT = Object.fromEntries(PICK_COLS.map(c => [c.id, c.short]))
+const isOut = s => s.slots.includes('absent')
+const signupOrder = () => [...data.signups].sort((x, y) => isOut(x) - isOut(y) || x.owner.localeCompare(y.owner, 'ko'))
+
+/** 편성 페이지 맨 아래 — 신청 현황. 신청한 사람마다 한 줄: 고른 시간대 · FA · 불참(고른 그대로) · 참가 계정 · 메모(불참은 사유) */
 function picksCard() {
-  const cols = [...SLOTS, ...A.extra].sort((x, y) => (x.day ?? 9) - (y.day ?? 9))
-  const isOut = s => s.slots.includes('absent')
-  const rows = [...data.signups].sort((x, y) => isOut(x) - isOut(y) || x.owner.localeCompare(y.owner, 'ko'))
-  const excel = () => saveCsv([['본계정', ...cols.map(c => c.short), '참가 계정', '메모'],
-    ...rows.map(s => [s.owner, ...cols.map(c => s.slots.includes(c.id) ? 'O' : ''), s.accounts.map(a => a.nick).join(', '), s.memo])], `vipers-arena-signups-${week}.csv`)
+  const cols = PICK_COLS, rows = signupOrder()
+  const excel = e => saveXlsx(e.currentTarget, `vipers-arena-signups-${week}.xlsx`, wb => { picksSheet(wb); detailSheet(wb) })
   return h('section', { className: 'card ar-card' },
     h('div', { className: 'ar-picks-head' }, h('h3', {}, `신청 현황 ${rows.length}명`, h('small', { className: 'rc-muted' }, ` · 불참 ${rows.filter(isOut).length}명`)),
       rows.length > 0 && h('button', { type: 'button', onclick: excel }, '엑셀 저장')),
@@ -708,21 +710,82 @@ const download = (blob, name) => {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000)
 }
 
-/** 엑셀(CSV) 내려받기 — BOM 을 붙여야 엑셀이 한글을 읽는다.
- *  = + - @ 로 시작하는 닉네임은 엑셀이 수식으로 실행하므로 앞에 ' 를 붙인다 */
-function saveCsv(rows, name) {
-  const cell = v => `"${String(v ?? '').replace(/^[=+\-@\t\r]/, "'$&").replace(/"/g, '""')}"`
-  download(new Blob(['\ufeff' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv' }), name)
+// ================================================================ 엑셀(.xlsx) — 열 너비 · 테두리 · 머리 줄 색 · 병합 · 시트 여러 개. ExcelJS 는 처음 누를 때 한 번만 불러온다
+// (글자는 문자열 칸으로 들어가 = + - @ 로 시작하는 닉네임도 수식으로 실행되지 않는다)
+
+const EXCELJS = { src: 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js', integrity: 'sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz', crossOrigin: 'anonymous' }
+let excelP = null
+const loadExcel = () => excelP ||= new Promise((ok, no) => document.head.append(h('script', { ...EXCELJS,
+  onload: () => ok(window.ExcelJS), onerror: () => { excelP = null; no(new Error('엑셀 도구를 불러오지 못했어요 — 잠시 뒤에 다시 눌러 주세요')) } })))
+
+async function saveXlsx(btn, name, fill) {
+  btn.disabled = true
+  try {
+    const wb = new (await loadExcel()).Workbook()
+    fill(wb)
+    download(new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name)
+  } catch (e) { alert(e.message) }
+  finally { btn.disabled = false }
 }
 
-/** 편성 명단 엑셀 — 계정 한 줄 */
-function saveExcel() {
-  const rows = [['시간대', '일시', '팀', '팀장', '닉네임', '본계정', '포지션', '캐릭터']]
-  for (const s of SLOTS) teamsOf(s.id).forEach((tm, i) => tm.forEach((x, j) => {
-    const a = accts.get(key(x.u, x.n))
-    rows.push([s.short, slotWhen(week, s), `${i + 1}팀`, j ? '' : '팀장', x.n, a?.owner, a?.roles.map(roleLabel).join(' · '), a && charNames(a.chars, a.bt)])
-  }))
-  saveCsv(rows, `vipers-arena-${week}.csv`)
+const solid = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } })
+const LINE = { style: 'thin', color: { argb: 'FFC9CED6' } }
+/** 시트 하나 — cols = [[머리, 너비, 가운데?]], rows = 값 줄들, merges = [[첫 줄, 열, 끝 줄]](데이터 줄 1부터 · 세로로), shade = 옅게 칠할 데이터 줄. 머리 줄은 고정 */
+function addSheet(wb, name, cols, rows, { merges = [], shade = new Set() } = {}) {
+  const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1 }] })
+  ws.columns = cols.map(([header, width]) => ({ header, width }))
+  ws.addRows(rows)
+  ws.eachRow((row, r) => {
+    row.height = r === 1 ? 24 : 20
+    for (let c = 1; c <= cols.length; c++) {
+      const cell = row.getCell(c)
+      cell.border = { top: LINE, left: LINE, bottom: LINE, right: LINE }
+      cell.alignment = { vertical: 'middle', horizontal: r === 1 || cols[c - 1][2] ? 'center' : 'left' }
+      if (r === 1) { cell.font = { bold: true, color: { argb: 'FF1A1200' } }; cell.fill = solid('FFF5A623') }
+      else if (shade.has(r - 1)) cell.fill = solid('FFF2F4F7')
+    }
+  })
+  for (const [r1, c, r2] of merges) ws.mergeCells(r1 + 1, c, r2 + 1, c)
+}
+
+/** 신청 현황 시트 — 사람마다 한 줄(화면 표와 같다) */
+const picksSheet = wb => addSheet(wb, '신청 현황', [['본계정', 16], ...PICK_COLS.map(c => [c.short, 8, 1]), ['참가 계정', 36], ['메모', 40]],
+  signupOrder().map(s => [s.owner, ...PICK_COLS.map(c => s.slots.includes(c.id) ? 'O' : ''), s.accounts.map(a => a.nick).join(', '), s.memo]))
+
+/** 참가자 상세 시트 — 계정의 캐릭터마다 한 줄(1열 닉네임 · 2열 캐릭터 · 레벨), 닉네임과 계정 정보는 캐릭터 수만큼 병합.
+ *  신청 현황 · 편성 명단의 내용(본계정 · 신청 시간대 · 메모 · 배정 팀)이 다 들어간다. 사람 순서는 신청 현황과 같고 한 사람씩 번갈아 옅게 칠한다. 사유불참은 계정이 없어 한 줄 */
+function detailSheet(wb) {
+  const at = placements(), rows = [], merges = [], shade = new Set()
+  signupOrder().forEach((s, p) => {
+    const first = rows.length + 1, slots = s.slots.map(id => SHORT[id]).join(' · ')
+    if (!s.accounts.length) rows.push([s.owner, '', '', '', s.owner, '', slots, '', s.memo])
+    for (const x of s.accounts) {
+      const a = accts.get(key(s.userId, x.nick)), top = rows.length + 1
+      const placed = (at.get(key(a.u, a.n)) || []).map(w => { const tm = plan[w.slot][w.team - 1]; return `${SHORT[w.slot]} ${w.team}팀${tm[0].u === a.u && tm[0].n === a.n ? '(팀장)' : ''}` }).join(' · ')
+      for (const id of a.chars) rows.push([a.n, P(id).name, a.bt?.[id] ? `${a.bt[id]}렙` : '-', a.n === s.owner ? '본계정' : '부계정', s.owner, a.roles.map(roleLabel).join(' / '), slots, placed, s.memo])
+      if (rows.length > top) for (const c of [1, 4, 5, 6, 7, 8, 9]) merges.push([top, c, rows.length])
+    }
+    if (p % 2) for (let r = first; r <= rows.length; r++) shade.add(r)
+  })
+  addSheet(wb, '참가자 상세', [['닉네임', 18], ['캐릭터', 16], ['레벨', 7, 1], ['구분', 8, 1], ['본계정', 16], ['포지션', 16, 1], ['신청 시간대', 30], ['배정', 26], ['메모', 40]], rows, { merges, shade })
+}
+
+/** 편성 명단 엑셀 — 첫 시트는 계정 한 줄(팀마다 번갈아 옅게), 둘째는 참가자 상세 */
+function saveExcel(e) {
+  saveXlsx(e.currentTarget, `vipers-arena-${week}.xlsx`, wb => {
+    const rows = [], shade = new Set()
+    let n = 0
+    for (const s of SLOTS) teamsOf(s.id).forEach((tm, i) => {
+      n++
+      tm.forEach((x, j) => {
+        const a = accts.get(key(x.u, x.n))
+        rows.push([s.short, slotWhen(week, s), `${i + 1}팀`, j ? '' : '팀장', x.n, a?.owner, a?.roles.map(roleLabel).join(' / '), a && charNames(a.chars, a.bt)])
+        if (n % 2 === 0) shade.add(rows.length)
+      })
+    })
+    addSheet(wb, '편성 명단', [['시간대', 10, 1], ['일시', 24], ['팀', 6, 1], ['팀장', 6, 1], ['닉네임', 18], ['본계정', 16], ['포지션', 16, 1], ['캐릭터', 44]], rows, { shade })
+    detailSheet(wb)
+  })
 }
 
 /** 편성표 그림 — 한 줄에 하루(1차 · 1.5차 · 2차). 팀 한 줄에 3명(얼굴 · 닉네임 · 캐릭터) */
