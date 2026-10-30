@@ -17,11 +17,9 @@ const ACCENT = '#f5a623'
 // 같은 날 시간이 겹치는 두 시간대(서버와 같은 규칙) — 1.5차는 1차 · 2차와 겹친다
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT = Object.fromEntries(SLOTS.map(s => [s.id, s]))
-// 그날 FA(시간 미정 · 용병)를 골랐으면 그날 모든 시간대를 신청한 셈이다
 const FAS = A.extra.filter(c => c.day != null), FA_DAY = Object.fromEntries(FAS.map(c => [c.id, c.day]))
-const wants = (slots, s) => slots.includes(s.id) || slots.some(x => FA_DAY[x] === s.day)
 const clash = (x, y) => { const a = SLOT[x], b = SLOT[y]; return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
-// 배치 현황의 FA 칸 — 직접 고른 시간대가 먼저, 그날 FA 를 골랐으면 직접 고른 시간대와 안 겹치는 그날 시간대(FA 만 골랐으면 그날 전부)
+// 배치 현황 · 팀 고르기 메뉴의 FA — 직접 고른 시간대가 먼저, 그날 FA 를 골랐으면 직접 고른 시간대와 안 겹치는 그날 시간대(FA 만 골랐으면 그날 전부)
 const viaFa = (slots, s) => !slots.includes(s.id) && slots.some(x => FA_DAY[x] === s.day) && !slots.some(x => SLOT[x] && clash(x, s.id))
 // 집계 순서(관리자 매뉴얼): 소유자의 참가 계정 수 많은 순 → 1순위 포지션(스코어러 > 중열 > 센터) → 계정 이름(가나다 · 영문)
 const roleRank = a => { const i = ROLES.findIndex(r => r.id === a.roles[0]); return i < 0 ? ROLES.length : i }
@@ -591,10 +589,10 @@ function menu(a, from) {
   const items = []
   if (from) items.push({ label: '빼기 (대기로)', pick: () => move(a, from, 'pool') })
   for (const s of SLOTS) {
-    const teams = teamsOf(s.id), applied = wants(a.slots, s)
+    const teams = teamsOf(s.id)
     if (SLOTS.some(o => clash(s.id, o.id) && teamsOf(o.id).some((tm, ti) => tm.some(x => x.u === a.u && !(from?.slot === o.id && from.ti === ti && x.n === a.n))))) continue   // 겹치는 시간대에 이미 있다
-    // 이 사람이 신청하지 않은 시간대(FA 도 아니면)는 줄마다 「신청 안 함」
-    const note = applied ? '' : ' · 신청 안 함'
+    // 배치 현황과 같은 기준 — 직접 고른 시간대는 그대로, FA 로 되는 시간대는 「FA」, 그 밖은 「신청 안 함」
+    const note = a.slots.includes(s.id) ? '' : viaFa(a.slots, s) ? ' · FA' : ' · 신청 안 함'
     teams.forEach((tm, ti) => {
       if (tm.length < A.teamSize && !(from?.slot === s.id && from.ti === ti)) items.push({ label: `${s.short} · ${ti + 1}팀 (${tm.length}/${A.teamSize})${note}`, pick: () => move(a, from, `${s.id}:${ti}`) })
     })
