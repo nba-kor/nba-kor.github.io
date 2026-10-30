@@ -1453,6 +1453,27 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .street .slam-fs { right: 1.2%; z-index: 1; }
 .street ul.slam-help { padding-left: 20px; }
 .street ul.slam-help li { margin: 3px 0; }
+/* 덩크 광장 (assets/plaza.js) — 스트리트 3:3 칸 그대로. 오른쪽 위 캐릭터 · 그 아래 몸짓 버튼 줄, 아래 가운데 채팅 칸(로그인 전에는 로그인 버튼) */
+.plaza #plaza { position: absolute; inset: 0; background: transparent; }
+.pz-emo { position: absolute; top: 13%; right: 1.2%; display: flex; flex-direction: column; gap: 4px; }
+.pz-emo button, .pz-char { touch-action: manipulation; height: 32px; min-width: 36px; padding: 0 8px; border: 0; border-radius: 9px; background: #0b0e14a8; color: #fff; font-size: 17px; line-height: 1; }
+.pz-emo button:hover, .pz-char:hover { background: #0b0e14e0; }
+.pz-char { position: absolute; top: 1.2%; right: calc(2.2% + max(26px, 3.8%)); font-size: 12.5px; font-weight: 800; }
+.pz-chat { position: absolute; left: 50%; bottom: 2.5%; transform: translateX(-50%); display: flex; gap: 6px; width: min(440px, 52%); }
+.pz-chat[hidden], .pz-login[hidden] { display: none; }
+.pz-chat input { flex: 1; min-width: 0; padding: 6px 14px; border: 1px solid #ffffff38; border-radius: 999px; background: #0b0e14b8; color: #fff; font-size: 16px; }   /* 16px 밑이면 아이폰이 누를 때 확대한다 */
+.pz-chat button { border-radius: 999px; padding: 6px 14px; white-space: nowrap; }
+.pz-login { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); padding: 9px 18px; border: 0; border-radius: 999px; background: var(--accent); color: #1a1200; font-size: 14px; font-weight: 800; white-space: nowrap; }
+.pz-teams { display: flex; flex-wrap: wrap; gap: 6px; }
+.pz-team { padding: 6px 12px; border-color: var(--team); color: var(--team); font-weight: 800; }
+.pz-team[aria-pressed="true"] { background: var(--team); color: #fff; }
+.pz-dialog .pt-grid { max-height: none; }
+/* 세운 휴대폰 — 화면이 작아 몸짓 줄 · 채팅 칸은 화면 아래로 뺀다 */
+@media (max-width: 560px) {
+  .pz-emo { position: static; flex-direction: row; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+  .pz-chat { position: static; transform: none; width: auto; margin-top: 8px; }
+  .pz-login { position: static; transform: none; display: block; margin: 8px auto 0; }
+}
 /* 덩크 서바이버 (assets/survive.js) — 슬램 칸을 빌려 쓰되 화면은 어떤 비율이든 꽉 채운다(세운 휴대폰도). 메뉴 · 상자는 캔버스 위 HTML(#sv-ui) */
 .sv-screen { position: relative; height: clamp(320px, calc(100dvh - 130px), 64vw); container-type: size; overflow: hidden; border-radius: 10px; background: #0b0e14; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 @media (orientation: portrait) { .sv-screen { height: clamp(420px, calc(100dvh - 150px), 900px); } }

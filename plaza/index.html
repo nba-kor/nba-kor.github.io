@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>덩크 광장 · TNAB Vipers</title>
+<link rel="icon" href="/assets/icon.png?v=2" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icon.png?v=2">
+<meta name="theme-color" content="#0d1117">
+<meta name="description" content="덩크 시티 선수가 되어 길거리 코트에 모이는 3D 광장 「덩크 광장」 — 같이 걸어 다니며 채팅하고, 손 인사 · 박수 · 춤 같은 몸짓을 하고, 골대에 슛 · 덩크. 설치 없이 브라우저에서 바로.">
+<link rel="canonical" href="https://nba-kor.github.io/plaza/">
+<!-- 카카오톡 · 디스코드 · 트위터 미리보기. 이미지를 바꾸면 ?v= 도 올린다(카카오는 URL 로 캐시한다) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TNAB Vipers">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:url" content="https://nba-kor.github.io/plaza/">
+<meta property="og:title" content="덩크 광장 · TNAB Vipers">
+<meta property="og:description" content="덩크 시티 선수가 되어 길거리 코트에 모이는 3D 광장 「덩크 광장」 — 같이 걸어 다니며 채팅하고, 손 인사 · 박수 · 춤 같은 몸짓을 하고, 골대에 슛 · 덩크. 설치 없이 브라우저에서 바로.">
+<meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
+<meta name="twitter:card" content="summary_large_image">
+<script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
+<link rel="stylesheet" href="/assets/style.css?v=4173242f">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><img src="/assets/icon.png?v=2" alt="">TNAB <span>Vipers</span></div>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/arena/">아레나 운영</a>
+    <a href="/tactics/" data-group="/tactics/ /tiers/ /combos/ /potentials/">전략·공략</a>
+    <a href="/videos/">영상 자료실</a>
+    <a href="/game/" data-group="/game/ /slam/ /street/ /survive/ /plaza/">게임</a>
+    <a href="/me/">마이페이지</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="rc-auth" id="auth" aria-live="polite"></div>
+  <div class="subnav" role="navigation" aria-label="게임">
+    <a href="/slam/">덩크 아케이드</a><a href="/street/">스트리트 3:3</a><a href="/survive/">덩크 서바이버</a><a href="/plaza/">덩크 광장</a>
+  </div>
+</header>
+
+<main class="slam street plaza">
+  <h1>덩크 광장 <small>길거리 코트에 모여 채팅 · 몸짓 · 슛 — 로그인하면 다른 사람들과 만나요</small></h1>
+  <div class="slam-stage">
+    <div class="slam-screen">
+      <canvas id="plaza3d" aria-hidden="true"></canvas>
+      <canvas id="plaza" aria-label="덩크 광장 화면"></canvas>
+      <div class="pz-emo" id="emo" role="toolbar" aria-label="몸짓"></div>
+      <button type="button" class="pz-char" id="btn-char">🎽 캐릭터</button>
+      <button type="button" class="slam-fs" id="btn-fs" aria-label="전체 화면"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="on" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path class="off" d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg></button>
+      <form class="pz-chat" id="chat" hidden autocomplete="off">
+        <input id="chat-in" maxlength="80" enterkeyhint="send" placeholder="Enter 로 채팅" aria-label="채팅">
+        <button type="submit">보내기</button>
+      </form>
+      <button type="button" class="pz-login" id="pz-login" hidden>로그인하고 광장 들어가기</button>
+    </div>
+    <div class="slam-pad">
+      <div class="slam-stick" id="stick"><span></span></div>
+      <div class="slam-btns">
+        <button type="button" id="btn-jp">점프</button>
+        <button type="button" id="btn-sh">슛</button>
+      </div>
+    </div>
+  </div>
+  <section class="slam-guide">
+    <h2>조작법</h2>
+    <table class="slam-keys">
+      <thead><tr><th>버튼</th><th class="kb">키보드</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><th>이동</th><td class="kb"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> · WASD</td><td>휴대폰은 왼쪽 스틱. 위(화면 안쪽)가 골대</td></tr>
+        <tr><th>슛</th><td class="kb"><kbd>스페이스</kbd> · <kbd>C</kbd></td><td>골대 바로 앞이면 덩크, 가까우면 레이업, 멀면 점프슛 — 멀수록 잘 안 들어가요</td></tr>
+        <tr><th>점프</th><td class="kb"><kbd>X</kbd></td><td>두 팔을 쭉 뻗고 뛰어요</td></tr>
+        <tr><th>몸짓</th><td class="kb"><kbd>1</kbd>~<kbd>7</kbd></td><td>화면 위 버튼 — 손 인사 · 박수 · 알통 · 환호 · 춤 · 꾸벅 · 앉기(움직일 때까지)</td></tr>
+        <tr><th>채팅</th><td class="kb"><kbd>Enter</kbd></td><td>화면 아래 칸에 쓰고 Enter — 머리 위 말풍선과 왼쪽 위 채팅 줄에 떠요</td></tr>
+      </tbody>
+    </table>
+    <h2>알아 두기</h2>
+    <ul class="slam-help">
+      <li>로그인하면 같은 광장에 있는 사람들이 보여요. 로그인하지 않으면 혼자 연습만 할 수 있어요.</li>
+      <li>채팅은 저장되지 않아요 — 그때 광장에 있는 사람만 봐요. 나갔다 들어오면 사라져요.</li>
+      <li>오른쪽 위 「캐릭터」에서 선수 얼굴과 유니폼 색을 바꿔요. 등에는 내 이름이 들어가요.</li>
+      <li>친구끼리 따로 모이려면 주소 끝에 <code>?room=방이름</code> 을 붙여 같은 주소로 들어오세요(영문 · 숫자).</li>
+    </ul>
+  </section>
+</main>
+
+<script type="module" src="/assets/plaza.js?v=70afd79f"></script>
+</body>
+</html>
