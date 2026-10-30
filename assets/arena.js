@@ -37,7 +37,7 @@ const PLAN_PAGE = location.pathname.startsWith('/arena/plan')   // 편성 페이
 let week = PLAN_PAGE ? '' : new URLSearchParams(location.search).get('w') || ''   // '' = 이번 주(서버가 정한다)
 let data = null      // GET /api/arena — { week, current, signups, plan, planAt, missing }
 let plan = {}        // 편성표 사본 { 시간대: [[{ u, n }]] } — 관리자가 고친다
-let accts = new Map()   // 신청한 계정 key → { u, n, owner(본계 닉네임), roles, chars, bt, slots, count(소유자의 참가 계정 수) }
+let accts = new Map()   // 신청한 계정 key → { u, n, owner(본계 닉네임), roles, chars, bt, slots, count(소유자의 참가 계정 수), i(그 사람 계정 중 프로필 순서, 0 = 대표) }
 let tab = 'all'
 // 편성 대기 목록 필터 — 시간대 · 포지션, 여러 개 고르면 하나라도 맞는 계정. 비어 있으면 미배정 · 전체
 const poolPick = new Set(), rolePick = new Set()
@@ -55,7 +55,7 @@ async function load() {
   show($('#ar-error'), '')
   week = data.week
   plan = structuredClone(data.plan)
-  accts = new Map(data.signups.flatMap(s => s.accounts.map(a => [key(s.userId, a.nick), { u: s.userId, n: a.nick, owner: s.owner, roles: a.roles, chars: a.chars, bt: a.bt, slots: s.slots, count: s.accounts.length }])))
+  accts = new Map(data.signups.flatMap(s => s.accounts.map((a, i) => [key(s.userId, a.nick), { u: s.userId, n: a.nick, owner: s.owner, roles: a.roles, chars: a.chars, bt: a.bt, slots: s.slots, count: s.accounts.length, i }])))
   render()
 }
 
@@ -474,15 +474,24 @@ const say = (msg, bad = false) => { status.textContent = msg; status.classList.t
 function editor() {
   const busy = (slot, u) => SLOTS.some(s => clash(slot, s.id) && teamsOf(s.id).some(tm => tm.some(x => x.u === u)))   // 겹치는 시간대에 이미 있다
   const at = placements()
-  const all = [...accts.values()].sort(byTally)
+  // 사람끼리 모은다 — 사람 순서는 대표 계정(프로필에서 가장 앞)의 집계 순서, 그 안은 프로필 순서(본계정 → 부계정)
+  const leads = new Map([...accts.values()].filter(a => a.i === 0).map(a => [a.u, a]))
+  const all = [...accts.values()].sort((x, y) => x.u === y.u ? x.i - y.i : byTally(leads.get(x.u), leads.get(y.u)) || x.u.localeCompare(y.u))
   // 시간대 필터 — 그 칸을 직접 고른 사람만(FA 는 FA 칸에서만), 겹치는 시간대에 이미 들어갔으면 뺀다.
   // FA 는 그날 넣을 시간대가 남은 사람만 — 1차 · 2차 둘 다(또는 1.5차) 뛰면 빠진다
   const fits = (a, id) => a.slots.includes(id) && (id in FA_DAY ? SLOTS.some(s => s.day === FA_DAY[id] && !busy(s.id, a.u)) : !busy(id, a.u))
   const bySlot = poolPick.size ? all.filter(a => [...poolPick].some(id => fits(a, id))) : all.filter(a => !at.has(key(a.u, a.n)))
-  // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션), 고른 포지션이 1순위인 계정이 먼저
+  // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션). 고른 포지션이 1순위인 계정이 있는 사람이 먼저(사람 묶음은 그대로 — 안정 정렬)
   const plays = (a, r) => a.roles.includes(r) || a.roles[0] === ALLPOS
-  const pool = !rolePick.size ? bySlot
-    : bySlot.filter(a => [...rolePick].some(r => plays(a, r))).sort((x, y) => !rolePick.has(x.roles[0]) - !rolePick.has(y.roles[0]) || byTally(x, y))
+  const pool = !rolePick.size ? bySlot : bySlot.filter(a => [...rolePick].some(r => plays(a, r)))
+  const top = new Set(pool.filter(a => rolePick.has(a.roles[0])).map(a => a.u))
+  pool.sort((x, y) => top.has(y.u) - top.has(x.u))
+  // 한 사람의 계정이 둘 이상 남았으면 한 칸에 묶는다 — 같은 시간대엔 그중 한 계정만 뛴다
+  const groups = []
+  for (const a of pool) {
+    if (groups.at(-1)?.[0].u !== a.u) groups.push([])
+    groups.at(-1).push(a)
+  }
   // 누르면 켜고 끈다 · 미배정 / 전체는 모두 끈다
   const pick = (set, id) => () => { id === 'all' ? set.clear() : set.has(id) ? set.delete(id) : set.add(id); renderPlan() }
   const on = (set, id) => id === 'all' ? !set.size : set.has(id)
@@ -493,7 +502,8 @@ function editor() {
   const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '미배정' }, ...SLOTS, ...FAS].map(s =>
     h('button', { type: 'button', 'aria-selected': on(poolPick, s.id), onclick: pick(poolPick, s.id) }, s.short)))
   // 계정 칸만 따로 세로 스크롤(필터는 그대로) · 아래 막대를 위아래로 끌어 높이 조절
-  const chips = h('div', { className: 'ar-chips' }, pool.length ? pool.map(a => chip(a, null)) : h('span', { className: 'rc-muted' }, '없어요'))
+  const chips = h('div', { className: 'ar-chips' }, groups.length ? groups.map(g => g.length > 1 ? h('div', { className: 'ar-group', title: `${g[0].owner} 님 계정` }, g.map(a => chip(a, null))) : chip(g[0], null))
+    : h('span', { className: 'rc-muted' }, '없어요'))
   if (poolH) chips.style.height = `${poolH}px`
   const grip = h('div', { className: 'ar-grip', title: '위아래로 끌어 높이 조절', 'aria-hidden': 'true' })
   grip.onpointerdown = e => {
@@ -515,7 +525,7 @@ function editor() {
       } }, detail ? '간단히 보기' : '자세히 보기')),
     poolTabs,
     roleTabs,
-    h('p', { className: 'rc-muted' }, !poolPick.size ? '어느 시간대에도 안 들어간 계정 · 집계 순서(계정 수 → 포지션 → 이름) · 필터는 여러 개 고를 수 있어요'
+    h('p', { className: 'rc-muted' }, !poolPick.size ? '어느 시간대에도 안 들어간 계정 · 사람별로 묶어 본계정 → 부계정, 사람 순서는 집계 순서(계정 수 → 포지션 → 이름) · 필터는 여러 개 고를 수 있어요'
       : `${[...poolPick].map(id => TAG[id]).join(' · ')} 중 하나라도 신청한 사람 · 겹치는 시간대에 이미 들어갔으면 빠져요(FA 는 그날 넣을 시간대가 남은 사람)`),
     chips, grip)
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {

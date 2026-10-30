@@ -1162,6 +1162,8 @@ label.ac-pick { cursor: pointer; }
 .ar-pool-head h3 { margin: 0 !important; }
 .ar-pool > .rc-muted { margin: -4px 0 10px; font-size: 12px; }
 .ar-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 40px; }
+/* 편성 대기 목록 — 한 사람의 계정 묶음(본계정 → 부계정) */
+.ar-group { display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%; padding: 4px; border: 1px dashed var(--muted); border-radius: 16px; background: #ffffff0a; }
 /* 편성 대기 목록의 계정 칸 — 따로 세로 스크롤(끝에 닿아도 페이지가 같이 밀리지 않게), 아래 막대(.ar-grip)를 끌어 높이 조절 */
 .ar-pool .ar-chips { height: 42vh; align-content: flex-start; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
 .ar-grip { display: flex; align-items: center; justify-content: center; height: 16px; margin-top: 6px; border-radius: 6px; cursor: ns-resize; touch-action: none; }
