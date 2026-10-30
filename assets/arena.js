@@ -485,7 +485,9 @@ function editor() {
   // FA 는 그날 넣을 시간대가 남은 사람만 — 1차 · 2차 둘 다(또는 1.5차) 뛰면 빠진다
   const fits = (a, id) => a.slots.includes(id) && (id in FA_DAY ? SLOTS.some(s => s.day === FA_DAY[id] && !busy(s.id, a.u)) : !busy(id, a.u))
   const match = (set, test) => allOf ? [...set].every(test) : [...set].some(test)
-  const bySlot = poolPick.size ? all.filter(a => match(poolPick, id => fits(a, id))) : all.filter(a => !at.has(key(a.u, a.n)))
+  // AND 는 고른 시간대를 모두 신청했고 그중 아직 넣을 데가 남은 사람 — 토 1차에 넣어도 토 2차가 남았으면 그대로 있다
+  const bySlot = !poolPick.size ? all.filter(a => !at.has(key(a.u, a.n)))
+    : all.filter(a => [...poolPick].some(id => fits(a, id)) && (!allOf || [...poolPick].every(id => a.slots.includes(id))))
   // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션). 고른 포지션이 1순위인 계정이 있는 사람이 먼저(사람 묶음은 그대로 — 안정 정렬)
   const plays = (a, r) => a.roles.includes(r) || a.roles[0] === ALLPOS
   const pool = !rolePick.size ? bySlot : bySlot.filter(a => match(rolePick, r => plays(a, r)))
@@ -538,7 +540,7 @@ function editor() {
       h('button', { type: 'button', className: 'ar-reset', disabled: !poolPick.size && !rolePick.size && !allOf,
         onclick: () => { poolPick.clear(); rolePick.clear(); allOf = false; renderPlan() } }, '필터 초기화')),
     h('p', { className: 'rc-muted' }, !poolPick.size ? '어느 시간대에도 안 들어간 계정 · 사람별로 묶어 본계정 → 부계정, 사람 순서는 집계 순서(계정 수 → 포지션 → 이름) · 필터는 여러 개 고를 수 있어요'
-      : `${[...poolPick].map(id => TAG[id]).join(' · ')} ${poolPick.size < 2 ? '' : allOf ? '모두 ' : '중 하나라도 '}신청한 사람 · 겹치는 시간대에 이미 들어갔으면 빠져요(FA 는 그날 넣을 시간대가 남은 사람)`),
+      : `${[...poolPick].map(id => TAG[id]).join(' · ')} ${poolPick.size < 2 ? '' : allOf ? '모두 ' : '중 하나라도 '}신청한 사람 · ${allOf && poolPick.size > 1 ? '고른 시간대에 다 들어가면' : '겹치는 시간대에 이미 들어갔으면'} 빠져요(FA 는 그날 넣을 시간대가 남은 사람)`),
     chips, grip)
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
