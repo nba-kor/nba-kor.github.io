@@ -41,6 +41,7 @@ let accts = new Map()   // 신청한 계정 key → { u, n, owner(본계 닉네�
 let tab = 'all'
 // 편성 대기 목록 필터 — 시간대 · 포지션, 여러 개 고르면 하나라도 맞는 계정. 비어 있으면 미배정 · 전체
 const poolPick = new Set(), rolePick = new Set()
+let allOf = false   // 여러 개 골랐을 때 false = 하나라도 맞으면(OR) · true = 모두 맞아야(AND). 시간대 · 포지션 줄에 같이 쓴다
 // 편성의 「자세히 보기」 — 칩마다 캐릭터(레벨)가 펼쳐진다. 처음엔 켜져 있고, 끄면 이 브라우저에 기억한다
 const DETAIL_KEY = 'dc.arena.detail'
 let detail = (() => { try { return localStorage.getItem(DETAIL_KEY) !== '0' } catch { return true } })()
@@ -483,10 +484,11 @@ function editor() {
   // 시간대 필터 — 그 칸을 직접 고른 사람만(FA 는 FA 칸에서만), 겹치는 시간대에 이미 들어갔으면 뺀다.
   // FA 는 그날 넣을 시간대가 남은 사람만 — 1차 · 2차 둘 다(또는 1.5차) 뛰면 빠진다
   const fits = (a, id) => a.slots.includes(id) && (id in FA_DAY ? SLOTS.some(s => s.day === FA_DAY[id] && !busy(s.id, a.u)) : !busy(id, a.u))
-  const bySlot = poolPick.size ? all.filter(a => [...poolPick].some(id => fits(a, id))) : all.filter(a => !at.has(key(a.u, a.n)))
+  const match = (set, test) => allOf ? [...set].every(test) : [...set].some(test)
+  const bySlot = poolPick.size ? all.filter(a => match(poolPick, id => fits(a, id))) : all.filter(a => !at.has(key(a.u, a.n)))
   // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션). 고른 포지션이 1순위인 계정이 있는 사람이 먼저(사람 묶음은 그대로 — 안정 정렬)
   const plays = (a, r) => a.roles.includes(r) || a.roles[0] === ALLPOS
-  const pool = !rolePick.size ? bySlot : bySlot.filter(a => [...rolePick].some(r => plays(a, r)))
+  const pool = !rolePick.size ? bySlot : bySlot.filter(a => match(rolePick, r => plays(a, r)))
   const top = new Set(pool.filter(a => rolePick.has(a.roles[0])).map(a => a.u))
   pool.sort((x, y) => top.has(y.u) - top.has(x.u))
   // 한 사람의 계정이 둘 이상 남았으면 한 칸에 묶는다 — 같은 시간대엔 그중 한 계정만 뛴다
@@ -528,8 +530,15 @@ function editor() {
       } }, detail ? '간단히 보기' : '자세히 보기')),
     poolTabs,
     roleTabs,
+    // 여러 개 골랐을 때 조건(OR · AND) · 필터 초기화(미배정 · 전체 · OR 로)
+    h('div', { className: 'ar-filter-ops' },
+      h('span', { className: 'rc-muted' }, '여러 개 고르면'),
+      h('div', { className: 'ar-tabs ar-role-tabs' }, [[false, '하나라도 (OR)'], [true, '모두 (AND)']].map(([v, label]) =>
+        h('button', { type: 'button', 'aria-selected': allOf === v, onclick: () => { allOf = v; renderPlan() } }, label))),
+      h('button', { type: 'button', className: 'ar-reset', disabled: !poolPick.size && !rolePick.size && !allOf,
+        onclick: () => { poolPick.clear(); rolePick.clear(); allOf = false; renderPlan() } }, '필터 초기화')),
     h('p', { className: 'rc-muted' }, !poolPick.size ? '어느 시간대에도 안 들어간 계정 · 사람별로 묶어 본계정 → 부계정, 사람 순서는 집계 순서(계정 수 → 포지션 → 이름) · 필터는 여러 개 고를 수 있어요'
-      : `${[...poolPick].map(id => TAG[id]).join(' · ')} 중 하나라도 신청한 사람 · 겹치는 시간대에 이미 들어갔으면 빠져요(FA 는 그날 넣을 시간대가 남은 사람)`),
+      : `${[...poolPick].map(id => TAG[id]).join(' · ')} ${poolPick.size < 2 ? '' : allOf ? '모두 ' : '중 하나라도 '}신청한 사람 · 겹치는 시간대에 이미 들어갔으면 빠져요(FA 는 그날 넣을 시간대가 남은 사람)`),
     chips, grip)
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
