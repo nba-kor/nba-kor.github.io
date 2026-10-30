@@ -7,10 +7,15 @@
 //   mkdir /tmp/gt && cd /tmp/gt && npm i @gltf-transform/core@4 @gltf-transform/functions@4
 //   NODE_PATH=/tmp/gt/node_modules node tools/plaza-bodies.mjs <원본 폴더(Male · Female 이 든 곳)>
 import { createRequire } from 'node:module'
-const require = createRequire(`${process.env.NODE_PATH || '.'}/`)
-const { NodeIO } = require('@gltf-transform/core'), { mergeDocuments, prune, unpartition } = require('@gltf-transform/functions')
-
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
+const HOW = '사용: NODE_PATH=<gltf-transform 을 설치한 곳>/node_modules node tools/plaza-bodies.mjs <원본 폴더(Male/Beach.glb · Male/Casual_2.glb · Female/Casual.glb 가 든 곳)> — 파일 맨 위 설명 참고'
 const src = process.argv[2], out = new URL('../assets/quaternius/', import.meta.url).pathname
+if (!src || !['Male/Beach.glb', 'Male/Casual_2.glb', 'Female/Casual.glb'].every(f => existsSync(`${src}/${f}`))) { console.error(HOW); process.exit(1) }
+const require = createRequire(`${resolve(process.env.NODE_PATH || '.')}/`)
+let NodeIO, mergeDocuments, prune, unpartition
+try { ({ NodeIO } = require('@gltf-transform/core')); ({ mergeDocuments, prune, unpartition } = require('@gltf-transform/functions')) } catch { console.error(`@gltf-transform 을 못 찾았어요. ${HOW}`); process.exit(1) }
+
 const io = new NodeIO(), KEEP = new Set(['Idle', 'Walk', 'Run', 'Wave'])
 const drop = a => { a.listChannels().forEach(c => c.dispose()); a.listSamplers().forEach(s => s.dispose()); a.dispose() }   // 동작만 지우면 그 안의 데이터가 남는다
 async function load(f) { const d = await io.read(f); for (const a of d.getRoot().listAnimations()) if (!KEEP.has(a.getName())) drop(a); return d }
