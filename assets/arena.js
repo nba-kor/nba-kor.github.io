@@ -803,7 +803,7 @@ function saveExcel(e) {
   })
 }
 
-/** 편성표 그림 — 한 줄에 하루(1차 · 1.5차 · 2차). 팀 한 줄에 3명(얼굴 · 닉네임 · 캐릭터) */
+/** 편성표 그림 — 한 줄에 하루(1차 · 1.5차 · 2차). 팀 한 줄에 3명(얼굴 · 닉네임 · 부계정이면 아래 작게 본계정) */
 async function drawPlan() {
   const rows = [...new Set(SLOTS.map(s => s.day))].map(d => SLOTS.filter(s => s.day === d))
   const PER = Math.max(...rows.map(r => r.length)), PAD = 28, GAP = 16, COL = 437, W = PAD * 2 + PER * COL + GAP * (PER - 1), ROW = 58, HEAD = 40, Z = 2
@@ -859,8 +859,9 @@ async function drawPlan() {
           g.restore()
           g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15.5, 0, Math.PI * 2); g.strokeStyle = '#bcc4ce'; g.lineWidth = 2; g.stroke()
           if (mi === 0) { box(cx + 1, ty + ROW / 2 + 9, 28, 14, 7, ACCENT); text('팀장', cx + 15, ty + ROW / 2 + 20, 10, '#1a1200', 800, 40, 'center') }   // 팀장은 얼굴 아래 뱃지
-          text(m.n, cx + 36, ty + 25, 13.5, '#16181d', 700, cw - 40)
-          text(a ? charNames(a.chars, a.bt) : '', cx + 36, ty + 43, 11, '#586272', 400, cw - 40)
+          const sub = a && a.owner !== a.n ? `본계 ${a.owner}` : ''   // 본계정은 닉네임만 가운데에
+          text(m.n, cx + 36, sub ? ty + 25 : ty + ROW / 2 + 5, 13.5, '#16181d', 700, cw - 40)
+          text(sub, cx + 36, ty + 43, 11, '#586272', 400, cw - 40)
         })
       })
     })
