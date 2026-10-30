@@ -249,7 +249,7 @@ delete from public.site_admins where user_id = '<디스코드 ID 또는 k카카�
 **처음 운영에 올릴 때** (순서대로 — 함수가 `site_admins` 를 읽고, 새 화면은 티어 없는 프로필을 보낸다)
 
 1. `20261023000000_arena.sql` 을 SQL Editor 에 붙여 넣어 Run → 위 SQL 로 관리자를 넣는다.
-2. Supabase **Authentication > URL Configuration > Redirect URLs** 에 `https://nba-kor.github.io/` · `https://nba-kor.github.io/arena/` · `https://nba-kor.github.io/arena/plan/` · `https://nba-kor.github.io/me/` · `https://nba-kor.github.io/slam/` · `https://nba-kor.github.io/street/` · `https://nba-kor.github.io/game/` · `https://nba-kor.github.io/survive/` · `https://nba-kor.github.io/plaza/` 추가(로그인은 누른 페이지로 돌아온다).
+2. Supabase **Authentication > URL Configuration > Redirect URLs** 는 `https://nba-kor.github.io/**` 한 줄로 모든 페이지가 된다(로그인은 누른 페이지로 돌아온다 — 새 페이지를 만들어도 따로 넣지 않는다).
 3. `sh tools/deploy-api.sh` → `node tools/stamp-assets.mjs` → main 푸시.
 
 ## 팀원모집
@@ -430,7 +430,7 @@ publishable key 나 로그인 토큰으로는 표를 읽거나 쓸 수 없다. �
 4. **디스코드 로그인** — [Discord Developer Portal](https://discord.com/developers/applications) 의 애플리케이션 **OAuth2 > Redirects** 에
    `https://lgchgqxjjlapszmxarun.supabase.co/auth/v1/callback` 을 넣고 Client ID · Client Secret 을 복사한다.
    Supabase **Authentication > Sign In / Providers > Discord** 를 켜고 둘을 넣는다(이메일 없는 디스코드 계정도 되게 이메일 필수는 끈다).
-   **Authentication > URL Configuration** 의 Site URL 은 `https://nba-kor.github.io/recruit/`, Redirect URLs 에 `https://nba-kor.github.io/recruit/` · `https://nba-kor.github.io/potentials/` · `https://nba-kor.github.io/videos/` · `https://nba-kor.github.io/tactics/` · `https://nba-kor.github.io/tiers/` · `http://localhost:8000/recruit/` · `http://localhost:8000/potentials/` · `http://localhost:8000/videos/`
+   **Authentication > URL Configuration** 의 Site URL 은 `https://nba-kor.github.io/recruit/`, Redirect URLs 에 `https://nba-kor.github.io/**`(모든 페이지) · `http://localhost:8000/recruit/` · `http://localhost:8000/potentials/` · `http://localhost:8000/videos/`
    (로그인은 누른 페이지로 돌아온다 — `assets/auth.js`. 목록에 없는 페이지는 Site URL 로 떨어진다).
    Client Secret 은 함수 비밀값이 아니다 — `.env` 에 두고 `secrets set` 으로 올리지 않는다.
 
@@ -667,7 +667,7 @@ API 가 팀을 보여 줄 때 그 줄을 `entries` 맨 앞으로 옮기므로 �
    카카오는 '사용 안함' 인 항목이 scope 에 있으면 KOE205 로 막는다 — 세 개 모두 **선택 동의**로 둔다.
    이메일은 비즈 앱만 켤 수 있으니 앱을 비즈 앱으로 바꾼다(개인 개발자 비즈 앱, 사업자번호 없이 된다). 사용자가 다 체크 해제해도 로그인은 된다.
 2. Supabase **Authentication > Sign In / Providers > Kakao** 를 켜고 REST API 키(Client ID) · Client Secret 을 넣고 **Allow users without an email** 을 켠다.
-   같은 화면의 **Allow manual linking**(카카오 연결)도 켠다. Redirect URLs 는 그대로(페이지 목록이 같다).
+   같은 화면의 **Allow manual linking**(카카오 연결)도 켠다. Redirect URLs 는 그대로.
 3. 마이그레이션 `20261016000000_kakao_guests.sql` 을 SQL Editor 에 붙여 넣어 Run(사용자 ID 형식 · 비회원 칸 · 만들기/가입 RPC). 옛 함수도 이 스키마로 그대로 돈다.
 4. TNAB 봇을 돌리고 있으면 새 코드로 먼저 다시 띄운다(옛 봇은 비회원 · 카카오 팀원이 낀 팀에서 목록을 못 읽는다). 2026-10 부터는 봇을 쓰지 않는다.
 5. `sh tools/deploy-api.sh` → `node tools/stamp-assets.mjs` 후 main 푸시.
@@ -741,7 +741,7 @@ supabase/migrations/20260928000000_potentials.sql  potential_builds · potential
 `data/potentials.json` 의 `potentials` 에 한 줄 넣는다(`id` 는 한 번 정하면 바꾸지 않는다 — 저장된 글이 이 id 를 가리킨다).
 함수에 묶여 있으므로 **함수도 다시 배포**한다([운영 배포](#운영-배포) 4번).
 
-처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → 위 Redirect URLs 에 `/potentials/` 추가 → 함수 배포 → main 푸시.
+처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → 함수 배포 → main 푸시.
 
 ## 영상
 
@@ -759,7 +759,7 @@ supabase/migrations/20260929000000_videos.sql  videos · video_likes · video_co
 - `GET /api/videos?cat=<분류>&limit=<n>` — 홈이 `cat=lecture&sort=new&limit=4` 로 "최신 강의" 를 그린다. 실패하거나 0개면 그 칸은 숨는다.
 - 카톡 공유는 피드 카드(유튜브 썸네일 `i.ytimg.com/vi/<id>/hqdefault.jpg`).
 
-처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → Redirect URLs 에 `/videos/` 추가 → `sh tools/deploy-api.sh` → main 푸시.
+처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → `sh tools/deploy-api.sh` → main 푸시.
 
 ## 커스텀 전술
 
@@ -776,7 +776,7 @@ GET /api/tactics?sort=likes      목록(보드 없이) · GET /api/tactics/<id> 
 - 카드: 1~3줄 공격 선수(모자라면 수비), 4줄 전술 설명(등록된 커스텀은 그 설명) — 4줄 사용자 정의 템플릿. 고친 보드(# 주소)는 기본 3줄(설명 없이), 선수 2명 미만이면 사이트 대표 이미지.
 - 팀원모집 「원하는 전술」 에도 커스텀 전술 묶음(좋아요순)이 나온다. 고르면 보드 · 이름과 함께 `tactic.custom`(전술 번호)을 보내고, 팀 화면은 그 번호로 설명 · 작성자 · 「전술판에서 열기」 를 보여 준다(전술이 지워졌으면 보드만).
 
-처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → Redirect URLs 에 `/tactics/` 추가 → `sh tools/deploy-api.sh` → main 푸시.
+처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → `sh tools/deploy-api.sh` → main 푸시.
 
 ## 티어표 게시판
 
@@ -791,7 +791,7 @@ supabase/migrations/20261006000000_tier_lists.sql   tier_lists · tier_list_like
 
 - 티어 1~12줄, 이름 10자 · 색 `#rrggbb` · 선수는 한 줄에만. 미출시 선수도 올릴 수 있다(`chars` 에는 한국 서버 선수만 들어간다).
 
-처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → Redirect URLs 에 `/tiers/` 추가 → `sh tools/deploy-api.sh` → main 푸시.
+처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → `sh tools/deploy-api.sh` → main 푸시.
 
 ## 조합표
 
@@ -809,7 +809,7 @@ supabase/migrations/20261006200000_combos_sets.sql  추천 티어 칸 빼기 · 
 - 잠재력추천은 **글 번호만 저장**하고, 글 화면이 게시판 공용 `?ids=1,2,3`(30개까지) 목록으로 한 번에 읽는다 — 지워진 글은 「지워졌어요」 로 보인다.
 - 카톡 공유: 선수 3줄(포지션 · 추천 빌드 제목) + 상성 줄 + 설명 줄(있을 때) — 4 · 5줄 사용자 정의 템플릿, 3줄뿐이면 기본 카드.
 
-처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → Redirect URLs 에 `/combos/` 추가 → `sh tools/deploy-api.sh` → main 푸시.
+처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → `sh tools/deploy-api.sh` → main 푸시.
 
 ## 카카오 4 · 5줄 리스트
 
