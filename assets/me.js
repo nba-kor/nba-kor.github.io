@@ -163,7 +163,7 @@ const adminCard = () => fold('admin', '관리자 메뉴',
 // ------------------------------------------------ 관리자 — 멤버 관리(프로필이 있는 사람). 슈퍼관리자(마스터) · 본인은 못 바꾼다 — 서버도 막는다
 
 const ROLE_KO = { master: '슈퍼관리자', admin: '관리자', member: '멤버' }
-// 출석 상태 — 연속 미참석(attend.missed) 2주 경고 · 3주 위험 · 4주 이상 강제탈퇴 대상. 탈퇴는 관리자가 멤버 관리의 「탈퇴」 로 한다
+// 출석 상태 — 연속 미참석(attend.missed, 사유불참 주는 서버가 건너뛴다) 2주 경고 · 3주 위험 · 4주 이상 강제탈퇴 대상. 탈퇴는 관리자가 멤버 관리의 「탈퇴」 로 한다
 const STATUS = [[4, 'out', '강제탈퇴'], [3, 'risk', '위험'], [2, 'warn', '경고'], [0, 'ok', '정상']]
 const statusOf = m => STATUS.find(([n]) => m.attend.missed >= n)
 const statusTag = m => { const [, id, label] = statusOf(m); return h('span', { className: `mp-status is-${id}`, title: m.attend.missed ? `${m.attend.missed}주째 미참석${m.attend.missed >= 4 ? ' · 「탈퇴」 로 내보낼 대상' : ''}` : '' }, label) }
@@ -206,7 +206,7 @@ function attendanceCard() {
       away.length ? table(away, [['미참석', m => m.attend.missed ? h('b', { className: 'mp-missed' }, `${m.attend.missed}주째`) : '-'], ['상태', statusTag], ['총 참석', m => `${m.attend.total}회`], ['최근 신청', last]]) : h('p', { className: 'rc-muted' }, '없어요'))
   })
   return fold('attendance', '아레나 출석 현황', box,
-    h('p', { className: 'rc-muted' }, '출석 = 그 주에 참가 신청(사유불참 빼고). 이번 주에 아직 신청하지 않았으면 지난주까지로 세요. 가입하기 전 주는 미참석으로 세지 않아요. 연속 미참석 2주 경고 · 3주 위험 · 4주 이상 강제탈퇴 대상. 관리자만 보여요.'))
+    h('p', { className: 'rc-muted' }, '출석 = 그 주에 참가 신청. 사유불참한 주는 건너뛰어요(연속 참석을 끊지도, 미참석으로 세지도 않아요). 이번 주에 아직 신청하지 않았으면 지난주까지로 세요. 가입하기 전 주는 미참석으로 세지 않아요. 연속 미참석 2주 경고 · 3주 위험 · 4주 이상 강제탈퇴 대상. 관리자만 보여요.'))
 }
 
 function membersCard() {
@@ -245,7 +245,7 @@ function membersCard() {
   }
   watchMembers(box, l => { list = l; paint() })
   return fold('members', '멤버 관리', h('div', { className: 'mp-members-head' }, q, head), box,
-    h('p', { className: 'rc-muted' }, '멤버 = 프로필(게임 계정)을 등록한 사람. 슈퍼관리자는 바꾸거나 탈퇴시킬 수 없어요. 탈퇴하면 프로필 · 게임 계정 · 아레나 신청 · 관리자 권한이 지워져요. 상태 = 아레나 연속 미참석(2주 경고 · 3주 위험 · 4주 이상 강제탈퇴 대상).'))
+    h('p', { className: 'rc-muted' }, '멤버 = 프로필(게임 계정)을 등록한 사람. 슈퍼관리자는 바꾸거나 탈퇴시킬 수 없어요. 탈퇴하면 프로필 · 게임 계정 · 아레나 신청 · 관리자 권한이 지워져요. 상태 = 아레나 연속 미참석(사유불참 주는 빼고 2주 경고 · 3주 위험 · 4주 이상 강제탈퇴 대상).'))
 }
 
 // ------------------------------------------------ 마스터 — 사이트 접근 비밀번호 보기 · 바꾸기

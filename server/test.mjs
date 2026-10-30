@@ -2036,15 +2036,15 @@ dbTest('멤버 관리: 관리자만 · 목록(등급 · 본계정 · 계정 수 
   assert.deepEqual([l[at(boss.id)].role, l[at(adm.id)].role, l[at(m2.id)].lastWeek], ['master', 'admin', null])
   assert.ok(at(boss.id) < at(adm.id) && at(adm.id) < at(m1.id), '슈퍼관리자 → 관리자 → 멤버 순')
 
-  // 출석: 이번 주에 아직 신청 안 한 m2 — 지난주 · 2주 전에 나왔으면 2주 연속(이번 주는 아직), 3 · 4주 전은 사유불참 · 없음
+  // 출석: 이번 주에 아직 신청 안 한 m2 — 지난주 · 2주 전 · 4주 전에 나왔고 3주 전은 사유불참 → 사유불참은 건너뛰어 3주 연속(이번 주는 아직)
   const cur = arenaWeek(clock), wk = n => new Date(Date.parse(`${cur}T00:00:00Z`) - n * 7 * 86_400_000).toISOString().slice(0, 10)
   const sign = (u, week, slots = ['sat1']) => rest('/arena_signups', post({ week, user_id: u, slots, nicks: [], updated_at: clock }))
-  for (const r of [await sign(m2.id, wk(1)), await sign(m2.id, wk(2)), await sign(m2.id, wk(3), ['absent'])]) assert.equal(r.status, 201)
-  // adm — 4주 전에 가입, 그 뒤로 한 번도 안 나왔다 → 4주째 미참석(이번 주는 아직이라 안 센다). 이번 주 사유불참이어도 미참석으로 센다
-  await rest(`/recruit_profiles?discord_user_id=eq.${adm.id}`, { method: 'PATCH', body: JSON.stringify({ created_at: clock - 28 * 86_400_000 }) })
-  assert.equal((await sign(adm.id, cur, ['absent'])).status, 201)
+  for (const r of [await sign(m2.id, wk(1)), await sign(m2.id, wk(2)), await sign(m2.id, wk(3), ['absent']), await sign(m2.id, wk(4))]) assert.equal(r.status, 201)
+  // adm — 5주 전에 가입, 그 뒤로 한 번도 안 나왔고 2주 전만 사유불참 → 사유불참 주는 빼고 4주째 미참석(이번 주 사유불참도 안 센다)
+  await rest(`/recruit_profiles?discord_user_id=eq.${adm.id}`, { method: 'PATCH', body: JSON.stringify({ created_at: clock - 35 * 86_400_000 }) })
+  for (const r of [await sign(adm.id, cur, ['absent']), await sign(adm.id, wk(2), ['absent'])]) assert.equal(r.status, 201)
   l = (await list(boss)).body.members
-  assert.deepEqual(l[at(m2.id)].attend, { now: null, streak: 2, missed: 0, total: 2 })
+  assert.deepEqual(l[at(m2.id)].attend, { now: null, streak: 3, missed: 0, total: 3 })
   assert.deepEqual(l[at(adm.id)].attend, { now: 'absent', streak: 0, missed: 4, total: 0 })
   assert.deepEqual(l[at(boss.id)].attend, { now: null, streak: 0, missed: 0, total: 0 }, '이번 주에 가입 — 셀 주가 없다')
 

@@ -1169,20 +1169,25 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       const last = new Map()
       for (const w of weeks) if (!last.has(w.user_id)) last.set(w.user_id, w.week)
       // 출석 = 그 주에 신청(사유불참 빼고). 이번 주에 신청했으면 이번 주부터, 아직이면 지난주부터 거꾸로 센다 —
-      // streak = 연속 참석 주, missed = 연속 미참석 주(가입한 주 · 아레나 신청을 받기 시작한 주 앞은 안 센다)
+      // streak = 연속 참석 주, missed = 연속 미참석 주(가입한 주 · 아레나 신청을 받기 시작한 주 앞은 안 센다).
+      // 사유불참한 주는 건너뛴다 — 연속 참석을 끊지도, 미참석으로 세지도 않는다
       const cur = arenaWeek(t), back = w => new Date(Date.parse(`${w}T00:00:00Z`) - 7 * 86_400_000).toISOString().slice(0, 10)
       const first = weeks.reduce((m, w) => w.week < m ? w.week : m, cur)
-      const went = new Map(), now = new Map()
+      const went = new Map(), excused = new Map(), now = new Map()
       for (const w of weeks) {
-        const absent = w.slots.includes('absent')
+        const absent = w.slots.includes('absent'), by = absent ? excused : went
         if (w.week === cur) now.set(w.user_id, absent ? 'absent' : 'in')
-        if (!absent) went.set(w.user_id, (went.get(w.user_id) || new Set()).add(w.week))
+        by.set(w.user_id, (by.get(w.user_id) || new Set()).add(w.week))
       }
       const attend = p => {
-        const set = went.get(p.discord_user_id) || new Set(), start = [first, arenaWeek(p.created_at)].sort().at(-1)
+        const set = went.get(p.discord_user_id) || new Set(), off = excused.get(p.discord_user_id) || new Set(), start = [first, arenaWeek(p.created_at)].sort().at(-1)
         let w = now.get(p.discord_user_id) === 'in' ? cur : back(cur), streak = 0, missed = 0
-        if (set.has(w)) for (; set.has(w); w = back(w)) streak++
-        else for (; w >= start && !set.has(w); w = back(w)) missed++
+        for (; ; w = back(w)) {
+          if (off.has(w)) continue
+          if (set.has(w)) { if (missed) break; streak++ }
+          else if (streak || w < start) break
+          else missed++
+        }
         return { now: now.get(p.discord_user_id) ?? null, streak, missed, total: set.size }
       }
       const ORDER = { master: 0, admin: 1, member: 2 }
