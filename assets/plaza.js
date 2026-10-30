@@ -1,6 +1,6 @@
 // 덩크 광장 — 덩크 시티 선수가 되어 길거리 코트에 모이는 곳. 걸어 다니며 채팅 · 몸짓(제스처) · 슛. 머리 메뉴 「게임」 아래 줄의 넷째.
-// 장면(코트 · 골대 · 배경)은 스트리트 3:3 과 같다(court3d.js). 사람은 Kenney Mini Characters(CC0, assets/kenney — 뼈 7개, 걷기 · 점프 · 앉기 등 동작 포함) —
-//   고른 덩크 시티 선수로 몸(아일라만 여자 모델) · 피부 · 머리색(얼굴 그림에서)을 정하고 셔츠는 팀 색, 등에 이름 · 번호. 손 인사 · 박수 · 슛 같은 동작은 팔 · 몸통 뼈를 덧돌린다. 로그인하면 같은 방(?room=, 기본 main)의 사람들과 Supabase Realtime 채널 plaza-<방>에서 만난다 —
+// 장면(코트 · 골대 · 배경)은 스트리트 3:3 과 같다(court3d.js). 사람은 Quaternius Ultimate Modular Men · Women(CC0, assets/quaternius) 몸에
+//   고른 덩크 시티 선수 얼굴 그림을 입힌 머리 — 피부 · 머리색 · 등번호도 그 선수, 유니폼은 팀 색(아일라만 여자 몸). 손 인사 · 걷기 · 달리기는 모델 동작, 나머지는 팔 · 다리 · 허리를 덧놓는다. 로그인하면 같은 방(?room=, 기본 main)의 사람들과 Supabase Realtime 채널 plaza-<방>에서 만난다 —
 //   누가 있나(presence: 이름 · 캐릭터 · 팀)와 짧은 알림(broadcast: 이동 · 점프 · 슛 · 몸짓 · 채팅)만 오간다. 로그인 안 하면 혼자 논다.
 // 이동은 스틱 · 방향키가 바뀔 때만 보낸다(자리 · 속도 · 방향) — 받는 쪽이 같은 걸음으로 이어 걷고, 어긋난 만큼 부드럽게 당긴다. 멈춰 있으면 아무것도 안 보낸다
 //   (Realtime 무료 한도: 초당 100 · 한 달 200만 메시지 — 받는 사람마다 센다).
@@ -14,8 +14,8 @@ import { clone as cloneRig } from 'https://cdn.jsdelivr.net/npm/three@0.170.0/ex
 import { mountTop, faceOf } from './app.js?v=fb02b445'
 import { loadData, data, kr, startAuth, me as who, auth, loggedIn, charGrid, h } from './board.js?v=4233415a'
 import { sb } from './auth.js?v=1fbb8e2f'
-import { TEAMS, NUMS, NBA_NUM, cutHead, skinOf } from './vipers.js?v=c92ed58c'
-import { R3, RIM, sm, wx, wz, LIFT, RIM_Y, RIM_Z, scene, part, toon, tex, floorMat, rimG, net as hoopNet, scenery, BALL, ballMat, hairOf, yaw } from './court3d.js?v=b22147fd'
+import { TEAMS, NUMS, NBA_NUM, cutHead, skinOf, SKIN } from './vipers.js?v=c92ed58c'
+import { R3, RIM, sm, wx, wz, LIFT, RIM_Y, RIM_Z, scene, part, toon, tex, floorMat, rimG, net as hoopNet, scenery, BALL, ballMat, hairOf, yaw } from './court3d.js?v=8016bbac'
 
 mountTop('/plaza/')
 
@@ -25,9 +25,9 @@ const W = 960, H = 540                                   // 겹친 2D 화면(이
 const SPD = 160, GRAV = 1100, JUMP = 300                 // 단위는 코트와 같다(0.1피트)
 const X0 = -100, X1 = 600, Y0 = -95, Y1 = 600            // 걸을 수 있는 곳 — 철망 안 아스팔트까지
 const POLE = { x: 250, y: -41 }                          // 골대 기둥
-const DUNKS = ['SLAM DUNK!', 'TOMAHAWK!', 'WINDMILL!', 'REVERSE!']   // style — 0 · 3 은 두 손, 1 · 2 는 한 손, 3 은 등지고
+const DUNKS = ['SLAM DUNK!', 'TOMAHAWK!', 'WINDMILL!', 'REVERSE!']   // style — 0 · 3 은 두 손, 1 · 2 는 한 손, 3 은 돌아서
 // 몸짓 — T 초 동안(0 이면 움직일 때까지). 동작은 animate
-const EMO = [['👋', '손 인사', 2.2], ['👏', '박수', 2.2], ['🙆', '끄덕', 2], ['🙌', '환호', 2.2], ['🕺', '춤', 3.6], ['🙇', '꾸벅', 1.6], ['🧘', '앉기', 0]]
+const EMO = [['👋', '손 인사', 2.2], ['👏', '박수', 2.2], ['💪', '알통', 2], ['🙌', '환호', 2.2], ['🕺', '춤', 3.6], ['🙇', '꾸벅', 1.6], ['🧘', '앉기', 0]]
 const ROOM = (new URLSearchParams(location.search).get('room') || '').replace(/[^\w-]/g, '').slice(0, 20) || 'main'
 
 const rnd = Math.random
@@ -57,69 +57,30 @@ const everyone = () => [me, ...others.values()]
 const log = (name, text, c = '#c9d1d9') => { logs.push({ name, text, c, at: tnow }); if (logs.length > 30) logs.shift() }
 const pop = (p, text, c = '#fff') => pops.push({ p, text, c, t: 1.3 })
 
-// ---------------------------------------------------------------- 몸 — Kenney Mini Characters(CC0)
+// ---------------------------------------------------------------- 몸 — Quaternius Ultimate Modular Men · Women(CC0) + 덩크 시티 얼굴
 
-const HT = 1.8                                                  // 키(미터) — 머리가 큰 2등신
-const LOOKS = ['male-a', 'male-b', 'male-d', 'male-e', 'male-f'], FEMALE = new Set(['al'])   // 국내 서버 여자 선수는 아일라뿐. male-c 는 경찰 모자라 뺐다
-const lookOf = id => FEMALE.has(id) ? 'female-a' : LOOKS[[...String(id)].reduce((a, ch) => a + ch.charCodeAt(0), 0) % LOOKS.length]
+// 몸 파일은 원본에서 머리를 빼고 동작 넷(Idle · Walk · Run · Wave)만 남겨 만든 것(tools/plaza-bodies.mjs). 남자는 Beach 몸 · 반바지 + Casual_2 운동화, 여자는 Casual.
+// 재질 이름 — Skin(피부) · Jersey(상의) · Shorts(하의) · Trim(반바지 줄)을 사람마다 칠한다. 머리는 고른 선수 얼굴 그림을 공에 입혀 머리 뼈에 붙인다
+const BODY = { m: '/assets/quaternius/male.glb', f: '/assets/quaternius/female.glb' }, FEMALE = new Set(['al'])   // 국내 서버 여자 선수는 아일라뿐
 const loader = new GLTFLoader(), kits = new Map()
-const kit = look => kits.get(look) ?? kits.set(look, loader.loadAsync(`/assets/kenney/character-${look}.glb`).then(study)).get(look)
-/** 모델을 한 번 고친다 — 팔레트 그림(colormap, 16 × 4 칸)에서 피부 · 머리 칸을 찾고, 옷을 농구 유니폼으로: 몸통 · 반바지는 비어 있는 칸(JERSEY — 사람마다 팀 색으로 칠한다),
- *  팔 · 정강이는 피부 칸, 신발은 그대로. 같은 모습끼리 모양(geometry)을 같이 쓰므로 한 번만. 등판 자리 · 손끝 · 키도 여기서 */
-const JERSEY = '15,0'
+const kit = sex => kits.get(sex) ?? kits.set(sex, loader.loadAsync(BODY[sex]).then(study)).get(sex)
+const local = (bone, v) => bone.worldToLocal(v.clone())   // 모델 자리 → 뼈 기준(처음 자세에서)
+/** 처음 자세에서 머리 · 등판 · 가슴 번호를 붙일 자리(뼈 기준)와 엉덩이 높이를 잰다 */
 function study(g) {
-  const meshes = {}, P = new THREE.Vector3(), at = {}, vs = []
-  g.scene.updateMatrixWorld()
-  g.scene.traverse(o => { if (o.isSkinnedMesh) meshes[o.name] = o; if (o.isBone) at[o.name] = o.getWorldPosition(new THREE.Vector3()) })
-  const stat = {}, box = {}   // 부위 → 칸 → { 수, 높이 범위 } · 뼈 → 꼭짓점 범위
-  for (const mesh of Object.values(meshes)) {
-    const { uv, skinIndex: si, skinWeight: sw, position } = mesh.geometry.attributes, bones = mesh.skeleton.bones
-    for (let i = 0; i < uv.count; i++) {
-      let k = 0
-      for (let j = 1; j < 4; j++) if (sw.getComponent(i, j) > sw.getComponent(i, k)) k = j
-      const bone = bones[si.getComponent(i, k)].name, part = bone.replace(/-(left|right)$/, ''), cell = `${Math.floor(uv.getX(i) * 16)},${Math.floor(uv.getY(i) * 4)}`, y = position.getY(i)
-      const e = ((stat[part] ??= {})[cell] ??= { n: 0, lo: 9, hi: -9 })
-      e.n++; e.lo = Math.min(e.lo, y); e.hi = Math.max(e.hi, y)
-      ;(box[bone] ??= new THREE.Box3()).expandByPoint(P.fromBufferAttribute(position, i))
-      vs.push([uv, i, part, cell])
-    }
-  }
-  const head = Object.entries(stat.head)
-  const skin = head.sort((m, n) => m[1].lo - n[1].lo || n[1].n - m[1].n)[0][0]                    // 머리 상자 — 목까지 내려온다
-  const hair = head.filter(([c]) => c !== skin).sort((m, n) => n[1].hi - m[1].hi)[0]?.[0]         // 가장 위까지 올라간다
-  const legTop = Math.max(...Object.values(stat.leg).map(e => e.hi))
-  const to = (part, cell) => part === 'torso' ? JERSEY : part === 'arm' ? skin
-    : part === 'leg' ? (stat.leg[cell].hi >= legTop * 0.97 ? JERSEY : stat.leg[cell].hi > legTop * 0.54 ? skin : null) : null   // 다리 — 위까지 닿으면 반바지, 아래 칸은 신발
-  for (const [uv, i, part, cell] of vs) {
-    const c = to(part, cell)
-    if (!c) continue
-    const [cx, cy] = c.split(',').map(Number), u = uv.getX(i) * 16, v = uv.getY(i) * 4
-    uv.setXY(i, (cx + u - Math.floor(u)) / 16, (cy + v - Math.floor(v)) / 4)   // 칸 안의 자리(위아래 음영)는 그대로
-  }
-  for (const m of Object.values(meshes)) m.geometry.attributes.uv.needsUpdate = true
-  const hand = side => { const b = box[side]; return new THREE.Vector3((b.min.x + b.max.x) / 2, b.min.y + 0.035, (b.min.z + b.max.z) / 2).sub(at[side]) }   // 팔 뼈 기준 손
-  const arm = side => ({ rest: at[side].clone().sub(at.torso), up: box[side].max.y - 0.02 - at[side].y,   // 팔 뼈는 팔 한가운데라 — 덧돌릴 때는 위끝(어깨)을 축으로
-    out: Math.max(0, (box.head.max.x - box.head.min.x) / 2 - Math.abs(at[side].x)) + 0.03 })   // 팔을 높이 들면 어깨를 이만큼 바깥으로 — 머리 옆으로 올라오게
-  const size = box.torso.getSize(new THREE.Vector3()), height = new THREE.Box3().setFromObject(g.scene).max.y
-  return { g, map: meshes['body-mesh'].material.map, cells: { shirt: JERSEY, skin, hair }, hand: { 'arm-right': hand('arm-right'), 'arm-left': hand('arm-left') }, arm: { 'arm-right': arm('arm-right'), 'arm-left': arm('arm-left') },
-    back: new THREE.Vector3(0, (box.torso.min.y + box.torso.max.y) / 2, box.torso.min.z - 0.004).sub(at.torso), front: box.torso.max.z + 0.004 - at.torso.z, w: size.x,
-    top: box.head.max.y - at.head.y, height }
-}
-/** 그 사람만의 팔레트 — 셔츠는 팀 색, 피부 · 머리는 덩크 시티 얼굴 그림에서 뽑은 색(칸 안 위아래로 조금 어둡게) */
-function paint(k, T, f) {
-  const c = Object.assign(document.createElement('canvas'), { width: 512, height: 512 }), x = c.getContext('2d')
-  x.drawImage(k.map.image, 0, 0, 512, 512)
-  const fill = (cell, col) => {
-    if (!cell || !col) return
-    const [cx, cy] = cell.split(',').map(Number), gr = x.createLinearGradient(0, cy * 128, 0, cy * 128 + 128)
-    gr.addColorStop(0, col); gr.addColorStop(1, `color-mix(in srgb, ${col} 72%, #000)`)
-    x.fillStyle = col; x.fillRect(cx * 32, cy * 128, 32, 128)
-    try { x.fillStyle = gr; x.fillRect(cx * 32, cy * 128, 32, 128) } catch {}   // color-mix 를 모르는 캔버스는 단색
-  }
-  fill(k.cells.shirt, T.color); fill(k.cells.skin, f.skin); fill(k.cells.hair, f.hair)
-  const t = new THREE.CanvasTexture(c)
-  Object.assign(t, { flipY: false, colorSpace: THREE.SRGBColorSpace, magFilter: THREE.NearestFilter, minFilter: THREE.NearestFilter })
-  return t
+  g.scene.updateMatrixWorld(true)
+  const bone = n => g.scene.getObjectByName(n), head = bone('Head'), chest = bone('Chest'), at = o => o.getWorldPosition(new THREE.Vector3())
+  const hp = at(head), box = new THREE.Box3(), P = new THREE.Vector3()
+  g.scene.traverse(o => {   // 가슴 높이 몸통 앞뒤
+    if (!o.isSkinnedMesh || o.material.name !== 'Jersey') return
+    const pos = o.geometry.attributes.position
+    for (let i = 0; i < pos.count; i++) { P.fromBufferAttribute(pos, i); if (Math.abs(P.x) < 0.1 && P.y > hp.y - 0.32 && P.y < hp.y - 0.12) box.expandByPoint(P) }
+  })
+  const R = 0.165, cy = (box.min.y + box.max.y) / 2
+  const unturn = o => o.getWorldQuaternion(new THREE.Quaternion()).invert()   // 붙인 것이 모델 축을 따르게
+  return { g, R, hipY: at(bone('Hips')).y,
+    head: { pos: local(head, new THREE.Vector3(0, hp.y + R * 0.92, hp.z + 0.03)), q: unturn(head) },
+    back: { pos: local(chest, new THREE.Vector3(0, cy, box.min.z - 0.012)), q: unturn(chest) },
+    front: { pos: local(chest, new THREE.Vector3(0, cy + 0.04, box.max.z + 0.012)), q: unturn(chest) } }
 }
 // 등 — 이름 · 큰 번호, 가슴 — 작은 번호(바탕은 비운다)
 const backTex = (T, num, name) => tex(256, 160, (c, w) => {
@@ -128,33 +89,34 @@ const backTex = (T, num, name) => tex(256, 160, (c, w) => {
   c.font = '900 104px system-ui, sans-serif'; c.lineWidth = 12; c.strokeText(num, w / 2, 146); c.fillText(num, w / 2, 146)
 })
 const chestTex = (T, num) => tex(128, 128, (c, w) => { c.textAlign = 'center'; c.lineJoin = 'round'; c.strokeStyle = T.dark; c.fillStyle = '#fff'; c.font = '900 76px system-ui, sans-serif'; c.lineWidth = 10; c.strokeText(num, w / 2, 96); c.fillText(num, w / 2, 96) })
-const BENDS = ['torso', 'head', 'arm-left', 'arm-right']   // 동작 위에 덧돌리는 뼈
 function build(p, k, f) {
-  const model = cloneRig(k.g.scene), T = TEAMS[p.team] ?? TEAMS[0], mat = toon(0xffffff, paint(k, T, f))
-  model.traverse(o => { if (o.isMesh) { o.material = mat; o.castShadow = true; o.frustumCulled = false } })
-  model.scale.setScalar(HT / k.height)
-  const bone = Object.fromEntries([...BENDS, 'root'].map(n => [n, model.getObjectByName(n)]))
-  const decal = (t, w, hh, pos, ry) => { const d = new THREE.Mesh(new THREE.PlaneGeometry(w, hh), Object.assign(toon(0xffffff, t), { alphaTest: 0.4 })); d.position.copy(pos); d.rotation.y = ry; bone.torso.add(d) }
-  decal(backTex(T, String(f.num), p.name.slice(0, 10)), k.w * 0.82, k.w * 0.82 * 0.625, k.back, Math.PI)
-  decal(chestTex(T, String(f.num)), k.w * 0.32, k.w * 0.32, new THREE.Vector3(k.back.x, k.back.y + k.w * 0.08, k.front), 0)
+  const model = cloneRig(k.g.scene), T = TEAMS[p.team] ?? TEAMS[0], female = FEMALE.has(p.c)
+  const paint = { Skin: f.skin || SKIN, Jersey: T.color, Shorts: female ? T.dark : T.color, Trim: T.trim }
+  model.traverse(o => { if (o.isMesh) { o.material = toon(paint[o.material.name] ?? o.material.color); o.castShadow = true; o.frustumCulled = false } })
+  const b = {}
+  model.traverse(o => { if (o.isBone) b[o.name] = o })
+  const stick = (bone, obj, at) => { obj.position.copy(at.pos); obj.quaternion.copy(at.q); bone.add(obj); return obj }
+  // 머리 — 공(머리카락 색) 앞쪽에 얼굴 그림을 감싼다(스트리트 3:3 과 같은 방식) + 목
+  const hd = stick(b.Head, new THREE.Group(), k.head), R = k.R
+  part(hd, new THREE.SphereGeometry(R, 24, 18), toon(f.hair || '#2a1d16'))
+  if (f.head) { const t = new THREE.CanvasTexture(f.head); t.colorSpace = THREE.SRGBColorSpace; hd.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.024, 30, 20, Math.PI / 2 - 1.8, 3.6), Object.assign(toon(0xffffff, t), { alphaTest: 0.5 }))) }
+  part(hd, new THREE.CylinderGeometry(R * 0.36, R * 0.42, R * 0.9, 12), toon(f.skin || SKIN), 0, -R * 0.95, -0.02, false)
+  const decal = (t, w, hh, at, ry) => stick(b.Chest, new THREE.Mesh(new THREE.PlaneGeometry(w, hh), Object.assign(toon(0xffffff, t), { alphaTest: 0.4 })), at).rotateY(ry)
+  decal(backTex(T, String(f.num), p.name.slice(0, 10)), 0.27, 0.17, k.back, Math.PI)
+  decal(chestTex(T, String(f.num)), 0.11, 0.11, k.front, 0)
   const root = new THREE.Group()
   root.add(model)
   const mixer = new THREE.AnimationMixer(model), acts = {}
   for (const c of k.g.animations) acts[c.name] = mixer.clipAction(c)
-  acts.jump.setLoop(THREE.LoopOnce); acts.jump.clampWhenFinished = true
-  return { root, model, mixer, acts, cur: null, bone, k, s: HT / k.height, w: Object.fromEntries(BENDS.map(b => [b, 0])), ang: {} }
+  return { root, model, mixer, acts, cur: null, b, hd, k, w: {}, dir: {} }
 }
-/** 몸 — 고른 선수(얼굴 그림 · 등번호)와 팀(셔츠 색)으로. 다 만든 뒤 옛 몸과 바꾼다(그동안은 옛 몸 그대로) */
+/** 몸 — 고른 선수(얼굴 그림 · 피부 · 머리색 · 등번호)와 팀(유니폼 색)으로. 다 만든 뒤 옛 몸과 바꾼다(그동안은 옛 몸 그대로) */
 function dress(p) {
-  const P0 = data.byId.get(p.c), img = new Image(), look = lookOf(p.c)
+  const P0 = data.byId.get(p.c), img = new Image()
   const f = p.next = { img, num: NBA_NUM[P0?.id] ?? NUMS[(P0?.pos || 1) - 1] }
   const done = async () => {
-    try {   // 못 뽑으면 모델 색 그대로. 머리색이 피부와 비슷하면(짧은 머리 · 머리띠) 짙은 갈색
-      [f.skin] = skinOf(img); f.hair = hairOf(cutHead(img))
-      const rgb = c => c.match(/\d+/g).map(Number), [a, b] = [rgb(f.skin), rgb(f.hair)]
-      f.hair = Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) < 110 ? '#2b2019' : `rgb(${b.map(v => v * 0.72 | 0)})`   // 그림의 머리는 빛을 받아 밝다
-    } catch {}
-    const k = await kit(look).catch(e => console.warn('캐릭터 모델을 못 받았어요', e))
+    try { f.head = cutHead(img); [f.skin] = skinOf(img); f.hair = hairOf(f.head) } catch {}   // 실패하면 얼굴 없는 머리 · 기본 피부색
+    const k = await kit(FEMALE.has(p.c) ? 'f' : 'm').catch(e => console.warn('캐릭터 모델을 못 받았어요', e))
     if (p.next !== f || !k) return   // 그새 또 바꿨거나 나갔다
     const m = build(p, k, f)
     if (p.m) crew.remove(p.m.root)
@@ -205,11 +167,11 @@ function acting(p, dt) {
     if (p.t > 0.38 && !p.done) { p.done = true; release(p, 0.45 + p.d0 / 700, 0.6 + p.d0 * 0.006) }
   } else if (p.act === 'lay') {
     const k = Math.min(1, p.t / p.T)
-    p.x = p.x0 + (p.x1 - p.x0) * sm(k); p.y = p.y0 + (p.y1 - p.y0) * sm(k); p.h = 40 * Math.sin(Math.PI * k)
+    p.x = p.x0 + (p.x1 - p.x0) * sm(k); p.y = p.y0 + (p.y1 - p.y0) * sm(k); p.h = 32 * Math.sin(Math.PI * k)
     if (k >= 0.6 && !p.done) { p.done = true; release(p, 0.3, 0.25) }
   } else if (p.act === 'dunk') {   // 0.42초에 림 — 그 뒤는 매달린다
     const k = Math.min(1, p.t / 0.42)
-    p.x = p.x0 + (p.x1 - p.x0) * sm(k); p.y = p.y0 + (p.y1 - p.y0) * sm(k); p.h = 62 * Math.sin(k * Math.PI / 2) - (p.t > 0.42 ? 5 * sm(Math.min(1, (p.t - 0.42) / 0.2)) : 0)
+    p.x = p.x0 + (p.x1 - p.x0) * sm(k); p.y = p.y0 + (p.y1 - p.y0) * sm(k); p.h = 46 * Math.sin(k * Math.PI / 2) - (p.t > 0.42 ? 4 * sm(Math.min(1, (p.t - 0.42) / 0.2)) : 0)
     if (k >= 1 && !p.done) { p.done = true; Object.assign(p.ball, { st: 'drop', t: 0, kind: 'dunk' }); p.ball.p0.set(0, RIM_Y - 0.1, RIM_Z); p.ball.v.set(0, -2, 0.3); RIM.shake = 1; scored(p) }
   }
   if (p.t >= p.T) { if (p.act !== 'shoot') p.vh = 0; p.act = null }
@@ -409,61 +371,74 @@ function moved(p, m, snap) {
   p.vx = num(m.vx, -SPD, SPD); p.vy = num(m.vy, -SPD, SPD); p.ax = num(m.ax, -1, 1); p.ay = num(m.ay, -1, 1)
 }
 
-// ---------------------------------------------------------------- 동작 — 모델에 든 동작(서기 · 걷기 · 달리기 · 점프 · 앉기 · 끄덕) 위에 팔 · 몸통 · 머리를 덧돌린다
+// ---------------------------------------------------------------- 동작 — 모델에 든 동작(서기 · 걷기 · 달리기 · 손 인사) 위에 팔 · 다리 · 허리를 덧놓는다
 
 function play(m, name, speed = 1) {
   const a = m.acts[name]
   a.timeScale = speed
   if (m.cur === a) return
   a.reset().play()
-  if (m.cur) m.cur.crossFadeTo(a, 0.15, false)
+  if (m.cur) m.cur.crossFadeTo(a, 0.2, false)
   m.cur = a
 }
-const Q1 = new THREE.Quaternion(), E1 = new THREE.Euler(), V3 = new THREE.Vector3(), V4 = new THREE.Vector3()
-// 뼈 각도 [x, y, z] — 모델은 +z 를 본다. 팔은 아래로 늘어져 있어 x 가 - 면 앞으로, z 가 - 면(오른팔) · + 면(왼팔) 옆으로 든다.
-// 어깨가 목 높이 · 머리가 어깨 두 배 너비(2등신)라 팔을 그냥 들면 머리 뒤에 가린다 — 팔이 수평보다 높이 갈수록 어깨를 머리 너비만큼 바깥으로 뺀다
+// 덧놓기는 「이 뼈가 모델 기준 이쪽을 향하게」(뼈 → 다음 뼈 방향). 모델은 +z 를 보고 +x 가 왼쪽 — 오른팔 · 오른다리는 x 가 -
+const CHAIN = { armR: ['UpperArmR', 'LowerArmR', 'WristR'], armL: ['UpperArmL', 'LowerArmL', 'WristL'], legR: ['UpperLegR', 'LowerLegR', 'FootR'], legL: ['UpperLegL', 'LowerLegL', 'FootL'], spine: ['Abdomen', 'Chest', 'Neck'] }
+const P1 = new THREE.Vector3(), P2 = new THREE.Vector3(), D1 = new THREE.Vector3(), QA = new THREE.Quaternion(), QB = new THREE.Quaternion(), QM = new THREE.Quaternion()
+function point(m, bone, child, dir, w) {
+  bone.getWorldPosition(P1); child.getWorldPosition(P2)
+  QA.setFromUnitVectors(P2.sub(P1).normalize(), D1.copy(dir).normalize().applyQuaternion(QM))
+  bone.getWorldQuaternion(QB); QA.multiply(QB)                                  // 새 월드 회전
+  bone.quaternion.slerp(bone.parent.getWorldQuaternion(QB).invert().multiply(QA), w)
+  bone.updateMatrixWorld(true)
+}
+const v = (x, y, z) => new THREE.Vector3(x, y, z)
+const mirror = d => d.map(u => v(-u.x, u.y, u.z))   // 오른쪽 → 왼쪽
 function animate(p, dt) {
-  const m = p.m, v = Math.hypot(p.vx, p.vy), E = p.emo, A = p.act, t = E?.t ?? 0, want = {}
+  const m = p.m, sp = Math.hypot(p.vx, p.vy), E = p.emo, A = p.act, t = E?.t ?? 0, want = {}
   p.spin = 0; m.model.position.y = 0
-  const base = E?.k === 6 ? 'sit' : E?.k === 2 ? 'emote-yes' : A === 'lay' || A === 'dunk' || p.h > 0 ? (p.vh < 0 && !A ? 'fall' : 'jump') : v > 110 ? 'sprint' : v > 20 ? 'walk' : 'idle'
-  play(m, base, base === 'walk' ? v / 80 : base === 'sprint' ? v / 150 : 1)
+  play(m, E?.k === 0 ? 'Wave' : !A && p.h === 0 && sp > 110 ? 'Run' : !A && p.h === 0 && sp > 20 ? 'Walk' : 'Idle', sp > 110 ? sp / 160 : sp > 20 ? sp / 70 : 1)
   m.mixer.update(dt)
-  const both = (x, z) => { want['arm-right'] = [x, 0, -z]; want['arm-left'] = [x, 0, z] }
-  if (A === 'shoot') p.t < 0.12 ? both(-1.1, 0.3) : both(p.done ? -1.95 : -1.7, 0.3)         // 공을 가슴에 → 앞 위로 → 팔을 뻗은 채
-  else if (A === 'lay') { want['arm-right'] = [-1.9, 0, -0.3]; want['arm-left'] = [-1.0, 0, 0.4] }
+  const arms = (r1, r2, l1 = null, l2 = null) => { want.armR = [r1, r2]; want.armL = l1 ? [l1, l2] : mirror([r1, r2]) }
+  const tuck = () => { want.legR = [v(-0.08, -0.8, 0.6), v(0, -0.9, -0.45)]; want.legL = mirror(want.legR) }   // 공중 — 무릎을 굽힌다
+  if (A === 'shoot') {
+    if (p.t < 0.12) arms(v(-0.3, -0.6, 0.7), v(0.4, 0.5, 0.75))                 // 공을 가슴에
+    else if (!p.done) arms(v(-0.2, 0.75, 0.6), v(0.1, 0.9, 0.4))                // 이마 위로
+    else arms(v(-0.1, 0.85, 0.5), v(0, 0.5, 0.85), v(0.3, 0.7, 0.6), v(0.1, 0.8, 0.5))   // 손목을 꺾고 팔을 뻗은 채
+  } else if (A === 'lay') { arms(v(-0.15, 0.95, 0.25), v(-0.05, 1, 0.1), v(0.3, 0.1, 0.95), v(0.2, 0.4, 0.9)); want.legR = [v(0, -0.2, 0.98), v(0, -1, 0.1)]; want.legL = [v(0.05, -0.95, -0.3), v(0, -0.9, -0.4)] }
   else if (A === 'dunk') {
-    const k = sm(Math.min(1, p.t / 0.42)), two = p.style === 0 || p.style === 3
-    if (p.t > 0.42) { both(-0.6, 2.6); if (p.style === 3) p.spin = Math.PI }                    // 림에 매달린다
-    else { want['arm-right'] = [-0.8 - 1.1 * k, 0, -0.3 * k]; want['arm-left'] = two ? [-0.8 - 1.1 * k, 0, 0.3 * k] : [-0.6, 0, 0.6]; if (p.style === 3) p.spin = Math.PI * k }
-  } else if (p.h > 0) both(-0.4, 2.6)                                                          // 점프 — 두 팔을 번쩍
+    const one = p.style === 1 || p.style === 2
+    arms(v(-0.15, 0.92, 0.35), v(-0.05, 1, 0.15), one ? v(0.4, 0.2, 0.9) : null, one ? v(0.2, 0.4, 0.9) : null); tuck()
+    if (p.style === 3) p.spin = Math.PI * sm(Math.min(1, p.t / 0.42))
+  } else if (p.h > 0) { arms(v(-0.35, 0.9, 0.2), v(-0.15, 1, 0.1)); tuck() }   // 점프 — 두 팔을 번쩍
   else if (E) {
     const s = Math.sin(t * 7)
-    if (E.k === 0) want['arm-right'] = [-0.3, 0, -2.5 + 0.3 * Math.sin(t * 10)]                  // 손 인사 — 머리 옆으로 들어 흔든다
-    else if (E.k === 1) { const c = Math.abs(Math.sin(t * 9)); want['arm-right'] = [-1.3, 0, 0.05 + 0.45 * c]; want['arm-left'] = [-1.3, 0, -0.05 - 0.45 * c] }   // 박수
-    else if (E.k === 3) { const c = 0.2 * Math.sin(t * 14); want['arm-right'] = [-0.2, 0, -2.6 - c]; want['arm-left'] = [-0.2, 0, 2.6 + c]; m.model.position.y = 0.05 * Math.abs(Math.sin(t * 7)) }   // 환호 — 두 팔 번쩍, 들썩
-    else if (E.k === 4) {                                                                        // 춤 — 몸을 흔들며 팔을 번갈아, 들썩들썩
-      want.torso = [0, 0.4 * s, 0.12 * s]; want.head = [0, 0, 0.2 * s]
-      want['arm-right'] = [-1.5 - 0.9 * s, 0, -0.3]; want['arm-left'] = [-1.5 + 0.9 * s, 0, 0.3]
-      m.model.position.y = 0.06 * Math.abs(Math.sin(t * 7)); p.spin = 0.4 * Math.sin(t * 3.5)
-    } else if (E.k === 5) { const k = sm(Math.min(1, t / 0.35)) * (t > 1.15 ? Math.max(0, 1 - (t - 1.15) / 0.4) : 1); want.torso = [0.75 * k, 0, 0]; want.head = [0.2 * k, 0, 0] }   // 꾸벅
-  } else if (p.ball.st === 'hand') want['arm-right'] = [-0.5 - 0.35 * (1 - Math.abs(Math.sin(tnow * 7.5))), 0, -0.1]   // 드리블 — 손이 공과 같이 오르내린다
-  const k = 1 - Math.exp(-14 * dt)
-  for (const b of BENDS) {
-    m.w[b] += ((want[b] ? 1 : 0) - m.w[b]) * k
-    if (want[b]) m.ang[b] = want[b]
-    const bone = m.bone[b], arm = m.k.arm[b]
-    if (m.w[b] > 0.002) {
-      bone.quaternion.slerp(Q1.setFromEuler(E1.set(...m.ang[b])), m.w[b])
-      if (arm) {   // 어깨 + 돌린 팔(V4 = 어깨에서 팔 가운데로). 팔이 위를 향한 만큼 어깨를 바깥으로
-        V4.set(0, -arm.up, 0).applyQuaternion(bone.quaternion)
-        const lift = clamp(V4.y / arm.up + 0.2, 0, 1)
-        bone.position.copy(arm.rest).add(V3.set(Math.sign(arm.rest.x) * arm.out * lift, arm.up + 0.03 * lift, 0)).add(V4)
-      }
-    } else if (arm) bone.position.copy(arm.rest)
+    if (E.k === 1) { const c = Math.abs(Math.sin(t * 9)); arms(v(-0.22, -0.5, 0.84), v(0.3 + 0.45 * c, 0.3, 0.86)) }   // 박수 — 두 손을 앞에서 모았다 벌린다
+    else if (E.k === 2) arms(v(-1, 0.05, 0.1), v(-0.12, 1, 0.15 + 0.25 * Math.sin(t * 8)))                          // 알통 — 팔을 옆으로, 아래팔을 세운다
+    else if (E.k === 3) { const c = 0.15 * Math.sin(t * 14); arms(v(-0.45, 0.88 + c, 0.15), v(-0.2, 1, 0.05)); m.model.position.y = 0.06 * Math.abs(Math.sin(t * 7)) }   // 환호 — 두 팔 번쩍, 들썩
+    else if (E.k === 4) {                                                                                               // 춤 — 허리를 흔들며 팔을 번갈아
+      want.spine = [v(0.3 * s, 1, 0.1), v(0.15 * s, 1, 0)]
+      arms(v(-0.7, 0.2 + 0.6 * s, 0.5), v(-0.2, 0.9, 0.3), v(0.7, 0.2 - 0.6 * s, 0.5), v(0.2, 0.9, 0.3))
+      m.model.position.y = 0.05 * Math.abs(Math.sin(t * 7)); p.spin = 0.4 * Math.sin(t * 3.5)
+    } else if (E.k === 5) { const k = sm(Math.min(1, t / 0.35)) * (t > 1.15 ? Math.max(0, 1 - (t - 1.15) / 0.4) : 1); want.spine = [v(0, Math.cos(0.5 * k), Math.sin(0.5 * k)), v(0, Math.cos(0.9 * k), Math.sin(0.9 * k))] }   // 꾸벅
+    else if (E.k === 6) {                                                                                               // 앉기 — 바닥에 다리를 뻗고 손으로 뒤를 짚는다
+      m.model.position.y = -(m.k.hipY - 0.14)
+      want.legR = [v(-0.12, 0, 1), v(-0.08, -0.12, 1)]; want.legL = mirror(want.legR); want.spine = [v(0, 1, -0.12), v(0, 1, -0.05)]
+      arms(v(-0.3, -0.75, -0.55), v(-0.1, -0.95, -0.25))
+    }
+  } else if (p.ball.st === 'hand') want.armR = [v(-0.25, -0.9, 0.35), v(-0.1, -0.35 - 0.45 * (1 - Math.abs(Math.sin(tnow * 7.5))), 0.85)]   // 드리블 — 손이 공과 같이 오르내린다
+  m.root.position.set(wx(p.x), p.h * LIFT, wz(p.y)); m.root.rotation.y = yaw(p) + p.spin   // 몸을 먼저 놓고 뼈를 돌린다
+  m.model.getWorldQuaternion(QM)
+  const k = 1 - Math.exp(-12 * dt)
+  for (const key in CHAIN) {
+    const w0 = m.w[key] ?? 0
+    m.w[key] = w0 + ((want[key] ? 1 : 0) - w0) * k
+    if (want[key]) m.dir[key] = want[key]
+    if (m.w[key] < 0.002) continue
+    const [a, b, c] = CHAIN[key].map(n => m.b[n])
+    point(m, a, b, m.dir[key][0], m.w[key]); point(m, b, c, m.dir[key][1], m.w[key])
   }
-  m.root.position.set(wx(p.x), p.h * LIFT, wz(p.y)); m.root.rotation.y = yaw(p) + p.spin
 }
-const hand = (p, side, out) => p.m.bone[side].localToWorld(out.copy(p.m.k.hand[side]))
+const hand = (p, side, out) => p.m.b[`Middle1${side}`].getWorldPosition(out)   // 손바닥 가운데쯤
 /** 공 자리 — 슛 · 덩크 · 점프는 손에, 몸짓 중에는 발 옆 바닥에, 아니면 드리블(손과 바닥 사이) */
 function ballAt(p, out) {
   const b = p.ball
@@ -471,12 +446,12 @@ function ballAt(p, out) {
   if (b.st === 'drop') return out.copy(b.p0)
   if (!p.ready) return out.set(wx(p.x), 1.6, wz(p.y))
   const y = yaw(p), A = p.act
-  if (p.emo) return out.set(wx(p.x) + Math.cos(y) * 0.5, 0.14, wz(p.y) - Math.sin(y) * 0.5)
-  hand(p, 'arm-right', V1); hand(p, 'arm-left', V2)
+  if (p.emo) return out.set(wx(p.x) + Math.cos(y) * 0.45, 0.14, wz(p.y) - Math.sin(y) * 0.45)
+  hand(p, 'R', V1); hand(p, 'L', V2)
   if (A === 'lay' || (A === 'dunk' && (p.style === 1 || p.style === 2))) return out.copy(V1).setY(V1.y + 0.1)
   if (A === 'shoot' || A === 'dunk' || p.h > 0) return out.addVectors(V1, V2).multiplyScalar(0.5).setY(Math.max(V1.y, V2.y) + 0.1)
   const d = Math.abs(Math.sin(tnow * 7.5))
-  return out.set(V1.x + Math.sin(y) * 0.08, V1.y - 0.1 - (V1.y - 0.24) * d, V1.z + Math.cos(y) * 0.08)
+  return out.set(V1.x + Math.sin(y) * 0.06, V1.y - 0.12 - (V1.y - 0.26) * d, V1.z + Math.cos(y) * 0.06)
 }
 
 // ---------------------------------------------------------------- 그리기
@@ -488,7 +463,7 @@ if (renderer) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THR
 const camP = new THREE.Vector3(0, 9, 24), camL = new THREE.Vector3(0, 1, 6), cw = new THREE.Vector3(), lw = new THREE.Vector3()
 function aim(dt) {   // 내 선수 뒤 위에서 골대 쪽을 본다. 처음(불러오는 중)은 코트를 돈다
   if (!me?.ready) { const a = tnow * 0.12; cw.set(Math.sin(a) * 15, 8.5, 7 + Math.cos(a) * 15); lw.set(0, 1.5, 4) }
-  else { const x = wx(me.x), z = wz(me.y); cw.set(x * 0.85, 3.9, z + 6.8); lw.set(x * 0.95, 1.3, z - 2.2) }   // 2등신이라 낮게 · 가까이
+  else { const x = wx(me.x), z = wz(me.y); cw.set(x * 0.85, 3.7, z + 5.6); lw.set(x * 0.95, 1.45, z - 2.4) }
   const k = 1 - Math.exp(-3 * dt)
   camP.lerp(cw, k); camL.lerp(lw, k)
   camera.position.copy(camP); camera.lookAt(camL)
@@ -525,7 +500,7 @@ function text(s, x, y, size, fill = '#fff', align = 'center', italic = false) {
   g.font = `${italic ? 'italic ' : ''}900 ${size}px system-ui, sans-serif`; g.textAlign = align; g.lineJoin = 'round'
   g.lineWidth = Math.max(3, size / 4.5); g.strokeStyle = '#0b0e14'; g.strokeText(s, x, y); g.fillStyle = fill; g.fillText(s, x, y)
 }
-function above(p) { p.m.bone.head.getWorldPosition(V2); return scr(V2.x, V2.y + p.m.k.top * p.m.s + 0.18, V2.z) }
+function above(p) { p.m.hd.getWorldPosition(V2); return scr(V2.x, V2.y + p.m.k.R + 0.22, V2.z) }
 function bubble(s, x, y) {   // 말풍선 — 글자 단위로 줄을 바꾼다(한글은 띄어쓰기가 드물다), 네 줄까지
   g.font = '700 13px system-ui, sans-serif'
   const lines = []

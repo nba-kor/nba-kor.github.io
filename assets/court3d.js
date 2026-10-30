@@ -1,4 +1,4 @@
-// 3D 길거리 하프코트 — 장면(코트 · 골대 · 철망 · 건물 · 노을)은 스트리트 3:3(street.js) · 덩크 광장(plaza.js)이 같이 쓰고, 만화풍 선수 몸(rigOf) · 관절 자세(Q · setRig)는 스트리트 3:3 이 쓴다(광장 사람은 Kenney 모델).
+// 3D 길거리 하프코트 — 장면(코트 · 골대 · 철망 · 건물 · 노을)은 스트리트 3:3(street.js) · 덩크 광장(plaza.js)이 같이 쓰고, 만화풍 선수 몸(rigOf) · 관절 자세(Q · setRig)는 스트리트 3:3 이 쓴다(광장 사람은 Quaternius 모델).
 // 코트 단위는 전술판(court.js)과 같다(0.1피트) — 위가 골대(y=0 쪽), 아래가 하프라인. 3D 는 three.js(CDN, 버전 고정 — 쓰는 페이지도 같은 주소로 불러 한 벌만 뜬다)
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js'
 import { SKIN } from './vipers.js?v=c92ed58c'
