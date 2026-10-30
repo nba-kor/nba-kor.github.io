@@ -878,7 +878,7 @@ async function drawPlan() {
           g.restore()
           g.beginPath(); g.arc(cx + 15, ty + ROW / 2, 15.5, 0, Math.PI * 2); g.strokeStyle = '#bcc4ce'; g.lineWidth = 2; g.stroke()
           if (mi === 0) { box(cx + 1, ty + ROW / 2 + 9, 28, 14, 7, ACCENT); text('팀장', cx + 15, ty + ROW / 2 + 20, 10, '#1a1200', 800, 40, 'center') }   // 팀장은 얼굴 아래 뱃지
-          const sub = a && a.owner !== a.n ? `본계 ${a.owner}` : ''   // 본계정은 닉네임만 가운데에
+          const sub = a && a.owner !== a.n ? a.owner : ''   // 부계정은 아래 작게 본계정 이름, 본계정은 닉네임만 가운데에
           text(m.n, cx + 36, sub ? ty + 25 : ty + ROW / 2 + 5, 13.5, '#16181d', 700, cw - 40)
           text(sub, cx + 36, ty + 43, 11, '#586272', 400, cw - 40)
         })
