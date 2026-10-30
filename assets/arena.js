@@ -485,9 +485,11 @@ function editor() {
   // FA 는 그날 넣을 시간대가 남은 사람만 — 1차 · 2차 둘 다(또는 1.5차) 뛰면 빠진다
   const fits = (a, id) => a.slots.includes(id) && (id in FA_DAY ? SLOTS.some(s => s.day === FA_DAY[id] && !busy(s.id, a.u)) : !busy(id, a.u))
   const match = (set, test) => allOf ? [...set].every(test) : [...set].some(test)
-  // AND 는 고른 시간대를 모두 신청했고 그중 아직 넣을 데가 남은 사람 — 토 1차에 넣어도 토 2차가 남았으면 그대로 있다
+  // AND 는 고른 시간대를 모두 신청했고 그중 아직 넣을 데가 남은 사람 — 고른 시간대에 이미 넣은 계정은 빼고 남은 계정만(토 1차에 한 계정을 넣으면 나머지 계정은 토 2차용으로 남는다)
+  const placedIn = a => (at.get(key(a.u, a.n)) || []).some(w => poolPick.has(w.slot))
+  const allPicked = a => [...poolPick].every(id => a.slots.includes(id)) && !placedIn(a)
   const bySlot = !poolPick.size ? all.filter(a => !at.has(key(a.u, a.n)))
-    : all.filter(a => [...poolPick].some(id => fits(a, id)) && (!allOf || [...poolPick].every(id => a.slots.includes(id))))
+    : all.filter(a => [...poolPick].some(id => fits(a, id)) && (!allOf || allPicked(a)))
   // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션). 고른 포지션이 1순위인 계정이 있는 사람이 먼저(사람 묶음은 그대로 — 안정 정렬)
   const plays = (a, r) => a.roles.includes(r) || a.roles[0] === ALLPOS
   const pool = !rolePick.size ? bySlot : bySlot.filter(a => match(rolePick, r => plays(a, r)))
@@ -540,7 +542,7 @@ function editor() {
       h('button', { type: 'button', className: 'ar-reset', disabled: !poolPick.size && !rolePick.size && !allOf,
         onclick: () => { poolPick.clear(); rolePick.clear(); allOf = false; renderPlan() } }, '필터 초기화')),
     h('p', { className: 'rc-muted' }, !poolPick.size ? '어느 시간대에도 안 들어간 계정 · 사람별로 묶어 본계정 → 부계정, 사람 순서는 집계 순서(계정 수 → 포지션 → 이름) · 필터는 여러 개 고를 수 있어요'
-      : `${[...poolPick].map(id => TAG[id]).join(' · ')} ${poolPick.size < 2 ? '' : allOf ? '모두 ' : '중 하나라도 '}신청한 사람 · ${allOf && poolPick.size > 1 ? '고른 시간대에 다 들어가면' : '겹치는 시간대에 이미 들어갔으면'} 빠져요(FA 는 그날 넣을 시간대가 남은 사람)`),
+      : `${[...poolPick].map(id => TAG[id]).join(' · ')} ${poolPick.size < 2 ? '' : allOf ? '모두 ' : '중 하나라도 '}신청한 사람 · ${allOf && poolPick.size > 1 ? '고른 시간대에 넣은 계정은' : '겹치는 시간대에 이미 들어갔으면'} 빠져요(FA 는 그날 넣을 시간대가 남은 사람)`),
     chips, grip)
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
@@ -595,7 +597,7 @@ function chip(a, from, lead = false) {
 }
 
 /** a 를 from(팀 자리, 없으면 대기 목록)에서 to('pool' | '<시간대>:<팀 번호>' | '<시간대>:new')로 */
-function move(a, from, to) {
+function move(a, from, to, ok) {
   if (!to || (!from && to === 'pool')) return
   const next = structuredClone(plan), same = x => x.u === a.u && x.n === a.n
   if (from) next[from.slot][from.ti] = next[from.slot][from.ti].filter(x => !same(x))
@@ -604,11 +606,28 @@ function move(a, from, to) {
     if (SLOTS.some(o => clash(slot, o.id) && (next[o.id] || []).some(tm => tm.some(x => x.u === a.u)))) return say(`${a.owner} 님은 겹치는 시간대에 이미 들어가 있어요`, true)
     const ti = t === 'new' ? teams.length : +t, team = teams[ti] ||= []
     if (team.length >= A.teamSize) return say(`${ti + 1}팀은 이미 ${A.teamSize}명이에요`, true)
+    // 신청 안 한 시간대(그날 FA 로도 안 되는 칸)면 한 번 더 묻고, 확인하면 그때의 편성으로 다시 넣는다 · 같은 시간대 안에서 팀만 옮길 땐 묻지 않는다
+    if (!ok && from?.slot !== slot && !a.slots.includes(slot) && !viaFa(a.slots, SLOT[slot])) return void askOff(a, slot).then(y => y && move(a, from, to, true))
     team.push({ u: a.u, n: a.n })
   }
   plan = Object.fromEntries(Object.entries(next).map(([k, v]) => [k, v.filter(tm => tm.length)]).filter(([, v]) => v.length))
   renderPlan()
   save()
+}
+
+// SweetAlert2 는 처음 물을 때 한 번만 불러온다(SRI 고정) — 못 불러오면 브라우저 확인 창으로
+const SWAL = { src: 'https://cdn.jsdelivr.net/npm/sweetalert2@11.26.25/dist/sweetalert2.all.min.js', integrity: 'sha384-nLoOnA/BDh8A/jxqtckg4DumuCGOBYUnNJLZdQz/zfYNp3wcjGSoWTAzgko06G/2', crossOrigin: 'anonymous' }
+let swalP = null
+const loadSwal = () => swalP ||= new Promise((ok, no) => document.head.append(h('script', { ...SWAL, onload: () => ok(window.Swal), onerror: () => { swalP = null; no() } })))
+async function askOff(a, slot) {
+  const who = a.owner === a.n ? a.n : `${a.n}(본계 ${a.owner})`
+  const lines = [`${SLOT[slot].label}는 ${who} 님이 선택한 시간대가 아닙니다.`, `(선택한 시간대 : ${a.slots.map(s => SHORT[s]).join(' · ') || '없음'})`, '해당 시간대로 투입하시겠습니까?']
+  try {
+    const Swal = await loadSwal()
+    // 닉네임은 글자로만 넣는다(html 문자열 X)
+    const r = await Swal.fire({ icon: 'warning', html: h('div', {}, ...lines.flatMap((l, i) => i ? [h('br'), l] : [l])), showCancelButton: true, confirmButtonText: '확인', cancelButtonText: '취소', focusCancel: true })
+    return r.isConfirmed
+  } catch { return confirm(lines.join('\n')) }
 }
 
 function menu(a, from) {
