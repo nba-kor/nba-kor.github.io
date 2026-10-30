@@ -3,7 +3,7 @@
 import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=fb02b445'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=1fbb8e2f'
 import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=4233415a'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES, ALLPOS } from './profile.js?v=a465db33'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES, ALLPOS } from './profile.js?v=a5912884'
 
 await loadData()
 mountTop('/arena/')
@@ -147,6 +147,8 @@ function openFromLink() {
 function renderForm() {
   if (!dlg?.open) return
   const mine = mineOf()
+  // 참가 계정은 한 주에 maxAccounts 개까지(시간대가 4번이라) — maxAccountsFrom 주부터. 다 고르면 나머지 칸은 잠근다
+  const cap = week >= A.maxAccountsFrom ? A.maxAccounts : Infinity
   if (!draft) {
     const accounts = accountsOf(me.profile?.entries)
     draft = { accounts, slots: new Set(mine?.slots.filter(s => LABEL[s])), nicks: new Set(mine ? mine.accounts.map(a => a.nick) : accounts.slice(0, 1).map(a => a.nick)), memo: mine?.memo || '' }   // 없어진 시간대(잠깐 있던 1차 올포)는 빼야 다시 저장된다
@@ -154,7 +156,7 @@ function renderForm() {
     if (!mine) api('/arena/mine', { withToken: true }).then(r => {
       const last = r.history.find(x => x.week !== week && x.nicks.length)
       if (!last || mineOf() || !draft) return
-      const have = new Set(draft.accounts.map(a => a.nick)), pick = last.nicks.filter(n => have.has(n))
+      const have = new Set(draft.accounts.map(a => a.nick)), pick = last.nicks.filter(n => have.has(n)).slice(0, cap)
       if (pick.length) { draft.nicks = new Set(pick); renderForm() }
     }).catch(() => {})
   }
@@ -185,17 +187,18 @@ function renderForm() {
     if (r === 'delete') d.nicks.delete(a.nick)
     else {
       if (a && a.nick !== r.acct.nick && d.nicks.delete(a.nick)) d.nicks.add(r.acct.nick)   // 닉네임을 바꿔도 고른 채로
-      if (!a) d.nicks.add(r.acct.nick)   // 새 계정은 바로 고른다
+      if (!a && d.nicks.size < cap) d.nicks.add(r.acct.nick)   // 새 계정은 바로 고른다(자리가 남았으면)
     }
     renderForm()
   }
+  const picked = d.accounts.filter(a => d.nicks.has(a.nick)).length, full = picked >= cap
   const list = h('ul', { className: `ac-list${absent ? ' is-off' : ''}` }, d.accounts.length
-    ? d.accounts.map((a, i) => accountRow(a, i, { checked: d.nicks.has(a.nick), onCheck: on => { on ? d.nicks.add(a.nick) : d.nicks.delete(a.nick); renderForm() }, onEdit: () => edit(a) }))
+    ? d.accounts.map((a, i) => accountRow(a, i, { checked: d.nicks.has(a.nick), disabled: full && !d.nicks.has(a.nick), onCheck: on => { on ? d.nicks.add(a.nick) : d.nicks.delete(a.nick); renderForm() }, onEdit: () => edit(a) }))
     : h('li', { className: 'ac-empty' }, '등록된 계정이 없어요 — 「+ 계정 추가」 로 게임 닉네임과 캐릭터를 넣어 주세요'))
-  const picked = d.accounts.filter(a => d.nicks.has(a.nick)).length, allOn = picked === d.accounts.length
-  // 계정이 둘 이상이면 한 번에 고르거나 빼기
+  const allOn = picked === Math.min(cap, d.accounts.length)
+  // 계정이 둘 이상이면 한 번에 고르거나 빼기 — 최대 개수보다 많으면 앞에서부터 그만큼
   const toggleAll = d.accounts.length > 1 && h('button', { type: 'button', className: 'ar-all', disabled: absent,
-    onclick: () => { d.nicks = new Set(allOn ? [] : d.accounts.map(a => a.nick)); renderForm() } }, allOn ? '전체 해제' : '전체 선택')
+    onclick: () => { d.nicks = new Set(allOn ? [] : d.accounts.slice(0, cap).map(a => a.nick)); renderForm() } }, allOn ? '전체 해제' : d.accounts.length > cap ? `앞 ${cap}개 선택` : '전체 선택')
   const memo = h('input', { type: 'text', maxLength: A.memo, value: d.memo, placeholder: absent ? '불참 사유 (선택)' : '예) 2차는 늦게 들어가요', oninput: () => { d.memo = memo.value } })
 
   const submit = h('button', { type: 'submit', className: 'primary rc-big' }, mine ? '신청 수정' : '신청하기')
@@ -204,11 +207,11 @@ function renderForm() {
     h('div', { className: 'ar-opts' }, SLOTS.map(s => opt(s, `${s.time} ~ ${s.end === A.closeAt ? '종료' : s.end}`))),
     h('div', { className: 'ar-opts is-extra' }, A.extra.map(c => opt(c))),
     h('p', { className: 'rc-muted' }, '여러 개 선택 가능 · 1.5차는 20:00 부터 종료까지 · 실제 배정은 운영진이 진행해요'),
-    h('div', { className: 'ar-acc-head' }, h('h3', {}, '2. 이번 주 참가 계정 ', h('small', { className: 'ar-count' }, absent ? '불참' : `${picked}개 계정`)), toggleAll),
+    h('div', { className: 'ar-acc-head' }, h('h3', {}, '2. 이번 주 참가 계정 ', h('small', { className: 'ar-count' }, absent ? '불참' : `${picked}${cap < Infinity ? ` / ${cap}` : ''}개 계정`)), toggleAll),
     person && h('div', { className: 'ar-first' }, h('p', { className: 'rc-muted' }, '처음이에요 — 프로필에 쓸 이름과 마이크도 한 번 정해 주세요'), person.el),
     list,
     h('div', { className: 'rc-add' }, h('button', { type: 'button', onclick: () => edit(null) }, '+ 계정 추가')),
-    h('p', { className: 'rc-muted' }, '아레나전에 실제로 쓸 계정만 골라 주세요. 계정 · 포지션 · 캐릭터는 내 프로필에 저장되어 다음 주에도 그대로예요'),
+    h('p', { className: 'rc-muted' }, `아레나전에 실제로 쓸 계정만 골라 주세요${cap < Infinity ? ` — 한 주에 최대 ${cap}개(뛸 수 있는 시간대가 ${cap}번이에요)` : ''}. 계정 · 포지션 · 캐릭터는 내 프로필에 저장되어 다음 주에도 그대로예요`),
     h('label', { className: 'rc-fld ar-memo' }, h('span', {}, absent ? '불참 사유' : '메모 ', h('small', {}, '선택')), memo),
     err,
     h('div', { className: 'rc-actions' },

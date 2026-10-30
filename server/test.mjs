@@ -1805,6 +1805,7 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   const b = await person(api, { name: `아레나B${RUN}`, entries: [entry({ nick: `B${RUN}`, roles: ['mid'] })] })
   const c = await person(api, { name: `아레나C${RUN}`, entries: [entry({ nick: `C${RUN}`, roles: ['scorer'] })] })
   const boss = await person(api, { name: `아레나관리${RUN}`, entries: [entry({ nick: `관리${RUN}` })] })
+  const five = await person(api, { name: `아레나다섯${RUN}`, entries: [1, 2, 3, 4, 5].map(i => entry({ nick: `다섯${i}`, roles: ['mid'] })) })
   const signup = (who, body) => api('PUT', '/api/arena/signup', body, { as: who.as })
   const view = (w = '') => api('GET', `/api/arena${w}`).then(r => r.body)
   const plan = (who, p, version) => api('PUT', '/api/arena/plan', { week, version, plan: p }, { as: who.as })
@@ -1819,6 +1820,8 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   const noRole = await signup(boss, { slots: ['sat1'], nicks: [`관리${RUN}`] })
   assert.deepEqual([noRole.status, noRole.body.error], [400, `「관리${RUN}」 계정의 주력 포지션(1순위)을 정해 주세요`], '집계표가 1순위로 나눈다')
   assert.equal((await api('PUT', '/api/arena/signup', { slots: ['sat1'], nicks: ['x'] })).status, 401, '로그인 없음')
+  const tooMany = await signup(five, { slots: ['sat1'], nicks: [1, 2, 3, 4, 5].map(i => `다섯${i}`) })
+  assert.deepEqual([tooMany.status, tooMany.body.error], [400, '아레나전 참가 계정은 4개까지예요'], '한 주에 뛸 수 있는 시간대가 4번')
 
   const okA = await signup(a, { slots: ['sunfa', 'sun2', 'sat1', 'satfa'], nicks: ['A부', 'A본'], memo: ' 늦을 수도 ' })
   assert.deepEqual([okA.status, okA.body], [200, { week, signup: { slots: ['sat1', 'sun2', 'satfa', 'sunfa'], nicks: ['A부', 'A본'], memo: '늦을 수도', updatedAt: clock } }], '시간대는 정해진 순서로')

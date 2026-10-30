@@ -2,7 +2,7 @@
 import { mountTop, copyLink } from './app.js?v=fb02b445'
 import { api, session, hasProvider, linkKakao, unlinkKakao, withdraw, saveGate, chooseLogin, KAKAO_SVG } from './auth.js?v=1fbb8e2f'
 import { $, h, loadData, startAuth, auth, me } from './board.js?v=4233415a'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=a465db33'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=a5912884'
 
 await loadData()
 mountTop('/me/')

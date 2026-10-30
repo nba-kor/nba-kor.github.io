@@ -45,7 +45,7 @@ export const roleTags = roles => h('span', { className: 'ac-roles' }, roles?.len
   : h('span', { className: 'is-none' }, '포지션 미정'))
 
 /** 계정 한 줄: (체크) 본계정/부계정 · 닉네임 · 주력 포지션 · 캐릭터(레벨) · 얼굴 · (✎) */
-export function accountRow(a, i, { checked, onCheck, onEdit } = {}) {
+export function accountRow(a, i, { checked, disabled, onCheck, onEdit } = {}) {
   const body = [
     h('span', { className: `ac-kind${i ? '' : ' is-main'}` }, i ? '부계정' : '본계정'),
     h('span', { className: 'ac-text' }, h('b', {}, a.nick, roleTags(a.roles)), h('small', {}, charNames(a.chars, a.bt))),
@@ -53,7 +53,7 @@ export function accountRow(a, i, { checked, onCheck, onEdit } = {}) {
   ]
   const li = h('li', { className: 'ac-row' })
   if (onCheck) {
-    const box = h('input', { type: 'checkbox', checked: !!checked, onchange: () => onCheck(box.checked) })
+    const box = h('input', { type: 'checkbox', checked: !!checked, disabled: !!disabled, onchange: () => onCheck(box.checked) })
     li.append(h('label', { className: 'ac-pick' }, box, ...body))
   } else li.append(h('div', { className: 'ac-pick' }, ...body))
   if (onEdit) li.append(h('button', { type: 'button', className: 'ac-edit', title: '수정', 'aria-label': `${a.nick} 수정`, onclick: onEdit }, '✎'))

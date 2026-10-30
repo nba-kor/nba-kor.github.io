@@ -423,15 +423,16 @@ export function arenaWeek(ms) {
   return d.toISOString().slice(0, 10)
 }
 
-/** 아레나 신청: 시간대(여럿 · 사유불참은 혼자) + 참가 계정(내 프로필의 게임 닉네임, 사유불참이면 없음) + 메모.
+/** 아레나 신청: 시간대(여럿 · 사유불참은 혼자) + 참가 계정(내 프로필의 게임 닉네임, 사유불참이면 없음 · maxAccountsFrom 주부터 maxAccounts 개까지) + 메모.
  *  nicks = 내 프로필의 계정 닉네임 → 주력 포지션 — 집계표가 1순위로 나누므로 참가 계정은 1순위가 있어야 한다 */
-function arenaSignup(v, nicks) {
+function arenaSignup(v, nicks, week) {
   if (!isObj(v)) fail(400, '신청 정보가 없어요')
   if (!listOf(v.slots, CHOICES.length, 1) || v.slots.some(s => !CHOICES.includes(s)) || new Set(v.slots).size !== v.slots.length) fail(400, '참석할 시간을 골라 주세요')
   const absent = v.slots.includes('absent')
   if (absent && v.slots.length > 1) fail(400, '사유불참은 다른 시간과 같이 고를 수 없어요')
   const picked = absent ? [] : v.nicks
   if (!absent && (!listOf(picked, nicks.size, 1) || picked.some(n => !nicks.has(n)) || new Set(picked).size !== picked.length)) fail(400, '참가할 계정을 내 프로필에서 골라 주세요')
+  if (week >= ARENA.maxAccountsFrom && picked.length > ARENA.maxAccounts) fail(400, `아레나전 참가 계정은 ${ARENA.maxAccounts}개까지예요`)
   const noRole = picked.find(n => !nicks.get(n)?.length)
   if (noRole) fail(400, `「${noRole}」 계정의 주력 포지션(1순위)을 정해 주세요`)
   return { slots: CHOICES.filter(c => v.slots.includes(c)), nicks: picked, memo: text(v.memo ?? '', ARENA.memo, '메모', 0) }
@@ -1124,7 +1125,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         const body = await readJson(request)
         const [p, [old]] = await Promise.all([mine(user), db(`/arena_signups?select=slots,nicks,memo&week=eq.${cur}&user_id=eq.${enc(user.id)}`)])
         if (!p) fail(428, NO_PROFILE)
-        const v = arenaSignup(body, new Map([...p.entries].reverse().map(e => [e.nick, e.roles ?? []])))   // 뒤집어 넣어 계정의 첫 줄 값이 남는다
+        const v = arenaSignup(body, new Map([...p.entries].reverse().map(e => [e.nick, e.roles ?? []])), cur)   // 뒤집어 넣어 계정의 첫 줄 값이 남는다
         // created_at 은 안 보낸다 — 처음 넣을 때만 DB 기본값, 다시 저장해도 신청 순서가 그대로다
         await db('/arena_signups?on_conflict=week,user_id', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { week: cur, user_id: user.id, ...v, updated_at: t } })
         note(request, `${cur} 주`, signupChanges(old, v))
