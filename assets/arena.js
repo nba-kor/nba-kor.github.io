@@ -36,10 +36,11 @@ const show = (box, msg) => { box.textContent = msg; box.hidden = !msg }
 const PLAN_PAGE = location.pathname.startsWith('/arena/plan')   // 편성 페이지 — 이번 주만
 let week = PLAN_PAGE ? '' : new URLSearchParams(location.search).get('w') || ''   // '' = 이번 주(서버가 정한다)
 let data = null      // GET /api/arena — { week, current, signups, plan, planAt, missing }
-let plan = {}        // 편성표 사본 { 시간대: [[{ u, n }]] } — 관리자가 고친다
+let plan = {}        // 편성표 사본 { 시간대: [[{ u, n }]], done?: [{ u, n }] } — 관리자가 고친다. done = 팀 없이 완료(강제 배정)
 let accts = new Map()   // 신청한 계정 key → { u, n, owner(본계 닉네임), roles, chars, bt, slots, count(소유자의 참가 계정 수), i(그 사람 계정 중 프로필 순서, 0 = 대표) }
 let tab = 'all'
-// 편성 대기 목록 필터 — 시간대 · 포지션, 여러 개 고르면 하나라도 맞는 계정. 비어 있으면 미배정 · 전체
+// 편성 대기 목록 — 「배정 대기」(팀에 안 들어간 계정) · 「배정 완료」(팀에 들어갔거나 팀 없이 완료) 탭, 그 안에서 시간대 · 포지션 필터(비어 있으면 전체)
+let poolView = 'wait'
 const poolPick = new Set(), rolePick = new Set()
 let allOf = false   // 여러 개 골랐을 때 false = 하나라도 맞으면(OR) · true = 모두 맞아야(AND). 시간대 · 포지션 줄에 같이 쓴다
 // 편성의 「자세히 보기」 — 칩마다 캐릭터(레벨)가 펼쳐진다. 처음엔 켜져 있고, 끄면 이 브라우저에 기억한다
@@ -262,13 +263,14 @@ function placements() {
   return at
 }
 const teamsOf = id => (plan[id] || []).filter(t => t.length)
+const doneKeys = () => new Set((plan.done || []).map(x => key(x.u, x.n)))   // 팀 없이 완료(강제 배정)한 계정
 
 function renderPlan() {
   const sec = $('#plan')
   sec.hidden = false
-  const at = placements()
+  const at = placements(), done = doneKeys()
   const players = data.signups.filter(s => !s.slots.includes('absent'))
-  const placedUsers = new Set([...at.keys()].map(k => k.split('\n')[0]))
+  const left = s => s.accounts.some(a => !at.has(key(s.userId, a.nick)) && !done.has(key(s.userId, a.nick)))   // 아직 안 끝난 계정이 있다
   const nTeams = SLOTS.reduce((n, s) => n + teamsOf(s.id).length, 0), edit = PLAN_PAGE && canEdit()
   const stat = (label, n, unit, cls = '') => h('div', { className: `ar-stat ${cls}` }, h('small', {}, label), h('b', {}, n, h('span', {}, unit)))
 
@@ -282,8 +284,8 @@ function renderPlan() {
 
   const stats = h('div', { className: 'ar-stats' },
     stat('참가 신청', players.length, '명'),
-    stat('배정 완료', players.filter(s => placedUsers.has(s.userId)).length, '명', 'is-ok'),
-    stat('대기', players.filter(s => !placedUsers.has(s.userId)).length, '명', 'is-wait'),
+    stat('배정 완료', players.filter(s => !left(s)).length, '명', 'is-ok'),   // 신청한 계정이 모두 배정(또는 팀 없이 완료)된 사람
+    stat('대기', players.filter(left).length, '명', 'is-wait'),
     stat('참가 계정', accts.size, '개'))
 
   // 편성 페이지인데 관리자가 아니면(로그인 확인 중 · 일반 멤버) 안내만
@@ -348,12 +350,15 @@ function missingCard() {
     names.length ? h('ol', { className: 'ar-missing' }, names.map(n => h('li', {}, n))) : h('p', { className: 'rc-muted' }, '모두 신청했어요'))
 }
 
-/** 멤버별 배치 현황 — 행 = 사람(본계정), 칸 = 시간대마다 몇 팀. 한 사람은 한 시간대에 한 팀뿐이라(겹치는 시간대 규칙) 부계정 배치도 그 줄에 — 뱃지에 마우스를 올리면 뛰는 계정 */
+/** 멤버별 배치 현황 — 행 = 사람(본계정), 칸 = 시간대마다 몇 팀. 한 사람은 한 시간대에 한 팀뿐이라(겹치는 시간대 규칙) 부계정 배치도 그 줄에 — 뱃지에 마우스를 올리면 뛰는 계정.
+ *  상태 = 신청한 계정이 모두 배정(또는 팀 없이 완료)되면 「완료」, 아니면 「끝난 계정 / 신청 계정」 */
 function membersCard(at) {
-  const order = data.signups.filter(s => s.accounts.length).map(s => ({ s, where: s.accounts.flatMap(a => (at.get(key(s.userId, a.nick)) || []).map(w => ({ ...w, n: a.nick }))) }))
+  const done = doneKeys()
+  const order = data.signups.filter(s => s.accounts.length).map(s => ({ s, where: s.accounts.flatMap(a => (at.get(key(s.userId, a.nick)) || []).map(w => ({ ...w, n: a.nick }))),
+    n: s.accounts.filter(a => at.has(key(s.userId, a.nick)) || done.has(key(s.userId, a.nick))).length }))   // 끝난 계정 수
   const rank = x => Math.min(1e6, ...x.where.map(w => SLOTS.findIndex(s => s.id === w.slot) * 100 + w.team))
   order.sort((x, y) => rank(x) - rank(y) || byOwner(x.s, y.s))
-  const body = order.map(({ s: p, where }, i) => h('tr', {},
+  const body = order.map(({ s: p, where, n }, i) => h('tr', {},
     h('td', {}, i + 1),
     h('td', { className: 'ar-nick' }, h('b', { className: 'ar-cnt', title: p.accounts.map(a => a.nick).join(', ') }, p.owner), p.accounts.length > 1 && h('small', {}, `계정 ${p.accounts.length}개`)),
     SLOTS.map(s => {
@@ -362,7 +367,7 @@ function membersCard(at) {
         : p.slots.includes(s.id) ? h('span', { className: 'ar-want', title: '신청' }, h('span', { className: 'ar-long' }, '신청'), h('span', { className: 'ar-short' }, '○'))   // 휴대폰은 ○
         : viaFa(p.slots, s) ? h('span', { className: 'ar-want', title: 'FA (시간 미정 · 용병)' }, 'FA') : h('span', { className: 'ar-dash' }, '-'))
     }),
-    h('td', {}, h('span', { className: `ar-st${where.length ? ' is-ok' : ''}` }, where.length ? '확정' : '대기'))))
+    h('td', {}, h('span', { className: `ar-st${n === p.accounts.length ? ' is-ok' : n ? ' is-part' : ''}` }, n === p.accounts.length ? '완료' : `${n}/${p.accounts.length}`))))
   return h('section', { className: 'card ar-card' },
     h('h3', {}, '멤버별 배치 현황'),
     body.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table' },
@@ -485,11 +490,12 @@ function editor() {
   // FA 는 그날 넣을 시간대가 남은 사람만 — 1차 · 2차 둘 다(또는 1.5차) 뛰면 빠진다
   const fits = (a, id) => a.slots.includes(id) && (id in FA_DAY ? SLOTS.some(s => s.day === FA_DAY[id] && !busy(s.id, a.u)) : !busy(id, a.u))
   const match = (set, test) => allOf ? [...set].every(test) : [...set].some(test)
-  // AND 는 고른 시간대를 모두 신청했고 그중 아직 넣을 데가 남은 사람 — 고른 시간대에 이미 넣은 계정은 빼고 남은 계정만(토 1차에 한 계정을 넣으면 나머지 계정은 토 2차용으로 남는다)
-  const placedIn = a => (at.get(key(a.u, a.n)) || []).some(w => poolPick.has(w.slot))
-  const allPicked = a => [...poolPick].every(id => a.slots.includes(id)) && !placedIn(a)
-  const bySlot = !poolPick.size ? all.filter(a => !at.has(key(a.u, a.n)))
-    : all.filter(a => [...poolPick].some(id => fits(a, id)) && (!allOf || allPicked(a)))
+  // 한 번 팀에 넣은 계정(FA 로 넣었어도) · 팀 없이 완료한 계정은 「배정 완료」 탭으로만 — 한 번 더 넣을 땐 거기서 고른다
+  const done = doneKeys(), isDone = a => at.has(key(a.u, a.n)) || done.has(key(a.u, a.n))
+  const nDone = all.filter(isDone).length, view = all.filter(a => isDone(a) === (poolView === 'done'))
+  // AND 는 고른 시간대를 모두 신청했고 그중 아직 넣을 데가 남은 사람
+  const bySlot = !poolPick.size ? view
+    : view.filter(a => [...poolPick].some(id => fits(a, id)) && (!allOf || [...poolPick].every(id => a.slots.includes(id))))
   // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션). 고른 포지션이 1순위인 계정이 있는 사람이 먼저(사람 묶음은 그대로 — 안정 정렬)
   const plays = (a, r) => a.roles.includes(r) || a.roles[0] === ALLPOS
   const pool = !rolePick.size ? bySlot : bySlot.filter(a => match(rolePick, r => plays(a, r)))
@@ -508,7 +514,9 @@ function editor() {
     const n = r.id === 'all' ? bySlot.length : bySlot.filter(a => plays(a, r.id)).length
     return h('button', { type: 'button', 'aria-selected': on(rolePick, r.id), onclick: pick(rolePick, r.id) }, `${r.label} ${n}`)
   }))
-  const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '미배정' }, ...SLOTS, ...FAS].map(s =>
+  const viewTabs = h('div', { className: 'ar-tabs ar-view-tabs' }, [['wait', '배정 대기', all.length - nDone], ['done', '배정 완료', nDone]].map(([id, label, n]) =>
+    h('button', { type: 'button', 'aria-selected': poolView === id, onclick: () => { poolView = id; renderPlan() } }, `${label} ${n}`)))
+  const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '전체' }, ...SLOTS, ...FAS].map(s =>
     h('button', { type: 'button', 'aria-selected': on(poolPick, s.id), onclick: pick(poolPick, s.id) }, s.short)))
   // 계정 칸만 따로 세로 스크롤(필터는 그대로) · 아래 막대를 위아래로 끌어 높이 조절
   const chips = h('div', { className: 'ar-chips' }, groups.length ? groups.map(g => g.length > 1 ? h('div', { className: 'ar-group', title: `${g[0].owner} 님 계정` }, g.map(a => chip(a, null))) : chip(g[0], null))
@@ -532,6 +540,7 @@ function editor() {
         try { localStorage.setItem(DETAIL_KEY, detail ? '1' : '0') } catch {}
         renderPlan()
       } }, detail ? '간단히 보기' : '자세히 보기')),
+    viewTabs,
     poolTabs,
     roleTabs,
     // 여러 개 골랐을 때 조건(OR · AND) · 필터 초기화(미배정 · 전체 · OR 로)
@@ -541,8 +550,9 @@ function editor() {
         h('button', { type: 'button', 'aria-selected': allOf === v, onclick: () => { allOf = v; renderPlan() } }, label))),
       h('button', { type: 'button', className: 'ar-reset', disabled: !poolPick.size && !rolePick.size && !allOf,
         onclick: () => { poolPick.clear(); rolePick.clear(); allOf = false; renderPlan() } }, '필터 초기화')),
-    h('p', { className: 'rc-muted' }, !poolPick.size ? '어느 시간대에도 안 들어간 계정 · 사람별로 묶어 본계정 → 부계정, 사람 순서는 집계 순서(계정 수 → 포지션 → 이름) · 필터는 여러 개 고를 수 있어요'
-      : `${[...poolPick].map(id => TAG[id]).join(' · ')} ${poolPick.size < 2 ? '' : allOf ? '모두 ' : '중 하나라도 '}신청한 사람 · ${allOf && poolPick.size > 1 ? '고른 시간대에 넣은 계정은' : '겹치는 시간대에 이미 들어갔으면'} 빠져요(FA 는 그날 넣을 시간대가 남은 사람)`),
+    h('p', { className: 'rc-muted' }, `${poolView === 'wait' ? '아직 팀에 안 들어간 계정 — 넣으면 「배정 완료」 로 옮겨 가요' : '팀에 들어갔거나 팀 없이 완료한 계정 — 한 번 더 넣을 땐 여기서 골라요'} · ${
+      !poolPick.size ? '사람별로 묶어 본계정 → 부계정, 사람 순서는 집계 순서(계정 수 → 포지션 → 이름) · 필터는 여러 개 고를 수 있어요'
+      : `${[...poolPick].map(id => TAG[id]).join(' · ')} ${poolPick.size < 2 ? '' : allOf ? '모두 ' : '중 하나라도 '}신청한 사람(겹치는 시간대에 이미 들어갔으면 빠지고, FA 는 그날 넣을 시간대가 남은 사람)`}`),
     chips, grip)
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
@@ -589,6 +599,7 @@ function chip(a, from, lead = false) {
     h('span', { className: 'ar-chip-body' }, h('span', { className: 'ar-chip-top' }, nickEl(a), roleTags(a.roles)),   // 주력 포지션 1 · 2순위
       a.owner !== a.n && h('span', { className: 'ar-owner' }, '본계 ', h('b', {}, a.owner)),
       h('small', {}, `계정 ${a.count} · `, a.slots.map(s => TAG[s]).filter(Boolean).join(' ')),   // 소유자의 참가 계정 수(집계 순서 1번) · 신청 시간대
+      !from && doneKeys().has(key(a.u, a.n)) && h('small', { className: 'ar-forced' }, '팀 없이 완료'),
       detail && charTags(a)))
   el.onpointerdown = e => startDrag(e, el, { onDrop: (x, y, target) => move(a, from, target?.closest('[data-drop]')?.dataset.drop) })
   el.onclick = () => menu(a, from)
@@ -609,8 +620,9 @@ function move(a, from, to, ok) {
     // 신청 안 한 시간대(그날 FA 로도 안 되는 칸)면 한 번 더 묻고, 확인하면 그때의 편성으로 다시 넣는다 · 같은 시간대 안에서 팀만 옮길 땐 묻지 않는다
     if (!ok && from?.slot !== slot && !a.slots.includes(slot) && !viaFa(a.slots, SLOT[slot])) return void askOff(a, slot).then(y => y && move(a, from, to, true))
     team.push({ u: a.u, n: a.n })
+    if (next.done) next.done = next.done.filter(x => !same(x))   // 팀에 넣으면 「팀 없이 완료」 는 풀린다
   }
-  plan = Object.fromEntries(Object.entries(next).map(([k, v]) => [k, v.filter(tm => tm.length)]).filter(([, v]) => v.length))
+  plan = Object.fromEntries(Object.entries(next).map(([k, v]) => [k, k in SLOT ? v.filter(tm => tm.length) : v]).filter(([, v]) => v.length))
   renderPlan()
   save()
 }
@@ -630,9 +642,19 @@ async function askOff(a, slot) {
   } catch { return confirm(lines.join('\n')) }
 }
 
+/** 팀 없이 완료(강제 배정) — 따로 팀을 꾸려 뛴 계정을 「배정 완료」 로. 끄면 「배정 대기」 로 */
+function setDone(a, on) {
+  const { done = [], ...rest } = plan, left = done.filter(x => x.u !== a.u || x.n !== a.n)
+  plan = on || left.length ? { ...rest, done: on ? [...left, { u: a.u, n: a.n }] : left } : rest
+  renderPlan()
+  save()
+}
+
 function menu(a, from) {
   const items = []
   if (from) items.push({ label: '빼기 (대기로)', pick: () => move(a, from, 'pool') })
+  else if (doneKeys().has(key(a.u, a.n))) items.push({ label: '팀 없이 완료 취소 (대기로)', pick: () => setDone(a, false) })
+  else if (!placements().has(key(a.u, a.n))) items.push({ label: '팀 없이 완료로 (강제 배정)', pick: () => setDone(a, true) })
   for (const s of SLOTS) {
     const teams = teamsOf(s.id)
     if (SLOTS.some(o => clash(s.id, o.id) && teamsOf(o.id).some((tm, ti) => tm.some(x => x.u === a.u && !(from?.slot === o.id && from.ti === ti && x.n === a.n))))) continue   // 겹치는 시간대에 이미 있다
@@ -787,7 +809,7 @@ const picksSheet = wb => addSheet(wb, '신청 현황', [['본계정', 16], ...PI
  *  포지션(1차 · 2차)과 신청 시간대(신청 현황처럼 칸마다 O)는 병합하지 않고 줄마다 넣어 열 필터로 걸러도 그 계정의 캐릭터 줄이 다 남는다.
  *  신청 현황 · 편성 명단의 내용(본계정 · 신청 시간대 · 메모 · 배정 팀)이 다 들어간다. 사람 순서는 신청 현황과 같고 한 사람씩 번갈아 옅게 칠한다. 사유불참은 계정이 없어 한 줄 */
 function detailSheet(wb) {
-  const at = placements(), rows = [], merges = [], shade = new Set()
+  const at = placements(), done = doneKeys(), rows = [], merges = [], shade = new Set()
   const cols = [['참가 계정', 18], ['캐릭터', 16], ['레벨', 7, 1], ['구분', 8, 1], ['본계정', 16], ['포지션 1차', 12, 1], ['포지션 2차', 12, 1], ...PICK_COLS.map(c => [c.short, 8, 1]), ['배정', 26], ['메모', 40]]
   const merged = [1, 4, 5, cols.length - 1, cols.length]   // 계정 정보 칸 — 포지션 · 시간대 칸은 병합하지 않는다
   signupOrder().forEach((s, p) => {
@@ -795,7 +817,7 @@ function detailSheet(wb) {
     if (!s.accounts.length) rows.push([s.owner, '', '', '', s.owner, '', '', ...picks, '', s.memo])
     for (const x of s.accounts) {
       const a = accts.get(key(s.userId, x.nick)), top = rows.length + 1
-      const placed = (at.get(key(a.u, a.n)) || []).map(w => { const tm = plan[w.slot][w.team - 1]; return `${SHORT[w.slot]} ${w.team}팀${tm[0].u === a.u && tm[0].n === a.n ? '(팀장)' : ''}` }).join(' · ')
+      const placed = (at.get(key(a.u, a.n)) || []).map(w => { const tm = plan[w.slot][w.team - 1]; return `${SHORT[w.slot]} ${w.team}팀${tm[0].u === a.u && tm[0].n === a.n ? '(팀장)' : ''}` }).join(' · ') || (done.has(key(a.u, a.n)) ? '팀 없이 완료' : '')
       for (const id of a.chars) rows.push([a.n, P(id).name, a.bt?.[id] ? `${a.bt[id]}렙` : '-', a.n === s.owner ? '본계정' : '부계정', s.owner, roleLabel(a.roles[0]), a.roles[1] ? roleLabel(a.roles[1]) : '', ...picks, placed, s.memo])
       if (rows.length > top) for (const c of merged) merges.push([top, c, rows.length])
     }

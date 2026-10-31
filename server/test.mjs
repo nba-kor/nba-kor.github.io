@@ -1783,6 +1783,7 @@ test('감사 로그 내용: 한글 이름 · 프로필 · 아레나 신청 · �
     ['B: 토 1차 1팀 → 토 1.5차 1팀', '−E: 일 1차 1팀', '+D: 토 1차 2팀', '+A2: 일 2차 1팀'])
   assert.deepEqual(planChanges(undefined, { sat1: [[p('1', 'A')]] }), ['+A: 토 1차 1팀'], '처음 저장')
   assert.deepEqual(planChanges({ sat1: [[p('9', 'Z')], [p('1', 'A')]] }, { sat1: [[p('1', 'A')]] }), ['−Z: 토 1차 1팀', 'A: 토 1차 2팀 → 1팀'], '앞 팀이 비어 번호가 당겨지면 옮긴 것으로')
+  assert.deepEqual(planChanges({ done: [p('1', 'A')] }, { done: [p('2', 'B')] }), ['+B: 팀 없이 완료', '−A: 팀 없이 완료'])
 })
 
 test('아레나 주: 그 주 토요일(KST) · 일요일 21:30 이 지나면 다음 주 · 연말을 넘는다', async () => {
@@ -1853,6 +1854,7 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
     [{ sat1: [[{ u: a.id, n: 'A본' }, { u: boss.id, n: `관리${RUN}` }]] }, 409, '신청 안 한 계정'],
     [{ sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: `B${RUN}` }, { u: a.id, n: 'A부' }, { u: b.id, n: `B${RUN}` }]] }, 400, '4명'],
     [{ mon1: [] }, 400, '없는 시간대'], [{ sat1: [{ u: a.id, n: 'A본' }] }, 400, '팀이 배열 아님'], [[], 400, '배열 편성표'],
+    [{ done: [{ u: boss.id, n: `관리${RUN}` }] }, 409, '팀 없이 완료도 신청한 계정만'], [{ done: { u: a.id, n: 'A본' } }, 400, '팀 없이 완료가 배열 아님'],
   ]) assert.equal((await plan(boss, p, null)).status, status, why)
   assert.equal((await api('PUT', '/api/arena/plan', { week: '2000-01-01', version: null, plan: p1 }, { as: boss.as })).status, 409, '지난 주')
   clock += MIN
@@ -1860,6 +1862,9 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   assert.deepEqual([saved.status, saved.body], [200, { plan: { sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: `B${RUN}` }]], sat2: [[{ u: a.id, n: 'A부' }]] }, planAt: clock }], '빈 팀은 버린다')
   assert.equal((await plan(boss, p1, null)).status, 409, '읽은 뒤 누가 저장했으면(버전이 다르면) 409')
   assert.deepEqual([(await view()).planAt, (await view()).plan.sat1], [clock, saved.body.plan.sat1], '편성표는 누구나 본다')
+  clock += MIN
+  const done = await plan(boss, { ...p1, done: [{ u: b.id, n: `B${RUN}` }, { u: b.id, n: `B${RUN}` }] }, saved.body.planAt)
+  assert.deepEqual([done.status, done.body.plan.done], [200, [{ u: b.id, n: `B${RUN}` }]], '팀 없이 완료 — 한 계정에 한 번')
 
   // 프로필에서 계정을 빼면 신청 · 편성표에서도 안 보인다
   clock += MIN
@@ -1870,7 +1875,7 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   // 신청 취소 → 편성표에서도 빠진다
   assert.equal((await api('DELETE', '/api/arena/signup', undefined, { as: b.as })).status, 200)
   v = await view()
-  assert.deepEqual([v.signups.map(s => s.userId), v.plan.sat1], [[a.id, c.id], [[{ u: a.id, n: 'A본' }]]])
+  assert.deepEqual([v.signups.map(s => s.userId), v.plan.sat1, v.plan.done], [[a.id, c.id], [[{ u: a.id, n: 'A본' }]], []], '팀 없이 완료에서도 빠진다')
   assert.ok(v.missing.includes(`B${RUN}`), '취소하면 미신청')
 
   // 이력 · 지난 주는 보기만

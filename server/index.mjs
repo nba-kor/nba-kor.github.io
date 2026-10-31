@@ -411,6 +411,9 @@ export function planChanges(old, now) {
     if (gone.length === 1 && added.length === 1) out.push(`${nick}: ${at(...gone[0])} → ${at(...added[0])}`)
     else out.push(...added.map(p => `+${nick}: ${at(...p)}`), ...gone.map(p => `−${nick}: ${at(...p)}`))
   }
+  const done = plan => new Set((plan?.done || []).map(a => `${a.u}\n${a.n}`)), was = done(old), is = done(now)
+  for (const k of is) if (!was.has(k)) out.push(`+${k.split('\n')[1]}: 팀 없이 완료`)
+  for (const k of was) if (!is.has(k)) out.push(`−${k.split('\n')[1]}: 팀 없이 완료`)
   return out
 }
 
@@ -438,22 +441,32 @@ function arenaSignup(v, nicks, week) {
   return { slots: CHOICES.filter(c => v.slots.includes(c)), nicks: picked, memo: text(v.memo ?? '', ARENA.memo, '메모', 0) }
 }
 
-/** 편성표: { 시간대: [[{ u, n }]] } — 신청한 계정만, 팀당 teamSize 명까지, 한 사람은 겹치는 시간대에 한 번(계정 둘을 동시에 못 한다). 빈 팀은 버린다 */
+/** 편성표: { 시간대: [[{ u, n }]], done?: [{ u, n }] } — 신청한 계정만, 팀당 teamSize 명까지, 한 사람은 겹치는 시간대에 한 번(계정 둘을 동시에 못 한다). 빈 팀은 버린다.
+ *  done = 팀 없이 완료(따로 팀을 꾸려 뛴 계정) — 한 계정에 한 번 */
 function arenaPlan(v, signups) {
   if (!isObj(v)) fail(400, '편성표 형식이 잘못됐어요')
   const ok = new Set(signups.flatMap(s => s.accounts.map(a => `${s.userId}\n${a.nick}`)))
   const out = {}, at = new Map()   // 사람 → 들어간 시간대들
+  const acct = a => {
+    if (!isObj(a) || typeof a.u !== 'string' || typeof a.n !== 'string') fail(400, '편성표 형식이 잘못됐어요')
+    if (!ok.has(`${a.u}\n${a.n}`)) fail(409, STALE_PLAN)   // 그새 신청을 취소했거나 계정을 뺐다
+    return { u: a.u, n: a.n }
+  }
+  if ('done' in v) {
+    if (!listOf(v.done, ok.size)) fail(400, '편성표 형식이 잘못됐어요')
+    const done = new Map(v.done.map(acct).map(a => [`${a.u}\n${a.n}`, a]))
+    if (done.size) out.done = [...done.values()]
+  }
   for (const [slot, teams] of Object.entries(v)) {
+    if (slot === 'done') continue
     if (!SLOTS.has(slot) || !listOf(teams, ARENA.maxTeams) || !teams.every(Array.isArray)) fail(400, '편성표 형식이 잘못됐어요')
     out[slot] = teams.filter(team => team.length).map(team => {
       if (team.length > ARENA.teamSize) fail(400, `한 팀은 ${ARENA.teamSize}명까지예요`)
-      return team.map(a => {
-        if (!isObj(a) || typeof a.u !== 'string' || typeof a.n !== 'string') fail(400, '편성표 형식이 잘못됐어요')
-        if (!ok.has(`${a.u}\n${a.n}`)) fail(409, STALE_PLAN)   // 그새 신청을 취소했거나 계정을 뺐다
-        const mine = at.get(a.u) || []
+      return team.map(m => {
+        const a = acct(m), mine = at.get(a.u) || []
         if (mine.some(x => clash(x, slot))) fail(400, '한 사람은 겹치는 시간대에 한 번만 넣을 수 있어요')
         at.set(a.u, [...mine, slot])
-        return { u: a.u, n: a.n }
+        return a
       })
     })
   }
@@ -1094,11 +1107,11 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         week === cur ? db('/recruit_profiles?select=discord_user_id,discord_name,main:entries->0->>nick&order=updated_at.desc&limit=1000') : [],
       ])
       const live = new Set(signups.flatMap(s => s.accounts.map(a => `${s.userId}\n${a.nick}`)))
-      const signed = new Set(signups.map(s => s.userId))
+      const signed = new Set(signups.map(s => s.userId)), alive = a => live.has(`${a.u}\n${a.n}`)
       return [200, {
         week, current: cur, signups,
         // 그새 신청을 취소했거나 계정을 뺀 줄은 편성표에서도 안 보인다(관리자가 다음에 저장하면 빠진다)
-        plan: Object.fromEntries(Object.entries(plan?.plan || {}).map(([slot, teams]) => [slot, teams.map(tm => tm.filter(a => live.has(`${a.u}\n${a.n}`)))])),
+        plan: Object.fromEntries(Object.entries(plan?.plan || {}).map(([slot, teams]) => [slot, slot === 'done' ? teams.filter(alive) : teams.map(tm => tm.filter(alive))])),
         planAt: plan?.updated_at ?? null,
         missing: members.filter(p => !signed.has(p.discord_user_id)).map(p => p.main || p.discord_name),   // 프로필은 있는데 이번 주 신청이 없는 사람(본계 닉네임)
       }]
@@ -1113,7 +1126,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         current: cur,
         history: rows.map(r => ({
           ...r,
-          assigned: Object.entries(planOf.get(r.week) || {}).flatMap(([slot, teams]) => teams.flatMap((tm, i) => tm.filter(a => a.u === user.id).map(a => ({ slot, team: i + 1, nick: a.n })))),
+          assigned: Object.entries(planOf.get(r.week) || {}).filter(([slot]) => slot !== 'done').flatMap(([slot, teams]) => teams.flatMap((tm, i) => tm.filter(a => a.u === user.id).map(a => ({ slot, team: i + 1, nick: a.n })))),
         })),
       }]
     }
