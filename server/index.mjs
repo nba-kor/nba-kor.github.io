@@ -71,7 +71,7 @@ const SLAM_MATCH = /^[A-Za-z0-9_-]{8,24}$/   // 방장 브라우저가 만든 �
 const SLAM_STALE = 86_400_000   // 한쪽만 올린 결과는 하루 뒤 지운다
 const SURVIVE_KEY = /^[a-z0-9_]{1,32}$/   // 덩크 서바이버: 업적 · 기록 이름(화면 assets/survive.js 가 정한다)
 const SURVIVE_MAX = 120   // 업적 · 기록 각각 이만큼까지
-const SURVIVE_MAPS = ['park', 'arena', 'roof']   // 덩크 서바이버 맵 — 랭킹은 맵마다
+const SURVIVE_MAPS = ['park', 'arena', 'roof', 'chal']   // 덩크 서바이버 맵 — 랭킹은 맵마다. chal = 챌린지(시간 제한 없음)
 const SURVIVE_LIST = 20   // 랭킹 줄 수
 // 받는 요청 — 메서드 + 경로 조각. 예: 'POST team members' = 가입, 'DELETE team members member' = 방출 · 나가기
 const ACTIONS = new Set([
@@ -561,10 +561,10 @@ function surviveSave(b) {
   if (!isObj(b) || !ok(b.ach) || !ok(b.stats)) fail(400, '요청 형식이 잘못됐어요')
   return { ach: b.ach, stats: b.stats }
 }
-/** 덩크 서바이버 한 판 — { map, hero: 캐릭터(국내 서버 선수 id), secs: 버틴 초(0~1800), kills, lvl } */
+/** 덩크 서바이버 한 판 — { map, hero: 캐릭터(국내 서버 선수 id), secs: 버틴 초(0~1800, 챌린지는 하루까지), kills, lvl } */
 function surviveRun(b) {
   const int = (v, max) => Number.isSafeInteger(v) && v >= 0 && v <= max
-  if (!isObj(b) || !SURVIVE_MAPS.includes(b.map) || typeof b.hero !== 'string' || !PLAYERS.has(b.hero) || !int(b.secs, 1800) || !int(b.lvl, 1000)
+  if (!isObj(b) || !SURVIVE_MAPS.includes(b.map) || typeof b.hero !== 'string' || !PLAYERS.has(b.hero) || !int(b.secs, b.map === 'chal' ? 86400 : 1800) || !int(b.lvl, 1000)
     || !int(b.kills, 1_000_000) || b.kills > b.secs * 200 + 50) fail(400, '요청 형식이 잘못됐어요')   // 1초에 200명 넘게는 못 쓰러뜨린다
   return { map: b.map, hero: b.hero, secs: b.secs, kills: b.kills, lvl: b.lvl }
 }

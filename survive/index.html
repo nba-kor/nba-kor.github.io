@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/icon.png?v=2" type="image/png">
 <link rel="apple-touch-icon" href="/assets/icon.png?v=2">
 <meta name="theme-color" content="#0d1117">
-<meta name="description" content="뱀파이어 서바이버즈류 농구 생존 게임 「덩크 서바이버」 — 몰려오는 수비를 피해 30분 버티기. 덩크 시티 선수 10명(업적으로 해금), 농구 스킬 13가지, 레벨 업 랜덤 상자와 잭팟, 맵 3개. 키보드 · 휴대폰 터치로 바로 플레이.">
+<meta name="description" content="뱀파이어 서바이버즈류 농구 생존 게임 「덩크 서바이버」 — 몰려오는 수비를 피해 30분 버티기. 덩크 시티 선수 14명(업적으로 해금), 농구 스킬 17가지와 돌파, 특징이 다른 보스 6종, 레벨 업 랜덤 상자와 잭팟, 맵 3개와 시간 제한 없는 챌린지. 키보드 · 휴대폰 터치로 바로 플레이.">
 <link rel="canonical" href="https://nba-kor.github.io/survive/">
 <!-- 카카오톡 · 디스코드 · 트위터 미리보기. 이미지를 바꾸면 ?v= 도 올린다(카카오는 URL 로 캐시한다) -->
 <meta property="og:type" content="website">
@@ -15,14 +15,14 @@
 <meta property="og:locale" content="ko_KR">
 <meta property="og:url" content="https://nba-kor.github.io/survive/">
 <meta property="og:title" content="덩크 서바이버 · TNAB Vipers">
-<meta property="og:description" content="뱀파이어 서바이버즈류 농구 생존 게임 「덩크 서바이버」 — 몰려오는 수비를 피해 30분 버티기. 덩크 시티 선수 10명(업적으로 해금), 농구 스킬 13가지, 레벨 업 랜덤 상자와 잭팟, 맵 3개. 키보드 · 휴대폰 터치로 바로 플레이.">
+<meta property="og:description" content="뱀파이어 서바이버즈류 농구 생존 게임 「덩크 서바이버」 — 몰려오는 수비를 피해 30분 버티기. 덩크 시티 선수 14명(업적으로 해금), 농구 스킬 17가지와 돌파, 특징이 다른 보스 6종, 레벨 업 랜덤 상자와 잭팟, 맵 3개와 시간 제한 없는 챌린지. 키보드 · 휴대폰 터치로 바로 플레이.">
 <meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=9ac1084d">
+<link rel="stylesheet" href="/assets/style.css?v=347d9609">
 </head>
 <body>
 
@@ -44,7 +44,7 @@
 </header>
 
 <main class="slam sv">
-  <h1>덩크 서바이버 <small>뱀파이어 서바이버즈류 · 30분 생존 · 캐릭터 10명 · 업적 · 랜덤 상자</small></h1>
+  <h1>덩크 서바이버 <small>뱀파이어 서바이버즈류 · 30분 생존 · 챌린지(무한) · 캐릭터 14명 · 보스 6종 · 업적</small></h1>
   <div class="slam-stage">
     <div class="sv-screen">
       <canvas id="sv" aria-label="덩크 서바이버 게임 화면"></canvas>
@@ -71,13 +71,30 @@
     <ul class="slam-help">
       <li>스킬은 쿨타임마다 저절로 나가요. 수비를 쓰러뜨리면 떨어지는 경험치(보석)를 주워 레벨을 올려요.</li>
       <li>레벨이 오를 때마다 랜덤 상자 — 새 스킬 · 스킬 레벨 업 · 아이템 셋 중 하나. 스킬 · 아이템은 6칸씩, 스킬은 Lv 8 · 아이템은 Lv 5 까지.</li>
-      <li>5분마다 올스타 수비수(보스)가 나와요. 멈칫(붉게)한 뒤 돌진하니 옆으로 피하세요. 쓰러뜨리면 트로피 상자(잭팟 확률 50%).</li>
+      <li>5 · 10 · 15분에 올스타 수비수(보스), 17분부터 중간보스, 20분에 상태이상을 거는 감독, <b>25분부터는 1분마다 다른 보스</b>가 나와요(아래 「보스」). 보스를 쓰러뜨리면 트로피 상자(잭팟 확률 50%).</li>
+      <li><b>15분부터 변수 기술</b> — 블록슛 · 프레스로 못 막으니 보고 피해야 해요. 25분부터는 훨씬 자주, 세게 와요. 가만히 서 있으면 못 버텨요.</li>
       <li>20분부터 심판이 나와 멀리서 호루라기를 던져요(갈수록 많아져요). 블록슛 손에 닿으면 막히고, 풀코트 프레스 · 스크린 바닥 안에서는 느리게 날아와요.</li>
       <li>마스코트는 드링크(회복) · 호루라기(경험치 모으기) · 타임아웃(수비 멈춤) · 버저(화면 정리)를 떨어뜨려요.</li>
       <li>스킬이 최고 레벨이 되면 수비가 아주 가끔 <b>챔피언 반지</b>를 떨어뜨려요(빛기둥). 주우면 그 스킬을 돌파 — 아래 「스킬 돌파」.</li>
+      <li><b>챌린지</b> 맵은 시간 제한이 없어요 — 버틸수록 수비가 세지고 빨라지고, 30분부터는 1분마다 보스가 여럿(갈수록 늘어나요) 나와요. 피는 30분 수준에서 더 늘지 않아요. 맵마다 랭킹이 따로예요.</li>
       <li>30분을 버티면 클리어. 업적을 달성하면 캐릭터가 열려요 — 로그인하면 업적이 계정에 저장돼 다른 기기에서도 이어지고, 기록이 랭킹에 올라가요(안 하면 이 브라우저에만).</li>
     </ul>
-    <h2>캐릭터 <small>르브론은 처음부터, 나머지 9명은 업적으로</small></h2>
+    <h2>보스 <small>피는 적당히 — 대신 서 있으면 맞는 기술을 써요. 기술 전에는 멈춰서 붉게 깜빡여요</small></h2>
+    <table class="slam-keys sv-table"><thead><tr><th>보스</th><th>나오는 때</th><th>특징</th></tr></thead><tbody id="sv-guide-bosses"></tbody></table>
+    <h2>변수 기술 <small>15분부터 · 25분부터는 훨씬 자주</small></h2>
+    <table class="slam-keys">
+      <tbody>
+        <tr><th>하프코트 폭격</th><td>내 발밑과 둘레에 붉은 원이 생기고, 다 차오르면 공이 떨어져 터져요. 원 밖으로 나가기</td></tr>
+        <tr><th>풀코트 러시</th><td>화면 한쪽(붉은 화살표)에서 수비가 줄지어 달려와요. 느려지지도 밀리지도 않으니 <b>초록 줄(빈자리)</b>로 들어가기</td></tr>
+      </tbody>
+    </table>
+    <h2>상태이상 <small>20분부터 감독 · 수석 심판 · MVP 가 보스마다 1분에 한 번</small></h2>
+    <table class="slam-keys sv-table"><tbody id="sv-guide-status"></tbody></table>
+    <ul class="slam-help">
+      <li>보스가 이름을 외치고(말풍선) 그 색 물결이 퍼져요 — 물결이 닿기 전에 멀리 벗어나면 안 걸려요. 걸리면 화면 위에 이름과 남은 초가 떠요.</li>
+      <li><img class="sv-ico" id="sv-spray" alt=""><b>쿨링 스프레이</b>를 주우면 상태이상이 모두 풀려요. 걸렸을 때 근처에 떨어지기도 하고, 20분부터 수비 · 마스코트가 가끔 떨어뜨려요(걸린 게 없으면 체력 15%).</li>
+    </ul>
+    <h2>캐릭터 <small>르브론은 처음부터, 나머지 13명은 업적으로</small></h2>
     <table class="slam-keys sv-table"><thead><tr><th>선수</th><th>시작 스킬</th><th>특성</th><th>여는 법</th></tr></thead><tbody id="sv-guide-chars"></tbody></table>
     <h2>스킬 <small>최고 Lv 8</small></h2>
     <table class="slam-keys sv-table"><tbody id="sv-guide-skills"></tbody></table>
@@ -95,6 +112,6 @@
   </section>
 </main>
 
-<script type="module" src="/assets/survive.js?v=618983aa"></script>
+<script type="module" src="/assets/survive.js?v=e52ce6f7"></script>
 </body>
 </html>

@@ -1590,7 +1590,7 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-h { margin: 0 0 10px; font: italic 900 1.5em/1.1 system-ui, sans-serif; }
 .sv-big { font-size: 2.6em; color: #ff6b6b; }
 .sv-over.is-win .sv-big { color: #ffd23f; }
-.sv-chars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.sv-chars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }   /* 14명 — 두 줄(세운 휴대폰은 다섯 줄씩) */
 .sv-char { position: relative; display: grid; justify-items: center; gap: 1px; padding: 8px 2px 6px; border-radius: 12px; border: 2px solid transparent; background: #ffffff10; color: #fff; }
 .sv-char img { width: min(64px, 70%); aspect-ratio: 1; border-radius: 50%; background: #ffffff18; }
 .sv-char b { font-size: .9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -1606,13 +1606,13 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-pick p { margin: 4px 0 0; font-size: .92em; color: #dfe5ee; }
 .sv-pick em { font-style: normal; font-weight: 800; color: #ffd23f; }
 .sv-lockmsg { color: #ff9b9b !important; }
-.sv-maps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sv-maps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .sv-map { display: grid; gap: 3px; padding: 6px 6px 8px; border-radius: 12px; border: 2px solid transparent; background: #ffffff10; color: #fff; text-align: left; }
 .sv-map canvas { width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 8px; }
 .sv-map small { color: #c9d1e0; font-size: .82em; }
 .sv-map .sv-best { color: #7ff3ff; font-weight: 700; }
 /* 세운 화면 — 캐릭터는 다섯 줄 그대로 작게, 맵은 한 줄에 하나(그림 왼쪽) */
-@container (orientation: portrait) { .sv-chars { gap: 4px; } .sv-char { padding: 6px 1px 4px; } .sv-char b { font-size: .78em; } .sv-char small { font-size: .7em; } .sv-maps { grid-template-columns: 1fr; } .sv-map { grid-template-columns: 42% 1fr; align-items: center; column-gap: 8px; } .sv-map canvas { grid-row: span 3; } .sv-panel { padding: 12px 10px; } }
+@container (orientation: portrait) { .sv-chars { grid-template-columns: repeat(5, 1fr); gap: 4px; } .sv-char { padding: 6px 1px 4px; } .sv-char b { font-size: .78em; } .sv-char small { font-size: .7em; } .sv-maps { grid-template-columns: 1fr; } .sv-map { grid-template-columns: 42% 1fr; align-items: center; column-gap: 8px; } .sv-map canvas { grid-row: span 3; } .sv-panel { padding: 12px 10px; } }
 .sv-achs { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 6px; text-align: left; }
 .sv-achs li { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 10px; background: #ffffff0b; opacity: .72; }
 .sv-achs li.is-done { opacity: 1; background: linear-gradient(90deg, #ffd23f22, #ffffff0b); }
@@ -1776,6 +1776,8 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-table tbody th { display: flex; align-items: center; gap: 8px; }
 .sv-face { width: 30px; height: 30px; border-radius: 50%; flex: none; }
 .sv-ico { width: 30px; height: 30px; flex: none; }
+.sv-boss { width: 30px; height: 44px; flex: none; object-fit: contain; }
+.slam-help .sv-ico { width: 22px; height: 22px; margin-right: 4px; vertical-align: middle; }
 .sv-ui button { touch-action: manipulation; }
 .sv #sv-guide-achs .sv-achs li { background: var(--panel); border: 1px solid var(--line); color: var(--text); }
 .sv #sv-guide-achs .sv-achs small { color: var(--muted); }

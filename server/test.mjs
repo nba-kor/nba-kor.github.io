@@ -1957,9 +1957,12 @@ dbTest('덩크 서바이버 랭킹: 맵마다 사람마다 최고 기록 한 줄
   const [a, b, c] = await Promise.all(['A', 'B', 'C'].map(k => person(api, { name: `랭킹${k}${RUN}` })))
   const map = 'roof', run = (who, o) => api('POST', '/api/survive/run', { map, hero: 'james', secs: 300, kills: 900, lvl: 20, ...o }, { as: who.as })
   assert.equal((await api('POST', '/api/survive/run', { map, hero: 'james', secs: 1, kills: 1, lvl: 1 })).status, 401)
-  for (const o of [{ map: 'moon' }, { hero: 'nobody' }, { secs: 1801 }, { secs: -1 }, { kills: 1.5 }, { lvl: '3' }, { secs: 10, kills: 5000 }]) {
+  for (const o of [{ map: 'moon' }, { hero: 'nobody' }, { secs: 1801 }, { secs: -1 }, { kills: 1.5 }, { lvl: '3' }, { secs: 10, kills: 5000 }, { map: 'chal', secs: 86401 }]) {
     assert.equal((await run(a, o)).status, 400, JSON.stringify(o))
   }
+  const ch = await run(a, { map: 'chal', secs: 3600, kills: 9000, hero: 'sga' })   // 챌린지는 30분을 넘겨도 된다 · 새 캐릭터
+  assert.equal(ch.status, 200, ch.text)
+  assert.equal(ch.body.mine.secs, 3600)
   // 로컬 DB 에는 지난 실행의 기록도 있다 — 이번 실행 것은 그보다 높게(1800초 + 처치 수로 가린다)
   const top = (await rows(`/survive_best?select=kills&map=eq.${map}&secs=eq.1800&order=kills.desc&limit=1`))[0]?.kills ?? 0
   const K = top + 1000
@@ -1973,7 +1976,7 @@ dbTest('덩크 서바이버 랭킹: 맵마다 사람마다 최고 기록 한 줄
   // 보기 — 로그인 없이. 맵마다, ID 는 내보내지 않는다
   const v = await api('GET', '/api/survive/ranking')
   assert.equal(v.status, 200)
-  assert.deepEqual(Object.keys(v.body.ranking), ['park', 'arena', 'roof'])
+  assert.deepEqual(Object.keys(v.body.ranking), ['park', 'arena', 'roof', 'chal'])
   assert.equal(v.body.mine, undefined)
   assert.deepEqual(v.body.ranking.roof.slice(0, 3).map(r => [r.rank, r.name, r.kills]), [[1, a.name, K + 20], [2, b.name, K + 10], [2, c.name, K + 10]])
   assert.ok(v.body.ranking.roof.every(r => Object.keys(r).join() === 'rank,name,hero,secs,kills,lvl'))
