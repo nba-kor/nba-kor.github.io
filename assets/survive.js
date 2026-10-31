@@ -122,9 +122,9 @@ const BOSS = {
   boss: { name: '올스타 수비수', line: '막아 보시지!', note: '멈칫(갈 길이 붉게)한 뒤 그 방향으로 돌진 — 옆으로 피하기' },
   shooter: { name: '샤프슈터', line: '스플래시!', note: '거리를 두고 농구공을 부채꼴로 던진다 — 블록슛 손 · 프레스로 못 막는다' },
   center: { name: '골밑 지배자', line: '골밑은 내 거다!', note: '뛰어올라 내 자리에 내려찍는다 — 붉은 원에서 벗어나기' },
-  coach: { name: '감독', line: '작전 타임!', note: '슬로우 · 약화 · 약체화를 차례로 건다 · 선수들을 불러 둘레를 에워싼다', st: ['slow', 'weak', 'frail'] },
-  chief: { name: '수석 심판', line: '테크니컬 파울!', note: '레드카드를 사방으로 뿌린다(손 · 프레스로 못 막는다) · 약체화를 건다', st: ['frail'] },
-  mvp: { name: 'MVP', line: '이게 MVP다!', note: '돌진 · 농구공 · 내려찍기를 번갈아 쓰고 상태이상도 건다', st: ['slow', 'weak', 'frail'] },
+  coach: { name: '감독', line: '작전 타임!', note: '슬로우 · 약화 · 약체화 · 봉인을 차례로 건다 · 선수들을 불러 둘레를 에워싼다', st: ['slow', 'weak', 'frail', 'seal'] },
+  chief: { name: '수석 심판', line: '테크니컬 파울!', note: '레드카드를 사방으로 뿌린다(손 · 프레스로 못 막는다) · 약체화 · 봉인을 건다', st: ['frail', 'seal'] },
+  mvp: { name: 'MVP', line: '이게 MVP다!', note: '돌진 · 농구공 · 내려찍기를 번갈아 쓰고 상태이상도 건다', st: ['slow', 'weak', 'frail', 'seal'] },
 }
 // 보스가 나오는 때 — [초, 종류, 중간보스면 1]. 25분부터는 1분마다 다른 보스. 챌린지는 30분 뒤로도 1분마다 여럿(spawner)
 const PLAN = [[300, 'boss'], [600, 'boss'], [900, 'boss'], [1020, 'shooter', 1], [1140, 'center', 1], [1200, 'coach'], [1320, 'shooter', 1], [1440, 'center', 1],
@@ -134,6 +134,7 @@ const STATUS = {
   slow: { name: '슬로우', note: '이동 속도 -40%', col: '#5ab0ff' },
   weak: { name: '약화', note: '주는 피해 -40%', col: '#ff9f43' },
   frail: { name: '약체화', note: '받는 피해 +50%', col: '#ff4d6d' },
+  seal: { name: '봉인', note: '주력 스킬(주황 아이콘) 하나를 못 쓴다', col: '#b6f26b' },
 }
 const ST_T = 10
 
@@ -915,6 +916,7 @@ function zig(x0, y0, x1, y1) {
 
 function weapons(dt) {
   for (const w of G.weapons) {
+    if (w === G.seal && sick('seal')) continue
     const st = w.st, A = st.area * S.area, D = st.dmg * S.might
     if (w.id === 'press') {   // 풀코트 프레스 — 쿨타임마다 둘레 전부
       w.R = 72 * A * (w.br ? 1.3 : 1)
@@ -1129,7 +1131,13 @@ const sick = id => G.sts[id] > G.t
 function afflict(id) {
   const st = STATUS[id]
   G.sts[id] = G.t + ST_T
-  fx({ k: 'text', x: pl.x, y: pl.y - 70, s: st.name, col: st.col, T: 1.2 }); fx({ k: 'flash', x: pl.x, y: pl.y - 20, R: 70, col: st.col, T: 0.5 })
+  let s = st.name
+  if (id === 'seal') {   // 봉인 — 주력 스킬 하나(G.seal)를 못 쓴다. 나가 있던 블록슛 손 · 프레스 바닥 · 남은 연사도 거둔다
+    const w = G.seal = pickOf(G.weapons); s += ` — ${WEAP[w.id].name}`
+    for (const b of G.shots) if (b.w === w) b.dead = true
+    w.hands = null; w.on = 0; w.R = 0; w.q = 0
+  }
+  fx({ k: 'text', x: pl.x, y: pl.y - 70, s, col: st.col, T: 1.6 }); fx({ k: 'flash', x: pl.x, y: pl.y - 20, R: 70, col: st.col, T: 0.5 })
   if (rnd() < 0.6) { const a = rnd() * TAU, d = 170 + rnd() * 90; item(pl.x + Math.cos(a) * d, pl.y + Math.sin(a) * d, 'spray') }
 }
 function hurt(e, dmg, ox, oy, kb = 0) {
@@ -1831,6 +1839,11 @@ function hud() {
     if (w.br) { c.strokeStyle = `rgba(199,125,255,${0.55 + Math.sin(tnow * 4) * 0.35})`; c.lineWidth = 1.4 * u; c.beginPath(); c.roundRect(x - u, y - u, s + 2 * u, s + 2 * u, 3 * u); c.stroke() }
     else if (w.lv === 8) { c.strokeStyle = '#ffd23f'; c.lineWidth = 1.2 * u; c.beginPath(); c.roundRect(x, y, s, s, 2.4 * u); c.stroke() }
     else label2(c, String(w.lv), x + s - 2.4 * u, y + s - 0.6 * u, 5.4 * u, '#fff')
+    if (w === G.seal && sick('seal')) {   // 봉인 — 어둡게 덮고 그 색 X
+      c.fillStyle = '#000b'; c.fillRect(x, y, s, s); c.strokeStyle = STATUS.seal.col; c.lineWidth = 1.6 * u
+      c.beginPath(); c.moveTo(x + 2 * u, y + 2 * u); c.lineTo(x + s - 2 * u, y + s - 2 * u); c.moveTo(x + s - 2 * u, y + 2 * u); c.lineTo(x + 2 * u, y + s - 2 * u); c.stroke()
+      c.beginPath(); c.roundRect(x, y, s, s, 2.4 * u); c.stroke()
+    }
     x += s + 1.6 * u
   }
   x = 4 * u; y += s + 2 * u
