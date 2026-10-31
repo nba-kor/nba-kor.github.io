@@ -212,7 +212,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .pm-head b { display: block; font-size: 16px; }
 .pm-head small { color: var(--muted); font-size: 12.5px; }
 .pm-items { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; }
-.pm-item { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 12px; font-size: 15px; font-weight: 600; text-align: left; }
+.pm-item { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 12px; font-size: 15px; font-weight: 600; text-align: left; word-break: keep-all; }
 .pm-item i { width: 30px; height: 30px; border-radius: 6px; flex: none; }
 .pm-item img { width: 32px; height: 32px; border-radius: 50%; background: #0b0f16; flex: none; }
 .pm-item.on { border-color: var(--accent); }
