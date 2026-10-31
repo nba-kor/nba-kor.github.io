@@ -60,7 +60,9 @@ const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT_AT = new Map(ARENA.slots.map(s => [s.id, s]))
 const clash = (x, y) => { const a = SLOT_AT.get(x), b = SLOT_AT.get(y); return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
 const CHOICES = [...SLOTS, ...ARENA.extra.map(c => c.id)]
+const DAY_OF = Object.fromEntries([...ARENA.slots, ...ARENA.extra].filter(c => c.day != null).map(c => [c.id, c.day]))   // 시간대 · FA → 0 토 · 1 일
 const WEEK = /^\d{4}-\d{2}-\d{2}$/
+const prevWeek = w => new Date(Date.parse(`${w}T00:00:00Z`) - 7 * 86_400_000).toISOString().slice(0, 10)   // 아레나 주(토요일) 한 주 전
 const PLAN_LIMIT = { max: 300, windowMs: 10 * 60_000 }   // 관리자 편성표 저장 — 끌어다 놓을 때마다 저장한다
 const STALE_PLAN = '그새 신청이나 편성표가 바뀌었어요 — 새로 불러올게요'
 const MEMBER_ID = /^(\d{17,20}|k\d{1,20})$/   // 멤버(프로필) ID — 디스코드 ID · k<카카오 회원번호>
@@ -1093,8 +1095,27 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
 
   async function arena(request, sub, t) {
     const action = [request.method, sub].filter(Boolean).join(' ')
-    if (!['GET', 'GET mine', 'PUT signup', 'DELETE signup', 'PUT plan'].includes(action)) fail(404, '없는 주소예요')
+    if (!['GET', 'GET mine', 'GET weekly', 'PUT signup', 'DELETE signup', 'PUT plan'].includes(action)) fail(404, '없는 주소예요')
     const cur = arenaWeek(t)
+
+    // 주별 참여 — 끝난 주 최근 8주(아레나 신청을 받기 시작한 주부터, 오래된 주 → 최근 주). 누구나 본다.
+    // sat · sun = 그날 시간대(FA 포함)를 신청한 사람(사유불참 빼고), members = 그 주까지 가입한 프로필(지금 남은 사람만)
+    if (action === 'GET weekly') {
+      const weeks = []
+      for (let w = prevWeek(cur); weeks.length < 8; w = prevWeek(w)) weeks.unshift(w)
+      // ponytail: 프로필 1만 명까지만 센다 — 길드 인원이면 넉넉하다
+      const [[first], rows, profiles] = await Promise.all([
+        db('/arena_signups?select=week&order=week.asc&limit=1'),
+        db(`/arena_signups?select=week,slots&week=gte.${weeks[0]}&week=lt.${cur}&limit=10000`),
+        db('/recruit_profiles?select=created_at&limit=10000'),
+      ])
+      const joined = profiles.map(p => arenaWeek(p.created_at))
+      return [200, { weeks: weeks.filter(w => first && w >= first.week).map(w => {
+        const went = rows.filter(r => r.week === w && !r.slots.includes('absent'))
+        const on = day => went.filter(r => r.slots.some(s => DAY_OF[s] === day)).length
+        return { week: w, members: joined.filter(j => j <= w).length, sat: on(0), sun: on(1) }
+      }) }]
+    }
 
     // ?w=YYYY-MM-DD(그 주 토요일) — 없으면 이번 주. 신청 · 편성은 이번 주만, 지난 주는 보기만
     if (action === 'GET') {
@@ -1185,7 +1206,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       // 출석 = 그 주에 신청(사유불참 빼고). 이번 주에 신청했으면 이번 주부터, 아직이면 지난주부터 거꾸로 센다 —
       // streak = 연속 참석 주, missed = 연속 미참석 주(가입한 주 · 아레나 신청을 받기 시작한 주 앞은 안 센다).
       // 사유불참한 주는 건너뛴다 — 연속 참석을 끊지도, 미참석으로 세지도 않는다
-      const cur = arenaWeek(t), back = w => new Date(Date.parse(`${w}T00:00:00Z`) - 7 * 86_400_000).toISOString().slice(0, 10)
+      const cur = arenaWeek(t), back = prevWeek
       const first = weeks.reduce((m, w) => w.week < m ? w.week : m, cur)
       const went = new Map(), excused = new Map(), now = new Map()
       for (const w of weeks) {
@@ -1301,7 +1322,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (pathname === '/api/slam') return slam(request, now())
     const sv = pathname.match(/^\/api\/survive(?:\/(ranking|run))?$/)
     if (sv) return survive(request, sv[1], now())
-    const a = pathname.match(/^\/api\/arena(?:\/(signup|plan|mine))?$/)
+    const a = pathname.match(/^\/api\/arena(?:\/(signup|plan|mine|weekly))?$/)
     if (a) return arena(request, a[1], now())
     const mb = pathname.match(/^\/api\/members(?:\/([^/]+))?$/)
     if (mb) return members(request, mb[1], now())

@@ -49,6 +49,7 @@ let detail = (() => { try { return localStorage.getItem(DETAIL_KEY) !== '0' } ca
 // 편성 대기 목록의 계정 칸 높이(px) — 아래 막대를 끌어 바꾸고 이 브라우저에 기억한다. 0 = 기본(CSS)
 const POOL_H_KEY = 'dc.arena.poolH'
 let poolH = (() => { try { return +localStorage.getItem(POOL_H_KEY) || 0 } catch { return 0 } })()
+let weekly = null    // GET /api/arena/weekly — 끝난 주 최근 8주 참여. 처음 그릴 때 한 번 불러온다
 let draft = null     // 신청 폼 상태 — 다시 그려도 남는다. 신청 · 취소하면 서버 값으로 다시 채운다
 
 async function load() {
@@ -303,7 +304,7 @@ function renderPlan() {
   // 편성 페이지인데 관리자가 아니면(로그인 확인 중 · 일반 멤버) 안내만
   if (PLAN_PAGE && !edit) return sec.replaceChildren(head, h('p', { className: 'card rc-note' },
     auth === 'loading' ? '로그인 확인 중…' : auth !== 'in' ? '관리자로 로그인해야 편성할 수 있어요.' : '관리자만 편성할 수 있어요.'))
-  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), teamsCard(), membersCard(at), chartCard(), mixCard()].filter(Boolean))
+  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), teamsCard(), membersCard(at), chartCard(), mixCard(), weeklyCard()].filter(Boolean))
   if (nTeams && !edit) queueShot()
 }
 
@@ -430,9 +431,10 @@ function barRow(label, ratio, rest) {
     h('span', { className: 'ar-bar-val' }, h('b', {}, pct), ` ${rest}`))
 }
 
-/** 도넛 — parts = [[이름, 수]], 합이 n(100%)일 때만 쓴다. 색은 강조색을 차례로 옅게, 「미정」은 회색 */
-function donut(parts, n, unit) {
-  const color = (i, label) => label === '미정' ? 'var(--muted)' : `color-mix(in srgb, var(--accent) ${100 - i * 24}%, var(--panel-2))`
+/** 도넛 — parts = [[이름, 수, id]], 합이 n(100%)일 때만 쓴다. 색은 포지션 순서(스코어러 → 올포)대로 강조색을 옅게 — 두 도넛에서 같은 포지션은 같은 색, 「미정」은 회색.
+ *  onPick 이 있으면 줄을 눌러 그 part 를 받는다 */
+function donut(parts, n, unit, onPick) {
+  const color = (i, label) => label === '미정' ? 'var(--muted)' : `color-mix(in srgb, var(--accent) ${100 - ROLES.findIndex(r => r.label === label) * 24}%, var(--panel-2))`
   const pct = k => `${Math.round(k / n * 100)}%`
   let at = 0
   const ring = h('div', { className: 'ar-donut', role: 'img', 'aria-label': parts.map(([label, k]) => `${label} ${pct(k)}`).join(', ') }, h('b', {}, n), h('small', {}, unit))
@@ -440,8 +442,34 @@ function donut(parts, n, unit) {
   return h('div', { className: 'ar-donut-wrap' }, ring, h('ul', { className: 'ar-donut-key' }, parts.map(([label, k], i) => {
     const dot = h('i', {})
     dot.style.background = color(i, label)
-    return h('li', {}, dot, h('span', {}, label), h('b', {}, pct(k)), h('small', {}, `${k}${unit}`))
+    const li = h('li', {}, dot, h('span', {}, label), h('b', {}, pct(k)), h('small', {}, `${k}${unit}`))
+    return onPick ? pickable(li, () => onPick(parts[i])) : li
   })))
+}
+
+// 누르면 열리는 줄 — 버튼처럼 키보드(Enter · Space)로도
+function pickable(el, fn) {
+  el.tabIndex = 0
+  el.setAttribute('role', 'button')
+  el.classList.add('is-pick')
+  el.onclick = fn
+  el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn() } }
+  return el
+}
+
+/** 누가 골랐는지 — 제목 줄에 고른 것(캐릭터면 얼굴), 아래에 계정마다 한 줄(부계정이면 본계정 이름 · 포지션 · extra). 바깥을 누르거나 Esc · ✕ 로 닫는다 */
+function showWho(title, list, extra = () => null) {
+  const dlg = h('dialog', { className: 'rc-dialog ar-who-dialog', 'aria-labelledby': 'ar-who-title' },
+    h('header', {}, h('h2', { id: 'ar-who-title' }, ...title), h('button', { type: 'button', 'aria-label': '닫기', onclick: () => dlg.close() }, '✕')),
+    h('ul', { className: 'ar-who-list' }, list.map(a => h('li', {},
+      h('span', {}, h('b', {}, a.n), h('small', {}, a.owner !== a.n ? ` 본계 ${a.owner}` : ' 본계정')), roleTags(a.roles), extra(a)))))
+  dlg.onclick = e => {
+    const r = dlg.getBoundingClientRect()
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dlg.close()
+  }
+  dlg.onclose = () => dlg.remove()
+  document.body.append(dlg)
+  dlg.showModal()
 }
 
 /** 요일 · 시간대별 참여 — 이번 주 신청한 사람(사유불참 빼고) 중 그 시간대를 고른 비율 */
@@ -465,22 +493,73 @@ function chartCard() {
     n > 0 && h('div', { className: 'ar-chart' }, days))
 }
 
-/** 포지션 · 캐릭터 비율 — 이번 주 참가 계정(사유불참은 계정이 없다) 기준. 포지션은 1순위, 캐릭터는 계정마다 고른 주력 캐릭터 */
+/** 포지션 · 캐릭터 비율 — 이번 주 참가 계정(사유불참은 계정이 없다) 기준. 포지션은 1순위와 1 · 2순위 합, 캐릭터는 계정마다 고른 주력 캐릭터.
+ *  줄을 누르면 누가 골랐는지 모달로 */
 function mixCard() {
   const list = [...accts.values()], n = list.length
   if (!n) return null
-  const roles = [...ROLES, { id: undefined, label: '미정' }].map(r => [r.label, list.filter(a => a.roles[0] === r.id).length]).filter(([, k]) => k)
+  const POS = [...ROLES, { id: undefined, label: '미정' }]
+  const top2 = a => a.roles.length ? a.roles.slice(0, 2) : [undefined]   // 1 · 2순위(포지션이 없으면 미정 한 번)
+  const roles = POS.map(r => [r.label, list.filter(a => a.roles[0] === r.id).length, r.id]).filter(([, k]) => k)
+  const both = POS.map(r => [r.label, list.filter(a => top2(a).includes(r.id)).length, r.id]).filter(([, k]) => k)
+  const n2 = list.reduce((k, a) => k + top2(a).length, 0)
   const count = new Map()
   for (const a of list) for (const id of a.chars) count.set(id, (count.get(id) || 0) + 1)
   const name = id => P(id).short || P(id).name
   const chars = [...count].sort((x, y) => y[1] - x[1] || name(x[0]).localeCompare(name(y[0]), 'ko'))
   const head = (title, sub) => h('div', { className: 'ar-chart-head' }, h('b', {}, title), h('small', {}, sub))
+  // 모달 — 같은 사람의 계정끼리 붙여(본계정 → 부계정), 캐릭터는 레벨 높은 순
+  const byOwner = (x, y) => x.owner.localeCompare(y.owner, 'ko') || x.u.localeCompare(y.u) || x.i - y.i
+  const whoRole = (which, test) => ([label, k, id]) => showWho([label, h('small', {}, `${which} ${k}계정`)], list.filter(a => test(a, id)).sort(byOwner))
+  const whoChar = id => showWho([h('img', { src: faceOf(P(id)), alt: '' }), P(id).name, h('small', {}, `${count.get(id)}계정`)],
+    list.filter(a => a.chars.includes(id)).sort((x, y) => (y.bt?.[id] || 0) - (x.bt?.[id] || 0) || byOwner(x, y)),
+    a => h('b', { className: 'ar-who-lv' }, a.bt?.[id] ? `${a.bt[id]}렙` : '레벨 미입력'))
   return foldCard('mix', '포지션 · 캐릭터 비율',
-    h('p', { className: 'rc-muted' }, `참가 계정 ${n}개 기준 · 캐릭터는 한 계정이 여럿 고를 수 있어 합이 100% 를 넘어요`),
+    h('p', { className: 'rc-muted' }, `참가 계정 ${n}개 기준 · 캐릭터는 한 계정이 여럿 고를 수 있어 합이 100% 를 넘어요 · 줄을 누르면 누가 골랐는지 보여요`),
     h('div', { className: 'ar-chart ar-mix' },
-      h('div', { className: 'ar-chart-day' }, head('포지션', '1순위'), donut(roles, n, '계정')),
+      h('div', { className: 'ar-chart-day' },
+        head('포지션', '1순위'), donut(roles, n, '계정', whoRole('1순위', (a, id) => a.roles[0] === id)),
+        head('포지션', '1 · 2순위 합'), donut(both, n2, '개', whoRole('1 · 2순위', (a, id) => top2(a).includes(id)))),
       h('div', { className: 'ar-chart-day' }, head('캐릭터', `${chars.length}종`),
-        h('div', { className: 'ar-mix-chars' }, chars.map(([id, k]) => barRow([h('img', { src: faceOf(P(id)), alt: '' }), h('span', {}, name(id))], k / n, `${k}계정`))))))
+        h('div', { className: 'ar-mix-chars' }, chars.map(([id, k]) => pickable(barRow([h('img', { src: faceOf(P(id)), alt: '' }), h('span', {}, name(id))], k / n, `${k}계정`), () => whoChar(id)))))))
+}
+
+/** 주별 참여율 — 끝난 주 최근 8주. 참여율 = 그날 시간대(FA 포함)를 신청한 사람(사유불참 빼고) / 그 주까지 가입한 멤버.
+ *  위는 지난주 토 · 일과 전주 대비(%p), 아래는 주마다 토 · 일 막대(마우스를 올리면 숫자) · 「표로 보기」 */
+function weeklyCard() {
+  if (weekly === null) {
+    weekly = []   // 한 번만 부른다 — 못 불러오면 카드 없이
+    api('/arena/weekly').then(r => { weekly = r.weeks; renderPlan() }).catch(e => console.warn(e))
+  }
+  if (!weekly.length) return null
+  const DAYS = [['sat', '토요일'], ['sun', '일요일']]
+  const rate = (w, d) => w.members ? Math.round(w[d] / w.members * 100) : 0
+  const md = w => w.slice(5).split('-').map(Number).join('/')
+  const last = weekly.at(-1), prev = weekly.at(-2)
+  const tiles = h('div', { className: 'ar-wk-tiles' }, DAYS.map(([d, label]) => {
+    const diff = prev && rate(last, d) - rate(prev, d)
+    return h('div', { className: 'ar-wk-tile' },
+      h('span', { className: 'ar-wk-name' }, h('i', { className: `is-${d}` }), label),
+      h('b', {}, `${rate(last, d)}%`),
+      h('small', {}, `${last[d]}명 / 멤버 ${last.members}명`),
+      prev && h('small', { className: diff > 0 ? 'is-up' : diff < 0 ? 'is-down' : '' }, `전주 대비 ${diff > 0 ? '▲' : diff < 0 ? '▼' : '–'} ${Math.abs(diff)}%p`))
+  }))
+  const cols = h('div', { className: 'ar-wk-cols' }, weekly.map(w => h('div', { className: 'ar-wk-col',
+    title: `${weekLabel(w.week)}\n${DAYS.map(([d, label]) => `${label} ${rate(w, d)}% (${w[d]}명)`).join(' · ')}\n멤버 ${w.members}명` },
+    DAYS.map(([d]) => { const bar = h('i', { className: `is-${d}` }); bar.style.height = `${rate(w, d)}%`; return bar }))))
+  const xs = h('div', { className: 'ar-wk-x' }, weekly.map(w => h('small', {}, md(w.week))))
+  for (const el of [cols, xs]) el.style.setProperty('--n', weekly.length)
+  return foldCard('weekly', '주별 참여율',
+    h('p', { className: 'rc-muted' }, `지난주 ${weekLabel(last.week)} 기준 · 참여율 = 그날 시간대(FA 포함)를 신청한 사람 / 그 주까지 가입한 멤버(사유불참은 빼요)`),
+    h('div', { className: 'ar-wk' }, tiles,
+      h('div', { className: 'ar-wk-key' }, DAYS.map(([d, label]) => h('span', {}, h('i', { className: `is-${d}` }), label))),
+      h('div', { className: 'ar-wk-plot' }, [100, 50, 0].map(v => { const g = h('span', { className: 'ar-wk-grid' }, h('small', {}, `${v}%`)); g.style.bottom = `${v}%`; return g }), cols),
+      xs,
+      h('details', { className: 'ar-wk-table' }, h('summary', {}, '표로 보기'),
+        h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table' },
+          h('thead', {}, h('tr', {}, ['주', '멤버', '토요일', '일요일'].map(x => h('th', {}, x)))),
+          h('tbody', {}, [...weekly].reverse().map(w => h('tr', {}, h('td', {}, `${md(w.week)} 주`), h('td', {}, `${w.members}명`),
+            DAYS.map(([d]) => h('td', {}, `${rate(w, d)}% (${w[d]}명)`))))))))))
 }
 
 // ================================================================ 편성(관리자) — 끌어다 놓거나, 눌러서 고른다. 바꿀 때마다 저장

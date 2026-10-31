@@ -1319,6 +1319,47 @@ label.ac-pick { cursor: pointer; }
 .ar-donut-key small { color: var(--muted); font-size: 12px; }
 @media (max-width: 860px) { .ar-chart { grid-template-columns: 1fr; } }
 @media (max-width: 520px) { .ar-mix-chars { grid-template-columns: 1fr; } .ar-donut { width: 104px; } }
+.ar-chart-day > .ar-chart-head ~ .ar-chart-head { margin-top: 8px; }   /* 포지션 1순위 아래 1 · 2순위 합 */
+/* 누르면 누가 골랐는지 모달 — 비율 줄 */
+.is-pick { cursor: pointer; border-radius: 8px; }
+.is-pick:hover { background: #ffffff0a; }
+.ar-who-dialog { height: fit-content; max-height: min(80vh, 720px); }   /* auto 면 모달(inset 0)이 화면 높이로 늘어난다 */
+@media (min-width: 561px) { .ar-who-dialog { width: min(480px, calc(100vw - 32px)); } }
+.ar-who-dialog h2 { display: flex; align-items: center; gap: 8px; }
+.ar-who-dialog h2 img { width: 36px; height: 36px; border-radius: 50%; background: var(--panel-2); }
+.ar-who-dialog h2 small { color: var(--muted); font-size: 12.5px; font-weight: 700; }
+.ar-who-list { list-style: none; margin: 0; padding: 4px 16px 16px; }
+.ar-who-list li { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.ar-who-list li:last-child { border-bottom: 0; }
+.ar-who-list small { color: var(--muted); font-size: 12px; }
+.ar-who-lv { margin-left: auto; }
+/* 주별 참여율 — 토 · 일 막대가 주마다 둘(색은 어두운 판에서 색약 구분 검증). 위는 지난주 숫자 */
+.ar-wk { --sat: #cc7a0e; --sun: #3d84dc; }
+.ar-wk i.is-sat { background: var(--sat); }
+.ar-wk i.is-sun { background: var(--sun); }
+.ar-wk-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.ar-wk-tile { display: flex; flex-direction: column; gap: 2px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.ar-wk-name, .ar-wk-key span { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 800; }
+:is(.ar-wk-name, .ar-wk-key) i { width: 10px; height: 10px; border-radius: 3px; }
+.ar-wk-tile b { font-size: 26px; line-height: 1.2; }
+.ar-wk-tile small { color: var(--muted); font-size: 12px; }
+.ar-wk-tile small.is-up { color: #3fb950; font-weight: 800; }
+.ar-wk-tile small.is-down { color: var(--def); font-weight: 800; }
+.ar-wk-key { display: flex; justify-content: flex-end; gap: 12px; margin-bottom: 8px; color: var(--muted); }
+.ar-wk-plot { position: relative; height: 150px; margin: 6px 0 0 36px; }
+.ar-wk-grid { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); }
+.ar-wk-grid small { position: absolute; right: calc(100% + 6px); top: -.7em; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.ar-wk-cols, .ar-wk-x { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+.ar-wk-cols { position: absolute; inset: 0; }
+.ar-wk-col { display: flex; align-items: flex-end; justify-content: center; gap: 2px; border-radius: 6px 6px 0 0; }
+.ar-wk-col:hover { background: #ffffff08; }
+.ar-wk-col i { width: min(14px, 40%); border-radius: 4px 4px 0 0; }
+.ar-wk-x { margin: 4px 0 0 36px; }
+.ar-wk-x small { text-align: center; color: var(--muted); font-size: 10.5px; }
+.ar-wk-table { margin-top: 12px; }
+.ar-wk-table summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+.ar-wk-table .ar-table-wrap { margin-top: 8px; }
+.ar-wk-table :is(th, td) { white-space: nowrap; }
 
 /* 아레나 참가 신청 모달 — ✕ · 신청 완료로만 닫힌다.
    PC 는 가운데 창(내용만큼 높이, 넘치면 창 안에서 스크롤), 휴대폰(640px 이하)은 전체 화면 */
