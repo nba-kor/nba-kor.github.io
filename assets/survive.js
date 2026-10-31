@@ -220,7 +220,7 @@ async function pull() {
   if (auth !== 'in') return
   let run = null
   try { run = JSON.parse(localStorage.getItem(PENDING)); localStorage.removeItem(PENDING) } catch {}
-  if (run && Date.now() - run.at < 2 * 3600_000) submit({ map: run.map, hero: run.hero, secs: run.secs, kills: run.kills, lvl: run.lvl }).then(msg => msg && notice(msg))
+  if (run && Date.now() - run.at < 2 * 3600_000) submit({ map: run.map, hero: run.hero, secs: run.secs, kills: run.kills, lvl: run.lvl, skills: run.skills }).then(msg => msg && notice(msg))
   try {
     const v = await api('/survive', { withToken: true }), srv = { ach: clean(v.ach), stats: clean(v.stats) }
     const extra = Object.keys(save.ach).some(k => !(k in srv.ach)) || Object.entries(save.stats).some(([k, n]) => n > (srv.stats[k] ?? 0))
@@ -311,7 +311,7 @@ function person(c, o) {
   if (!up) arm(c, o, 6.2 * wd, -sw * 0.55, sk, true)
   if (o.extra === 'ball') ballAt(c, 8.6 * wd, -15.4, 4.8)   // 샤프슈터 — 손에 공
   if (o.extra === 'card') { c.save(); c.translate(8.6 * wd, -17); c.rotate(0.25); rr(c, -2.6, -4, 5.2, 7.4, 0.8, '#e63946'); c.restore() }   // 수석 심판 — 레드카드
-  if (o.head) { rr(c, -2.4, -33.6, 4.8, 5, 1.6, skD); c.drawImage(o.head, -10.8, -52.6, 22.4, 23.8) }   // 선수 얼굴 그림(cutHead)
+  if (o.head) { rr(c, -2.4, -33.6, 4.8, 5, 1.6, skD); c.save(); c.scale(-1, 1); c.drawImage(o.head, -11.6, -52.6, 22.4, 23.8); c.restore() }   // 선수 얼굴 그림(cutHead) — 거의 다 왼쪽을 보고 있어서 뒤집어 몸과 같은 쪽을 보게
   else face(c, o)
   if (o.extra === 'crown') { c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(-6.4, -48); c.lineTo(-7.4, -56); c.lineTo(-3.4, -52.4); c.lineTo(0.6, -58); c.lineTo(4.6, -52.4); c.lineTo(8.6, -56); c.lineTo(7.6, -48); c.closePath(); c.fill(); ell(c, 0.6, -51.4, 1.3, 1.3, '#e63946') }   // MVP — 왕관
   if (up) arm(c, o, 6.2 * wd, Math.PI + (k === 'fan' ? 0.35 : 0.15), sk, true)
@@ -1958,7 +1958,8 @@ function rankList(tab, set) {
       : !rows.length ? h('p', { className: 'sv-note' }, '아직 기록이 없어요 — 첫 기록의 주인공이 되어 보세요')
       : h('ol', { className: 'sv-ranks' }, rows.map(r => h('li', { className: [r.rank <= 3 && `is-top${r.rank}`, isMe(r) && 'is-me'].filter(Boolean).join(' ') },
         h('b', { className: 'sv-rk' }, String(r.rank)), h('img', { src: faceOf(P(r.hero)), alt: '' }), h('span', { className: 'sv-rn' }, r.name),
-        h('span', { className: 'sv-rt' }, fmt(r.secs)), h('small', {}, `처치 ${r.kills.toLocaleString()} · Lv ${r.lvl} · ${nameOf({ id: r.hero })}`)))),
+        h('span', { className: 'sv-rt' }, fmt(r.secs)), h('small', {}, `처치 ${r.kills.toLocaleString()} · Lv ${r.lvl} · ${nameOf({ id: r.hero })}`),
+        r.skills?.length > 0 && h('span', { className: 'sv-rs' }, r.skills.filter(k => ICON_URL[k]).map(k => { const n = k.endsWith('+') ? `${BREAK[k.slice(0, -1)].name} · 돌파` : WEAP[k].name; return h('img', { src: ICON_URL[k], alt: n, title: n }) }))))),
     mine && !rows.some(isMe) && h('p', { className: 'sv-mine' }, `내 기록 ${mine.rank}위 · ${fmt(mine.secs)} · 처치 ${mine.kills.toLocaleString()}`),
     auth !== 'in' && h('p', { className: 'sv-note' }, '로그인하면 판이 끝날 때 내 기록이 랭킹에 올라가요 ', h('button', { type: 'button', className: 'sv-link', onclick: chooseLogin }, '로그인')))
 }
@@ -2004,7 +2005,7 @@ function finish(win, quit = false) {
   if (CHARS.every(c => st[`p_${c.id}`])) gain('allchar')
   persist(true)
   // 랭킹 — 로그인했으면 바로 올리고, 아니면 이 판을 남겨 뒀다가 로그인하고 돌아오면(pull)
-  const run = { map: G.map.id, hero: G.ch.id, secs: G.t | 0, kills: G.kills, lvl: G.lvl }, rankMsg = h('p', { className: 'sv-rankmsg' })
+  const run = { map: G.map.id, hero: G.ch.id, secs: G.t | 0, kills: G.kills, lvl: G.lvl, skills: G.weapons.map(iconOf) }, rankMsg = h('p', { className: 'sv-rankmsg' })
   if (run.secs >= 10) {
     if (auth === 'in') { rankMsg.textContent = '랭킹에 기록을 올리는 중…'; submit(run, rankMsg) }
     else {

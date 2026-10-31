@@ -70,6 +70,7 @@ const SLAM_LIST = 20   // 덩크 아케이드: 최근 대전 · 랭킹 줄 수
 const SLAM_MATCH = /^[A-Za-z0-9_-]{8,24}$/   // 방장 브라우저가 만든 경기 번호
 const SLAM_STALE = 86_400_000   // 한쪽만 올린 결과는 하루 뒤 지운다
 const SURVIVE_KEY = /^[a-z0-9_]{1,32}$/   // 덩크 서바이버: 업적 · 기록 이름(화면 assets/survive.js 가 정한다)
+const SURVIVE_SKILL = /^[a-z0-9_]{1,32}\+?$/   // 덩크 서바이버 랭킹: 스킬 id(돌파는 뒤에 +)
 const SURVIVE_MAX = 120   // 업적 · 기록 각각 이만큼까지
 const SURVIVE_MAPS = ['park', 'arena', 'roof', 'chal']   // 덩크 서바이버 맵 — 랭킹은 맵마다. chal = 챌린지(시간 제한 없음)
 const SURVIVE_LIST = 20   // 랭킹 줄 수
@@ -561,12 +562,13 @@ function surviveSave(b) {
   if (!isObj(b) || !ok(b.ach) || !ok(b.stats)) fail(400, '요청 형식이 잘못됐어요')
   return { ach: b.ach, stats: b.stats }
 }
-/** 덩크 서바이버 한 판 — { map, hero: 캐릭터(국내 서버 선수 id), secs: 버틴 초(0~1800, 챌린지는 하루까지), kills, lvl } */
+/** 덩크 서바이버 한 판 — { map, hero: 캐릭터(국내 서버 선수 id), secs: 버틴 초(0~1800, 챌린지는 하루까지), kills, lvl, skills: 끝날 때 든 스킬(6칸까지, 돌파는 'block+') — 없으면 [] } */
 function surviveRun(b) {
-  const int = (v, max) => Number.isSafeInteger(v) && v >= 0 && v <= max
+  const int = (v, max) => Number.isSafeInteger(v) && v >= 0 && v <= max, skills = b?.skills ?? []
   if (!isObj(b) || !SURVIVE_MAPS.includes(b.map) || typeof b.hero !== 'string' || !PLAYERS.has(b.hero) || !int(b.secs, b.map === 'chal' ? 86400 : 1800) || !int(b.lvl, 1000)
-    || !int(b.kills, 1_000_000) || b.kills > b.secs * 200 + 50) fail(400, '요청 형식이 잘못됐어요')   // 1초에 200명 넘게는 못 쓰러뜨린다
-  return { map: b.map, hero: b.hero, secs: b.secs, kills: b.kills, lvl: b.lvl }
+    || !int(b.kills, 1_000_000) || b.kills > b.secs * 200 + 50   // 1초에 200명 넘게는 못 쓰러뜨린다
+    || !Array.isArray(skills) || skills.length > 6 || !skills.every(k => typeof k === 'string' && SURVIVE_SKILL.test(k)) || new Set(skills).size < skills.length) fail(400, '요청 형식이 잘못됐어요')
+  return { map: b.map, hero: b.hero, secs: b.secs, kills: b.kills, lvl: b.lvl, skills }
 }
 /** 두 저장을 합친다 — 업적은 둘 다(먼저 단 시각), 기록은 큰 쪽. 그래서 옛 기기가 올려도 줄지 않는다 */
 function mergeSurvive(a, b) {
@@ -1063,7 +1065,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       if (request.method !== 'GET') fail(404, '없는 주소예요')
       const user = request.headers.has('authorization') ? await identity(request) : null
       const [top, mine] = await Promise.all([
-        db(`/survive_ranking?select=map,rank,name,hero,secs,kills,lvl&rank=lte.${SURVIVE_LIST}&order=map.asc,rank.asc,at.asc`),
+        db(`/survive_ranking?select=map,rank,name,hero,secs,kills,lvl,skills&rank=lte.${SURVIVE_LIST}&order=map.asc,rank.asc,at.asc`),
         user ? db(`/survive_ranking?select=map,rank,hero,secs,kills,lvl&user_id=eq.${enc(user.id)}`) : [],
       ])
       const by = rows => Object.fromEntries(SURVIVE_MAPS.map(m => [m, rows.filter(r => r.map === m).map(({ map, ...r }) => r)]))

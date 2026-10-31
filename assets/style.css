@@ -1649,6 +1649,8 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-ranks .sv-rn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .sv-ranks .sv-rt { font: 900 1.1em/1 system-ui, sans-serif; font-variant-numeric: tabular-nums; color: #7ff3ff; }
 .sv-ranks small { grid-column: 3 / 5; color: #c9d1e0; font-size: .8em; }
+.sv-ranks .sv-rs { grid-column: 3 / 5; display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.sv-ranks .sv-rs img { grid-row: auto; width: 20px; height: 20px; border-radius: 5px; background: none; }
 .sv-ranks .is-top1 .sv-rk { color: #ffd23f; font-size: 1.4em; }
 .sv-ranks .is-top2 .sv-rk { color: #e3e8f0; font-size: 1.3em; }
 .sv-ranks .is-top3 .sv-rk { color: #e0a36b; font-size: 1.25em; }

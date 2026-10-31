@@ -1957,7 +1957,8 @@ dbTest('덩크 서바이버 랭킹: 맵마다 사람마다 최고 기록 한 줄
   const [a, b, c] = await Promise.all(['A', 'B', 'C'].map(k => person(api, { name: `랭킹${k}${RUN}` })))
   const map = 'roof', run = (who, o) => api('POST', '/api/survive/run', { map, hero: 'james', secs: 300, kills: 900, lvl: 20, ...o }, { as: who.as })
   assert.equal((await api('POST', '/api/survive/run', { map, hero: 'james', secs: 1, kills: 1, lvl: 1 })).status, 401)
-  for (const o of [{ map: 'moon' }, { hero: 'nobody' }, { secs: 1801 }, { secs: -1 }, { kills: 1.5 }, { lvl: '3' }, { secs: 10, kills: 5000 }, { map: 'chal', secs: 86401 }]) {
+  for (const o of [{ map: 'moon' }, { hero: 'nobody' }, { secs: 1801 }, { secs: -1 }, { kills: 1.5 }, { lvl: '3' }, { secs: 10, kills: 5000 }, { map: 'chal', secs: 86401 },
+    { skills: 'block' }, { skills: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] }, { skills: ['Block'] }, { skills: ['block++'] }, { skills: ['block', 'block'] }, { skills: [1] }]) {
     assert.equal((await run(a, o)).status, 400, JSON.stringify(o))
   }
   const ch = await run(a, { map: 'chal', secs: 3600, kills: 9000, hero: 'sga' })   // 챌린지는 30분을 넘겨도 된다 · 새 캐릭터
@@ -1966,20 +1967,21 @@ dbTest('덩크 서바이버 랭킹: 맵마다 사람마다 최고 기록 한 줄
   // 로컬 DB 에는 지난 실행의 기록도 있다 — 이번 실행 것은 그보다 높게(1800초 + 처치 수로 가린다)
   const top = (await rows(`/survive_best?select=kills&map=eq.${map}&secs=eq.1800&order=kills.desc&limit=1`))[0]?.kills ?? 0
   const K = top + 1000
-  const r1 = await run(a, { secs: 1800, kills: K, hero: 'klfd' })
+  const r1 = await run(a, { secs: 1800, kills: K, hero: 'klfd', skills: ['three+', 'block', 'press'] })
   assert.equal(r1.status, 200, r1.text)
   assert.deepEqual(r1.body, { best: true, mine: { rank: 1, hero: 'klfd', secs: 1800, kills: K, lvl: 20 } })
   assert.deepEqual((await run(a, { secs: 1700, kills: K + 500 })).body.best, false, '더 짧게 버틴 판은 기록이 안 바뀐다')
   assert.deepEqual((await run(b, { secs: 1800, kills: K + 10 })).body.mine.rank, 1, '같은 시간이면 많이 쓰러뜨린 쪽이 위')
   assert.deepEqual((await run(c, { secs: 1800, kills: K + 10 })).body.mine.rank, 1, '똑같으면 같은 순위')
-  assert.equal((await run(a, { secs: 1800, kills: K + 20, lvl: 99 })).body.mine.rank, 1, '더 나아지면 바꾼다')
+  assert.equal((await run(a, { secs: 1800, kills: K + 20, lvl: 99, skills: ['three+', 'block+', 'press', 'dunk'] })).body.mine.rank, 1, '더 나아지면 바꾼다')
   // 보기 — 로그인 없이. 맵마다, ID 는 내보내지 않는다
   const v = await api('GET', '/api/survive/ranking')
   assert.equal(v.status, 200)
   assert.deepEqual(Object.keys(v.body.ranking), ['park', 'arena', 'roof', 'chal'])
   assert.equal(v.body.mine, undefined)
   assert.deepEqual(v.body.ranking.roof.slice(0, 3).map(r => [r.rank, r.name, r.kills]), [[1, a.name, K + 20], [2, b.name, K + 10], [2, c.name, K + 10]])
-  assert.ok(v.body.ranking.roof.every(r => Object.keys(r).join() === 'rank,name,hero,secs,kills,lvl'))
+  assert.ok(v.body.ranking.roof.every(r => Object.keys(r).join() === 'rank,name,hero,secs,kills,lvl,skills'))
+  assert.deepEqual(v.body.ranking.roof.slice(0, 2).map(r => r.skills), [['three+', 'block+', 'press', 'dunk'], []], '그 기록의 스킬 — 안 보낸 판은 빈 목록')
   const m = await api('GET', '/api/survive/ranking', undefined, { as: b.as })
   assert.deepEqual(m.body.mine, { roof: { rank: 2, hero: 'james', secs: 1800, kills: K + 10, lvl: 20 } }, '로그인하면 내 기록 · 순위')
   assert.deepEqual(await rows(`/audit_log?select=action&user_id=eq.${a.id}&action=eq.POST%20%2Fapi%2Fsurvive%2Frun`), [], '판마다 오는 기록은 감사 로그에 안 남긴다')
