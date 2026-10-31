@@ -53,7 +53,7 @@ let poolH = (() => { try { return +localStorage.getItem(POOL_H_KEY) || 0 } catch
 const TEAM_H_KEY = 'dc.arena.teamH', PIN_KEY = 'dc.arena.pin'
 let teamH = (() => { try { return +localStorage.getItem(TEAM_H_KEY) || 0 } catch { return 0 } })()
 let pinned = (() => { try { return localStorage.getItem(PIN_KEY) === '1' } catch { return false } })()
-let weekly = null    // GET /api/arena/weekly — 끝난 주 최근 8주 참여. 처음 그릴 때 한 번 불러온다
+let weekly = null    // GET /api/arena/weekly — 이번 주(진행 중)까지 최근 8주 참여. 처음 그릴 때 한 번 불러온다
 let draft = null     // 신청 폼 상태 — 다시 그려도 남는다. 신청 · 취소하면 서버 값으로 다시 채운다
 
 async function load() {
@@ -541,8 +541,8 @@ function mixCard() {
         h('div', { className: 'ar-mix-chars' }, chars.map(([id, k]) => pickable(barRow([h('img', { src: faceOf(P(id)), alt: '' }), h('span', {}, name(id))], k / n, `${k}계정`), () => whoChar(id)))))))
 }
 
-/** 주별 참여율 — 끝난 주 최근 8주. 참여율 = 그날 시간대(FA 포함)를 신청한 사람(사유불참 빼고) / 그 주까지 가입한 멤버.
- *  위는 지난주 토 · 일과 전주 대비(%p), 아래는 주마다 토 · 일 막대(마우스를 올리면 숫자) · 「표로 보기」 */
+/** 주별 참여율 — 이번 주(진행 중)까지 최근 8주. 참여율 = 그날 시간대(FA 포함)를 신청한 사람(사유불참 빼고) / 그 주까지 가입한 멤버.
+ *  위는 가장 최근 주(이번 주) 토 · 일과 전주 대비(%p), 아래는 주마다 토 · 일 막대(이번 주는 옅게 · 마우스를 올리면 숫자) · 「표로 보기」 */
 function weeklyCard() {
   if (weekly === null) {
     weekly = []   // 한 번만 부른다 — 못 불러오면 카드 없이
@@ -553,6 +553,7 @@ function weeklyCard() {
   const rate = (w, d) => w.members ? Math.round(w[d] / w.members * 100) : 0
   const md = w => w.slice(5).split('-').map(Number).join('/')
   const last = weekly.at(-1), prev = weekly.at(-2)
+  const now = w => w.week === data.current, name = w => now(w) ? '이번 주' : md(w.week)   // 이번 주는 아직 신청 중
   const tiles = h('div', { className: 'ar-wk-tiles' }, DAYS.map(([d, label]) => {
     const diff = prev && rate(last, d) - rate(prev, d)
     return h('div', { className: 'ar-wk-tile' },
@@ -561,13 +562,13 @@ function weeklyCard() {
       h('small', {}, `${last[d]}명 / 멤버 ${last.members}명`),
       prev && h('small', { className: diff > 0 ? 'is-up' : diff < 0 ? 'is-down' : '' }, `전주 대비 ${diff > 0 ? '▲' : diff < 0 ? '▼' : '–'} ${Math.abs(diff)}%p`))
   }))
-  const cols = h('div', { className: 'ar-wk-cols' }, weekly.map(w => h('div', { className: 'ar-wk-col',
+  const cols = h('div', { className: 'ar-wk-cols' }, weekly.map(w => h('div', { className: `ar-wk-col${now(w) ? ' is-now' : ''}`,
     title: `${weekLabel(w.week)}\n${DAYS.map(([d, label]) => `${label} ${rate(w, d)}% (${w[d]}명)`).join(' · ')}\n멤버 ${w.members}명` },
     DAYS.map(([d]) => { const bar = h('i', { className: `is-${d}` }); bar.style.height = `${rate(w, d)}%`; return bar }))))
-  const xs = h('div', { className: 'ar-wk-x' }, weekly.map(w => h('small', {}, md(w.week))))
+  const xs = h('div', { className: 'ar-wk-x' }, weekly.map(w => h('small', {}, name(w))))
   for (const el of [cols, xs]) el.style.setProperty('--n', weekly.length)
   return foldCard('weekly', '주별 참여율',
-    h('p', { className: 'rc-muted' }, `지난주 ${weekLabel(last.week)} 기준 · 참여율 = 그날 시간대(FA 포함)를 신청한 사람 / 그 주까지 가입한 멤버(사유불참은 빼요)`),
+    h('p', { className: 'rc-muted' }, `${now(last) ? '이번 주(신청 중)' : '지난주'} ${weekLabel(last.week)} 기준 · 참여율 = 그날 시간대(FA 포함)를 신청한 사람 / 그 주까지 가입한 멤버(사유불참은 빼요)`),
     h('div', { className: 'ar-wk' }, tiles,
       h('div', { className: 'ar-wk-key' }, DAYS.map(([d, label]) => h('span', {}, h('i', { className: `is-${d}` }), label))),
       h('div', { className: 'ar-wk-plot' }, [100, 50, 0].map(v => { const g = h('span', { className: 'ar-wk-grid' }, h('small', {}, `${v}%`)); g.style.bottom = `${v}%`; return g }), cols),
@@ -575,7 +576,7 @@ function weeklyCard() {
       h('details', { className: 'ar-wk-table' }, h('summary', {}, '표로 보기'),
         h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table' },
           h('thead', {}, h('tr', {}, ['주', '멤버', '토요일', '일요일'].map(x => h('th', {}, x)))),
-          h('tbody', {}, [...weekly].reverse().map(w => h('tr', {}, h('td', {}, `${md(w.week)} 주`), h('td', {}, `${w.members}명`),
+          h('tbody', {}, [...weekly].reverse().map(w => h('tr', {}, h('td', {}, now(w) ? '이번 주' : `${md(w.week)} 주`), h('td', {}, `${w.members}명`),
             DAYS.map(([d]) => h('td', {}, `${rate(w, d)}% (${w[d]}명)`))))))))))
 }
 
@@ -664,7 +665,9 @@ function editor() {
     const list = h('div', { className: 'ar-slot-body', 'data-keep': s.id },
       teams.map((tm, i) => h('div', { className: `ar-drop${tm.length >= A.teamSize ? ' is-full' : ''}`, 'data-drop': `${s.id}:${i}` },
         h('div', { className: 'ar-drop-head' }, h('span', {}, `${i + 1}팀`, canEarly(s, tm) && earlyTag()), h('small', {}, `${tm.length}/${A.teamSize}`)),
-        tm.map((x, j) => chip(accts.get(key(x.u, x.n)), { slot: s.id, ti: i }, j === 0)))))
+        // 팀원 셋이 한 줄(팀별 편성 명단처럼) — 빈자리도 칸으로
+        h('div', { className: 'ar-seats' }, tm.map((x, j) => chip(accts.get(key(x.u, x.n)), { slot: s.id, ti: i }, j === 0)),
+          Array.from({ length: A.teamSize - tm.length }, () => h('span', { className: 'ar-seat' }, '빈자리'))))))
     if (teamH) list.style.maxHeight = `${teamH}px`
     return foldable(h('details', { className: 'ar-slot ar-edit' },
       h('summary', { className: 'ar-slot-head' }, h('b', {}, s.label), h('small', {}, `${s.time} · ${teams.length}팀`)),

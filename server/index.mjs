@@ -1098,15 +1098,15 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (!['GET', 'GET mine', 'GET weekly', 'PUT signup', 'DELETE signup', 'PUT plan'].includes(action)) fail(404, '없는 주소예요')
     const cur = arenaWeek(t)
 
-    // 주별 참여 — 끝난 주 최근 8주(아레나 신청을 받기 시작한 주부터, 오래된 주 → 최근 주). 누구나 본다.
+    // 주별 참여 — 이번 주(진행 중)까지 최근 8주(아레나 신청을 받기 시작한 주부터, 오래된 주 → 이번 주). 누구나 본다.
     // sat · sun = 그날 시간대(FA 포함)를 신청한 사람(사유불참 빼고), members = 그 주까지 가입한 프로필(지금 남은 사람만)
     if (action === 'GET weekly') {
       const weeks = []
-      for (let w = prevWeek(cur); weeks.length < 8; w = prevWeek(w)) weeks.unshift(w)
+      for (let w = cur; weeks.length < 8; w = prevWeek(w)) weeks.unshift(w)
       // ponytail: 프로필 1만 명까지만 센다 — 길드 인원이면 넉넉하다
       const [[first], rows, profiles] = await Promise.all([
         db('/arena_signups?select=week&order=week.asc&limit=1'),
-        db(`/arena_signups?select=week,slots&week=gte.${weeks[0]}&week=lt.${cur}&limit=10000`),
+        db(`/arena_signups?select=week,slots&week=gte.${weeks[0]}&week=lte.${cur}&limit=10000`),
         db('/recruit_profiles?select=created_at&limit=10000'),
       ])
       const joined = profiles.map(p => arenaWeek(p.created_at))
