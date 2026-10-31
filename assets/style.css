@@ -1081,7 +1081,8 @@ label.ac-pick { cursor: pointer; }
 .ar-count { margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 700; }
 .ar-state { flex: 0 1 auto; min-width: 0; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; color: var(--muted); background: var(--panel-2); }
 .ar-state.is-on { color: var(--bg); background: var(--text); }
-.ar-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }   /* 한 줄에 하루(1차 · 1.5차 · 2차) · 토 FA · 일 FA · 사유불참 */
+.ar-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }   /* 한 줄에 하루(1차 · 2차) — 휴대폰도 두 칸 */
+.ar-opts.is-extra { grid-template-columns: repeat(3, minmax(0, 1fr)); }   /* 토 FA · 일 FA · 사유불참 */
 .ar-opt { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); cursor: pointer; font-size: 15px; font-weight: 700; }
 .ar-opt input { width: 20px !important; height: 20px; accent-color: var(--sc); flex: none; }
 .ar-opt small { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 500; }
@@ -1201,7 +1202,7 @@ label.ac-pick { cursor: pointer; }
 .ar-drop-head small { color: var(--muted); font-weight: 600; }
 .ar-drop.is-full .ar-drop-head small { color: var(--ok); }
 .ar-drop.is-new { align-items: center; justify-content: center; color: var(--muted); font-size: 12.5px; border-style: dashed; background: transparent; }
-@media (max-width: 980px) { .ar-edit-grid, .ar-opts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 980px) { .ar-edit-grid, .ar-opts.is-extra { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) {
   .ar-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ar-edit-grid { grid-template-columns: 1fr; }
@@ -1210,7 +1211,9 @@ label.ac-pick { cursor: pointer; }
   .ar-nick small { display: block; margin: 0; }
 }
 @media (max-width: 420px) {
-  .ar-opts, .ar-opts.is-extra { grid-template-columns: 1fr; }
+  .ar-opts.is-extra { grid-template-columns: 1fr; }
+  .ar-opts:not(.is-extra) .ar-opt { flex-wrap: wrap; row-gap: 2px; padding: 11px 12px; }   /* 두 칸이 좁으면 시간은 이름 아래로 */
+  .ar-opts:not(.is-extra) .ar-opt small { flex-basis: 100%; margin-left: 30px; }
   .ar-members { grid-template-columns: 1fr; }
 }
 
