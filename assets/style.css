@@ -1339,7 +1339,9 @@ label.ac-pick { cursor: pointer; }
 .ar-mine-me, .ar-mine-mates { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
 .ar-mine-k { flex: none; min-width: 3.6em; color: var(--muted); font-size: 12px; }
 .ar-mine .ac-roles { margin-left: 2px; }
-.ar-mate { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--chip); }
+.ar-mate { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--chip); }
+.ar-mine .ar-chars { flex-basis: 100%; }   /* 캐릭터 · 레벨은 닉네임 아래 줄에 */
+.ar-mine-me > .ar-chars { padding-left: calc(3.6em + 8px); }   /* 「내 계정」 글자 뒤에 맞춘다 */
 /* 편성 대기 목록 머리 — 휴대폰에서 줄이 접혀도 「자세히 보기」 와 아래 탭 사이를 띄운다 */
 .ar-pool-head { margin-bottom: 10px; }
 

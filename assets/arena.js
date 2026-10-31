@@ -101,20 +101,20 @@ function renderSignup() {
   renderForm()   // 모달이 열려 있으면 새로 읽은 값으로(적던 것은 draft 에 남아 있다)
 }
 
-/** 내 배정 — 시간대마다 어느 팀에 어느 계정으로, 같은 팀은 누구(참가 계정 · 본계정 · 포지션). 편성표는 누구나 보니 여기서도 그대로 보여 준다 */
+/** 내 배정 — 시간대마다 어느 팀에 어느 계정으로, 같은 팀은 누구(참가 계정 · 본계정 · 포지션 · 캐릭터 레벨). 편성표는 누구나 보니 여기서도 그대로 보여 준다 */
 function myTeams() {
   const who = a => a.owner === a.n ? [h('b', {}, a.n), h('small', {}, ' 본계정')] : [h('b', {}, a.n), h('small', {}, ` 본계 ${a.owner}`)]
   const rows = SLOTS.flatMap(s => teamsOf(s.id).flatMap((tm, ti) => {
     const self = tm.find(x => x.u === me.id)
     if (!self) return []
-    const a = accts.get(key(self.u, self.n)) || { n: self.n, owner: self.n, roles: [] }
+    const a = accts.get(key(self.u, self.n)) || { n: self.n, owner: self.n, roles: [], chars: [] }
     const mates = tm.filter(x => x !== self).map(x => accts.get(key(x.u, x.n))).filter(Boolean)
     const lead = m => m.u === tm[0].u && m.n === tm[0].n && leadTag()
     const row = h('li', {},
       h('div', { className: 'ar-mine-slot' }, h('b', {}, `${s.label} ${ti + 1}팀`), h('small', {}, slotWhen(week, s))),
-      h('div', { className: 'ar-mine-me' }, h('span', { className: 'ar-mine-k' }, '내 계정'), ...who(a), roleTags(a.roles), lead(self)),
+      h('div', { className: 'ar-mine-me' }, h('span', { className: 'ar-mine-k' }, '내 계정'), ...who(a), roleTags(a.roles), lead(self), charTags(a)),
       h('div', { className: 'ar-mine-mates' }, h('span', { className: 'ar-mine-k' }, '같은 팀'),
-        mates.length ? mates.map(m => h('span', { className: 'ar-mate' }, ...who(m), roleTags(m.roles), lead(m))) : h('span', { className: 'rc-muted' }, '아직 혼자예요')))
+        mates.length ? mates.map(m => h('span', { className: 'ar-mate' }, ...who(m), roleTags(m.roles), lead(m), charTags(m))) : h('span', { className: 'rc-muted' }, '아직 혼자예요')))
     return [row]
   }))
   return h('div', { className: 'ar-mine' }, h('p', { className: 'ar-mine-title' }, '내 배정'),
