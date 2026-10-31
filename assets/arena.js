@@ -783,7 +783,7 @@ function menu(a, from) {
     // 배치 현황과 같은 기준 — 직접 고른 시간대는 그대로, FA 로 되는 시간대는 「FA」, 그 밖은 「신청 안 함」
     const note = a.slots.includes(s.id) ? '' : viaFa(a.slots, s) ? ' · FA' : ' · 신청 안 함'
     teams.forEach((tm, ti) => {
-      if (tm.length < A.teamSize && !(from?.slot === s.id && from.ti === ti)) items.push({ label: `${s.short} · ${ti + 1}팀 (${tm.length}/${A.teamSize}) · 팀장 ${tm[0].n}${note}`, pick: () => move(a, from, `${s.id}:${ti}`) })
+      if (tm.length < A.teamSize && !(from?.slot === s.id && from.ti === ti)) items.push({ label: `${s.short} · ${ti + 1}팀 (${tm.length}/${A.teamSize}) · 팀장 ${accts.get(key(tm[0].u, tm[0].n))?.owner || tm[0].n}${note}`, pick: () => move(a, from, `${s.id}:${ti}`) })
     })
     items.push({ label: `${s.short} · 새 팀${note}`, pick: () => move(a, from, `${s.id}:new`) })
   }
