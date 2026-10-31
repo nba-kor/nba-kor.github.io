@@ -22,7 +22,7 @@
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=4dad09d1">
+<link rel="stylesheet" href="/assets/style.css?v=0bb8309b">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -106,7 +106,7 @@ document.getElementById('faces').innerHTML = kr
   .map(p => `<img src="${p.img}" alt="${p.name}" title="${p.name}" loading="lazy">`).join('')
 
 // 내 프로필 + 이번 주 아레나 신청 — 로그인 상태가 정해지거나 바뀔 때마다. 이름 · 닉네임은 사용자 입력이라 h() 로(글자로만) 넣는다
-const A = await arenaCfg(), TAG = Object.fromEntries([...A.slots.map(s => [s.id, s.short]), ...A.extra.map(c => [c.id, c.label])])
+const A = await arenaCfg(), TAG = Object.fromEntries([...A.slots, ...A.retired].map(s => [s.id, s.short]).concat(A.extra.map(c => [c.id, c.label])))
 let arena = null
 async function paint() {
   const box = document.getElementById('me-card'), go = (href, label, cls = '') => h('a', { className: `btn ${cls}`, href }, label)
@@ -117,7 +117,7 @@ async function paint() {
   const accts = accountsOf(me.profile?.entries), main = accts[0]
   arena ||= api('/arena').catch(() => null)
   const a = await arena, mine = a?.signups.find(s => s.userId === me.id)
-  const at = a && Object.entries(a.plan).flatMap(([slot, teams]) => teams.flatMap((tm, i) => tm.some(x => x.u === me.id) ? [`${TAG[slot]} ${i + 1}팀`] : []))
+  const at = a && A.slots.flatMap(s => (a.plan[s.id] || []).flatMap((tm, i) => tm.some(x => x.u === me.id) ? [`${s.short} ${i + 1}팀`] : []))   // plan 에는 시간대 말고 done(팀 없이 완료) 도 있다
   box.replaceChildren(
     h('div', { className: 'me-main' },
       main ? h('img', { src: faceOf(P(main.chars[0])), alt: '' }) : h('span', { className: 'rc-hole' }),

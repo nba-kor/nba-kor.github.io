@@ -52,15 +52,15 @@ const GUEST_ID = /^g(\d{1,15})$/   // 비회원 · 팀장이 넣은 팀원의 us
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const CONTROL = /[\x00-\x1f\x7f]/
 const JSON_TYPE = /^application\/json\b/i
-// 아레나전: 시간대(토 · 일 1팟 · 2팟) + 토 · 일 FA(그날 시간 미정 · 용병) · 사유불참. 주는 그 주 토요일 날짜
+// 아레나전: 시간대(토 · 일 1팟 · 2팟) + 토 · 일 FA(그날 시간 미정 · 용병) · 사유불참. 주는 그 주 토요일 날짜. 1.5차는 retired(지난 신청에만 남는다)
 const SLOTS = new Set(ARENA.slots.map(s => s.id))
 const ROLES = new Set(ARENA.roles.map(r => r.id))   // 계정의 주력 포지션 1 · 2순위 — 스코어러 · 중열 · 센터 · 올포(allpos, 1순위로만 · 2순위 없이)
-// 같은 날 시간이 겹치는 두 시간대 — 1.5차(20:00~)는 1차 · 2차와 겹친다. 한 사람은 겹치는 시간대에 한 번만 들어간다(계정 둘을 동시에 못 한다)
+// 같은 날 시간이 겹치는 두 시간대(지금은 1차 · 2차라 같은 시간대만). 한 사람은 겹치는 시간대에 한 번만 들어간다(계정 둘을 동시에 못 한다)
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT_AT = new Map(ARENA.slots.map(s => [s.id, s]))
 const clash = (x, y) => { const a = SLOT_AT.get(x), b = SLOT_AT.get(y); return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
 const CHOICES = [...SLOTS, ...ARENA.extra.map(c => c.id)]
-const DAY_OF = Object.fromEntries([...ARENA.slots, ...ARENA.extra].filter(c => c.day != null).map(c => [c.id, c.day]))   // 시간대 · FA → 0 토 · 1 일
+const DAY_OF = Object.fromEntries([...ARENA.slots, ...ARENA.extra, ...ARENA.retired].filter(c => c.day != null).map(c => [c.id, c.day]))   // 시간대 · FA(· 지난 1.5차) → 0 토 · 1 일
 const WEEK = /^\d{4}-\d{2}-\d{2}$/
 const prevWeek = w => new Date(Date.parse(`${w}T00:00:00Z`) - 7 * 86_400_000).toISOString().slice(0, 10)   // 아레나 주(토요일) 한 주 전
 const PLAN_LIMIT = { max: 300, windowMs: 10 * 60_000 }   // 관리자 편성표 저장 — 끌어다 놓을 때마다 저장한다
@@ -394,7 +394,7 @@ export function signupChanges(old, now) {
 
 /**
  * 편성표 저장 전 · 후 → 계정마다 「닉네임: 토 1차 1팀 → 2팀」 · 「+닉네임: 토 2차 1팀」(넣음) · 「−닉네임: …」(뺌).
- * 한 시간대에서 빠지고 다른 시간대에 들어갔으면 한 줄(「닉네임: 토 1차 1팀 → 토 1.5차 2팀」). 앞 팀이 비어 번호가 당겨진 것도 옮긴 것으로 나온다
+ * 한 시간대에서 빠지고 다른 시간대에 들어갔으면 한 줄(「닉네임: 토 1차 1팀 → 토 2차 2팀」). 앞 팀이 비어 번호가 당겨진 것도 옮긴 것으로 나온다
  */
 export function planChanges(old, now) {
   const places = plan => {
@@ -1131,8 +1131,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       const signed = new Set(signups.map(s => s.userId)), alive = a => live.has(`${a.u}\n${a.n}`)
       return [200, {
         week, current: cur, signups,
-        // 그새 신청을 취소했거나 계정을 뺀 줄은 편성표에서도 안 보인다(관리자가 다음에 저장하면 빠진다)
-        plan: Object.fromEntries(Object.entries(plan?.plan || {}).map(([slot, teams]) => [slot, slot === 'done' ? teams.filter(alive) : teams.map(tm => tm.filter(alive))])),
+        // 그새 신청을 취소했거나 계정을 뺀 줄은 편성표에서도 안 보인다(관리자가 다음에 저장하면 빠진다). 없앤 시간대(1.5차)도 뺀다
+        plan: Object.fromEntries(Object.entries(plan?.plan || {}).filter(([slot]) => slot === 'done' || SLOTS.has(slot)).map(([slot, teams]) => [slot, slot === 'done' ? teams.filter(alive) : teams.map(tm => tm.filter(alive))])),
         planAt: plan?.updated_at ?? null,
         missing: members.filter(p => !signed.has(p.discord_user_id)).map(p => p.main || p.discord_name),   // 프로필은 있는데 이번 주 신청이 없는 사람(본계 닉네임)
       }]

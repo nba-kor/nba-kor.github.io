@@ -11,10 +11,10 @@ loadKakao()
 const A = await arenaCfg()
 const SLOTS = A.slots
 const LABEL = Object.fromEntries([...SLOTS.map(s => [s.id, s.label]), ...A.extra.map(c => [c.id, c.label])])
-const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replaceAll(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short.replaceAll(' ', '')])])   // 토1 · 토1.5 · 토FA
+const TAG = Object.fromEntries([...SLOTS.map(s => [s.id, s.short.replaceAll(' ', '').replace('차', '')]), ...A.extra.map(c => [c.id, c.short.replaceAll(' ', '')])])   // 토1 · 토2 · 토FA
 // 색은 강조색(주황) 하나 + 회색 — 시간대 · 포지션 · 계정 수는 글자로 구분한다. 카톡 이미지도 같은 색(팀 줄은 화면 카드처럼 밝은 회색 바탕 · 검은 글자)
 const ACCENT = '#f5a623'
-// 같은 날 시간이 겹치는 두 시간대(서버와 같은 규칙) — 1.5차는 1차 · 2차와 겹친다
+// 같은 날 시간이 겹치는 두 시간대(서버와 같은 규칙) — 지금은 1차 · 2차라 같은 시간대만
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT = Object.fromEntries(SLOTS.map(s => [s.id, s]))
 const FAS = A.extra.filter(c => c.day != null), FA_DAY = Object.fromEntries(FAS.map(c => [c.id, c.day]))
@@ -49,6 +49,10 @@ let detail = (() => { try { return localStorage.getItem(DETAIL_KEY) !== '0' } ca
 // 편성 대기 목록의 계정 칸 높이(px) — 아래 막대를 끌어 바꾸고 이 브라우저에 기억한다. 0 = 기본(CSS)
 const POOL_H_KEY = 'dc.arena.poolH'
 let poolH = (() => { try { return +localStorage.getItem(POOL_H_KEY) || 0 } catch { return 0 } })()
+// 편성 시간대 카드의 팀 목록 최대 높이(px) — 0 = 기본(CSS). 「배치할 계정」 위에 고정 — 스크롤해도 화면 위에 붙는다
+const TEAM_H_KEY = 'dc.arena.teamH', PIN_KEY = 'dc.arena.pin'
+let teamH = (() => { try { return +localStorage.getItem(TEAM_H_KEY) || 0 } catch { return 0 } })()
+let pinned = (() => { try { return localStorage.getItem(PIN_KEY) === '1' } catch { return false } })()
 let weekly = null    // GET /api/arena/weekly — 끝난 주 최근 8주 참여. 처음 그릴 때 한 번 불러온다
 let draft = null     // 신청 폼 상태 — 다시 그려도 남는다. 신청 · 취소하면 서버 값으로 다시 채운다
 
@@ -113,7 +117,8 @@ function myTeams() {
     const mates = tm.filter(x => x !== self).map(x => accts.get(key(x.u, x.n))).filter(Boolean)
     const lead = m => m.u === tm[0].u && m.n === tm[0].n && leadTag()
     const row = h('li', {},
-      h('div', { className: 'ar-mine-slot' }, h('b', {}, `${s.label} ${ti + 1}팀`), h('small', {}, slotWhen(week, s))),
+      h('div', { className: 'ar-mine-slot' }, h('b', {}, `${s.label} ${ti + 1}팀`), h('small', {}, slotWhen(week, s)), canEarly(s, tm) && earlyTag()),
+      canEarly(s, tm) && h('p', { className: 'ar-early-note' }, EARLY),
       h('div', { className: 'ar-mine-me' }, h('span', { className: 'ar-mine-k' }, '내 계정'), ...who(a), roleTags(a.roles), lead(self), charTags(a)),
       h('div', { className: 'ar-mine-mates' }, h('span', { className: 'ar-mine-k' }, '같은 팀'),
         mates.length ? mates.map(m => h('span', { className: 'ar-mate' }, ...who(m), roleTags(m.roles), lead(m), charTags(m))) : h('span', { className: 'rc-muted' }, '아직 혼자예요')))
@@ -209,7 +214,7 @@ function renderForm() {
     h('h3', {}, '1. 참석 가능한 시간'),
     h('div', { className: 'ar-opts' }, SLOTS.map(s => opt(s, `${s.time} ~ ${s.end === A.closeAt ? '종료' : s.end}`))),
     h('div', { className: 'ar-opts is-extra' }, A.extra.map(c => opt(c))),
-    h('p', { className: 'rc-muted' }, '여러 개 선택 가능 · 1.5차는 20:00 부터 종료까지 · 실제 배정은 운영진이 진행해요'),
+    h('p', { className: 'rc-muted' }, '여러 개 선택 가능 · 실제 배정은 운영진이 진행해요'),
     h('div', { className: 'ar-acc-head' }, h('h3', {}, '2. 이번 주 참가 계정 ', h('small', { className: 'ar-count' }, absent ? '불참' : `${picked}${cap < Infinity ? ` / ${cap}` : ''}개 계정`)), toggleAll),
     person && h('div', { className: 'ar-first' }, h('p', { className: 'rc-muted' }, '처음이에요 — 프로필에 쓸 이름과 마이크도 한 번 정해 주세요'), person.el),
     list,
@@ -265,17 +270,27 @@ function placements() {
 }
 const teamsOf = id => (plan[id] || []).filter(t => t.length)
 
-// 카드 접기(아코디언) — 제목 줄을 누르면 접힌다. 접은 카드는 이 브라우저에 기억한다(마이페이지와 같은 방식)
-const FOLD_KEY = 'dc.arena.fold'
-const folded = (() => { try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY)) || []) } catch { return new Set() } })()
-function foldCard(id, title, ...kids) {
-  const el = h('details', { className: 'card ar-card ar-fold', open: !folded.has(id) }, h('summary', {}, h('h3', {}, title)), ...kids)
+// 접기(아코디언) — 카드 · 편성 필터 · 편성 시간대마다 연 상태를 이 브라우저에 기억한다. 처음엔 def
+const FOLD_KEY = 'dc.arena.open'
+const opens = (() => { try { return JSON.parse(localStorage.getItem(FOLD_KEY)) || {} } catch { return {} } })()
+function foldable(el, id, def = true) {
+  el.open = opens[id] ?? def
   el.ontoggle = () => {
-    el.open ? folded.delete(id) : folded.add(id)
-    try { localStorage.setItem(FOLD_KEY, JSON.stringify([...folded])) } catch {}
+    opens[id] = el.open
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify(opens)) } catch {}
   }
   return el
 }
+const SHUT = new Set(['tally', 'missing', 'members'])   // 처음엔 접힌 카드 — 길어지는 표
+const foldCard = (id, title, ...kids) => foldable(h('details', { className: 'card ar-card ar-fold' }, h('summary', {}, h('h3', {}, title)), ...kids), id, !SHUT.has(id))
+
+// 1.5차 — 따로 편성하지 않는다. 2차 팀인데 팀원 누구도 그날 1차에 없으면(같은 사람의 다른 계정도) 팀장이 20:00 로 당겨 해도 된다
+const EARLY = '팀원 모두 그날 1차가 없어요 — 팀장이 팀원들과 정해 1.5차(20:00)로 당겨 진행해도 돼요'
+const canEarly = (s, tm) => {
+  const first = SLOTS.find(x => x.day === s.day && x.time < s.time)
+  return !!first && tm.length > 0 && !teamsOf(first.id).some(t => t.some(x => tm.some(m => m.u === x.u)))
+}
+const earlyTag = () => h('span', { className: 'ar-early', title: EARLY }, '1.5차 가능')
 const doneKeys = () => new Set((plan.done || []).map(x => key(x.u, x.n)))   // 팀 없이 완료(강제 배정)한 계정
 
 function renderPlan() {
@@ -304,7 +319,9 @@ function renderPlan() {
   // 편성 페이지인데 관리자가 아니면(로그인 확인 중 · 일반 멤버) 안내만
   if (PLAN_PAGE && !edit) return sec.replaceChildren(head, h('p', { className: 'card rc-note' },
     auth === 'loading' ? '로그인 확인 중…' : auth !== 'in' ? '관리자로 로그인해야 편성할 수 있어요.' : '관리자만 편성할 수 있어요.'))
+  const keep = new Map([...sec.querySelectorAll('[data-keep]')].map(el => [el.dataset.keep, el.scrollTop]))   // 다시 그려도 계정 · 팀 목록 스크롤 그대로
   sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), teamsCard(), membersCard(at), chartCard(), mixCard(), weeklyCard()].filter(Boolean))
+  for (const el of sec.querySelectorAll('[data-keep]')) el.scrollTop = keep.get(el.dataset.keep) || 0
   if (nTeams && !edit) queueShot()
 }
 
@@ -396,8 +413,8 @@ function teamsCard() {
     const teams = teamsOf(s.id)
     const el = h('div', { className: 'ar-slot' },
       h('div', { className: 'ar-slot-head' }, h('b', {}, s.short), h('span', {}, `(${teams.length}팀)`), h('small', {}, slotWhen(week, s))),
-      teams.length ? h('div', { className: 'ar-teams' }, teams.map((tm, i) => h('div', { className: 'ar-team' },
-        h('div', { className: 'ar-team-head' }, `${s.short} - ${i + 1}팀`),
+      teams.length ? h('div', { className: 'ar-teams' }, teams.map((tm, i) => h('div', { className: `ar-team${canEarly(s, tm) ? ' is-early' : ''}` },
+        h('div', { className: 'ar-team-head' }, `${s.short} - ${i + 1}팀`, canEarly(s, tm) && earlyTag()),
         h('div', { className: 'ar-members' }, tm.map((x, j) => memberCard(accts.get(key(x.u, x.n)) || { u: x.u, n: x.n, owner: '', chars: [] }, j === 0))))))
         : h('p', { className: 'rc-muted ar-none' }, '아직 편성 전이에요'))
     return el
@@ -574,7 +591,7 @@ function editor() {
   const leads = new Map([...accts.values()].filter(a => a.i === 0).map(a => [a.u, a]))
   const all = [...accts.values()].sort((x, y) => x.u === y.u ? x.i - y.i : byTally(leads.get(x.u), leads.get(y.u)) || x.u.localeCompare(y.u))
   // 시간대 필터 — 그 칸을 직접 고른 사람만(FA 는 FA 칸에서만), 겹치는 시간대에 이미 들어갔으면 뺀다.
-  // FA 는 그날 넣을 시간대가 남은 사람만 — 1차 · 2차 둘 다(또는 1.5차) 뛰면 빠진다
+  // FA 는 그날 넣을 시간대가 남은 사람만 — 1차 · 2차 둘 다 뛰면 빠진다
   const fits = (a, id) => a.slots.includes(id) && (id in FA_DAY ? SLOTS.some(s => s.day === FA_DAY[id] && !busy(s.id, a.u)) : !busy(id, a.u))
   const match = (set, test) => allOf ? [...set].every(test) : [...set].some(test)
   // 한 번 팀에 넣은 계정(FA 로 넣었어도) · 팀 없이 완료한 계정은 「배정 완료」 탭으로만 — 한 번 더 넣을 땐 거기서 고른다
@@ -605,29 +622,24 @@ function editor() {
     h('button', { type: 'button', 'aria-selected': poolView === id, onclick: () => { poolView = id; renderPlan() } }, `${label} ${n}`)))
   const poolTabs = h('div', { className: 'ar-tabs' }, [{ id: 'all', short: '전체' }, ...SLOTS, ...FAS].map(s =>
     h('button', { type: 'button', 'aria-selected': on(poolPick, s.id), onclick: pick(poolPick, s.id) }, s.short)))
-  // 계정 칸만 따로 세로 스크롤(필터는 그대로) · 아래 막대를 위아래로 끌어 높이 조절
-  const chips = h('div', { className: 'ar-chips' }, groups.length ? groups.map(g => g.length > 1 ? h('div', { className: 'ar-group', title: `${g[0].owner} 님 계정` }, g.map(a => chip(a, null))) : chip(g[0], null))
+  // 계정 칸만 따로 세로 스크롤(필터는 그대로) · 아래 막대를 위아래로 끌어 높이 조절. data-keep — 다시 그려도 스크롤 위치 그대로
+  const chips = h('div', { className: 'ar-chips', 'data-keep': 'pool' }, groups.length ? groups.map(g => g.length > 1 ? h('div', { className: 'ar-group', title: `${g[0].owner} 님 계정` }, g.map(a => chip(a, null))) : chip(g[0], null))
     : h('span', { className: 'rc-muted' }, '없어요'))
   if (poolH) chips.style.height = `${poolH}px`
-  const grip = h('div', { className: 'ar-grip', title: '위아래로 끌어 높이 조절', 'aria-hidden': 'true' })
-  grip.onpointerdown = e => {
-    e.preventDefault()
-    const y0 = e.clientY, h0 = chips.offsetHeight
-    grip.setPointerCapture(e.pointerId)
-    grip.onpointermove = m => { poolH = Math.max(80, Math.round(h0 + m.clientY - y0)); chips.style.height = `${poolH}px` }
-    grip.onpointerup = grip.onpointercancel = () => {
-      grip.onpointermove = null
-      try { localStorage.setItem(POOL_H_KEY, poolH) } catch {}
-    }
-  }
-  const poolBox = h('section', { className: 'card ar-pool', 'data-drop': 'pool' },
+  const toggle = (on, label, key, flip) => h('button', { type: 'button', className: 'ar-detail-btn', 'aria-pressed': on, onclick: () => {
+    flip()
+    try { localStorage.setItem(key, on ? '0' : '1') } catch {}
+    renderPlan()
+  } }, label)
+  const poolBox = h('section', { className: `card ar-pool${pinned ? ' is-pinned' : ''}`, 'data-drop': 'pool' },
     h('div', { className: 'ar-pool-head' }, h('h3', {}, '배치할 계정'), h('small', { className: 'rc-muted' }, '끌어서 배치하거나, 눌러서 팀을 고르세요'),
-      h('button', { type: 'button', className: 'ar-detail-btn', 'aria-pressed': detail, onclick: () => {
-        detail = !detail
-        try { localStorage.setItem(DETAIL_KEY, detail ? '1' : '0') } catch {}
-        renderPlan()
-      } }, detail ? '간단히 보기' : '자세히 보기')),
+      h('span', { className: 'ar-pool-btns' },
+        toggle(pinned, pinned ? '고정 풀기' : '위에 고정', PIN_KEY, () => { pinned = !pinned }),   // 스크롤해도 화면 위에 붙어 있다
+        toggle(detail, detail ? '간단히 보기' : '자세히 보기', DETAIL_KEY, () => { detail = !detail }))),
     viewTabs,
+    // 필터는 접을 수 있다(휴대폰은 처음에 접힌 채) — 접으면 제목 줄에 고른 필터
+    foldable(h('details', { className: 'ar-filters' },
+      h('summary', {}, '필터', h('small', {}, [...[...poolPick].map(id => TAG[id]), ...[...rolePick].map(roleLabel)].join(' · ') || '전체', poolPick.size + rolePick.size > 1 ? ` · ${allOf ? 'AND' : 'OR'}` : '')),
     poolTabs,
     roleTabs,
     // 여러 개 골랐을 때 조건(OR · AND) · 필터 초기화(미배정 · 전체 · OR 로)
@@ -639,22 +651,31 @@ function editor() {
         onclick: () => { poolPick.clear(); rolePick.clear(); allOf = false; renderPlan() } }, '필터 초기화')),
     h('p', { className: 'rc-muted' }, `${poolView === 'wait' ? '아직 팀에 안 들어간 계정 — 넣으면 「배정 완료」 로 옮겨 가요' : '팀에 들어갔거나 팀 없이 완료한 계정 — 한 번 더 넣을 땐 여기서 골라요'} · ${
       !poolPick.size ? '사람별로 묶어 본계정 → 부계정, 사람 순서는 집계 순서(계정 수 → 포지션 → 이름) · 필터는 여러 개 고를 수 있어요'
-      : `${[...poolPick].map(id => TAG[id]).join(' · ')} ${poolPick.size < 2 ? '' : allOf ? '모두 ' : '중 하나라도 '}신청한 사람(겹치는 시간대에 이미 들어갔으면 빠지고, FA 는 그날 넣을 시간대가 남은 사람)`}`),
-    chips, grip)
+      : `${[...poolPick].map(id => TAG[id]).join(' · ')} ${poolPick.size < 2 ? '' : allOf ? '모두 ' : '중 하나라도 '}신청한 사람(겹치는 시간대에 이미 들어갔으면 빠지고, FA 는 그날 넣을 시간대가 남은 사람)`}`)),
+      'filters', !matchMedia('(max-width: 720px)').matches),
+    chips, grip(chips, 'height', px => { poolH = px; try { localStorage.setItem(POOL_H_KEY, px) } catch {} }))
+  if (pinned) {   // 사이트 머리 바로 아래, 화면보다 길면 안에서 스크롤
+    const top = $('.top')?.offsetHeight || 0
+    Object.assign(poolBox.style, { top: `${top}px`, maxHeight: `calc(100dvh - ${top + 12}px)` })
+  }
+  // 시간대 카드 — 접을 수 있고, 팀 목록은 최대 높이까지만(넘으면 스크롤 · 아래 막대로 높이 조절, 네 칸 같이). 「새 팀」 칸은 아래에 늘 보인다
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
-    const box = h('div', { className: 'ar-slot ar-edit' },
-      h('div', { className: 'ar-slot-head' }, h('b', {}, s.label), h('small', {}, `${s.time} · ${teams.length}팀`)),
+    const list = h('div', { className: 'ar-slot-body', 'data-keep': s.id },
       teams.map((tm, i) => h('div', { className: `ar-drop${tm.length >= A.teamSize ? ' is-full' : ''}`, 'data-drop': `${s.id}:${i}` },
-        h('div', { className: 'ar-drop-head' }, `${i + 1}팀`, h('small', {}, `${tm.length}/${A.teamSize}`)),
-        tm.map((x, j) => chip(accts.get(key(x.u, x.n)), { slot: s.id, ti: i }, j === 0)))),
-      h('div', { className: 'ar-drop is-new', 'data-drop': `${s.id}:new` }, '+ 새 팀 — 여기에 놓기'))
-    return box
+        h('div', { className: 'ar-drop-head' }, h('span', {}, `${i + 1}팀`, canEarly(s, tm) && earlyTag()), h('small', {}, `${tm.length}/${A.teamSize}`)),
+        tm.map((x, j) => chip(accts.get(key(x.u, x.n)), { slot: s.id, ti: i }, j === 0)))))
+    if (teamH) list.style.maxHeight = `${teamH}px`
+    return foldable(h('details', { className: 'ar-slot ar-edit' },
+      h('summary', { className: 'ar-slot-head' }, h('b', {}, s.label), h('small', {}, `${s.time} · ${teams.length}팀`)),
+      list,
+      h('div', { className: 'ar-drop is-new', 'data-drop': `${s.id}:new` }, '+ 새 팀 — 여기에 놓기'),
+      grip(list, 'maxHeight', px => { teamH = px; try { localStorage.setItem(TEAM_H_KEY, px) } catch {} }, () => [...document.querySelectorAll('.ar-slot-body')])), `edit:${s.id}`)
   }))
   return [poolBox, status, grid, picksCard()]
 }
 
-// 신청 현황 칸은 요일 순(토 1 · 1.5 · 2 · FA → 일 … → 불참), 줄은 불참이 맨 아래 · 그 밖은 본계정 가나다 — 화면 표 · 엑셀이 같이 쓴다
+// 신청 현황 칸은 요일 순(토 1 · 2 · FA → 일 … → 불참), 줄은 불참이 맨 아래 · 그 밖은 본계정 가나다 — 화면 표 · 엑셀이 같이 쓴다
 const PICK_COLS = [...SLOTS, ...A.extra].sort((x, y) => (x.day ?? 9) - (y.day ?? 9))
 const SHORT = Object.fromEntries(PICK_COLS.map(c => [c.id, c.short]))
 const isOut = s => s.slots.includes('absent')
@@ -695,6 +716,20 @@ function chip(a, from, lead = false) {
 }
 
 /** a 를 from(팀 자리, 없으면 대기 목록)에서 to('pool' | '<시간대>:<팀 번호>' | '<시간대>:new')로 */
+/** 높이 조절 막대 — 위아래로 끌면 el 높이에서 시작해 all() 의 prop(height · maxHeight)을 바로 바꾸고, 놓으면 save(px) */
+function grip(el, prop, save, all = () => [el]) {
+  const g = h('div', { className: 'ar-grip', title: '위아래로 끌어 높이 조절', 'aria-hidden': 'true' })
+  g.onpointerdown = e => {
+    e.preventDefault()
+    const y0 = e.clientY, h0 = el.offsetHeight
+    let px = h0
+    g.setPointerCapture(e.pointerId)
+    g.onpointermove = m => { px = Math.max(80, Math.round(h0 + m.clientY - y0)); for (const x of all()) x.style[prop] = `${px}px` }
+    g.onpointerup = g.onpointercancel = () => { g.onpointermove = null; save(px) }
+  }
+  return g
+}
+
 function move(a, from, to, ok) {
   if (!to || (!from && to === 'pool')) return
   const next = structuredClone(plan), same = x => x.u === a.u && x.n === a.n
@@ -931,7 +966,7 @@ function saveExcel(e) {
   })
 }
 
-/** 편성표 그림 — 한 줄에 하루(1차 · 1.5차 · 2차). 팀 한 줄에 3명(얼굴 · 닉네임 · 부계정이면 아래 작게 본계정) */
+/** 편성표 그림 — 한 줄에 하루(1차 · 2차). 팀 한 줄에 3명(얼굴 · 닉네임 · 부계정이면 아래 작게 본계정) */
 async function drawPlan() {
   const rows = [...new Set(SLOTS.map(s => s.day))].map(d => SLOTS.filter(s => s.day === d))
   const PER = Math.max(...rows.map(r => r.length)), PAD = 28, GAP = 16, COL = 437, W = PAD * 2 + PER * COL + GAP * (PER - 1), ROW = 58, HEAD = 40, Z = 2

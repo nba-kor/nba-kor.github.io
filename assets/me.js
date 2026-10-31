@@ -7,7 +7,7 @@ import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfi
 await loadData()
 mountTop('/me/')
 const arena = await arenaCfg()
-const CHOICE = Object.fromEntries([...arena.slots.map(s => [s.id, s.short]), ...arena.extra.map(c => [c.id, c.label])])
+const CHOICE = Object.fromEntries([...arena.slots, ...arena.retired].map(s => [s.id, s.short]).concat(arena.extra.map(c => [c.id, c.label])))   // 지난 이력의 1.5차(retired)도 이름으로
 
 const card = (title, ...kids) => h('section', { className: 'card mp-card' }, h('h2', {}, title), ...kids)
 // 관리자 · 마스터 카드 — 제목 줄을 누르면 접고 편다. 처음엔 펼쳐 두고, 접은 카드는 이 브라우저에 기억한다

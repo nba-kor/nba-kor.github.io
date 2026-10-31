@@ -1,5 +1,5 @@
 {
-  "note": "아레나전 설정 — 서버(server/index.mjs) · 화면(assets/arena.js · assets/profile.js · assets/me.js · index.html) 이 같이 읽는다. 고치면 함수도 다시 배포한다. 시간대 id 는 저장된 신청 · 편성표에 남으니 바꾸지 말고 더하기만 한다. roles 의 올포(allpos)는 스코어러 · 중열 · 센터 다 — 1순위로만 고르고 2순위는 없다. extra 의 FA 는 요일(day)마다 — 그날 어느 시간대든 된다(예전 하나짜리 flex 는 마이그레이션에서 둘 다로 바꿨다). maxAccounts = 한 사람이 한 주에 낼 수 있는 참가 계정 수(한 주에 뛸 수 있는 시간대가 4번), maxAccountsFrom 주부터 — 그 전 주 신청은 그대로 둔다",
+  "note": "아레나전 설정 — 서버(server/index.mjs) · 화면(assets/arena.js · assets/profile.js · assets/me.js · index.html) 이 같이 읽는다. 고치면 함수도 다시 배포한다. 시간대 id 는 저장된 신청 · 편성표에 남으니 바꾸지 말고 더하기만 한다. roles 의 올포(allpos)는 스코어러 · 중열 · 센터 다 — 1순위로만 고르고 2순위는 없다. extra 의 FA 는 요일(day)마다 — 그날 어느 시간대든 된다(예전 하나짜리 flex 는 마이그레이션에서 둘 다로 바꿨다). maxAccounts = 한 사람이 한 주에 낼 수 있는 참가 계정 수(한 주에 뛸 수 있는 시간대가 4번), maxAccountsFrom 주부터 — 그 전 주 신청은 그대로 둔다. retired = 더는 고르거나 편성하지 않는 시간대(1.5차 — 2026-11 부터, 팀원 모두 그날 1차가 없는 2차 팀은 팀장이 20:00 로 당겨 해도 된다) — 지난 신청 이력에 이름만 보인다",
   "teamSize": 3,
   "maxTeams": 20,
   "closeAt": "21:30",
@@ -15,15 +15,17 @@
   ],
   "slots": [
     { "id": "sat1", "day": 0, "label": "토요일 1차", "short": "토 1차", "time": "19:30", "end": "20:30" },
-    { "id": "sat15", "day": 0, "label": "토요일 1.5차", "short": "토 1.5차", "time": "20:00", "end": "21:30" },
     { "id": "sat2", "day": 0, "label": "토요일 2차", "short": "토 2차", "time": "20:30", "end": "21:30" },
     { "id": "sun1", "day": 1, "label": "일요일 1차", "short": "일 1차", "time": "19:30", "end": "20:30" },
-    { "id": "sun15", "day": 1, "label": "일요일 1.5차", "short": "일 1.5차", "time": "20:00", "end": "21:30" },
     { "id": "sun2", "day": 1, "label": "일요일 2차", "short": "일 2차", "time": "20:30", "end": "21:30" }
   ],
   "extra": [
     { "id": "satfa", "day": 0, "label": "토요일 FA (시간 미정 · 용병)", "short": "토 FA" },
     { "id": "sunfa", "day": 1, "label": "일요일 FA (시간 미정 · 용병)", "short": "일 FA" },
     { "id": "absent", "label": "사유불참", "short": "불참" }
+  ],
+  "retired": [
+    { "id": "sat15", "day": 0, "label": "토요일 1.5차", "short": "토 1.5차" },
+    { "id": "sun15", "day": 1, "label": "일요일 1.5차", "short": "일 1.5차" }
   ]
 }

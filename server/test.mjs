@@ -1779,8 +1779,8 @@ test('감사 로그 내용: 한글 이름 · 프로필 · 아레나 신청 · �
   const p = (u, n) => ({ u, n })
   assert.deepEqual(planChanges(
     { sat1: [[p('1', 'A'), p('2', 'B')], [p('3', 'C')]], sun1: [[p('5', 'E')]] },
-    { sat1: [[p('1', 'A')], [p('3', 'C'), p('4', 'D')]], sat15: [[p('2', 'B')]], sun2: [[p('1', 'A2')]] }),
-    ['B: 토 1차 1팀 → 토 1.5차 1팀', '−E: 일 1차 1팀', '+D: 토 1차 2팀', '+A2: 일 2차 1팀'])
+    { sat1: [[p('1', 'A')], [p('3', 'C'), p('4', 'D')]], sat2: [[p('2', 'B')]], sun2: [[p('1', 'A2')]] }),
+    ['B: 토 1차 1팀 → 토 2차 1팀', '−E: 일 1차 1팀', '+D: 토 1차 2팀', '+A2: 일 2차 1팀'])
   assert.deepEqual(planChanges(undefined, { sat1: [[p('1', 'A')]] }), ['+A: 토 1차 1팀'], '처음 저장')
   assert.deepEqual(planChanges({ sat1: [[p('9', 'Z')], [p('1', 'A')]] }, { sat1: [[p('1', 'A')]] }), ['−Z: 토 1차 1팀', 'A: 토 1차 2팀 → 1팀'], '앞 팀이 비어 번호가 당겨지면 옮긴 것으로')
   assert.deepEqual(planChanges({ done: [p('1', 'A')] }, { done: [p('2', 'B')] }), ['+B: 팀 없이 완료', '−A: 팀 없이 완료'])
@@ -1813,7 +1813,7 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
 
   // 신청 검증
   for (const [body, why] of [
-    [{ slots: [], nicks: ['A본'] }, '시간대 없음'], [{ slots: ['mon1'], nicks: ['A본'] }, '없는 시간대'], [{ slots: ['sat1', 'sat1'], nicks: ['A본'] }, '같은 시간대 두 번'],
+    [{ slots: [], nicks: ['A본'] }, '시간대 없음'], [{ slots: ['mon1'], nicks: ['A본'] }, '없는 시간대'], [{ slots: ['sat15'], nicks: ['A본'] }, '없앤 시간대(1.5차)'], [{ slots: ['sat1', 'sat1'], nicks: ['A본'] }, '같은 시간대 두 번'],
     [{ slots: ['absent', 'sat1'], nicks: ['A본'] }, '사유불참 + 시간대'], [{ slots: ['sat1'], nicks: [] }, '계정 없음'], [{ slots: ['sat1'], nicks: [`B${RUN}`] }, '남의 계정'],
     [{ slots: ['sat1'], nicks: ['A본', 'A본'] }, '같은 계정 두 번'], [{ slots: ['sat1'], nicks: ['A본'], memo: 'x'.repeat(51) }, '메모 51자'], [{ slots: 'sat1', nicks: ['A본'] }, '시간대가 배열 아님'],
   ]) assert.equal((await signup(a, body)).status, 400, why)
@@ -1849,8 +1849,7 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   assert.equal((await api('GET', '/api/me', undefined, { as: boss.as })).body.admin, true)
   for (const [p, status, why] of [
     [{ sat1: [[{ u: a.id, n: 'A본' }], [{ u: a.id, n: 'A부' }]] }, 400, '같은 시간대에 한 사람 두 계정'],
-    [{ sat1: [[{ u: a.id, n: 'A본' }]], sat15: [[{ u: a.id, n: 'A부' }]] }, 400, '1차와 1.5차는 겹친다'],
-    [{ sat15: [[{ u: a.id, n: 'A본' }]], sat2: [[{ u: a.id, n: 'A본' }]] }, 400, '1.5차와 2차도 겹친다(같은 계정이어도)'],
+    [{ sat15: [[{ u: a.id, n: 'A본' }]] }, 400, '없앤 시간대(1.5차)'],
     [{ sat1: [[{ u: a.id, n: 'A본' }, { u: boss.id, n: `관리${RUN}` }]] }, 409, '신청 안 한 계정'],
     [{ sat1: [[{ u: a.id, n: 'A본' }, { u: b.id, n: `B${RUN}` }, { u: a.id, n: 'A부' }, { u: b.id, n: `B${RUN}` }]] }, 400, '4명'],
     [{ mon1: [] }, 400, '없는 시간대'], [{ sat1: [{ u: a.id, n: 'A본' }] }, 400, '팀이 배열 아님'], [[], 400, '배열 편성표'],
@@ -1865,6 +1864,9 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   clock += MIN
   const done = await plan(boss, { ...p1, done: [{ u: b.id, n: `B${RUN}` }, { u: b.id, n: `B${RUN}` }] }, saved.body.planAt)
   assert.deepEqual([done.status, done.body.plan.done], [200, [{ u: b.id, n: `B${RUN}` }]], '팀 없이 완료 — 한 계정에 한 번')
+  await rest(`/arena_plans?week=eq.${week}`, { method: 'PATCH', body: JSON.stringify({ plan: { ...done.body.plan, sat15: [[{ u: a.id, n: 'A본' }]] } }) })
+  assert.equal('sat15' in (await view()).plan, false, '없앤 시간대(1.5차)는 저장돼 있어도 편성표에서 안 보인다(지난 이력에는 남는다)')
+  await rest(`/arena_plans?week=eq.${week}`, { method: 'PATCH', body: JSON.stringify({ plan: done.body.plan }) })
 
   // 프로필에서 계정을 빼면 신청 · 편성표에서도 안 보인다
   clock += MIN

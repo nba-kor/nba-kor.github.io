@@ -1184,9 +1184,17 @@ label.ac-pick { cursor: pointer; }
 .ar-chip.ghost { position: fixed; z-index: 999; pointer-events: none; transform: translate(-50%, -50%); box-shadow: 0 8px 24px #000a; }
 .ar-status { margin: 0; min-height: 1.4em; color: var(--muted); font-size: 12.5px; }
 .ar-status.is-bad { color: var(--def); }
-.ar-edit-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.ar-edit { margin: 0 !important; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; gap: 8px; }
-.ar-edit .ar-slot-head { margin-bottom: 0; }
+.ar-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.ar-edit { margin: 0 !important; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+.ar-edit > * + * { margin-top: 8px; }
+/* 시간대 카드 — 제목 줄을 눌러 접는다. 팀 목록은 최대 높이까지(넘으면 스크롤 · 아래 막대로 조절), 「새 팀」 칸은 그 아래에 늘 보인다 */
+.ar-edit > summary.ar-slot-head { margin-bottom: 0; cursor: pointer; list-style: none; user-select: none; }
+.ar-edit > summary::-webkit-details-marker { display: none; }
+.ar-edit > summary::after { content: '▾'; color: var(--muted); font-size: 15px; transition: rotate .15s; }
+.ar-edit:not([open]) > summary::after { rotate: -90deg; }
+.ar-slot-body { display: flex; flex-direction: column; gap: 8px; max-height: 460px; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.ar-slot-body > * { flex: none; }   /* 높이가 모자라도 팀 칸이 줄어들지 않고 스크롤된다 */
+.ar-slot-body:empty { display: none; }
 .ar-drop { display: flex; flex-direction: column; gap: 5px; padding: 8px; min-height: 52px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
 .ar-drop .ar-chip { align-self: flex-start; }
 .ar-drop-head { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; }
@@ -1283,7 +1291,20 @@ label.ac-pick { cursor: pointer; }
 .ar-owner b { font-size: inherit; color: var(--text); font-weight: 800; }   /* 「본계」 와 같은 크기, 굵기만 */
 .ar-chip.is-detail { align-items: flex-start; border-radius: 14px; padding: 6px 10px 6px 6px; }
 .ar-chip .ar-chars { margin-top: 3px; max-width: 260px; }
-.ar-pool-head .ar-detail-btn { margin-left: auto; padding: 4px 12px; font-size: 12.5px; font-weight: 700; }
+.ar-pool-btns { margin-left: auto; display: flex; gap: 6px; }
+.ar-pool-head .ar-detail-btn { padding: 4px 12px; font-size: 12.5px; font-weight: 700; }
+/* 「위에 고정」 — 스크롤해도 사이트 머리 바로 아래에 붙는다(top 은 머리 높이로 인라인). 화면보다 길면 안에서 스크롤 */
+.ar-pool.is-pinned { position: sticky; z-index: 5; overflow-y: auto; overscroll-behavior: contain; box-shadow: 0 12px 28px -12px #000; }
+/* 필터 — 접으면 제목 줄에 고른 필터만 */
+.ar-filters > summary { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; cursor: pointer; list-style: none; user-select: none; font-size: 13px; font-weight: 800; }
+.ar-filters > summary::-webkit-details-marker { display: none; }
+.ar-filters > summary small { color: var(--muted); font-size: 12px; font-weight: 600; }
+.ar-filters > summary::after { content: '▾'; color: var(--muted); transition: rotate .15s; }
+.ar-filters:not([open]) > summary::after { rotate: -90deg; }
+/* 1.5차 가능 — 2차 팀인데 팀원 모두 그날 1차가 없다 */
+.ar-early { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1.6; color: #1a1200; background: var(--accent); vertical-align: 1px; white-space: nowrap; }
+.ar-team.is-early { border: 2px solid var(--accent); }
+.ar-early-note { margin: 0; padding: 6px 10px; border-radius: 8px; font-size: 12.5px; background: color-mix(in srgb, #f5a623 22%, transparent); }
 .ar-detail-btn[aria-pressed="true"] { color: var(--bg); background: var(--text); border-color: var(--text); }
 .pm-detail { display: flex; flex-direction: column; gap: 6px; margin: -4px 0 12px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); }
 .pm-detail .ac-roles { margin: 0; }
@@ -1445,7 +1466,8 @@ label.ac-pick { cursor: pointer; }
   .ar-nick small { display: block; margin: 0 !important; }
   /* 편성 대기 목록 — 휴대폰은 눌러서 팀을 고르니(높이 조절도 안 된다) 계정을 다 펼친다 */
   .ar-pool .ar-chips { height: auto !important; overflow: visible; }   /* 막대로 바꾼 높이(인라인)도 무시 */
-  .ar-grip { display: none; }
+  .ar-pool .ar-grip { display: none; }
+  .ar-pool.is-pinned .ar-chips { max-height: 35vh; overflow-y: auto; }   /* 고정했으면 계정 칸만 짧게 */
   /* 출석 현황 — 「3주 연속」 이 두 줄로 접히지 않게, # 는 뺀다 */
   .mp-attend :is(th, td) { padding: 6px 4px; white-space: nowrap; }
   .mp-attend :is(th, td):first-child { display: none; }
