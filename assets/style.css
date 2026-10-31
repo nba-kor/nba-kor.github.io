@@ -1268,12 +1268,13 @@ label.ac-pick { cursor: pointer; }
 .mp-status.is-risk { --c: #ff8a3d; }
 .mp-status.is-out { --c: var(--def); color: #1a0000; background: var(--c); }
 /* 마이페이지 — 관리자 · 마스터 카드는 제목 줄을 눌러 접는다 */
-.mp-fold > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; user-select: none; }
-.mp-fold > summary::-webkit-details-marker { display: none; }
-.mp-fold > summary h2 { flex: 1; margin: 0; }
-.mp-fold > summary::after { content: '▾'; color: var(--muted); font-size: 16px; transition: rotate .15s; }
-.mp-fold:not([open]) > summary::after { rotate: -90deg; }
+:is(.mp-fold, .ar-fold) > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; user-select: none; }
+:is(.mp-fold, .ar-fold) > summary::-webkit-details-marker { display: none; }
+:is(.mp-fold, .ar-fold) > summary :is(h2, h3) { flex: 1; margin: 0; }
+:is(.mp-fold, .ar-fold) > summary::after { content: '▾'; color: var(--muted); font-size: 16px; transition: rotate .15s; }
+:is(.mp-fold, .ar-fold):not([open]) > summary::after { rotate: -90deg; }
 .mp-fold[open] > summary { margin-bottom: 14px; }
+.ar-fold[open] > summary { margin-bottom: 12px; }   /* 아레나 페이지 카드 */
 #audit { scroll-margin-top: 110px; }
 
 /* 아레나 편성 — 칩: 부계정이면 본계정 닉네임 줄, 「자세히 보기」 면 캐릭터 */
@@ -1398,7 +1399,7 @@ label.ac-pick { cursor: pointer; }
   .ar-short { display: inline; }
   .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally, .ar-picks) :is(th, td) { padding: 6px 2px; font-size: 11.5px; white-space: nowrap; }
   .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally, .ar-picks) .ar-nick { max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
-  .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally, .ar-picks) :is(th, td):is(:first-child, :last-child) { display: none; }   /* # · 상태(배정은 뱃지로 보인다) */
+  .ar-card > .ar-table-wrap > .ar-table:not(.ar-tally, .ar-picks) :is(th, td):first-child { display: none; }   /* # */
   .ar-badge { min-width: 34px; padding: 2px 4px; font-size: 11px; }
   .ar-nick small { display: block; margin: 0 !important; }
   /* 편성 대기 목록 — 휴대폰은 눌러서 팀을 고르니(높이 조절도 안 된다) 계정을 다 펼친다 */

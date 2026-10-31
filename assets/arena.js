@@ -263,6 +263,18 @@ function placements() {
   return at
 }
 const teamsOf = id => (plan[id] || []).filter(t => t.length)
+
+// 카드 접기(아코디언) — 제목 줄을 누르면 접힌다. 접은 카드는 이 브라우저에 기억한다(마이페이지와 같은 방식)
+const FOLD_KEY = 'dc.arena.fold'
+const folded = (() => { try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY)) || []) } catch { return new Set() } })()
+function foldCard(id, title, ...kids) {
+  const el = h('details', { className: 'card ar-card ar-fold', open: !folded.has(id) }, h('summary', {}, h('h3', {}, title)), ...kids)
+  el.ontoggle = () => {
+    el.open ? folded.delete(id) : folded.add(id)
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify([...folded])) } catch {}
+  }
+  return el
+}
 const doneKeys = () => new Set((plan.done || []).map(x => key(x.u, x.n)))   // 팀 없이 완료(강제 배정)한 계정
 
 function renderPlan() {
@@ -338,15 +350,14 @@ function tallyCard() {
           : h('p', { className: 'rc-muted ar-none' }, '아직 없어요'))
     return sec
   })
-  return h('section', { className: 'card ar-card' }, h('h3', {}, '집계표'), tabs, sections)
+  return foldCard('tally', '집계표', tabs, sections)
 }
 
 /** 이번 주 미신청 — 프로필(게임 계정)은 있는데 이번 주 신청이 없는 사람의 본계정 닉네임 */
 function missingCard() {
   if (week !== data.current) return null
   const names = [...data.missing].sort((a, b) => a.localeCompare(b, 'ko'))
-  return h('section', { className: 'card ar-card' },
-    h('h3', {}, `이번 주 미신청 ${names.length}명`),
+  return foldCard('missing', `이번 주 미신청 ${names.length}명`,
     names.length ? h('ol', { className: 'ar-missing' }, names.map(n => h('li', {}, n))) : h('p', { className: 'rc-muted' }, '모두 신청했어요'))
 }
 
@@ -368,8 +379,7 @@ function membersCard(at) {
         : viaFa(p.slots, s) ? h('span', { className: 'ar-want', title: 'FA (시간 미정 · 용병)' }, 'FA') : h('span', { className: 'ar-dash' }, '-'))
     }),
     h('td', {}, h('span', { className: `ar-st${n === p.accounts.length ? ' is-ok' : n ? ' is-part' : ''}` }, n === p.accounts.length ? '완료' : `${n}/${p.accounts.length}`))))
-  return h('section', { className: 'card ar-card' },
-    h('h3', {}, '멤버별 배치 현황'),
+  return foldCard('members', '멤버별 배치 현황',
     body.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table' },
       h('thead', {}, h('tr', {}, h('th', {}, '#'), h('th', {}, '본계정'), SLOTS.map(s => h('th', {}, h('span', { className: 'ar-long' }, s.short), h('span', { className: 'ar-short' }, TAG[s.id]))), h('th', {}, '상태'))),
       h('tbody', {}, body)))
@@ -391,7 +401,7 @@ function teamsCard() {
         : h('p', { className: 'rc-muted ar-none' }, '아직 편성 전이에요'))
     return el
   })
-  return h('section', { className: 'card ar-card' }, h('h3', {}, '팀별 편성 명단'), tabs, blocks)
+  return foldCard('teams', '팀별 편성 명단', tabs, blocks)
 }
 
 // 팀장 = 그 팀에 처음 넣은 계정(팀 배열의 맨 앞). 팀장을 빼면 다음 사람이 팀장이 된다
@@ -450,8 +460,7 @@ function chartCard() {
       A.extra.filter(c => c.day === day).map(c => bar(c.id, 'FA 시간 미정')))
   })
   const absent = data.signups.length - n
-  return h('section', { className: 'card ar-card' },
-    h('h3', {}, '요일 · 시간대별 참여'),
+  return foldCard('chart', '요일 · 시간대별 참여',
     h('p', { className: 'rc-muted' }, n ? `참가 신청 ${n}명 기준(한 사람이 여러 시간대를 고를 수 있어 합이 100% 를 넘어요)${absent ? ` · 사유불참 ${absent}명 제외` : ''}` : '아직 참가 신청이 없어요'),
     n > 0 && h('div', { className: 'ar-chart' }, days))
 }
@@ -466,8 +475,7 @@ function mixCard() {
   const name = id => P(id).short || P(id).name
   const chars = [...count].sort((x, y) => y[1] - x[1] || name(x[0]).localeCompare(name(y[0]), 'ko'))
   const head = (title, sub) => h('div', { className: 'ar-chart-head' }, h('b', {}, title), h('small', {}, sub))
-  return h('section', { className: 'card ar-card' },
-    h('h3', {}, '포지션 · 캐릭터 비율'),
+  return foldCard('mix', '포지션 · 캐릭터 비율',
     h('p', { className: 'rc-muted' }, `참가 계정 ${n}개 기준 · 캐릭터는 한 계정이 여럿 고를 수 있어 합이 100% 를 넘어요`),
     h('div', { className: 'ar-chart ar-mix' },
       h('div', { className: 'ar-chart-day' }, head('포지션', '1순위'), donut(roles, n, '계정')),
