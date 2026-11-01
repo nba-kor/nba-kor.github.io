@@ -46,7 +46,7 @@ const WEAP = {
   three: { name: '3점슛', note: '멀리 있는 수비에게 높이 쏴 떨어진 자리를 스플래시', cd: 2.2, dmg: 22, ups: [{ n: 1 }, { area: 0.2 }, { dmg: 10 }, { n: 1 }, { cd: -0.4 }, { dmg: 12 }, { n: 1, area: 0.2 }] },
   dunk: { name: '덩크', note: '뛰어올라 내리꽂으면 둘레에 충격파 — 밀쳐 낸다', cd: 3.2, dmg: 26, ups: [{ area: 0.15 }, { dmg: 10 }, { cd: -0.5 }, { area: 0.15 }, { dmg: 12 }, { n: 1 }, { dmg: 18, area: 0.15 }] },
   bounce: { name: '바운스 패스', note: '맞으면 옆 수비에게 튕겨 간다', cd: 1.6, dmg: 9, pierce: 1, bounce: 3, ups: [{ bounce: 1 }, { dmg: 4 }, { n: 1 }, { bounce: 2 }, { dmg: 5 }, { cd: -0.3 }, { bounce: 2, dmg: 6 }] },
-  block: { name: '블록슛', note: '두 손이 몸 둘레를 돌며 쳐 낸다 — 날아오는 호루라기를 가끔(10%) 막는다', cd: 2.2, dmg: 12, n: 2, dur: 3.2, ups: [{ n: 1 }, { area: 0.15, spd: 0.25 }, { dmg: 4 }, { n: 1 }, { dur: 1 }, { n: 1 }, { dmg: 6, dur: 1 }] },
+  block: { name: '블록슛', note: '두 손이 몸 둘레를 돌며 쳐 낸다 — 날아오는 호루라기를 가끔(10%) 막는다', cd: 2.2, dmg: 9, n: 2, dur: 3.2, ups: [{ n: 1 }, { area: 0.15, spd: 0.25 }, { dmg: 3 }, { n: 1 }, { dur: 1 }, { n: 1 }, { dmg: 4, dur: 1 }] },
   press: { name: '풀코트 프레스', note: '둘레의 수비를 계속 압박해 피해를 준다', cd: 0.45, dmg: 4, ups: [{ area: 0.1 }, { dmg: 1 }, { area: 0.1 }, { cd: -0.08 }, { dmg: 2 }, { area: 0.1 }, { dmg: 2 }] },
   alley: { name: '앨리웁', note: '하늘에서 공이 떨어져 그 자리를 내리찍는다', cd: 2.6, dmg: 18, n: 2, ups: [{ n: 1 }, { dmg: 6 }, { area: 0.2 }, { n: 1 }, { cd: -0.5 }, { n: 1 }, { dmg: 12 }] },
   fade: { name: '스텝백 슛', note: '보는 쪽으로 꿰뚫는 슛', cd: 0.95, dmg: 8, pierce: 2, ups: [{ n: 1 }, { dmg: 4 }, { n: 1 }, { pierce: 2 }, { n: 1 }, { dmg: 5 }, { cd: -0.3 }] },
@@ -106,7 +106,7 @@ const FOES = {
   rookie: { r: 12, hp: 9, spd: 62, dmg: 7, xp: 1 },
   fan: { r: 10, hp: 5, spd: 95, dmg: 5, xp: 1 },
   ref: { r: 12, hp: 18, spd: 57, dmg: 7, xp: 2 },   // 심판 — 멀리서 호루라기를 던진다. 20분부터 나온다
-  big: { r: 18, hp: 52, spd: 47, dmg: 12, xp: 3 },
+  big: { r: 18, hp: 52, spd: 47, dmg: 10, xp: 3 },
   mascot: { r: 26, hp: 420, spd: 55, dmg: 16, xp: 25 },   // 정예 — 아이템을 떨어뜨린다
   rusher: { r: 11, hp: 14, spd: 0, dmg: 14, xp: 1 },   // 풀코트 러시 — 줄지어 화면을 가로지른다(느려지지도 밀리지도 않는다)
   // 보스(BOSS) — 피는 시간에 따라 완만하게(spawn), 대신 서 있으면 맞는 기술을 쓴다. 트로피 상자를 떨어뜨린다
@@ -754,7 +754,7 @@ document.addEventListener('fullscreenchange', () => setFull(!!document.fullscree
 // ---------------------------------------------------------------- 한 판
 let mode = 'load', G = null, pl = null, S = null, menuChar = 0, menuMap = 0, shake = 0, tnow = 0
 const cam = { x: 0, y: 0 }
-const need = lv => lv < 20 ? 5 + (lv - 1) * 7 : 138 + (lv - 20) * 12 + (lv - 20) ** 2   // 다음 레벨까지 경험치 — 20부터는 오를수록 더 많이, 늘어나는 폭도 커진다(30 → 358 · 40 → 778 · 50 → 1398)
+const need = lv => Math.round((1 + 0.2 * Math.min(1, (lv - 1) / 15)) * (lv < 20 ? 5 + (lv - 1) * 7 : 138 + (lv - 20) * 12 + (lv - 20) ** 2))   // 다음 레벨까지 경험치 — 처음엔 예전 그대로, Lv 16 부터 1.2배. 20부터는 오를수록 더 많이, 늘어나는 폭도 커진다(30 → 430 · 40 → 934 · 50 → 1678)
 
 function start() {
   const ch = CHARS[menuChar], map = MAPS[menuMap]
@@ -790,7 +790,7 @@ function stats() {
     amount: L('double') + (m.amount || 0),
     magnet: 80 * (1 + 0.3 * L('vision') + (m.magnet || 0)),
     luck: 1 + 0.1 * L('clutch') + (m.luck || 0),
-    growth: (1 + 0.08 * L('rookie') + (m.growth || 0)) * G.map.xp,
+    growth: 0.8 * (1 + 0.08 * L('rookie') + (m.growth || 0)) * G.map.xp,   // 줍는 경험치 — 기본 0.8배
     crit: 0.03 + (m.crit || 0) + 0.02 * L('clutch'),
     critX: 2 + (m.critX || 0),
     body: !!m.body,
@@ -956,14 +956,14 @@ function weapons(dt) {
 }
 
 // ---- 수비
-const HPK = [1, 1.45, 2, 3, 6.5, 15, 26]   // 보통 수비 피 배수 — 0 · 5 · 10 … 30분, 사이는 잇는다
+const HPK = [1, 1.25, 1.5, 2.1, 4, 13, 26]   // 보통 수비 피 배수 — 0 · 5 · 10 … 30분, 사이는 잇는다
 const hpK = m => { const i = Math.min(5, m / 5 | 0); return HPK[i] + (HPK[i + 1] - HPK[i]) * Math.min(1, m / 5 - i) }
 function spawn(type, x, y) {
   const F = FOES[type], m = G.t / 60, mm = Math.min(m, 30), big = type in BOSS
-  // 피 — 보통 수비는 HPK(성장이 느려진 만큼 10 ~ 20분은 완만하게, 다 키우는 25분쯤부터 가파르게), 보스는 완만하게(5분 2.5배 · 25분 8.5배 — 잘 짠 빌드면 30초 안팎).
+  // 피 — 보통 수비는 HPK(성장이 느려진 만큼 10 ~ 20분은 완만하게, 다 키우는 25분쯤부터 가파르게), 보스는 완만하게(5분 2.25배 · 25분 7.25배 — 잘 짠 빌드면 30초 안팎).
   // 둘 다 30분에서 멈춘다(챌린지는 피 대신 세기 · 빠르기 · 보스 수가 오른다)
-  const hp = F.hp * (big ? 1 + mm * 0.3 : hpK(mm)) * G.map.hp
-  const dmgK = (1 + m * 0.07) * (m >= 25 && !big ? 1.25 : 1), spdK = 1 + Math.min(0.3, Math.max(0, m - 25) * 0.015)   // 25분부터 더 세고 빠르게(빠르기는 +30% 까지)
+  const hp = F.hp * (big ? 1 + mm * 0.25 : hpK(mm)) * G.map.hp
+  const dmgK = (1 + m * 0.055) * (m >= 25 && !big ? 1.4 : 1), spdK = 1 + Math.min(0.3, Math.max(0, m - 25) * 0.015)   // 25분부터 더 세고 빠르게(빠르기는 +30% 까지)
   const e = {
     type, v: rnd() * SPR[type].length | 0, x: 0, y: 0, r: F.r, hp, max: hp, spd: F.spd * G.map.spd * (0.9 + rnd() * 0.2) * spdK, dmg: F.dmg * dmgK, xp: F.xp,
     vx: 0, vy: 0, kx: 0, ky: 0, flash: 0, slow: 0, held: 0, rage: 0, fx: 1, seed: rnd() * 10, cd: 1 + rnd() * 2, st: 'walk', stT: 3, dx: 0, dy: 0, age: 0, z: 0,
@@ -992,12 +992,12 @@ function ring(e, ahead = false) {
   if (G.map.wall && Math.abs(e.y) > G.map.wall - 14) { e.y = wallY(e.y); e.x = pl.x + (c >= 0 ? hw : -hw) }
 }
 function spawner(dt) {
-  const m = G.t / 60, want = Math.min(MAX_FOES, (22 + m * 14 + m * m * 0.45) * (m >= 25 ? 1.3 : 1))
+  const m = G.t / 60, want = Math.min(MAX_FOES, (22 + m * 10 + m * m * 0.45) * (m >= 25 ? 1.3 : 1))
   if ((G.spawnT -= dt) <= 0) {
     G.spawnT = Math.max(m >= 25 ? 0.06 : 0.09, 0.55 - m * 0.02)
     const n = Math.min(want - G.foes.length, 1 + (m / 1.8 | 0))
     for (let i = 0; i < n; i++) {
-      const w = [['rookie', 1], ['fan', m >= 1 ? 0.5 + m * 0.03 : 0], ['ref', m >= 20 ? 0.1 + (m - 20) * 0.035 : 0], ['big', m >= 3 ? 0.25 + m * 0.025 : 0]]
+      const w = [['rookie', 1], ['fan', m >= 1 ? 0.5 + m * 0.03 : 0], ['ref', m >= 20 ? 0.1 + (m - 20) * 0.035 : 0], ['big', m >= 4 ? 0.1 + m * 0.03 : 0]]
       let q = rnd() * w.reduce((s, x) => s + x[1], 0), type = 'rookie'
       for (const [k, v] of w) if ((q -= v) < 0) { type = k; break }
       spawn(type)
@@ -1156,7 +1156,7 @@ function hurt(e, dmg, ox, oy, kb = 0) {
   dmg = Math.max(1, Math.round(dmg * (crit ? S.critX : 1) * (0.9 + rnd() * 0.2)))
   e.hp -= dmg; e.flash = 0.1
   if (G.fx.length < 150 && (crit || rnd() < 0.45)) fx({ k: 'spark', x: e.x + (rnd() - 0.5) * e.r, y: e.y - e.r * 2 + (rnd() - 0.5) * e.r, s: crit ? 36 : 20, a: rnd() * TAU, T: 0.22 })
-  if (kb && !e.boss && !(e.rage > G.t)) { const dx = e.x - ox, dy = e.y - oy, d = Math.hypot(dx, dy) || 1, k = kb / (e.heavy ? 3 : 1); e.kx += dx / d * k; e.ky += dy / d * k }
+  if (kb && !e.heavy && !e.boss && !(e.rage > G.t)) { const dx = e.x - ox, dy = e.y - oy, d = Math.hypot(dx, dy) || 1; e.kx += dx / d * kb; e.ky += dy / d * kb }   // 밀리는 건 작은 수비(신인 · 팬 · 심판)만
   num(e.x, e.y - e.r * 3.4, dmg, crit ? 'crit' : '')
   if (e.hp <= 0) kill(e)
 }
@@ -1485,7 +1485,7 @@ function take(o) {
 let BOX = null
 function openBox() {
   const src = G.queue.shift(), chest = src === 'chest', brk = src === 'break'
-  const jack = !brk && rnd() < (chest ? 0.5 : 0.07 * S.luck * (G.ch.mod.jackpot ? 2 : 1))
+  const jack = !brk && rnd() < (chest ? 0.5 : 0.01 * S.luck * (G.ch.mod.jackpot ? 2 : 1))   // 잭팟 — 기본 1%(행운 배수)
   const opts = brk ? breaks() : offers()
   if (!opts.length) return   // 반지를 주웠는데 돌파할 스킬이 없으면(ringable 이 막아 거의 없다) 그냥 지나간다
   mode = 'box'; calm(); pauseBtn.hidden = true
@@ -2077,6 +2077,12 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '성장 더 느리게 · 넉백 · 잭팟', items: [
+    '줍는 경험치를 20% 줄이고, 레벨 업에 필요한 경험치를 늘렸어요(Lv 16 부터 20% — 처음 몇 레벨은 그대로) — 스킬을 다 키우는 때가 17분쯤에서 22분쯤으로',
+    '잭팟이 아주 드물어졌어요 — 기본 확률 7% → 1%(행운 · 돈치치 2배는 그대로, 트로피 상자는 50% 그대로)',
+    '블록슛 피해를 약하게 — 12 → 9, 레벨 업 피해 +4 → +3 · +6 → +4',
+    '스킬에 밀려나는 건 이제 작은 수비(신인 · 팬 · 심판)뿐이에요. 빅맨 · 마스코트 · 보스는 밀리지 않아요',
+    '대신 성장이 느려진 만큼 20분 전 수비를 조금 덜 몰려오고 덜 단단하게 했어요 — 빅맨은 4분부터 더 적게, 몸통 피해 12 → 10, 보스 피도 조금. 25분부터는 수비 피해가 1.25배 → 1.4배'] },
   { date: '2026-11-01', title: '코트 선 정리', items: ['아레나 · 챌린지 바닥의 코트 선(자유투 원 · 3점 선)이 겹쳐 보이던 것을 고쳤어요 — 실제 코트 비율로 다시 그렸어요(스트리트 파크도)', '챌린지 바닥의 코트 사이 간격을 가로세로 같게'] },
   { date: '2026-11-01', title: '수비를 묶는 스킬 조정 · 패치 노트', items: [
     '풀코트 프레스가 더는 수비를 느리게 하지 않아요(돌파 「존 프레스」도). 안에 들어온 호루라기도 느려지지 않아요. 존 프레스는 압박 범위 +30%',
