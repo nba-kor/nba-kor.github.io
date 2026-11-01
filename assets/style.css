@@ -1367,6 +1367,11 @@ label.ac-pick { cursor: pointer; }
 .ar-who-list li:last-child { border-bottom: 0; }
 .ar-who-list small { color: var(--muted); font-size: 12px; }
 .ar-who-lv { margin-left: auto; }
+/* 카톡 공유 · 이미지 저장 — 요일 고르기 */
+.ar-day-note { margin: 0; padding: 14px 16px 0; }
+.ar-day-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 16px 16px; }
+.ar-day-opts button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 6px; word-break: keep-all; }
+.ar-day-opts small { color: var(--muted); font-size: 12px; font-weight: 400; }
 /* 주별 참여율 — 토 · 일 막대가 주마다 둘(색은 어두운 판에서 색약 구분 검증). 위는 지난주 숫자 */
 .ar-wk { --sat: #cc7a0e; --sun: #3d84dc; }
 .ar-wk i.is-sat { background: var(--sat); }

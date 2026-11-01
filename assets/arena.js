@@ -474,12 +474,10 @@ function pickable(el, fn) {
   return el
 }
 
-/** 누가 골랐는지 — 제목 줄에 고른 것(캐릭터면 얼굴), 아래에 계정마다 한 줄(부계정이면 본계정 이름 · 포지션 · extra). 바깥을 누르거나 Esc · ✕ 로 닫는다 */
-function showWho(title, list, extra = () => null) {
-  const dlg = h('dialog', { className: 'rc-dialog ar-who-dialog', 'aria-labelledby': 'ar-who-title' },
-    h('header', {}, h('h2', { id: 'ar-who-title' }, ...title), h('button', { type: 'button', 'aria-label': '닫기', onclick: () => dlg.close() }, '✕')),
-    h('ul', { className: 'ar-who-list' }, list.map(a => h('li', {},
-      h('span', {}, h('b', {}, a.n), h('small', {}, a.owner !== a.n ? ` 본계 ${a.owner}` : ' 본계정')), roleTags(a.roles), extra(a)))))
+/** 작은 모달 — 제목 줄 + 내용. 바깥을 누르거나 Esc · ✕ 로 닫는다 */
+function modal(title, ...kids) {
+  const dlg = h('dialog', { className: 'rc-dialog ar-who-dialog', 'aria-labelledby': 'ar-dlg-title' },
+    h('header', {}, h('h2', { id: 'ar-dlg-title' }, ...title), h('button', { type: 'button', 'aria-label': '닫기', onclick: () => dlg.close() }, '✕')), ...kids)
   dlg.onclick = e => {
     const r = dlg.getBoundingClientRect()
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dlg.close()
@@ -487,7 +485,13 @@ function showWho(title, list, extra = () => null) {
   dlg.onclose = () => dlg.remove()
   document.body.append(dlg)
   dlg.showModal()
+  return dlg
 }
+
+/** 누가 골랐는지 — 제목 줄에 고른 것(캐릭터면 얼굴), 아래에 계정마다 한 줄(부계정이면 본계정 이름 · 포지션 · extra) */
+const showWho = (title, list, extra = () => null) => modal(title,
+  h('ul', { className: 'ar-who-list' }, list.map(a => h('li', {},
+    h('span', {}, h('b', {}, a.n), h('small', {}, a.owner !== a.n ? ` 본계 ${a.owner}` : ' 본계정')), roleTags(a.roles), extra(a)))))
 
 /** 요일 · 시간대별 참여 — 이번 주 신청한 사람(사유불참 빼고) 중 그 시간대를 고른 비율 */
 function chartCard() {
@@ -817,67 +821,92 @@ async function save() {
 }
 
 // ================================================================ 카카오 공유 — 편성표를 그림으로 그려 카카오에 올리고 그 그림으로 카드를 보낸다
+// 누르면 모달에서 토요일만 · 일요일만 · 모두 를 고른다(그 요일 1 · 2차만 그린 그림)
 
+const SHOT_DAYS = [['sat', '토요일만', 0], ['sun', '일요일만', 1], ['all', '모두', null]]   // [이름, 버튼, day(null = 모두)]
+const shotDay = v => SHOT_DAYS.find(d => d[0] === v)[2]
+const shotSlots = v => SLOTS.filter(s => shotDay(v) === null || s.day === shotDay(v))
+const shotTeams = v => shotSlots(v).reduce((n, s) => n + teamsOf(s.id).length, 0)
 const shotKey = () => `${week}:${data.planAt}`
-let shot = null, shotTimer = 0   // { key, blob, w, h, url? }
-// 그림은 미리 그려 둔다 — 버튼을 누른 그 순간에 보내야 PC 팝업 · 휴대폰 공유창이 막히지 않는다
-const queueShot = () => { clearTimeout(shotTimer); shotTimer = setTimeout(() => snapshot().catch(e => console.warn(e)), 400) }
+const shots = {}   // 이름 → { key, blob, w, h, url? }
+let shotTimer = 0
+// 그림은 요일마다 미리 그려 둔다 — 버튼을 누른 그 순간에 보내야 PC 팝업 · 휴대폰 공유창이 막히지 않는다
+const queueShot = () => {
+  clearTimeout(shotTimer)
+  shotTimer = setTimeout(async () => { for (const [v] of SHOT_DAYS) if (shotTeams(v)) await snapshot(v).catch(e => console.warn(e)) }, 400)
+}
 
 function shareButtons() {
-  const ready = shot?.key === shotKey() && shot.url
-  const kakao = h('button', { type: 'button', className: 'is-kakao', onclick: e => shareKakao(e.currentTarget) }, ready ? '카톡으로 보내기' : '카톡 공유')
-  const img = h('button', { type: 'button', onclick: e => saveImage(e.currentTarget) }, IS_MOBILE ? '이미지 공유' : '이미지 저장')
+  const kakao = h('button', { type: 'button', className: 'is-kakao', onclick: () => pickDay(true) }, '카톡 공유')
+  const img = h('button', { type: 'button', onclick: () => pickDay(false) }, IS_MOBILE ? '이미지 공유' : '이미지 저장')
   return h('span', { className: 'ar-share' }, kakao, img)
 }
 
-async function snapshot() {
-  const k = shotKey()
-  if (shot?.key === k) return shot
-  const c = await drawPlan()
-  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9))
-  if (k !== shotKey()) return snapshot()   // 그리는 사이에 편성이 바뀌었다
-  return shot = { key: k, blob, w: c.width, h: c.height }
+/** 어느 요일을 보낼지 — 편성된 팀이 없는 요일은 못 누른다. 보내거나 저장하면 닫힌다(PC 카톡은 그림을 올린 뒤 한 번 더 눌러 보낸다) */
+function pickDay(kakao) {
+  const dlg = modal([kakao ? '카톡 공유' : IS_MOBILE ? '이미지 공유' : '이미지 저장'],
+    h('p', { className: 'rc-muted ar-day-note' }, '어느 요일 편성표를 보낼까요?'),
+    h('div', { className: 'ar-day-opts' }, SHOT_DAYS.map(([v, label]) => {
+      const n = shotTeams(v)
+      return h('button', { type: 'button', disabled: !n, onclick: async e => { if (await (kakao ? shareKakao : saveImage)(e.currentTarget, v)) dlg.close() } },
+        h('b', {}, label), h('small', {}, n ? `${n}팀` : '편성 전'))
+    })))
 }
 
-function sendCard(s) {
-  const url = `${location.origin}/arena/?w=${week}`, link = { mobileWebUrl: url, webUrl: url }
-  const nTeams = SLOTS.reduce((n, x) => n + teamsOf(x.id).length, 0)
+async function snapshot(v) {
+  const k = shotKey()
+  if (shots[v]?.key === k) return shots[v]
+  const c = await drawPlan(v)
+  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9))
+  if (k !== shotKey()) return snapshot(v)   // 그리는 사이에 편성이 바뀌었다
+  return shots[v] = { key: k, blob, w: c.width, h: c.height }
+}
+
+const shotName = v => `vipers-arena-${week}${v === 'all' ? '' : `-${v}`}.jpg`
+const shotWhen = v => v === 'all' ? weekLabel(week) : weekLabel(week).split(' ~ ')[shotDay(v)]
+
+function sendCard(s, v) {
+  const url = `${location.origin}/arena/?w=${week}`, link = { mobileWebUrl: url, webUrl: url }, slots = shotSlots(v)
   Kakao.Share.sendDefault({
     objectType: 'feed',
-    content: { title: `VIPERS 아레나전 편성 결과 · ${weekLabel(week)}`, description: `${SLOTS.filter(x => teamsOf(x.id).length).map(x => `${x.short} ${teamsOf(x.id).length}팀`).join(' · ')} · 총 ${nTeams}팀`, imageUrl: s.url, imageWidth: s.w, imageHeight: s.h, link },
+    content: { title: `VIPERS 아레나전 편성 결과 · ${shotWhen(v)}`, description: `${slots.filter(x => teamsOf(x.id).length).map(x => `${x.short} ${teamsOf(x.id).length}팀`).join(' · ')} · 총 ${shotTeams(v)}팀`, imageUrl: s.url, imageWidth: s.w, imageHeight: s.h, link },
     buttons: [{ title: '편성표 보기', link }],
   })
+  return true
 }
 
-async function shareKakao(btn) {
-  if (!window.Kakao?.isInitialized?.()) return saveImage(btn)   // SDK 를 못 불러왔으면 그림 공유 · 저장으로
-  if (shot?.key === shotKey() && shot.url) return sendCard(shot)   // 누른 그 순간에 보낸다
-  const label = btn.textContent
+/** 보냈으면 true */
+async function shareKakao(btn, v) {
+  if (!window.Kakao?.isInitialized?.()) return saveImage(btn, v)   // SDK 를 못 불러왔으면 그림 공유 · 저장으로
+  if (shots[v]?.key === shotKey() && shots[v].url) return sendCard(shots[v], v)   // 누른 그 순간에 보낸다
+  const label = btn.firstChild.textContent
   btn.disabled = true
-  btn.textContent = '그림 올리는 중…'
+  btn.firstChild.textContent = '그림 올리는 중…'
   try {
-    const s = await snapshot()
-    const r = await Kakao.Share.uploadImage({ file: [new File([s.blob], `arena-${week}.jpg`, { type: 'image/jpeg' })] })
+    const s = await snapshot(v)
+    const r = await Kakao.Share.uploadImage({ file: [new File([s.blob], shotName(v), { type: 'image/jpeg' })] })
     s.url = r.infos.original.url
-    btn.textContent = '카톡으로 보내기'   // PC 는 기다린 뒤에 열면 팝업이 막힌다 — 한 번 더 눌러 보낸다
-    if (IS_MOBILE) sendCard(s)
+    btn.firstChild.textContent = '카톡으로 보내기'   // PC 는 기다린 뒤에 열면 팝업이 막힌다 — 한 번 더 눌러 보낸다
+    return IS_MOBILE && sendCard(s, v)
   } catch (e) {
     console.warn(e)
-    btn.textContent = label
+    btn.firstChild.textContent = label
     alert('카카오에 그림을 올리지 못했어요 — 「이미지 저장」 으로 받아 카톡에 직접 올려 주세요')
+    return false
   } finally { btn.disabled = false }
 }
 
-async function saveImage(btn) {
+async function saveImage(btn, v) {
   btn.disabled = true
   try {
-    const s = await snapshot(), file = new File([s.blob], `vipers-arena-${week}.jpg`, { type: 'image/jpeg' })
+    const s = await snapshot(v), file = new File([s.blob], shotName(v), { type: 'image/jpeg' })
     // 휴대폰: 공유창에서 카카오톡을 고르면 사진으로 바로 보낸다
     if (IS_MOBILE && navigator.canShare?.({ files: [file] })) {
-      try { return await navigator.share({ files: [file], title: 'VIPERS 아레나전 편성 결과' }) }
-      catch (e) { if (e.name === 'AbortError') return }
+      try { await navigator.share({ files: [file], title: 'VIPERS 아레나전 편성 결과' }); return true }
+      catch (e) { if (e.name === 'AbortError') return false }
     }
     download(file, file.name)
+    return true
   } finally { btn.disabled = false }
 }
 
@@ -969,16 +998,17 @@ function saveExcel(e) {
   })
 }
 
-/** 편성표 그림 — 한 줄에 하루(1차 · 2차). 팀 한 줄에 3명(얼굴 · 닉네임 · 부계정이면 아래 작게 본계정) */
-async function drawPlan() {
-  const rows = [...new Set(SLOTS.map(s => s.day))].map(d => SLOTS.filter(s => s.day === d))
+/** 편성표 그림(v = 토요일만 · 일요일만 · 모두) — 한 줄에 하루(1차 · 2차). 팀 한 줄에 3명(얼굴 · 닉네임 · 부계정이면 아래 작게 본계정) */
+async function drawPlan(v) {
+  const slots = shotSlots(v)
+  const rows = [...new Set(slots.map(s => s.day))].map(d => slots.filter(s => s.day === d))
   const PER = Math.max(...rows.map(r => r.length)), PAD = 28, GAP = 16, COL = 437, W = PAD * 2 + PER * COL + GAP * (PER - 1), ROW = 58, HEAD = 40, Z = 2
   const FONT = '"Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif'
   const blockH = s => HEAD + Math.max(1, teamsOf(s.id).length) * (ROW + 6) + 8
   const H = 112 + rows.reduce((n, r) => n + Math.max(...r.map(blockH)) + GAP, 0) + 30
 
   // 얼굴은 같은 도메인 그림이라 캔버스가 더럽혀지지 않는다
-  const ids = [...new Set(SLOTS.flatMap(s => teamsOf(s.id).flat().map(x => accts.get(key(x.u, x.n))?.chars[0]).filter(Boolean)))]
+  const ids = [...new Set(slots.flatMap(s => teamsOf(s.id).flat().map(x => accts.get(key(x.u, x.n))?.chars[0]).filter(Boolean)))]
   const faces = new Map(await Promise.all(ids.map(async id => {
     const img = new Image()
     img.src = faceOf(P(id))
@@ -1000,8 +1030,7 @@ async function drawPlan() {
   box(0, 0, W, H, 0, '#0d1117')
   text('VIPERS ARENA', PAD, 50, 30, ACCENT, 800)
   text('아레나전 편성 결과', PAD + g.measureText('VIPERS ARENA').width + 14, 50, 22, '#e6edf3', 700)
-  const nTeams = SLOTS.reduce((n, s) => n + teamsOf(s.id).length, 0)
-  text(`${weekLabel(week)} · 총 ${nTeams}팀 · 팀당 ${A.teamSize}명`, PAD, 82, 15, '#8b97a8')
+  text(`${shotWhen(v)} · 총 ${shotTeams(v)}팀 · 팀당 ${A.teamSize}명`, PAD, 82, 15, '#8b97a8')
 
   let y = 104
   for (const r of rows) {
