@@ -46,8 +46,8 @@ const WEAP = {
   three: { name: '3점슛', note: '멀리 있는 수비에게 높이 쏴 떨어진 자리를 스플래시', cd: 2.2, dmg: 22, ups: [{ n: 1 }, { area: 0.2 }, { dmg: 10 }, { n: 1 }, { cd: -0.4 }, { dmg: 12 }, { n: 1, area: 0.2 }] },
   dunk: { name: '덩크', note: '뛰어올라 내리꽂으면 둘레에 충격파 — 밀쳐 낸다', cd: 3.2, dmg: 26, ups: [{ area: 0.15 }, { dmg: 10 }, { cd: -0.5 }, { area: 0.15 }, { dmg: 12 }, { n: 1 }, { dmg: 18, area: 0.15 }] },
   bounce: { name: '바운스 패스', note: '맞으면 옆 수비에게 튕겨 간다', cd: 1.6, dmg: 9, pierce: 1, bounce: 3, ups: [{ bounce: 1 }, { dmg: 4 }, { n: 1 }, { bounce: 2 }, { dmg: 5 }, { cd: -0.3 }, { bounce: 2, dmg: 6 }] },
-  block: { name: '블록슛', note: '두 손이 몸 둘레를 돌며 쳐 낸다 — 날아오는 호루라기도 막는다', cd: 2.2, dmg: 12, n: 2, dur: 3.2, ups: [{ n: 1 }, { area: 0.15, spd: 0.25 }, { dmg: 4 }, { n: 1 }, { dur: 1 }, { n: 1 }, { dmg: 6, dur: 1 }] },
-  press: { name: '풀코트 프레스', note: '둘레의 수비를 계속 압박 — 피해를 주고 느리게, 안에 들어온 호루라기도 느리게', cd: 0.45, dmg: 4, ups: [{ area: 0.1 }, { dmg: 1 }, { area: 0.1 }, { cd: -0.08 }, { dmg: 2 }, { area: 0.1 }, { dmg: 2 }] },
+  block: { name: '블록슛', note: '두 손이 몸 둘레를 돌며 쳐 낸다 — 날아오는 호루라기를 가끔(10%) 막는다', cd: 2.2, dmg: 12, n: 2, dur: 3.2, ups: [{ n: 1 }, { area: 0.15, spd: 0.25 }, { dmg: 4 }, { n: 1 }, { dur: 1 }, { n: 1 }, { dmg: 6, dur: 1 }] },
+  press: { name: '풀코트 프레스', note: '둘레의 수비를 계속 압박해 피해를 준다', cd: 0.45, dmg: 4, ups: [{ area: 0.1 }, { dmg: 1 }, { area: 0.1 }, { cd: -0.08 }, { dmg: 2 }, { area: 0.1 }, { dmg: 2 }] },
   alley: { name: '앨리웁', note: '하늘에서 공이 떨어져 그 자리를 내리찍는다', cd: 2.6, dmg: 18, n: 2, ups: [{ n: 1 }, { dmg: 6 }, { area: 0.2 }, { n: 1 }, { cd: -0.5 }, { n: 1 }, { dmg: 12 }] },
   fade: { name: '스텝백 슛', note: '보는 쪽으로 꿰뚫는 슛', cd: 0.95, dmg: 8, pierce: 2, ups: [{ n: 1 }, { dmg: 4 }, { n: 1 }, { pierce: 2 }, { n: 1 }, { dmg: 5 }, { cd: -0.3 }] },
   cross: { name: '크로스오버', note: '옆으로 길게 휘둘러 베는 드리블', cd: 1.4, dmg: 13, ups: [{ n: 1 }, { dmg: 5 }, { area: 0.15 }, { dmg: 5 }, { cd: -0.3 }, { area: 0.2 }, { dmg: 9 }] },
@@ -69,7 +69,7 @@ const BREAK = {
   dunk: { name: '토마호크', note: '내리꽂은 뒤 1.5배 큰 충격파가 한 번 더' },
   bounce: { name: '핀볼 패스', note: '처음 튕길 때 공이 둘로 갈라져 두 수비에게' },
   block: { name: '철벽', note: '두 손이 쉬지 않고 끝없이 돈다' },
-  press: { name: '존 프레스', note: '범위 +20% · 안에 든 수비는 더 느리게(45%)' },
+  press: { name: '존 프레스', note: '압박하는 범위가 30% 넓어진다' },
   alley: { name: '스카이 워크', note: '하늘에서 떨어지는 공이 2배' },
   fade: { name: '더블 스텝백', note: '등 뒤로도 한 발씩 — 앞뒤를 같이 꿰뚫는다' },
   cross: { name: '앵클 브레이커', note: '양옆을 한 번에 베고, 맞은 수비는 넘어져 잠깐 못 움직인다' },
@@ -903,7 +903,7 @@ function beam(x, y, a, L, W, D, br) {
   fx({ k: 'beam', x, y, a, L, W, T: 0.32, br })
 }
 const alive = e => e && !e.dead ? e : null
-/** T 초 동안 속도 k 배 — 더 느린 게 걸려 있으면 그게 끝날 때까지 약한 건 무시(앵클 브레이커 0 · 존 프레스 0.45 · 보통 0.7). 보스 · 중간보스 · 흥분한 수비는 안 걸린다 */
+/** T 초 동안 속도 k 배 — 더 느린 게 걸려 있으면 그게 끝날 때까지 약한 건 무시(앵클 브레이커 0 · 스크린 · 유로 갤럽 0.7). 보스 · 중간보스 · 흥분한 수비는 안 걸린다 */
 const slow = (e, T, k) => { if (e.boss || e.rage > G.t) return; if (e.slow <= 0 || k <= e.sk) { e.sk = k; e.slow = Math.max(e.slow, T) } }
 function ball(dx, dy, o) { G.shots.push({ k: 'ball', x: o.x ?? pl.x, y: o.y ?? pl.y, vx: dx * o.v, vy: dy * o.v, r: o.r, dmg: o.dmg, pierce: o.pierce, bounce: o.bounce || 0, life: o.life || 1.3, t: 0, a: 0, hit: new Set(), kb: o.kb, col: o.col, br: o.br }) }
 /** 번개 — (x0, y0) 에서 (x1, y1) 까지 지그재그 아홉 점. 끝으로 갈수록 덜 흔들린다 */
@@ -919,8 +919,8 @@ function weapons(dt) {
     if (w === G.seal && sick('seal')) continue
     const st = w.st, A = st.area * S.area, D = st.dmg * S.might
     if (w.id === 'press') {   // 풀코트 프레스 — 쿨타임마다 둘레 전부
-      w.R = 70 * A * (w.br ? 1.2 : 1)
-      if ((w.t -= dt) <= 0) { w.t = Math.max(0.2, st.cd * S.cdr); near(pl.x, pl.y, w.R, e => { hurt(e, D, pl.x, pl.y, 30); slow(e, 0.5, w.br ? 0.45 : 0.65) }) }
+      w.R = 70 * A * (w.br ? 1.3 : 1)
+      if ((w.t -= dt) <= 0) { w.t = Math.max(0.2, st.cd * S.cdr); near(pl.x, pl.y, w.R, e => { hurt(e, D, pl.x, pl.y, 30) }) }
       continue
     }
     if (w.id === 'block') {   // 블록슛 — 켜져 있는 동안 손이 돈다
@@ -1055,7 +1055,7 @@ function foes(dt) {
     e.slow -= dt
     if (frozen && !e.leap) { e.vx = e.vy = 0 }
     else if (e.boss) bossAI(e, dt, dx, dy, d)
-    else {   // 흥분 — 10분부터, 1.6초 넘게 느려져 있으면(프레스 · 스크린 · 잔상 · 넘어뜨리기) 붉게 달아올라 3초 동안 안 느려지고 안 밀리고 1.3배로 달려든다(마스코트는 안 한다)
+    else {   // 흥분 — 10분부터, 1.6초 넘게 느려져 있으면(스크린 · 유로 갤럽 잔상 · 넘어뜨리기) 붉게 달아올라 3초 동안 안 느려지고 안 밀리고 1.3배로 달려든다(마스코트는 안 한다)
       e.held = e.slow > 0 && G.t >= 600 && !e.elite ? e.held + dt : Math.max(0, e.held - dt)
       if (e.held > 1.6) { e.held = 0; e.rage = G.t + 3; e.slow = 0; e.kx = e.ky = 0; if (G.fx.length < 150) fx({ k: 'text', x: e.x, y: e.y - e.r * 3.2, s: '!', col: '#ff4d4d', T: 0.5 }) }
       const sp = e.spd * (e.rage > G.t ? 1.3 : e.slow > 0 ? e.sk : 1); e.vx = dx * sp; e.vy = dy * sp
@@ -1263,15 +1263,17 @@ function step(dt) {
     for (let i = 0; i < 8; i++) { const a = rnd() * TAU; part(z.x, z.y, Math.cos(a) * 160, Math.sin(a) * 90 - 80, i % 2 ? '#ff7a1a' : '#fff', 0.35, 2.6) }
     shake = Math.max(shake, z.k === 'land' ? 8 : 4)
   }
-  // 날아오는 것 — 심판 호루라기만 블록슛 손에 막히고 프레스 · 스크린 바닥 안에서 느리게(사라지는 시간도 같이 늦춰 결국 날아온다). 보스의 농구공 · 레드카드는 피하는 수밖에
-  const press = G.weapons.find(w => w.id === 'press'), guard = G.eshots.length ? G.shots.filter(b => b.k === 'orb' || b.k === 'zone') : []
+  // 날아오는 것 — 심판 호루라기만 블록슛 손에 10% 로 막히고 스크린 바닥 안에서 느리게(사라지는 시간도 같이 늦춰 결국 날아온다). 보스의 농구공 · 레드카드는 피하는 수밖에
+  const guard = G.eshots.length ? G.shots.filter(b => b.k === 'orb' || b.k === 'zone') : []
   const inside = (b, x, y, R) => ((b.x - x) / R) ** 2 + ((b.y - y) / (R * 0.8)) ** 2 < 1   // 바닥은 납작한 타원
   for (const b of G.eshots) {
     const soft = !b.k
-    let sp = soft && press?.R && inside(b, pl.x, pl.y, press.R) ? 0.3 : 1
+    let sp = 1
     if (soft) for (const o of guard) {
       if (o.k === 'zone') { if (inside(b, o.x, o.y, o.R)) sp = 0.3 }
-      else if ((b.x - o.x) ** 2 + (b.y - o.y) ** 2 < (o.r + 24) ** 2) {   // 손이 크게 휘둘러 잡는다 — 몸 판정보다 넉넉히
+      else if (!b.tried && (b.x - o.x) ** 2 + (b.y - o.y) ** 2 < (o.r + 24) ** 2) {   // 손에 처음 닿을 때 한 번 10% — 놓치면 그대로 지나간다
+        b.tried = true
+        if (rnd() >= 0.1) continue
         b.dead = true; fx({ k: 'flash', x: b.x, y: b.y - 18, R: 30, col: '#ffe2c0', T: 0.25 })
         for (let i = 0; i < 5; i++) { const a = rnd() * TAU; part(b.x, b.y - 18, Math.cos(a) * 120, Math.sin(a) * 80 - 60, i % 2 ? '#ffd23f' : '#fff', 0.3, 2) }
         break
@@ -1359,7 +1361,7 @@ function shots(dt) {
           fx({ k: 'crack', x: b.x, y: b.y, R: b.R * 0.75, T: 1.2 }); fx({ k: 'text', x: b.x, y: b.y - (b.after ? 84 : 64), s: b.after ? 'TOMAHAWK!' : 'SLAM!', col: b.br ? '#ffd23f' : '#ffb35e', T: 0.8 })
         }
         const R = b.R * Math.min(1, b.t / b.T)
-        near(b.x, b.y, R, e => { if (!b.hit.has(e)) { b.hit.add(e); hurt(e, b.dmg, b.x, b.y, 440) } })
+        near(b.x, b.y, R, e => { if (!b.hit.has(e)) { b.hit.add(e); hurt(e, b.dmg, b.x, b.y, 220) } })
         if (b.t > b.T + 0.18) b.dead = true
         break
       }
@@ -1909,7 +1911,7 @@ function title() {
   show(false, h('div', { className: 'sv-title' },
     h('p', { className: 'sv-logo' }, h('span', {}, 'DUNK'), h('span', {}, 'SURVIVOR')),
     h('p', { className: 'sv-sub' }, '몰려오는 수비를 피해 30분을 버텨라'),
-    row(btn('게임 시작', chars, 'is-main'), btn('랭킹', ranks), btn(`업적 ${got} / ${ACH.length}`, achs)),
+    row(btn('게임 시작', chars, 'is-main'), btn('랭킹', ranks), btn(`업적 ${got} / ${ACH.length}`, achs), btn(['패치 노트', notesNew() && h('i', { className: 'sv-new' }, 'NEW')], notes)),
     h('p', { className: 'sv-note' }, saveNote())))
 }
 function chars(keep = false) {
@@ -2067,7 +2069,43 @@ function refresh() {
   guideAchs()
   if (mode !== 'menu') return
   const h2 = ui.querySelector('.sv-h')?.textContent || ''
-  if (h2.startsWith('캐릭터')) chars(true); else if (h2.startsWith('맵')) maps(true); else if (h2.startsWith('업적')) achs(); else if (h2 === '랭킹') ranks(true); else title()
+  if (h2.startsWith('캐릭터')) chars(true); else if (h2.startsWith('맵')) maps(true); else if (h2.startsWith('업적')) achs(); else if (h2 === '랭킹') ranks(true); else if (h2 === '패치 노트') notes(); else title()
+}
+
+// ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
+const NOTES = [
+  { date: '2026-11-01', title: '수비를 묶는 스킬 조정 · 패치 노트', items: [
+    '풀코트 프레스가 더는 수비를 느리게 하지 않아요(돌파 「존 프레스」도). 안에 들어온 호루라기도 느려지지 않아요. 존 프레스는 압박 범위 +30%',
+    '덩크 충격파가 밀쳐 내는 거리를 절반으로',
+    '블록슛 손이 날아오는 호루라기를 막는 건 이제 10% 확률',
+    '패치 노트 — 첫 화면 「패치 노트」 · 아래 「패치 노트」 탭. 아래 설명을 탭으로 나눴어요'] },
+  { date: '2026-11-01', title: '성장 속도 · 난이도 조정', items: [
+    'Lv 20 부터 다음 레벨까지 필요한 경험치가 점점 더 많이 늘어나요 — 스킬을 다 키우는 때가 15분쯤에서 17분쯤으로, 돌파를 다 하는 때는 25분쯤',
+    '챔피언 반지가 더 드물게 떨어져요',
+    '풀코트 프레스 · 스크린 · 블록슛 · 앵클 브레이커처럼 수비를 묶는 스킬을 약하게',
+    '흥분 — 10분부터 오래 느려져 있던 수비는 발밑이 붉게 달아올라 3초 동안 느려지지도 밀리지도 않고 더 빨리 달려들어요',
+    '풀코트 러시는 스킬에 맞지 않고, 보스 · 중간보스는 느려지지 않아요',
+    '하프코트 폭격 · 내려찍기 · 러시 · 보스의 농구공이 더 아파요(최대 체력 비례). 보스 몸통에 닿아도 최대 체력의 8 ~ 10% 넘게',
+    '10 ~ 20분 수비 체력은 느려진 성장에 맞춰 완만하게'] },
+  { date: '2026-11-01', title: '상태이상 「봉인」', items: ['감독 · 수석 심판 · MVP 가 봉인을 걸어요 — 10초 동안 주력 스킬 하나를 못 써요(아이콘에 X). 쿨링 스프레이로 풀려요'] },
+  { date: '2026-11-01', title: '얼굴 방향 · 랭킹 스킬', items: ['움직일 때 얼굴이 반대쪽을 보던 캐릭터를 고쳤어요', '랭킹에서 그 기록의 스킬을 볼 수 있어요(돌파는 금테)'] },
+  { date: '2026-11-01', title: '보스 · 변수 기술 · 챌린지', items: [
+    '15분부터 변수 기술(하프코트 폭격 · 풀코트 러시) — 가만히 서 있으면 못 버텨요',
+    '보스 6종 — 17분부터 중간보스, 25분부터는 1분마다 다른 보스',
+    '상태이상(슬로우 · 약화 · 약체화)과 쿨링 스프레이',
+    '챌린지 맵 — 시간 제한 없이 최고 기록',
+    '스킬 4개(리바운드 · 유로스텝 · 스틸 · 아웃렛 패스) · 캐릭터 4명 · 업적 9개'] },
+  { date: '2026-11-01', title: '스킬 돌파', items: ['최고 레벨(8) 스킬은 챔피언 반지를 주우면 한 번씩 돌파해요 — 피해는 그대로, 쓰는 법이 바뀌어요'] },
+  { date: '2026-10-29', title: '심판 등장', items: ['20분부터 심판이 멀리서 호루라기를 던져요'] },
+  { date: '2026-10-29', title: '랭킹', items: ['맵마다 랭킹 — 로그인하면 판이 끝날 때 기록이 올라가요', '난이도를 올리고 사람 그림 · 효과를 다시 그렸어요'] },
+  { date: '2026-10-29', title: '덩크 서바이버 공개', items: ['30분 생존 · 캐릭터 10명 · 스킬 13 · 아이템 13 · 맵 3 · 업적 27'] },
+]
+const NOTES_SEEN = 'survive.notes'   // 본 패치 노트 수(이 브라우저) — 늘면 첫 화면 버튼에 NEW
+const noteList = () => h('div', { className: 'sv-notes' }, NOTES.map(n => h('section', {}, h('h3', {}, h('time', {}, n.date), n.title), h('ul', {}, n.items.map(x => h('li', {}, x))))))
+const notesNew = () => { try { return +(localStorage.getItem(NOTES_SEEN) || 0) < NOTES.length } catch { return false } }
+function notes() {
+  try { localStorage.setItem(NOTES_SEEN, String(NOTES.length)) } catch {}
+  show(false, h('div', { className: 'sv-panel sv-wide' }, h('p', { className: 'sv-h' }, '패치 노트'), noteList(), row(btn('← 처음으로', title, 'is-main'))))
 }
 
 // ---------------------------------------------------------------- 아래 설명 — 캐릭터 · 스킬 · 아이템 · 업적 표
@@ -2086,9 +2124,17 @@ function guide() {
   document.getElementById('sv-guide-bosses').replaceChildren(...Object.entries(BOSS).map(([kind, B]) => tr(named(SPR[kind][0].R[0].c.toDataURL(), B.name, 'sv-boss'), h('td', {}, when(kind)), h('td', {}, B.note))))
   document.getElementById('sv-guide-status').replaceChildren(...Object.values(STATUS).map(st => tr(h('th', {}, h('b', { style: `color:${st.col}` }, st.name)), h('td', {}, `${st.note} · ${ST_T}초`))))
   document.getElementById('sv-spray').src = ITEMS.spray.c.toDataURL()
+  document.getElementById('sv-guide-notes').replaceChildren(noteList())
   document.getElementById('sv-guide-items').replaceChildren(...Object.entries(PASS).map(([id, d]) => tr(named(ICON_URL[id], d.name, 'sv-ico'), h('td', {}, `${d.note} (최대 Lv ${d.max})`))))
   guideAchs()
 }
+// 설명 탭 — 주소 끝 #sv-g-… 이면 그 탭부터
+const gtabs = document.querySelector('.sv-gtabs')
+function gtab(id) {
+  for (const b of gtabs.children) { const on = b.getAttribute('aria-controls') === id; b.setAttribute('aria-selected', String(on)); document.getElementById(b.getAttribute('aria-controls')).hidden = !on }
+}
+gtabs.addEventListener('click', e => { const b = e.target.closest('[role=tab]'); if (b) gtab(b.getAttribute('aria-controls')) })
+if (document.getElementById(location.hash.slice(1))?.classList.contains('sv-gpanel')) gtab(location.hash.slice(1))
 let ready = false   // 선수 데이터(이름 · 얼굴)를 읽은 뒤
 const guideAchs = () => { if (ready) document.getElementById('sv-guide-achs').replaceChildren(achList()) }
 

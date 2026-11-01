@@ -1791,6 +1791,16 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .slam kbd { display: inline-block; min-width: 20px; padding: 0 5px; margin: 0 1px; border: 1px solid var(--muted); border-radius: 4px; font: 600 12px/18px ui-monospace, Menlo, Consolas, monospace; text-align: center; color: var(--text); }
 /* 아래 설명 — 조작법 표 · 팀별 궁극기 탭 */
 .slam-guide { margin-top: 20px; }
+.sv-gtabs { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }   /* 덩크 서바이버 아래 설명 탭 */
+.sv-gtabs button { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text); font-weight: 700; }
+.sv-gtabs button[aria-selected="true"] { border-color: var(--accent); background: var(--accent); color: #1a1200; }
+.sv-notes { text-align: left; }   /* 패치 노트 — 아래 탭 · 첫 화면 창 */
+.sv-notes section { padding: 10px 0; border-bottom: 1px solid #ffffff1a; }
+.sv-notes h3 { margin: 0 0 4px; font-size: 1em; }
+.sv-notes time { margin-right: 8px; color: var(--muted); font-size: .85em; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sv-notes ul { margin: 0; padding-left: 1.2em; font-size: .92em; line-height: 1.55; }
+.sv-ui .sv-notes { max-height: 52vh; overflow: auto; margin-bottom: 10px; }
+.sv-new { margin-left: 5px; padding: 1px 5px; border-radius: 6px; background: #ff4d6d; color: #fff; font: 900 .7em/1.4 system-ui, sans-serif; font-style: normal; vertical-align: 2px; }
 /* 온라인 1:1 — 방 만들기 · 코드로 들어가기, 아래 대전 랭킹 · 최근 대전(slam.js 의 「온라인 1:1」) */
 .slam-online { margin-top: 12px; }
 .slam-room { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
