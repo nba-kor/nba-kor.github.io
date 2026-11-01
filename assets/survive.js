@@ -608,22 +608,26 @@ const courtAt = (mi, mj) => (mi === 0 && mj === 0) || hash(mi, mj, 5) < 0.45 ? {
 function parkCourt(c, x, y) {
   const L = 560, D = 320, l = x - L / 2, t = y - D / 2
   rr(c, l - 18, t - 18, L + 36, D + 36, 6, '#24507a'); c.fillStyle = '#2f6c9e'; c.fillRect(l, t, L, D)
-  c.fillStyle = '#c4553c'; c.fillRect(l, y - 55, 125, 110); c.fillRect(l + L - 125, y - 55, 125, 110)
-  courtLines(c, x, y, L, D, 125, 55, 165, 'rgba(255,255,255,.85)')
+  court(c, x, y, L, D, 'rgba(255,255,255,.85)', '#c4553c')
 }
-function courtLines(c, x, y, L, D, key, kw, r3, col) {
-  const l = x - L / 2, rt = x + L / 2
+/** 코트 선 — 길이 L 을 94피트로 본 실제 비율(림은 끝줄에서 5.25 · 페인트존 19 × 16 · 자유투 원 6 · 3점 23.75, 코너 22 · 가운데 원 6피트)이라 선끼리 안 겹친다.
+ *  paint 면 페인트존을, mid 면 가운데 원 안을 칠한다(로고는 부르는 쪽이 위에) */
+function court(c, x, y, L, D, col, paint, mid) {
+  const u = L / 94, l = x - L / 2, rt = x + L / 2, key = 19 * u, kw = 8 * u, fr = 6 * u, r3 = 23.75 * u, sy = Math.min(22 * u, D / 2 - 3 * u), ang = Math.asin(sy / r3)
+  if (paint) { c.fillStyle = paint; c.fillRect(l, y - kw, key, kw * 2); c.fillRect(rt - key, y - kw, key, kw * 2) }
   c.strokeStyle = col; c.lineWidth = 3.4
   c.strokeRect(l, y - D / 2, L, D); c.strokeRect(l, y - kw, key, kw * 2); c.strokeRect(rt - key, y - kw, key, kw * 2)
   c.beginPath(); c.moveTo(x, y - D / 2); c.lineTo(x, y + D / 2); c.stroke()
-  for (const [cx0, a] of [[x, 0], [l + key, -1], [rt - key, 1]]) { c.beginPath(); a ? c.arc(cx0, y, kw * 0.85, a < 0 ? -Math.PI / 2 : Math.PI / 2, a < 0 ? Math.PI / 2 : Math.PI * 1.5) : c.arc(cx0, y, kw * 0.85, 0, TAU); c.stroke() }
+  if (mid) ell(c, x, y, fr, fr, mid)
+  c.beginPath(); c.arc(x, y, fr, 0, TAU); c.stroke()
   for (const s of [1, -1]) {
-    const bx = s > 0 ? l : rt, rx = bx + s * 26, sy = Math.min(r3 * 0.94, D / 2 - 12), ang = Math.asin(sy / r3)
+    const bx = s > 0 ? l : rt, rx = bx + s * 5.25 * u, fx = bx + s * key   // 끝줄 · 림 · 자유투 줄
+    c.beginPath(); s > 0 ? c.arc(fx, y, fr, -Math.PI / 2, Math.PI / 2) : c.arc(fx, y, fr, Math.PI / 2, Math.PI * 1.5); c.stroke()
     c.beginPath(); c.moveTo(bx, y - sy); c.lineTo(rx + s * Math.cos(ang) * r3, y - sy)
     s > 0 ? c.arc(rx, y, r3, -ang, ang) : c.arc(rx, y, r3, Math.PI + ang, Math.PI - ang, true)
     c.lineTo(bx, y + sy); c.stroke()
-    c.lineWidth = 4.4; c.beginPath(); c.moveTo(bx + s * 10, y - 22); c.lineTo(bx + s * 10, y + 22); c.stroke(); c.lineWidth = 3.4
-    c.strokeStyle = '#ff7a1a'; c.beginPath(); c.arc(rx, y, 8, 0, TAU); c.stroke(); c.strokeStyle = col
+    c.lineWidth = 4.4; c.beginPath(); c.moveTo(bx + s * 4 * u, y - 3 * u); c.lineTo(bx + s * 4 * u, y + 3 * u); c.stroke(); c.lineWidth = 3.4   // 백보드
+    c.strokeStyle = '#ff7a1a'; c.beginPath(); c.arc(rx, y, Math.max(6, 0.9 * u), 0, TAU); c.stroke(); c.strokeStyle = col
   }
 }
 /** 바닥 — (x0, y0) 부터 w × h 안. 미리보기 캔버스도 같은 걸 쓴다 */
@@ -633,11 +637,10 @@ function floor(c, map, x0, y0, w, H, t = 0) {
     const W = map.wall
     c.save(); c.beginPath(); c.rect(x0, -W, w, 2 * W); c.clip()
     for (let j = j0; j * T < y0 + H; j++) for (let i = i0; i * T < x0 + w; i++) c.drawImage(A.tile, i * T, j * T, T + 0.6, T + 0.6)
-    for (let k = Math.floor((x0 - 700) / 1400); k * 1400 - 700 < x0 + w; k++) {
-      const x = k * 1400
-      c.fillStyle = '#7c1d2c'; c.fillRect(x - 640, -90, 210, 180); c.fillRect(x + 430, -90, 210, 180)
-      ell(c, x, 0, 78, 78, '#7c1d2c'); c.font = 'italic 900 40px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#f2c14e'; c.fillText('TNAB', x, 2)
-      courtLines(c, x, 0, 1280, 740, 210, 90, 250, 'rgba(255,255,255,.9)')
+    for (let k = Math.floor((x0 - 710) / 1420); k * 1420 - 710 < x0 + w; k++) {   // 코트(1280 × 740)마다 사이 140
+      const x = k * 1420
+      court(c, x, 0, 1280, 740, 'rgba(255,255,255,.9)', '#7c1d2c', '#7c1d2c')
+      c.font = 'italic 900 40px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#f2c14e'; c.fillText('TNAB', x, 2)
     }
     c.restore()
     for (const s of [1, -1]) {   // 관중석(위는 뒤집어서) · 전광판 띠
@@ -653,10 +656,10 @@ function floor(c, map, x0, y0, w, H, t = 0) {
   }
   for (let j = j0; j * T < y0 + H; j++) for (let i = i0; i * T < x0 + w; i++) c.drawImage(A.tile, i * T, j * T, T + 0.6, T + 0.6)
   if (map.id === 'chal') {   // 금빛 줄 코트 · 가운데 ∞
-    for (let mi = Math.floor((x0 - 700) / 1400); mi * 1400 - 700 < x0 + w; mi++) for (let mj = Math.floor((y0 - 500) / 1000); mj * 1000 - 500 < y0 + H; mj++) {
-      const x = mi * 1400, y = mj * 1000
-      ell(c, x, y, 84, 84, '#3b1d5e'); c.font = '900 120px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#ffd23fd0'; c.fillText('∞', x, y + 6)
-      courtLines(c, x, y, 1280, 740, 210, 90, 250, 'rgba(255,210,63,.7)')
+    for (let mi = Math.floor((x0 - 710) / 1420); mi * 1420 - 710 < x0 + w; mi++) for (let mj = Math.floor((y0 - 440) / 880); mj * 880 - 440 < y0 + H; mj++) {   // 코트(1280 × 740)마다 사이 140 — 가로세로 같게
+      const x = mi * 1420, y = mj * 880
+      court(c, x, y, 1280, 740, 'rgba(255,210,63,.7)', null, '#3b1d5e')
+      c.font = '900 120px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#ffd23fd0'; c.fillText('∞', x, y + 6)
     }
     return
   }
@@ -2074,6 +2077,7 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-01', title: '코트 선 정리', items: ['아레나 · 챌린지 바닥의 코트 선(자유투 원 · 3점 선)이 겹쳐 보이던 것을 고쳤어요 — 실제 코트 비율로 다시 그렸어요(스트리트 파크도)', '챌린지 바닥의 코트 사이 간격을 가로세로 같게'] },
   { date: '2026-11-01', title: '수비를 묶는 스킬 조정 · 패치 노트', items: [
     '풀코트 프레스가 더는 수비를 느리게 하지 않아요(돌파 「존 프레스」도). 안에 들어온 호루라기도 느려지지 않아요. 존 프레스는 압박 범위 +30%',
     '덩크 충격파가 밀쳐 내는 거리를 절반으로',
