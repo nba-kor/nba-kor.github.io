@@ -46,15 +46,15 @@ const WEAP = {
   three: { name: '3점슛', note: '멀리 있는 수비에게 높이 쏴 떨어진 자리를 스플래시', cd: 2.2, dmg: 22, ups: [{ n: 1 }, { area: 0.2 }, { dmg: 10 }, { n: 1 }, { cd: -0.4 }, { dmg: 12 }, { n: 1, area: 0.2 }] },
   dunk: { name: '덩크', note: '뛰어올라 내리꽂으면 둘레에 충격파 — 밀쳐 낸다', cd: 3.2, dmg: 26, ups: [{ area: 0.15 }, { dmg: 10 }, { cd: -0.5 }, { area: 0.15 }, { dmg: 12 }, { n: 1 }, { dmg: 18, area: 0.15 }] },
   bounce: { name: '바운스 패스', note: '맞으면 옆 수비에게 튕겨 간다', cd: 1.6, dmg: 9, pierce: 1, bounce: 3, ups: [{ bounce: 1 }, { dmg: 4 }, { n: 1 }, { bounce: 2 }, { dmg: 5 }, { cd: -0.3 }, { bounce: 2, dmg: 6 }] },
-  block: { name: '블록슛', note: '두 손이 몸 둘레를 돌며 쳐 낸다 — 날아오는 호루라기도 막는다', cd: 2.2, dmg: 12, n: 2, dur: 3.2, ups: [{ n: 1 }, { area: 0.25, spd: 0.25 }, { dmg: 5 }, { n: 1 }, { dur: 1 }, { n: 1 }, { dmg: 8, dur: 1 }] },
-  press: { name: '풀코트 프레스', note: '둘레의 수비를 계속 압박 — 피해를 주고 느리게, 안에 들어온 호루라기도 느리게', cd: 0.45, dmg: 4, ups: [{ area: 0.15 }, { dmg: 2 }, { area: 0.15 }, { cd: -0.09 }, { dmg: 2 }, { area: 0.15 }, { dmg: 4 }] },
+  block: { name: '블록슛', note: '두 손이 몸 둘레를 돌며 쳐 낸다 — 날아오는 호루라기도 막는다', cd: 2.2, dmg: 12, n: 2, dur: 3.2, ups: [{ n: 1 }, { area: 0.15, spd: 0.25 }, { dmg: 4 }, { n: 1 }, { dur: 1 }, { n: 1 }, { dmg: 6, dur: 1 }] },
+  press: { name: '풀코트 프레스', note: '둘레의 수비를 계속 압박 — 피해를 주고 느리게, 안에 들어온 호루라기도 느리게', cd: 0.45, dmg: 4, ups: [{ area: 0.1 }, { dmg: 1 }, { area: 0.1 }, { cd: -0.08 }, { dmg: 2 }, { area: 0.1 }, { dmg: 2 }] },
   alley: { name: '앨리웁', note: '하늘에서 공이 떨어져 그 자리를 내리찍는다', cd: 2.6, dmg: 18, n: 2, ups: [{ n: 1 }, { dmg: 6 }, { area: 0.2 }, { n: 1 }, { cd: -0.5 }, { n: 1 }, { dmg: 12 }] },
   fade: { name: '스텝백 슛', note: '보는 쪽으로 꿰뚫는 슛', cd: 0.95, dmg: 8, pierce: 2, ups: [{ n: 1 }, { dmg: 4 }, { n: 1 }, { pierce: 2 }, { n: 1 }, { dmg: 5 }, { cd: -0.3 }] },
   cross: { name: '크로스오버', note: '옆으로 길게 휘둘러 베는 드리블', cd: 1.4, dmg: 13, ups: [{ n: 1 }, { dmg: 5 }, { area: 0.15 }, { dmg: 5 }, { cd: -0.3 }, { area: 0.2 }, { dmg: 9 }] },
   nolook: { name: '노룩 패스', note: '던지면 되돌아오는 패스 — 오가며 계속 맞힌다', cd: 1.8, dmg: 10, ups: [{ dmg: 4 }, { n: 1 }, { area: 0.25 }, { dmg: 5 }, { n: 1 }, { spd: 0.3 }, { n: 1 }] },
   hook: { name: '스카이훅', note: '높이 떴다 떨어지는 큰 공 — 여럿을 꿰뚫는다', cd: 1.7, dmg: 18, pierce: 3, ups: [{ n: 1 }, { dmg: 6 }, { area: 0.2 }, { pierce: 2 }, { n: 1 }, { dmg: 8 }, { n: 1 }] },
   buzzer: { name: '버저비터', note: '화면 안 수비에게 번개처럼 꽂힌다', cd: 2.8, dmg: 20, n: 2, ups: [{ n: 1 }, { dmg: 8 }, { area: 0.25 }, { n: 1 }, { cd: -0.5 }, { n: 1 }, { dmg: 14 }] },
-  screen: { name: '스크린', note: '근처에 동료가 스크린을 서서 걸린 수비를 묶고 때린다 — 안에 들어온 호루라기도 느리게', cd: 4, dmg: 6, dur: 2.5, ups: [{ n: 1 }, { dmg: 3 }, { dur: 1 }, { area: 0.2 }, { n: 1 }, { dmg: 4 }, { dur: 1, area: 0.2 }] },
+  screen: { name: '스크린', note: '근처에 동료가 스크린을 서서 걸린 수비를 묶고 때린다 — 안에 들어온 호루라기도 느리게', cd: 4, dmg: 6, dur: 2.5, ups: [{ n: 1 }, { dmg: 2 }, { dur: 1 }, { area: 0.15 }, { n: 1 }, { dmg: 3 }, { dur: 1, area: 0.15 }] },
   rebound: { name: '리바운드', note: '화면 가장자리에 튕기며 날아다니는 공 — 지나가는 수비를 계속 맞힌다', cd: 3.2, dmg: 11, dur: 3, ups: [{ dmg: 4 }, { n: 1 }, { dur: 1 }, { area: 0.25 }, { n: 1 }, { dmg: 6 }, { dur: 1.5, n: 1 }] },
   euro: { name: '유로스텝', note: '움직이면 지나간 자리에 잔상이 남아 밟은 수비를 때린다 — 서 있으면 안 나간다', cd: 0.2, dmg: 6, dur: 1.4, ups: [{ dmg: 2 }, { area: 0.2 }, { dur: 0.5 }, { dmg: 3 }, { area: 0.2 }, { dur: 0.6 }, { dmg: 5 }] },
   steal: { name: '스틸', note: '가장 강한 수비(보스 · 정예 먼저)의 공을 낚아채는 큰 한 방', cd: 1.9, dmg: 38, ups: [{ dmg: 14 }, { n: 1 }, { cd: -0.3 }, { dmg: 18 }, { n: 1 }, { cd: -0.3 }, { dmg: 30 }] },
@@ -69,7 +69,7 @@ const BREAK = {
   dunk: { name: '토마호크', note: '내리꽂은 뒤 1.5배 큰 충격파가 한 번 더' },
   bounce: { name: '핀볼 패스', note: '처음 튕길 때 공이 둘로 갈라져 두 수비에게' },
   block: { name: '철벽', note: '두 손이 쉬지 않고 끝없이 돈다' },
-  press: { name: '존 프레스', note: '범위 +30% · 안에 든 수비는 훨씬 느리게(25%)' },
+  press: { name: '존 프레스', note: '범위 +20% · 안에 든 수비는 더 느리게(45%)' },
   alley: { name: '스카이 워크', note: '하늘에서 떨어지는 공이 2배' },
   fade: { name: '더블 스텝백', note: '등 뒤로도 한 발씩 — 앞뒤를 같이 꿰뚫는다' },
   cross: { name: '앵클 브레이커', note: '양옆을 한 번에 베고, 맞은 수비는 넘어져 잠깐 못 움직인다' },
@@ -751,7 +751,7 @@ document.addEventListener('fullscreenchange', () => setFull(!!document.fullscree
 // ---------------------------------------------------------------- 한 판
 let mode = 'load', G = null, pl = null, S = null, menuChar = 0, menuMap = 0, shake = 0, tnow = 0
 const cam = { x: 0, y: 0 }
-const need = lv => lv < 20 ? 5 + (lv - 1) * 7 : lv < 40 ? 138 + (lv - 20) * 12 : 378 + (lv - 40) * 16   // 다음 레벨까지 경험치
+const need = lv => lv < 20 ? 5 + (lv - 1) * 7 : 138 + (lv - 20) * 12 + (lv - 20) ** 2   // 다음 레벨까지 경험치 — 20부터는 오를수록 더 많이, 늘어나는 폭도 커진다(30 → 358 · 40 → 778 · 50 → 1398)
 
 function start() {
   const ch = CHARS[menuChar], map = MAPS[menuMap]
@@ -875,7 +875,7 @@ const SHOT = {
     }
     shake = Math.max(shake, 2)
   },
-  screen(w, st, i, A, D) { const a = rnd() * TAU, d = 50 + rnd() * 90, ox = Math.cos(a) * d, oy = Math.sin(a) * d; G.shots.push({ k: 'zone', x: pl.x + ox, y: wallY(pl.y + oy), ox, oy, R: 48 * A, dmg: D, tick: 0, t: 0, life: st.dur * S.dur, br: w.br }) },
+  screen(w, st, i, A, D) { const a = rnd() * TAU, d = 50 + rnd() * 90, ox = Math.cos(a) * d, oy = Math.sin(a) * d; G.shots.push({ k: 'zone', x: pl.x + ox, y: wallY(pl.y + oy), ox, oy, R: 45 * A, dmg: D, tick: 0, t: 0, life: st.dur * S.dur, br: w.br }) },
   rebound(w, st, i, A, D) { const a = rnd() * TAU, v = 380 * st.spd * S.speed; G.shots.push({ k: 'rebound', x: pl.x, y: pl.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 9 * A, dmg: D, hit: new Map(), t: 0, life: st.dur * S.dur, a: 0, br: w.br }) },
   steal(w, st, i, A, D) {   // 가장 강한 수비에게 손을 뻗는다 — 돌파면 5초 동안 받는 피해 +30%
     const e = alive(w.list[i]) || strongest(1)[0]; if (!e) return
@@ -903,8 +903,8 @@ function beam(x, y, a, L, W, D, br) {
   fx({ k: 'beam', x, y, a, L, W, T: 0.32, br })
 }
 const alive = e => e && !e.dead ? e : null
-/** T 초 동안 속도 k 배 — 더 느린 게 걸려 있으면 그게 끝날 때까지 약한 건 무시(앵클 브레이커 0 · 존 프레스 0.25 · 보통 0.55) */
-const slow = (e, T, k) => { if (e.slow <= 0 || k <= e.sk) { e.sk = k; e.slow = Math.max(e.slow, T) } }
+/** T 초 동안 속도 k 배 — 더 느린 게 걸려 있으면 그게 끝날 때까지 약한 건 무시(앵클 브레이커 0 · 존 프레스 0.45 · 보통 0.7). 보스 · 중간보스 · 흥분한 수비는 안 걸린다 */
+const slow = (e, T, k) => { if (e.boss || e.rage > G.t) return; if (e.slow <= 0 || k <= e.sk) { e.sk = k; e.slow = Math.max(e.slow, T) } }
 function ball(dx, dy, o) { G.shots.push({ k: 'ball', x: o.x ?? pl.x, y: o.y ?? pl.y, vx: dx * o.v, vy: dy * o.v, r: o.r, dmg: o.dmg, pierce: o.pierce, bounce: o.bounce || 0, life: o.life || 1.3, t: 0, a: 0, hit: new Set(), kb: o.kb, col: o.col, br: o.br }) }
 /** 번개 — (x0, y0) 에서 (x1, y1) 까지 지그재그 아홉 점. 끝으로 갈수록 덜 흔들린다 */
 function zig(x0, y0, x1, y1) {
@@ -919,13 +919,13 @@ function weapons(dt) {
     if (w === G.seal && sick('seal')) continue
     const st = w.st, A = st.area * S.area, D = st.dmg * S.might
     if (w.id === 'press') {   // 풀코트 프레스 — 쿨타임마다 둘레 전부
-      w.R = 72 * A * (w.br ? 1.3 : 1)
-      if ((w.t -= dt) <= 0) { w.t = Math.max(0.2, st.cd * S.cdr); near(pl.x, pl.y, w.R, e => { hurt(e, D, pl.x, pl.y, 30); slow(e, 0.5, w.br ? 0.25 : 0.55) }) }
+      w.R = 70 * A * (w.br ? 1.2 : 1)
+      if ((w.t -= dt) <= 0) { w.t = Math.max(0.2, st.cd * S.cdr); near(pl.x, pl.y, w.R, e => { hurt(e, D, pl.x, pl.y, 30); slow(e, 0.5, w.br ? 0.45 : 0.65) }) }
       continue
     }
     if (w.id === 'block') {   // 블록슛 — 켜져 있는 동안 손이 돈다
       w.ang += dt * 3.4 * st.spd * S.speed
-      const n = st.n + S.amount, R = 80 * A, r = 11 * Math.sqrt(A)
+      const n = st.n + S.amount, R = 80 * A, r = 10 * Math.sqrt(A)
       if (w.br) {   // 돌파 — 쉬지 않고 계속. 손 개수가 바뀌면(더블 클러치) 새로 쥐고, 범위 · 피해는 늘 지금 것
         if (w.hands?.length !== n) {
           for (const b of G.shots) if (b.w === w) b.dead = true
@@ -953,15 +953,17 @@ function weapons(dt) {
 }
 
 // ---- 수비
+const HPK = [1, 1.45, 2, 3, 6.5, 15, 26]   // 보통 수비 피 배수 — 0 · 5 · 10 … 30분, 사이는 잇는다
+const hpK = m => { const i = Math.min(5, m / 5 | 0); return HPK[i] + (HPK[i + 1] - HPK[i]) * Math.min(1, m / 5 - i) }
 function spawn(type, x, y) {
   const F = FOES[type], m = G.t / 60, mm = Math.min(m, 30), big = type in BOSS
-  // 피 — 보통 수비는 초반 완만 · 15분 뒤로 가파르게(10분 3배 · 20분 12배 · 30분 33배), 보스는 완만하게(5분 2.5배 · 25분 8.5배 — 잘 짠 빌드면 30초 안팎).
+  // 피 — 보통 수비는 HPK(성장이 느려진 만큼 10 ~ 20분은 완만하게, 다 키우는 25분쯤부터 가파르게), 보스는 완만하게(5분 2.5배 · 25분 8.5배 — 잘 짠 빌드면 30초 안팎).
   // 둘 다 30분에서 멈춘다(챌린지는 피 대신 세기 · 빠르기 · 보스 수가 오른다)
-  const hp = F.hp * (big ? 1 + mm * 0.3 : 1 + mm * 0.1 + mm ** 3 * 0.0011) * G.map.hp
+  const hp = F.hp * (big ? 1 + mm * 0.3 : hpK(mm)) * G.map.hp
   const dmgK = (1 + m * 0.07) * (m >= 25 && !big ? 1.25 : 1), spdK = 1 + Math.min(0.3, Math.max(0, m - 25) * 0.015)   // 25분부터 더 세고 빠르게(빠르기는 +30% 까지)
   const e = {
     type, v: rnd() * SPR[type].length | 0, x: 0, y: 0, r: F.r, hp, max: hp, spd: F.spd * G.map.spd * (0.9 + rnd() * 0.2) * spdK, dmg: F.dmg * dmgK, xp: F.xp,
-    vx: 0, vy: 0, kx: 0, ky: 0, flash: 0, slow: 0, fx: 1, seed: rnd() * 10, cd: 1 + rnd() * 2, st: 'walk', stT: 3, dx: 0, dy: 0, age: 0, z: 0,
+    vx: 0, vy: 0, kx: 0, ky: 0, flash: 0, slow: 0, held: 0, rage: 0, fx: 1, seed: rnd() * 10, cd: 1 + rnd() * 2, st: 'walk', stT: 3, dx: 0, dy: 0, age: 0, z: 0,
     elite: type === 'mascot', boss: big, kind: big ? type : null, heavy: type === 'big' || type === 'mascot',
   }
   if (x === undefined) ring(e); else { e.x = x; e.y = wallY(y) }
@@ -1017,12 +1019,12 @@ function spawner(dt) {
 const pct = f => S.maxHp * f * (1 + Math.max(0, G.t / 60 - 30) * 0.03)
 function event(m) {
   if (m < 17 || rnd() < 0.55) {   // 하프코트 폭격 — 붉은 원이 다 차면 공이 떨어진다. 첫 원은 내 발밑
-    const n = Math.min(16, 5 + ((m - 15) / 2 | 0)), dmg = pct(0.1 + clamp((m - 15) / 15, 0, 1) * 0.06)
+    const n = Math.min(16, 5 + ((m - 15) / 2 | 0)), dmg = pct(0.13 + clamp((m - 15) / 15, 0, 1) * 0.07)
     for (let i = 0; i < n; i++) { const a = rnd() * TAU, d = i ? 40 + rnd() * 220 : 0; G.haz.push({ k: 'bomb', x: pl.x + Math.cos(a) * d, y: wallY(pl.y + Math.sin(a) * d), R: 60, t: -i * 0.1, T: 1.3, dmg }) }
     say('하프코트 폭격!', 1.2, '#ff6b6b')
   } else {   // 풀코트 러시 — 한쪽에서 줄지어 달려온다. 초록 줄(빈자리)로 피하기
     const horiz = !!G.map.wall || rnd() < 0.5
-    G.haz.push({ k: 'rush', t: 0, T: 1.2, horiz, dir: rnd() < 0.5 ? 1 : -1, gap: (horiz ? cam.y : cam.x) + (rnd() - 0.5) * (horiz ? VH : VW) * 0.6, dmg: pct(0.1) })
+    G.haz.push({ k: 'rush', t: 0, T: 1.2, horiz, dir: rnd() < 0.5 ? 1 : -1, gap: (horiz ? cam.y : cam.x) + (rnd() - 0.5) * (horiz ? VH : VW) * 0.6, dmg: pct(m >= 25 ? 0.17 : 0.14) })
     say('풀코트 러시!', 1.2, '#ff6b6b')
   }
 }
@@ -1053,7 +1055,11 @@ function foes(dt) {
     e.slow -= dt
     if (frozen && !e.leap) { e.vx = e.vy = 0 }
     else if (e.boss) bossAI(e, dt, dx, dy, d)
-    else { const sp = e.spd * (e.slow > 0 ? e.sk : 1); e.vx = dx * sp; e.vy = dy * sp }
+    else {   // 흥분 — 10분부터, 1.6초 넘게 느려져 있으면(프레스 · 스크린 · 잔상 · 넘어뜨리기) 붉게 달아올라 3초 동안 안 느려지고 안 밀리고 1.3배로 달려든다(마스코트는 안 한다)
+      e.held = e.slow > 0 && G.t >= 600 && !e.elite ? e.held + dt : Math.max(0, e.held - dt)
+      if (e.held > 1.6) { e.held = 0; e.rage = G.t + 3; e.slow = 0; e.kx = e.ky = 0; if (G.fx.length < 150) fx({ k: 'text', x: e.x, y: e.y - e.r * 3.2, s: '!', col: '#ff4d4d', T: 0.5 }) }
+      const sp = e.spd * (e.rage > G.t ? 1.3 : e.slow > 0 ? e.sk : 1); e.vx = dx * sp; e.vy = dy * sp
+    }
     // 서로 밀어 겹치지 않게
     near(e.x, e.y, e.r * 0.6, o => { if (o === e) return; const ox = e.x - o.x, oy = e.y - o.y, q = Math.hypot(ox, oy) || 0.01, push = (e.r * 0.6 + o.r - q) * 0.35; e.x += ox / q * push; e.y += oy / q * push })
     e.x += (e.vx + e.kx) * dt; e.y = wallY(e.y + (e.vy + e.ky) * dt)
@@ -1061,7 +1067,7 @@ function foes(dt) {
     if (Math.abs(dx) > 0.15) e.fx = dx > 0 ? 1 : -1
     if (!frozen && e.type === 'ref' && d < 330 && (e.cd -= dt) <= 0) { e.cd = 2.6 + rnd(); G.eshots.push({ x: e.x, y: e.y, vx: dx * 210, vy: dy * 210, t: 0, life: 2.6, dmg: e.dmg + 1, a: 0 }) }
     if (d < e.r + pl.r - 2 && e.z < 20) {   // 뛰어오른 보스는 안 닿는다
-      if (!frozen) ouch(e.dmg * (e.st === 'dash' ? 1.5 : 1))
+      if (!frozen) ouch((e.boss ? Math.max(e.dmg, pct(e.mid ? 0.08 : 0.1)) : e.dmg) * (e.st === 'dash' ? 1.5 : 1))   // 보스 · 중간보스는 최대 체력의 8 · 10% 보다는 아프게
       if (S.body && (e.bodyT ?? 0) < G.t) { e.bodyT = G.t + 0.5; hurt(e, 14 * S.might, pl.x, pl.y, 280) }   // 자이언 — 밀쳐 내기
     }
   }
@@ -1087,7 +1093,7 @@ function bossAI(e, dt, dx, dy, d) {
   }
   if (e.kind === 'boss') return boss(e, dt, dx, dy)
   // 걷기 — 슈터는 거리를 두고 옆으로 돈다, 감독은 조금 떨어져서, 나머지는 다가온다
-  const sp = e.spd * (e.slow > 0 ? Math.max(0.5, e.sk) : 1), keep = e.kind === 'shooter' ? 250 : e.kind === 'coach' ? 190 : 0
+  const sp = e.spd, keep = e.kind === 'shooter' ? 250 : e.kind === 'coach' ? 190 : 0
   if (keep && d < keep - 40) { e.vx = -dx * sp; e.vy = -dy * sp }
   else if (keep && d < keep + 60) { const s = e.seed > 5 ? 1 : -1; e.vx = -dy * sp * s; e.vy = dx * sp * s }
   else { e.vx = dx * sp; e.vy = dy * sp }
@@ -1103,7 +1109,7 @@ function bossAI(e, dt, dx, dy, d) {
 const ACT = {
   volley(e, a) {   // 농구공을 부채꼴로 — 손 · 프레스로 못 막는다
     const q0 = Math.atan2(pl.y - e.y, pl.x - e.x), v = e.mid ? 230 : 265
-    for (let i = 0; i < a.n; i++) { const q = q0 + (i - (a.n - 1) / 2) * 0.17; G.eshots.push({ k: 'ball', x: e.x, y: e.y, vx: Math.cos(q) * v, vy: Math.sin(q) * v, t: 0, life: 3.2, dmg: pct(e.mid ? 0.05 : 0.08), a: 0, r: 8 }) }
+    for (let i = 0; i < a.n; i++) { const q = q0 + (i - (a.n - 1) / 2) * 0.17; G.eshots.push({ k: 'ball', x: e.x, y: e.y, vx: Math.cos(q) * v, vy: Math.sin(q) * v, t: 0, life: 3.2, dmg: pct(e.mid ? 0.07 : 0.09), a: 0, r: 8 }) }
   },
   cards(e) {   // 레드카드를 사방으로 — 매번 반 칸씩 돌려서
     const n = 14, o = (e.pat++ % 2) * Math.PI / n
@@ -1119,7 +1125,7 @@ const ACT = {
 function leap(e) {
   const x = pl.x + (pl.moving ? pl.face[0] * 50 : 0), y = wallY(pl.y + (pl.moving ? pl.face[1] * 50 : 0)), T = e.mid ? 1.15 : 1
   e.leap = { x0: e.x, y0: e.y, x1: x, y1: y, t: 0, T }
-  G.haz.push({ k: 'land', e, x, y, R: e.mid ? 85 : 110, t: 0, T, dmg: pct(e.mid ? 0.14 : 0.22) })
+  G.haz.push({ k: 'land', e, x, y, R: e.mid ? 85 : 110, t: 0, T, dmg: pct(e.mid ? 0.18 : 0.26) })
 }
 function leapStep(e, dt) {
   const L = e.leap, u = Math.min(1, (L.t += dt) / L.T)
@@ -1141,13 +1147,13 @@ function afflict(id) {
   if (rnd() < 0.6) { const a = rnd() * TAU, d = 170 + rnd() * 90; item(pl.x + Math.cos(a) * d, pl.y + Math.sin(a) * d, 'spray') }
 }
 function hurt(e, dmg, ox, oy, kb = 0) {
-  if (e.dead) return
+  if (e.dead || e.rush) return   // 러시는 스킬에 안 맞는다 — 막을 수 없고 피하는 수밖에
   const crit = rnd() < S.crit
   dmg *= (sick('weak') ? 0.6 : 1) * (e.boss || e.elite ? S.bossX : 1) * (e.mark > G.t ? 1.3 : 1)   // 약화 · 폴 조지 · 락다운
   dmg = Math.max(1, Math.round(dmg * (crit ? S.critX : 1) * (0.9 + rnd() * 0.2)))
   e.hp -= dmg; e.flash = 0.1
   if (G.fx.length < 150 && (crit || rnd() < 0.45)) fx({ k: 'spark', x: e.x + (rnd() - 0.5) * e.r, y: e.y - e.r * 2 + (rnd() - 0.5) * e.r, s: crit ? 36 : 20, a: rnd() * TAU, T: 0.22 })
-  if (kb && !e.boss && !e.rush) { const dx = e.x - ox, dy = e.y - oy, d = Math.hypot(dx, dy) || 1, k = kb / (e.heavy ? 3 : 1); e.kx += dx / d * k; e.ky += dy / d * k }
+  if (kb && !e.boss && !(e.rage > G.t)) { const dx = e.x - ox, dy = e.y - oy, d = Math.hypot(dx, dy) || 1, k = kb / (e.heavy ? 3 : 1); e.kx += dx / d * k; e.ky += dy / d * k }
   num(e.x, e.y - e.r * 3.4, dmg, crit ? 'crit' : '')
   if (e.hp <= 0) kill(e)
 }
@@ -1160,7 +1166,7 @@ function kill(e) {
   if (e.elite || e.mid) { item(e.x, e.y); for (let i = 0; i < 3; i++) gem(e.x + (rnd() - 0.5) * 40, e.y + (rnd() - 0.5) * 40, e.mid ? 10 : 5) }
   else if (!e.boss && rnd() < 0.004 * S.luck) item(e.x, e.y, rnd() < 0.6 ? 'drink' : 'whistle')
   else if (!e.boss && G.t >= 1200 && rnd() < 0.0015 * S.luck) item(e.x, e.y, 'spray')
-  if (rnd() < (e.boss ? (e.mid ? 0.15 : 0.3) : e.elite ? 0.1 : 0.0004) * S.luck && ringable()) item(e.x, e.y + 14, 'ring')
+  if (rnd() < (e.boss ? (e.mid ? 0.1 : 0.2) : e.elite ? 0.055 : 0.00011) * S.luck && ringable()) item(e.x, e.y + 14, 'ring')
   if (e.boss) {
     const B = BOSS[e.kind]
     if (e.mid) { if (++G.mids >= 3) gain('mid3'); say(`${B.name} 격파!`, 1.6, '#ffb35e') }
@@ -1361,7 +1367,7 @@ function shots(dt) {
         const a = b.w.ang + b.i / b.n * TAU
         b.x = pl.x + Math.cos(a) * b.R; b.y = pl.y + Math.sin(a) * b.R; b.ang = a
         if ((b.life -= dt) <= 0) { b.dead = true; break }
-        near(b.x, b.y, b.r, e => { const t = b.hit.get(e); if (t === undefined || G.t - t > 0.45) { b.hit.set(e, G.t); hurt(e, b.dmg, pl.x, pl.y, 240) } })
+        near(b.x, b.y, b.r, e => { const t = b.hit.get(e); if (t === undefined || G.t - t > 0.45) { b.hit.set(e, G.t); hurt(e, b.dmg, pl.x, pl.y, 190) } })
         break
       }
       case 'slash': {   // 크로스오버 — 처음 한 번 옆으로 길게
@@ -1369,7 +1375,7 @@ function shots(dt) {
         if (!b.done) {
           b.done = true
           const x0 = Math.min(pl.x, pl.x + b.side * b.W), x1 = Math.max(pl.x, pl.x + b.side * b.W), y0 = pl.y - 12 - b.H / 2, y1 = pl.y - 12 + b.H / 2
-          near((x0 + x1) / 2, (y0 + y1) / 2, b.W / 2 + b.H / 2, e => { if (e.x + e.r > x0 && e.x - e.r < x1 && e.y + e.r > y0 && e.y - e.r < y1) { hurt(e, b.dmg, pl.x, pl.y - 12, 120); if (b.br && !e.boss) slow(e, 0.7, 0) } })
+          near((x0 + x1) / 2, (y0 + y1) / 2, b.W / 2 + b.H / 2, e => { if (e.x + e.r > x0 && e.x - e.r < x1 && e.y + e.r > y0 && e.y - e.r < y1) { hurt(e, b.dmg, pl.x, pl.y - 12, 120); if (b.br) slow(e, 0.35, 0) } })
         }
         if (b.t > b.T) b.dead = true
         break
@@ -1391,7 +1397,7 @@ function shots(dt) {
         break
       }
       case 'trail':   // 유로스텝 잔상 — 밟은 수비를 때린다(돌파면 느리게)
-        if ((b.tick -= dt) <= 0) { b.tick = 0.3; near(b.x, b.y, b.R, e => { hurt(e, b.dmg, b.x, b.y, 0); if (b.br) slow(e, 0.5, 0.45) }) }
+        if ((b.tick -= dt) <= 0) { b.tick = 0.3; near(b.x, b.y, b.R, e => { hurt(e, b.dmg, b.x, b.y, 0); if (b.br) slow(e, 0.5, 0.7) }) }
         if (b.t > b.life) b.dead = true
         break
       case 'rebound': {   // 리바운드 — 화면 가장자리(아레나는 벽)에 튕긴다. 돌파면 튕긴 자리가 터진다
@@ -1409,7 +1415,7 @@ function shots(dt) {
       }
       case 'zone':   // 스크린 — 걸린 수비를 묶고 때린다. 돌파면 나를 따라다닌다
         if (b.br) { b.x = pl.x + b.ox; b.y = wallY(pl.y + b.oy) }
-        if ((b.tick -= dt) <= 0) { b.tick = 0.3; near(b.x, b.y, b.R, e => { hurt(e, b.dmg, b.x, b.y, 0); slow(e, 0.4, 0.55) }) }
+        if ((b.tick -= dt) <= 0) { b.tick = 0.3; near(b.x, b.y, b.R, e => { hurt(e, b.dmg, b.x, b.y, 0); slow(e, 0.4, 0.7) }) }
         if (b.t > b.life) b.dead = true
         break
     }
@@ -1659,6 +1665,9 @@ function world(c) {
   for (const e of G.foes) if (onScreen(e, 60)) shadow(e.x, e.y, e.r * 1.05)
   for (const b of G.shots) if (b.k === 'arc' || b.k === 'drop') shadow(b.x, b.y, 6 + (b.k === 'drop' ? b.t / b.T * 6 : 0))
   c.fill()
+  c.strokeStyle = `rgba(255,40,40,${0.8 + Math.sin(t * 20) * 0.2})`; c.lineWidth = 3.4; c.beginPath()   // 흥분한 수비 — 발밑에 붉은 고리
+  for (const e of G.foes) if (e.rage > G.t && onScreen(e, 60)) { c.moveTo(e.x + e.r * 1.25, e.y); c.ellipse(e.x, e.y, e.r * 1.25, e.r * 0.48, 0, 0, TAU) }
+  c.stroke()
   // ---- 사람 — 위(먼 쪽)부터. 나는 내 발 높이 차례에
   let drawn = false
   for (const e of G.foes) {
