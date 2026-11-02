@@ -2435,30 +2435,36 @@ function shop(closet = false, keep = false) {
       h('b', {}, name),
       h('small', { className: 'sv-item-st' }, on ? '착용 중' : own ? '보유' : k.ach ? '업적 보상' : `${k.price.toLocaleString()} P`))
   }
-  // 고른 것 — 설명 · 사기 · 입기
-  const msg = h('p', { className: 'sv-shop-msg', role: 'status' })
+  // 고른 것 — 설명 · 사기 · 입기(이펙트는 캐릭터와 상관없다 — 잠긴 캐릭터여도 된다), 공용 스킨(공 · 옷)은 모든 캐릭터에 한 번에
+  const lk = slot !== 'fx' && lock, put = (id, all) => { for (const c of all ? CHARS : [ch]) wearSkin(slot, slot === 'fx' ? key : c.id, id); shop(closet, true) }
   let act = null
-  if (!sel) act = wornNow ? btn('기본으로', () => { wearSkin(slot, key, null); shop(closet, true) }, 'is-main') : h('span', { className: 'sv-shop-on' }, '착용 중')
-  else if (owns(sel)) act = wornNow?.id === sel.id ? btn('벗기', () => { wearSkin(slot, key, null); shop(closet, true) }) : Object.assign(btn('착용', () => { wearSkin(slot, key, sel.id); shop(closet, true) }, 'is-main'), { disabled: !!lock })
+  if (!sel) act = wornNow ? btn('기본으로', () => put(null), 'is-main') : h('span', { className: 'sv-shop-on' }, '착용 중')
+  else if (owns(sel)) act = wornNow?.id === sel.id ? btn('벗기', () => put(null)) : Object.assign(btn('착용', () => put(sel.id), 'is-main'), { disabled: !!lk })
   else if (sel.ach) act = h('span', { className: 'sv-shop-lock' }, `업적 「${ACH.find(a => a.id === sel.ach).name}」 — ${ACH.find(a => a.id === sel.ach).note}`)
-  else act = Object.assign(btn(`구매 · ${sel.price.toLocaleString()} P`, () => { if (buy(sel)) { wearSkin(slot, key, sel.id); shop(closet, true); notice(`「${sel.name}」 — 바로 입혔어요`, '구매') } }, 'is-main'), { disabled: !!lock || points() < sel.price })
-  const why = sel && !owns(sel) && !sel.ach && (lock ? '잠긴 캐릭터예요 — 캐릭터를 먼저 열어야 살 수 있어요' : points() < sel.price ? `포인트가 ${(sel.price - points()).toLocaleString()} 모자라요 — 판을 끝내면 쌓여요` : '')
+  else act = Object.assign(btn(`구매 · ${sel.price.toLocaleString()} P`, () => { if (buy(sel)) { put(sel.id); notice(`「${sel.name}」 — 바로 입혔어요`, '구매') } }, 'is-main'), { disabled: !!lk || points() < sel.price })
+  const shared = slot !== 'fx' && (sel ? owns(sel) && !sel.char : true), allOn = CHARS.every(c => (equip[slot][c.id] || null) === (sel?.id || null))
+  const allBtn = shared && Object.assign(btn(sel ? '모든 캐릭터에 입히기' : '모든 캐릭터 기본으로', () => { put(sel?.id || null, true); notice(sel ? `모든 캐릭터에 「${sel.name}」` : `모든 캐릭터가 ${slot === 'ball' ? '농구공' : '팀 유니폼'}으로`, '일괄 적용') }), { disabled: allOn })
+  const why = sel && !owns(sel) && !sel.ach && (lk ? '잠긴 캐릭터예요 — 캐릭터를 먼저 열어야 살 수 있어요' : points() < sel.price ? `포인트가 ${(sel.price - points()).toLocaleString()} 모자라요 — 판을 끝내면 쌓여요` : '')
   const note = !sel ? '' : sel.kind === 'fx' ? `${WEAP[sel.w].name} — ${FX_NOTE[sel.tier]}` : sel.kind === 'ball' ? (sel.pet ? `드리블할 때 공 대신 ${sel.name}가 통통` : `드리블하는 공이 ${sel.name}로${sel.glow && sel.glow !== 'gold' ? ' — 빛 · 꼬리가 따라다녀요' : ''}`) : [sel.char ? `${nameOf(ch)} 전용` : '모든 캐릭터', sel.aura && AURA_NOTE[sel.aura[0]]].filter(Boolean).join(' · ')
+  const who = slot === 'fx' ? '' : `${nameOf(ch)}${lock ? ' (잠김)' : ''} · `
   ui.classList.add('is-shop')
   const old = ui.querySelector('.sv-shop'), pos = old && [old.scrollTop, old.querySelector('.sv-shop-chars')?.scrollLeft, old.querySelector('.sv-shop-skills')?.scrollLeft]
   show(keep, h('div', { className: 'sv-shop' },
-    h('div', { className: 'sv-shop-head' }, h('p', { className: 'sv-h' }, closet ? '마이페이지' : '상점'), h('span', { className: 'sv-pts-pill' }, `${points().toLocaleString()} P`)),
+    // 머리(위에 붙어 있다) — 나가기 · 상점 | 마이페이지 · 포인트
+    h('div', { className: 'sv-shop-head' },
+      h('button', { type: 'button', className: 'sv-exit', onclick: () => { ui.classList.remove('is-shop'); title() } }, '← 나가기'),
+      h('div', { className: 'sv-seg', role: 'tablist' }, [['상점', false], ['마이페이지', true]].map(([n, c]) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(c === closet), onclick: () => c !== closet && shop(c) }, n))),
+      h('span', { className: 'sv-pts-pill' }, `${points().toLocaleString()} P`)),
+    closet && h('p', { className: 'sv-mine' }, `모은 것 ${(save.stats.pts || 0).toLocaleString()} P · 쓴 것 ${((save.stats.pts || 0) - points()).toLocaleString()} P · 남은 것 ${points().toLocaleString()} P`),
     h('div', { className: 'sv-tabs', role: 'tablist' }, SHOP_TABS.map(([id, name]) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(id === shopTab), onclick: () => { shopTab = id; shop(closet) } }, name))),
-    h('div', { className: 'sv-shop-chars' }, CHARS.map((c, i) => h('button', { type: 'button', className: lockOf(c) ? 'is-locked' : '', 'aria-pressed': String(i === shopCi), title: nameOf(c), onclick: () => { shopCi = i; shopW = null; shop(closet) } }, h('img', { src: faceOf(P(c.id)), alt: nameOf(c) })))),
+    shopTab !== 'fx' && h('div', { className: 'sv-shop-chars' }, CHARS.map((c, i) => h('button', { type: 'button', className: lockOf(c) ? 'is-locked' : '', 'aria-pressed': String(i === shopCi), title: nameOf(c), onclick: () => { shopCi = i; shopW = null; shop(closet) } }, h('img', { src: faceOf(P(c.id)), alt: nameOf(c) })))),
     (shopTab === 'fx' || shopTab === 'ach') && h('div', { className: 'sv-shop-skills' }, Object.keys(WEAP).map(w => h('button', { type: 'button', 'aria-pressed': String(w === shopW), title: WEAP[w].name, onclick: () => { shopW = w; shop(closet) } }, h('img', { src: ICON_URL[w], alt: WEAP[w].name })))),
     h('div', { className: 'sv-items' }, items.map(card)),
     items.length <= (shopTab === 'ach' ? 0 : 1) && h('p', { className: 'sv-note' }, closet ? '아직 가진 스킨이 없어요 — 상점에서 포인트로 사요' : '이 캐릭터의 업적 스킨이 없어요'),
+    // 고른 것(아래에 붙어 있다) — 설명 · 사기 · 입기 · 모든 캐릭터에
     h('div', { className: 'sv-shop-sel' },
-      h('div', {}, h('b', {}, sel ? sel.name : '기본', sel && h('small', { className: `sv-tier is-t${sel.tier}` }, TIER[sel.tier].name)), h('small', {}, `${nameOf(ch)}${lock ? ' (잠김)' : ''} · ${note || (slot === 'fx' ? `${WEAP[shopW].name} 기본` : slot === 'ball' ? '농구공' : '그 팀 유니폼')}`), why && h('small', { className: 'sv-shop-why' }, why)),
-      act),
-    msg,
-    closet && h('p', { className: 'sv-mine' }, `내 포인트 — 모은 것 ${(save.stats.pts || 0).toLocaleString()} P · 쓴 것 ${((save.stats.pts || 0) - points()).toLocaleString()} P · 남은 것 ${points().toLocaleString()} P`),
-    row(btn('← 처음으로', () => { ui.classList.remove('is-shop'); title() }), closet ? btn('상점 →', () => shop()) : btn('마이페이지 →', () => shop(true)))))
+      h('div', {}, h('b', {}, sel ? sel.name : '기본', sel && h('small', { className: `sv-tier is-t${sel.tier}` }, TIER[sel.tier].name)), h('small', {}, `${who}${note || (slot === 'fx' ? `${WEAP[shopW].name} 기본` : slot === 'ball' ? '농구공' : '그 팀 유니폼')}`), why && h('small', { className: 'sv-shop-why' }, why)),
+      h('div', { className: 'sv-shop-acts' }, act, allBtn))))
   const box = ui.querySelector('.sv-shop'), strips = [box.querySelector('.sv-shop-chars'), box.querySelector('.sv-shop-skills')]
   if (pos) { box.scrollTop = pos[0]; strips.forEach((el, i) => { if (el && pos[i + 1] != null) el.scrollLeft = pos[i + 1] }) }
   else for (const el of strips) { const on = el?.querySelector('[aria-pressed="true"]'); if (on) el.scrollLeft = on.offsetLeft - (el.clientWidth - on.offsetWidth) / 2 }   // 처음 열 때 — 고른 것이 가운데
@@ -2618,6 +2624,11 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '상점 · 마이페이지 화면', items: [
+    '위에 「← 나가기」 · 「상점 | 마이페이지」 · 포인트가 늘 붙어 있어요(목록을 내려도 그대로)',
+    '고른 스킨의 사기 · 입기 버튼은 아래에 늘 붙어 있어요',
+    '옷 · 농구공은 「모든 캐릭터에 입히기」로 한 번에(「모든 캐릭터 기본으로」도)',
+    '스킬 이펙트 탭에는 선수 얼굴 줄을 뺐어요 — 이펙트는 캐릭터와 상관없어요'] },
   { date: '2026-11-02', title: '리더보드', items: [
     '「랭킹」이 「리더보드」로 — 랭킹 · 최근 기록 · 내 기록 · 구매 내역 탭',
     '최근 기록 — 모두의 최근 판(맵 · 버틴 시간 · 처치 · 레벨 · 캐릭터 · 받은 포인트). 내 기록 — 내 최근 판과 내 포인트(모은 것 · 쓴 것 · 남은 것)',

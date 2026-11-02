@@ -1727,10 +1727,18 @@ dialog, .ac-body { overscroll-behavior: contain; }
 /* 상점 · 마이페이지 — 패널은 오른쪽(세운 화면은 아래), 나머지 자리에 미리 보기 판(게임 화면 그대로) */
 .sv-ui.is-shop { display: block; padding: 0; overflow: hidden; background: none; pointer-events: none; }
 .sv-shop { pointer-events: auto; position: absolute; top: 52px; right: 10px; bottom: 10px; width: min(58%, 640px); overflow: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 9px; padding: 12px; border: 1px solid #ffffff24; border-radius: 14px; background: #0b0e14eb; box-shadow: 0 10px 30px #000a; }
-@container (orientation: portrait) { .sv-shop { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; height: 62%; padding: 10px; } }
+@container (orientation: portrait) {
+  .sv-shop { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; height: 62%; padding: 10px; }
+  .sv-shop-head { top: -10px; margin: -10px -10px 0; padding: 8px 10px; } .sv-shop-sel { bottom: -10px; margin: auto -10px -10px; padding: 8px 10px; }
+  .sv-exit { padding: 6px 10px; } .sv-seg button { padding: 5px 10px; }
+}
 .sv-shop > * { flex: none; }   /* 가로로 넘기는 줄(캐릭터 · 스킬)이 눌려 납작해지지 않게 */
-.sv-shop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.sv-shop-head .sv-h { margin: 0; }
+.sv-shop-head { position: sticky; top: -12px; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -12px -12px 0; padding: 10px 12px; border-bottom: 1px solid #ffffff1a; background: #0d1119f5; }   /* 위에 붙어 있다 — 나가기 · 상점 | 마이페이지 · 포인트 */
+.sv-exit { flex: none; padding: 7px 14px; border: 2px solid #ffffffcc; border-radius: 999px; background: #ffffff14; color: #fff; font: 800 .95em system-ui, sans-serif; cursor: pointer; }
+.sv-exit:hover, .sv-exit:focus-visible { background: #ffffff2e; outline: none; }
+.sv-seg { display: flex; padding: 3px; border-radius: 999px; background: #ffffff14; }
+.sv-seg button { padding: 6px 14px; border: 0; border-radius: 999px; background: none; color: #c9d1e0; font: 800 .92em system-ui, sans-serif; cursor: pointer; }
+.sv-seg button[aria-selected="true"] { background: #ffd23f; color: #2a1200; }
 .sv-pts-pill { padding: 3px 12px; border-radius: 999px; background: linear-gradient(#ffe066, #d99a1f); color: #2a1200; font-weight: 900; }
 .sv-shop .sv-tabs { margin: 0; }
 .sv-shop-chars, .sv-shop-skills { position: relative; display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding: 2px 2px 4px; scrollbar-width: thin; }   /* 가로로만 — 위아래로 끌면 패널이 움직인다 */
@@ -1757,7 +1765,8 @@ dialog, .ac-body { overscroll-behavior: contain; }
 @keyframes sv-hue { to { filter: hue-rotate(360deg); } }
 .sv-tier { padding: 0 7px; border-radius: 999px; background: #ffffff1c; font-size: .7em; font-weight: 800; color: #aab4c3; }
 .is-t2 > .sv-tier, .sv-tier.is-t2 { color: #74c0fc; } .is-t3 > .sv-tier, .sv-tier.is-t3 { color: #d8a6ff; } .is-t4 > .sv-tier, .sv-tier.is-t4 { color: #ffd23f; }
-.sv-shop-sel { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border-radius: 11px; background: #ffffff0f; }
+.sv-shop-sel { position: sticky; bottom: -12px; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: auto -12px -12px; padding: 10px 12px; border-top: 1px solid #ffffff1a; background: #161b27f7; }   /* 아래에 붙어 있다 — 사기 · 입기 */
+.sv-shop-acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex: none; max-width: 55%; }
 .sv-shop-sel > div { display: grid; gap: 2px; }
 .sv-shop-sel b { display: flex; align-items: center; gap: 6px; }
 .sv-shop-sel small { color: #c9d1e0; }
