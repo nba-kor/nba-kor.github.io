@@ -970,7 +970,7 @@ const cam = { x: 0, y: 0 }
 const need = lv => Math.round((1 + 0.2 * Math.min(1, (lv - 1) / 15)) * (lv < 20 ? 5 + (lv - 1) * 7 : 138 + (lv - 20) * 12 + (lv - 20) ** 2))   // 다음 레벨까지 경험치 — 처음엔 예전 그대로, Lv 16 부터 1.2배. 20부터는 오를수록 더 많이, 늘어나는 폭도 커진다(30 → 430 · 40 → 934 · 50 → 1678)
 
 // 자동사냥(네온 시티) — 켜짐 · 공격형(atk) | 수비형(def). 이 브라우저에 기억한다
-const AUTO_KEY = 'survive.auto', autoSet = { on: true, mode: 'atk' }
+const AUTO_KEY = 'survive.auto', autoSet = { on: true, mode: 'atk', again: true }   // again — 판이 끝나면 다시 시작
 try { Object.assign(autoSet, JSON.parse(localStorage.getItem(AUTO_KEY)) || {}) } catch {}
 const keepAuto = () => { try { localStorage.setItem(AUTO_KEY, JSON.stringify(autoSet)) } catch {} }
 /** 판 하나 — 입은 스킨(옷 · 공 · 이펙트)으로. demo 면 상점 미리 보기 판(고른 스킨 · 업적 없음) */
@@ -2560,6 +2560,7 @@ function maps(keep = false) {
       : h('div', { className: 'sv-autoset' },   // 자동사냥 — 켬 · 끔, 공격형 · 수비형(판 중에도 위의 버튼으로 바꾼다)
         h('b', {}, '자동사냥'), seg([['켬', true], ['끔', false]], autoSet.on, v => { autoSet.on = v }),
         autoSet.on && seg([['공격형', 'atk'], ['수비형', 'def']], autoSet.mode, v => { autoSet.mode = v }),
+        autoSet.on && h('span', { className: 'sv-autoset-again' }, '끝나면 다시 시작', seg([['켬', true], ['끔', false]], autoSet.again, v => { autoSet.again = v })),
         h('small', {}, !autoSet.on ? '직접 움직여요 — 판 중에도 위의 「자동」 버튼으로 켤 수 있어요'
           : autoSet.mode === 'atk' ? '넓게 돌아다니며 보석 · 아이템을 쓸어 담아요 — 움직이며 쓰는 스킬 위주로 고르고 리롤 · 스킵 · 제외도 써요'
           : '처음 자리 둘레에서만 버텨요 — 아이템은 모아 뒀다가 필요할 때만 줍고, 몸을 지키는 스킬 위주로 골라요'),
@@ -2783,7 +2784,7 @@ function finish(win, quit = false) {
       rankMsg.append('로그인하면 이 기록이 랭킹에 올라가요 ', h('button', { type: 'button', className: 'sv-link', onclick: chooseLogin }, '로그인'))
     }
   }
-  const unlocked = G.got.filter(a => a.char)
+  const unlocked = G.got.filter(a => a.char), again = G.auto && G.map.farm && autoSet.again && !quit && h('p', { className: 'sv-again', role: 'status' })
   show(false, h('div', { className: `sv-panel sv-over${win ? ' is-win' : ''}` },
     h('p', { className: 'sv-h sv-big' }, quit ? '경기 포기' : G.map.endless ? `챌린지 ${fmt(G.t)}` : win ? '30분 생존!' : 'K.O.'),
     h('p', { className: 'sv-note' }, `${nameOf(G.ch)} · ${G.map.name}`),
@@ -2793,7 +2794,18 @@ function finish(win, quit = false) {
     build(),
     G.got.length > 0 && h('div', { className: 'sv-got' }, h('b', {}, `새 업적 ${G.got.length}개`), h('ul', {}, G.got.map(a => h('li', {}, `★ ${a.name}`, a.char && h('em', {}, ` — ${nameOf(CHARS.find(c => c.id === a.char))} 해금!`), a.skin && h('em', {}, ` — 스킨 「${SKIN[a.skin].name}」`))))),
     unlocked.length > 0 && h('div', { className: 'sv-unlock' }, unlocked.map(a => { const c = CHARS.find(x => x.id === a.char); return h('img', { src: faceOf(P(c.id)), alt: nameOf(c), title: nameOf(c) }) })),
+    again,
     row(btn('다시 하기', start, 'is-main'), btn('캐릭터 고르기', () => chars()), btn('처음으로', title))))
+  if (again) {   // 자동사냥 — 5초 뒤 같은 캐릭터 · 맵 · 모드로 다시(탭이 가려져 있으면 바로)
+    let n = document.hidden ? 0 : 5
+    const tick = () => {
+      if (mode !== 'over' || !again.isConnected) return clearInterval(iv)
+      if (n <= 0) { clearInterval(iv); return setTimeout(start) }
+      again.replaceChildren(`자동사냥 — ${n}초 뒤에 다시 시작해요 `, h('button', { type: 'button', className: 'sv-link', onclick: () => { clearInterval(iv); again.textContent = '자동 재시작을 멈췄어요' } }, '멈추기'))
+      n--
+    }
+    const iv = setInterval(tick, 1000); tick()
+  }
 }
 function gain(id) {
   if (save.ach[id] || G?.demo || G?.autoUsed) return   // 상점 미리 보기 · 자동사냥을 켠 판은 업적이 없다
@@ -2828,6 +2840,7 @@ const NOTES = [
     '공격형 — 넓게 돌아다니며 보석 · 아이템을 쓸어 담고, 움직이며 쓰는 스킬(유로스텝 · 덩크 · 크로스오버 · 프레스 …) · 이동 속도 · 자석 위주로 골라요. 리롤 · 스킵 · 제외도 알아서 써요',
     '수비형 — 처음 자리 둘레에서만 버티고, 아이템은 밟지 않고 모아 뒀다가 필요할 때만(체력이 낮을 때 드링크, 둘러싸이면 타임아웃 · 버저, 상태이상이면 스프레이 …) 주워요. 몸을 지키는 스킬(블록슛 · 프레스 · 스크린 …) · 체력 · 방어 위주',
     '자동사냥 중에는 다른 창 · 탭으로 가도 일시정지되지 않고 계속 돌아요(멈추려면 일시정지 버튼)',
+    '판이 끝나면 5초 뒤 같은 캐릭터 · 모드로 다시 시작해요(맵 고르기에서 「끝나면 다시 시작」을 끄거나, 결과 화면의 「멈추기」 · 그만두기로 멈춰요)',
     '포인트 사냥터라 랭킹에는 안 올라가요. 자동사냥을 켠 판은 포인트만 받고 업적 · 기록에는 안 들어가요'] },
   { date: '2026-11-02', title: '캐릭터 목 · 옷깃', items: [
     '선수 얼굴 그림의 턱 아래(그림 속 목 · 옷깃 · 어깨 옷)를 잘라 얼굴만 써요 — 몸 그림의 목 · 유니폼에 바로 이어져요(커리의 흰 옷깃, 요키치의 빨간 옷깃, 탐슨의 보라 옷깃 등이 사라졌어요)',
