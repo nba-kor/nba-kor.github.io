@@ -381,6 +381,16 @@ function brighten(col, min = 96) { const [r, g, b] = rgbOf(col), l = 0.3 * r + 0
 function rng(seed) { return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 } }
 function hash(i, j, s) { let x = Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(s, 1442695041) | 0; x = Math.imul(x ^ x >>> 13, 1274126177); return ((x ^ x >>> 16) >>> 0) / 4294967296 }
 
+const HEAD_K = 0.86   // 선수 얼굴 그림 크기(예전 22.4 × 23.8 에 곱한다)
+/** 얼굴 그림의 턱 — 맨 아래 불투명 줄(b, 높이 비율)과 그 위 턱 둘레의 가운데(f, 너비 비율). 비스듬히 본 얼굴도 턱이 몸의 목 위에 오게 */
+function chinOf(head) {
+  const W = head.width, H = head.height, d = head.getContext('2d').getImageData(0, 0, W, H).data, on = (x, y) => d[(y * W + x) * 4 + 3] > 128
+  let last = H - 1
+  while (last > 0 && ![...Array(W).keys()].some(x => on(x, last))) last--
+  let sx = 0, n = 0
+  for (let y = Math.max(0, last - 20); y <= last; y++) for (let x = 0; x < W; x++) if (on(x, y)) { sx += x; n++ }
+  return { f: n ? sx / n / W : 0.5, b: (last + 1) / H }
+}
 /** 사람 — 발밑 (0,0), 오른쪽을 본다(키 약 52). o = { jersey, trim, shorts, skin, hair, hs 머리 모양, shoe, frame 0~3, wide, kind, num, mirror, head(얼굴 그림) }
  *  걸음 네 칸 — 0 · 2 는 두 발을 벌리고 1 · 3 은 뒷발을 들어 앞으로(몸이 살짝 뜬다). 앞(오른쪽) 팔다리는 밝게, 뒤는 어둡게 */
 function person(c, o) {
@@ -440,7 +450,10 @@ function person(c, o) {
   if (!up) arm(c, o, 6.2 * wd, -sw * 0.55, sk, true)
   if (o.extra === 'ball') ballAt(c, 8.6 * wd, -15.4, 4.8)   // 샤프슈터 — 손에 공
   if (o.extra === 'card') { c.save(); c.translate(8.6 * wd, -17); c.rotate(0.25); rr(c, -2.6, -4, 5.2, 7.4, 0.8, '#e63946'); c.restore() }   // 수석 심판 — 레드카드
-  if (o.head) { rr(c, -2.4, -33.6, 4.8, 5, 1.6, skD); c.save(); c.scale(-1, 1); c.drawImage(o.head, -11.6, -52.6, 22.4, 23.8); c.restore() }   // 선수 얼굴 그림(cutHead) — 거의 다 왼쪽을 보고 있어서 뒤집어 몸과 같은 쪽을 보게
+  if (o.head) {   // 선수 얼굴 그림(cutHead) — 거의 다 왼쪽을 보고 있어서 뒤집어 몸과 같은 쪽을 보게. 조금 작게, 턱(o.chin)이 목 위에 오게
+    const w = 22.4 * HEAD_K, hh = 23.8 * HEAD_K, a = o.chin || { f: 0.5, b: 0.9 }
+    rr(c, -2.4, -33.6, 4.8, 5, 1.6, skD); c.save(); c.scale(-1, 1); c.drawImage(o.head, -0.3 - a.f * w, -29.4 - a.b * hh, w, hh); c.restore()
+  }   // 선수 얼굴 그림(cutHead) — 거의 다 왼쪽을 보고 있어서 뒤집어 몸과 같은 쪽을 보게
   else face(c, o)
   if (o.extra === 'crown') { c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(-6.4, -48); c.lineTo(-7.4, -56); c.lineTo(-3.4, -52.4); c.lineTo(0.6, -58); c.lineTo(4.6, -52.4); c.lineTo(8.6, -56); c.lineTo(7.6, -48); c.closePath(); c.fill(); ell(c, 0.6, -51.4, 1.3, 1.3, '#e63946') }   // MVP — 왕관
   if (up) arm(c, o, 6.2 * wd, Math.PI + (k === 'fan' ? 0.35 : 0.15), sk, true)
@@ -965,7 +978,7 @@ function demoStep(dt) {
   cam.x = pl.x + (port ? 0 : VW / ZOOM * 0.29); cam.y = pl.y + (port ? VH / ZOOM * 0.3 : 0)   // 패널이 덮지 않는 쪽에 내가 보이게(1.6배로 가까이)
 }
 function playerSprites(ch, look) {
-  const o = { jersey: ch.c[0], trim: ch.c[1], shorts: ch.c[0], skin: ch.skin || '#b9825a', hair: '#1d140e', shoe: '#f4f4f4', num: NBA_NUM[ch.id] ?? '', head: ch.head, kind: 'me', ...ch.fit, ...look }
+  const o = { jersey: ch.c[0], trim: ch.c[1], shorts: ch.c[0], skin: ch.skin || '#b9825a', hair: '#1d140e', shoe: '#f4f4f4', num: NBA_NUM[ch.id] ?? '', head: ch.head, chin: ch.chin, kind: 'me', ...ch.fit, ...look }
   const paint = (frame, mirror) => sprite(36, 66, 18, 62, c => { if (mirror) c.scale(-1, 1); person(c, { ...o, frame, mirror }) })
   return { R: [0, 1, 2, 3].map(f => paint(f)), L: [0, 1, 2, 3].map(f => paint(f, true)), mate: sprite(36, 66, 18, 62, c => person(c, { ...o, ...ch.fit, jersey: ch.c[1], trim: ch.c[0], shorts: ch.c[1], side: ch.c[0], pin: null, tee: 0, hood: 0, shine: 0, star: 0, bands: 0, head: null, kind: 'screen' })) }
 }
@@ -2240,7 +2253,7 @@ function aura(c, [k, c1, c2], x, y, front) {
     if (!front) {
       c.globalAlpha = 0.32 + Math.sin(t * 3) * 0.08; bloom(c, c2, x, y - 26, 46)
       c.fillStyle = rgba(c2, 0.13); for (let i = 0; i < 8; i++) { const a = t * 0.6 + i * TAU / 8; c.beginPath(); c.moveTo(x, y - 26); c.lineTo(x + Math.cos(a - 0.12) * 56, y - 26 + Math.sin(a - 0.12) * 56); c.lineTo(x + Math.cos(a + 0.12) * 56, y - 26 + Math.sin(a + 0.12) * 56); c.fill() }
-    } else { const hy = y - 61 + Math.sin(t * 3) * 1.5; c.globalAlpha = 0.95; c.strokeStyle = c1; c.lineWidth = 2.2; c.beginPath(); c.ellipse(x, hy, 9, 3, 0, 0, TAU); c.stroke(); c.globalAlpha = 0.6; bloom(c, c1, x, hy, 15) }
+    } else { const hy = y - 57 + Math.sin(t * 3) * 1.5; c.globalAlpha = 0.95; c.strokeStyle = c1; c.lineWidth = 2.2; c.beginPath(); c.ellipse(x, hy, 9, 3, 0, 0, TAU); c.stroke(); c.globalAlpha = 0.6; bloom(c, c1, x, hy, 15) }
   } else if (k === 'storm') {
     if (!front) { c.globalAlpha = 0.3 + Math.sin(t * 17) * 0.1; bloom(c, c1, x, y - 24, 40) }
     else if ((t * 14 | 0) % 3 === 0) {
@@ -2269,7 +2282,7 @@ function aura(c, [k, c1, c2], x, y, front) {
     }
     if (front) {
       c.globalAlpha = 0.35 + Math.sin(t * 5) * 0.2; bloom(c, c1, x, y - 22, 17)
-      c.globalAlpha = 0.9; star(c, x + 0.6, y - 64 + Math.sin(t * 3) * 1.5, 4.2, c2); c.globalAlpha = 0.6; bloom(c, c2, x, y - 64, 13)
+      c.globalAlpha = 0.9; star(c, x + 0.6, y - 60 + Math.sin(t * 3) * 1.5, 4.2, c2); c.globalAlpha = 0.6; bloom(c, c2, x, y - 60, 13)
       if (G.fx.length < 150 && rnd() < 0.3) fx({ k: 'spark', x: x + (rnd() - 0.5) * 34, y: y - 6 - rnd() * 52, s: 9 + rnd() * 9, a: rnd() * TAU, T: 0.5 })
       if (pl.moving && (t * 7 | 0) !== (G.stepT | 0)) { G.stepT = t * 7; fx({ k: 'ring', x, y: pl.y, R: 16, T: 0.5, col: c1 }) }   // 발자국 빛
     }
@@ -2443,7 +2456,7 @@ function thumb(k, ch) {   // 카드 그림 — 이펙트는 스킬 아이콘(등
   let cv0 = THUMB.get(key)
   if (!cv0) {
     const sp = kind === 'ball' ? (k === 'base' ? BALL : BALLSK[k.id])
-      : sprite(36, 66, 18, 62, c => person(c, { jersey: ch.c[0], trim: ch.c[1], shorts: ch.c[0], skin: ch.skin || '#b9825a', hair: '#1d140e', shoe: '#f4f4f4', num: NBA_NUM[ch.id] ?? '', head: ch.head, kind: 'me', ...ch.fit, ...(k === 'base' ? null : k.look) }))
+      : sprite(36, 66, 18, 62, c => person(c, { jersey: ch.c[0], trim: ch.c[1], shorts: ch.c[0], skin: ch.skin || '#b9825a', hair: '#1d140e', shoe: '#f4f4f4', num: NBA_NUM[ch.id] ?? '', head: ch.head, chin: ch.chin, kind: 'me', ...ch.fit, ...(k === 'base' ? null : k.look) }))
     cv0 = sp.c.toDataURL(); THUMB.set(key, cv0)
   }
   return h('img', { src: cv0, alt: '', className: kind === 'ball' ? 'is-ball' : 'is-fit' })
@@ -2661,7 +2674,8 @@ function refresh() {
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
   { date: '2026-11-02', title: '캐릭터 목 · 옷깃', items: [
-    '선수 얼굴 그림의 턱 아래(그림 속 목 · 옷깃 · 어깨 옷)를 잘라 얼굴만 써요 — 몸 그림의 목 · 유니폼에 바로 이어져요(커리의 흰 옷깃, 요키치의 빨간 옷깃, 탐슨의 보라 옷깃 등이 사라졌어요)'] },
+    '선수 얼굴 그림의 턱 아래(그림 속 목 · 옷깃 · 어깨 옷)를 잘라 얼굴만 써요 — 몸 그림의 목 · 유니폼에 바로 이어져요(커리의 흰 옷깃, 요키치의 빨간 옷깃, 탐슨의 보라 옷깃 등이 사라졌어요)',
+    '얼굴을 조금 작게(86%) 하고, 비스듬히 본 얼굴도 턱이 몸의 목 위에 오게 맞췄어요 — 머리가 어깨 위에 자연스럽게 얹혀요'] },
   { date: '2026-11-02', title: '레전더리를 더 화려하게', items: [
     '레전드 스킬 이펙트 — 날아가는 공은 두 배 긴 금빛 꼬리 · 둘레를 도는 별 셋 · 튀는 금빛 전기, 고리 · 구역에는 도는 문양 고리, 맞은 자리에는 하늘에서 번개가 내리꽂히고 큰 빛기둥 · 두 겹 충격파 · 솟는 금가루',
     '레전더리 옷 — 등 뒤에 퍼덕이는 금빛 날개, 몸을 도는 빛 구슬 셋이 더해졌어요'] },
@@ -2820,7 +2834,7 @@ await loadData()
 for (const ch of CHARS) {   // 얼굴 그림 → 머리 · 피부색
   const img = new Image()
   img.onload = () => {
-    try { ch.head = cutHead(img, true); [ch.skin] = skinOf(img) } catch {}
+    try { ch.head = cutHead(img, true); ch.chin = chinOf(ch.head); [ch.skin] = skinOf(img) } catch {}
     THUMB.clear(); if (mode === 'shop' && CHARS[shopCi] === ch) shop(closetOn, true)   // 상점 · 마이페이지가 얼굴보다 먼저 떴으면 다시
   }
   img.src = faceOf(P(ch.id))
