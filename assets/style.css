@@ -1614,7 +1614,13 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-pick p { margin: 4px 0 0; font-size: .92em; color: #dfe5ee; }
 .sv-pick em { font-style: normal; font-weight: 800; color: #ffd23f; }
 .sv-lockmsg { color: #ff9b9b !important; }
-.sv-maps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sv-maps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.sv-map.is-locked canvas { filter: grayscale(1) brightness(.5); }
+.sv-map.is-locked { opacity: .7; }
+.sv-autoset { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 10px; margin-top: 10px; padding: 10px; border-radius: 12px; background: #3ce6ff12; border: 1px solid #3ce6ff40; }
+.sv-autoset > small { flex-basis: 100%; text-align: center; color: #c9d1e0; }
+.sv-autobtn { width: auto !important; padding: 7px 10px !important; font: 800 12px/1 system-ui, sans-serif; white-space: nowrap; }
+.sv-autobtn.is-on { background: #0f6b78e0 !important; box-shadow: 0 0 0 2px #3ce6ff, 0 0 12px #3ce6ff88; opacity: 1 !important; }
 .sv-map { display: grid; gap: 3px; padding: 6px 6px 8px; border-radius: 12px; border: 2px solid transparent; background: #ffffff10; color: #fff; text-align: left; }
 .sv-map canvas { width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 8px; }
 .sv-map small { color: #c9d1e0; font-size: .82em; }

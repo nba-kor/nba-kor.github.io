@@ -165,7 +165,10 @@ const MAPS = [
   { id: 'arena', name: '아레나', note: '마루 코트 — 위아래가 관중석이라 좌우로만 트였다', hp: 1, spd: 1, xp: 1.1, wall: 460 },
   { id: 'roof', name: '네온 루프탑', note: '밤의 옥상 — 수비가 더 단단하고 빠르다 · 경험치 +25%', hp: 1.4, spd: 1.12, xp: 1.25 },
   { id: 'chal', name: '챌린지', note: '시간 제한 없음 — 버틸수록 수비가 세지고 보스가 늘어난다 · 최고 기록에 도전', hp: 1, spd: 1, xp: 1.2, endless: true },
+  { id: 'neon', name: '네온 시티', note: '포인트 사냥터 — 자동사냥(공격형 · 수비형)을 켤 수 있다 · 랭킹 · 업적 없음', hp: 1, spd: 1, xp: 1, farm: true },
 ]
+/** 네온 시티(farm)는 다른 세 맵(스트리트 파크 · 아레나 · 네온 루프탑)에서 10분 넘게 버텨야 열린다 — 아직인 맵 목록(다 됐으면 null) */
+const farmLock = () => { const left = ['park', 'arena', 'roof'].filter(id => (save.stats[`best_${id}`] || 0) < 600); return left.length ? left : null }
 
 // 업적 — char = 여는 캐릭터, stat · goal = 모든 판을 합친 기록
 const ACH = [
@@ -757,6 +760,13 @@ function art(map) {
       }
       rr(c, 0, 6, T, 4, 2, '#9aa3b5')
     }, 1)
+  } else if (map.id === 'neon') {   // 네온 시티 — 검은 바닥 · 가는 네온 격자
+    A.tile = tile(c => {
+      c.fillStyle = '#07060f'; c.fillRect(0, 0, T, T)
+      c.strokeStyle = 'rgba(160,80,255,.16)'; c.lineWidth = 1; for (let i = 0; i <= T; i += 32) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, T); c.moveTo(0, i); c.lineTo(T, i); c.stroke() }
+      c.strokeStyle = 'rgba(60,230,255,.22)'; c.lineWidth = 1.6; for (let i = 0; i <= T; i += 128) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, T); c.moveTo(0, i); c.lineTo(T, i); c.stroke() }
+      specks(c, r, 700, ['#7ff3ff14', '#ff6bd514', '#00000040'])
+    })
   } else if (map.id === 'chal') {   // 챌린지 — 검은 결승 코트 마루
     A.tile = tile(c => {
       for (let y = 0; y < T; y += 16) {
@@ -798,10 +808,10 @@ function parkCourt(c, x, y) {
 }
 /** 코트 선 — 길이 L 을 94피트로 본 실제 비율(림은 끝줄에서 5.25 · 페인트존 19 × 16 · 자유투 원 6 · 3점 23.75, 코너 22 · 가운데 원 6피트)이라 선끼리 안 겹친다.
  *  paint 면 페인트존을, mid 면 가운데 원 안을 칠한다(로고는 부르는 쪽이 위에) */
-function court(c, x, y, L, D, col, paint, mid) {
+function court(c, x, y, L, D, col, paint, mid, lw = 3.4) {
   const u = L / 94, l = x - L / 2, rt = x + L / 2, key = 19 * u, kw = 8 * u, fr = 6 * u, r3 = 23.75 * u, sy = Math.min(22 * u, D / 2 - 3 * u), ang = Math.asin(sy / r3)
   if (paint) { c.fillStyle = paint; c.fillRect(l, y - kw, key, kw * 2); c.fillRect(rt - key, y - kw, key, kw * 2) }
-  c.strokeStyle = col; c.lineWidth = 3.4
+  c.strokeStyle = col; c.lineWidth = lw
   c.strokeRect(l, y - D / 2, L, D); c.strokeRect(l, y - kw, key, kw * 2); c.strokeRect(rt - key, y - kw, key, kw * 2)
   c.beginPath(); c.moveTo(x, y - D / 2); c.lineTo(x, y + D / 2); c.stroke()
   if (mid) ell(c, x, y, fr, fr, mid)
@@ -812,7 +822,7 @@ function court(c, x, y, L, D, col, paint, mid) {
     c.beginPath(); c.moveTo(bx, y - sy); c.lineTo(rx + s * Math.cos(ang) * r3, y - sy)
     s > 0 ? c.arc(rx, y, r3, -ang, ang) : c.arc(rx, y, r3, Math.PI + ang, Math.PI - ang, true)
     c.lineTo(bx, y + sy); c.stroke()
-    c.lineWidth = 4.4; c.beginPath(); c.moveTo(bx + s * 4 * u, y - 3 * u); c.lineTo(bx + s * 4 * u, y + 3 * u); c.stroke(); c.lineWidth = 3.4   // 백보드
+    c.lineWidth = lw * 1.3; c.beginPath(); c.moveTo(bx + s * 4 * u, y - 3 * u); c.lineTo(bx + s * 4 * u, y + 3 * u); c.stroke(); c.lineWidth = lw   // 백보드
     c.strokeStyle = '#ff7a1a'; c.beginPath(); c.arc(rx, y, Math.max(6, 0.9 * u), 0, TAU); c.stroke(); c.strokeStyle = col
   }
 }
@@ -841,6 +851,15 @@ function floor(c, map, x0, y0, w, H, t = 0) {
     return
   }
   for (let j = j0; j * T < y0 + H; j++) for (let i = i0; i * T < x0 + w; i++) c.drawImage(A.tile, i * T, j * T, T + 0.6, T + 0.6)
+  if (map.id === 'neon') {   // 네온 코트 — 넓게 번진 빛(굵고 흐린 선) 위에 가는 선, 코트마다 하늘 · 분홍이 번갈아 숨 쉰다
+    for (let mi = Math.floor((x0 - 710) / 1420); mi * 1420 - 710 < x0 + w; mi++) for (let mj = Math.floor((y0 - 440) / 880); mj * 880 - 440 < y0 + H; mj++) {
+      const x = mi * 1420, y = mj * 880, pink = (mi + mj) & 1, rgb = pink ? '255,90,220' : '60,230,255', a = 0.55 + Math.sin(t * 2 + mi + mj * 1.7) * 0.25
+      court(c, x, y, 1280, 740, `rgba(${rgb},${0.16 * a})`, null, null, 16)
+      court(c, x, y, 1280, 740, `rgba(${rgb},${0.9 * a + 0.1})`, null, null, 2.6)
+      c.font = 'italic 900 64px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = `rgba(${rgb},${0.5 * a})`; c.fillText('NEON', x, y + 4)
+    }
+    return
+  }
   if (map.id === 'chal') {   // 금빛 줄 코트 · 가운데 ∞
     for (let mi = Math.floor((x0 - 710) / 1420); mi * 1420 - 710 < x0 + w; mi++) for (let mj = Math.floor((y0 - 440) / 880); mj * 880 - 440 < y0 + H; mj++) {   // 코트(1280 × 740)마다 사이 140 — 가로세로 같게
       const x = mi * 1420, y = mj * 880
@@ -898,8 +917,16 @@ addEventListener('keydown', e => {
 })
 addEventListener('keyup', e => { const k = KEYS[e.code]; if (k) key[k] = 0 })
 const calm = () => { for (const k in key) key[k] = 0; joy.on = false; joy.id = null; joy.x = joy.y = 0 }
-addEventListener('blur', () => { calm(); if (mode === 'play') pause() })
-document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'play') pause() })
+addEventListener('blur', () => { calm(); if (mode === 'play' && !G?.auto) pause() })
+document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'play' && !G?.auto) pause() })
+// 자동사냥 중 탭을 가리면 브라우저가 그림(requestAnimationFrame)을 멈춘다 — 그동안은 1초마다 지난 시간만큼 판을 돌린다(한 번에 1분까지)
+let hidAt = 0
+setInterval(() => {
+  if (!document.hidden || mode !== 'play' || !G?.auto) { hidAt = 0; return }
+  const now = performance.now()
+  let left = Math.min(60, hidAt ? (now - hidAt) / 1000 : 1); hidAt = now
+  while (left > 0 && mode === 'play') { const d = Math.min(1 / 30, left); step(d); left -= d }
+}, 1000)
 // 손가락 스틱 — 화면 아무 데나 누른 자리가 가운데. 멀리 끌면 원이 손가락을 따라온다
 cv.addEventListener('pointerdown', e => {
   if (mode !== 'play') return
@@ -942,13 +969,19 @@ let mode = 'load', G = null, pl = null, S = null, menuChar = 0, menuMap = 0, sha
 const cam = { x: 0, y: 0 }
 const need = lv => Math.round((1 + 0.2 * Math.min(1, (lv - 1) / 15)) * (lv < 20 ? 5 + (lv - 1) * 7 : 138 + (lv - 20) * 12 + (lv - 20) ** 2))   // 다음 레벨까지 경험치 — 처음엔 예전 그대로, Lv 16 부터 1.2배. 20부터는 오를수록 더 많이, 늘어나는 폭도 커진다(30 → 430 · 40 → 934 · 50 → 1678)
 
+// 자동사냥(네온 시티) — 켜짐 · 공격형(atk) | 수비형(def). 이 브라우저에 기억한다
+const AUTO_KEY = 'survive.auto', autoSet = { on: true, mode: 'atk' }
+try { Object.assign(autoSet, JSON.parse(localStorage.getItem(AUTO_KEY)) || {}) } catch {}
+const keepAuto = () => { try { localStorage.setItem(AUTO_KEY, JSON.stringify(autoSet)) } catch {} }
 /** 판 하나 — 입은 스킨(옷 · 공 · 이펙트)으로. demo 면 상점 미리 보기 판(고른 스킨 · 업적 없음) */
 function newGame(ch, map, demo = null) {
   if (kOf() !== K) sprites(kOf())
   const fit = demo ? SKIN[demo.fit] : worn('fit', ch.id), ball = demo ? demo.ball : worn('ball', ch.id)?.id
   pl = { x: 0, y: 0, r: 12, hp: 1, inv: 0, face: [1, 0], fx: 1, jump: 0, moving: false, spr: playerSprites(ch, fit?.look) }
+  const auto = map.farm && !demo && autoSet.on ? autoSet.mode : null
   G = {
     demo, ball, aura: fit?.aura,   // 미리 보기 · 드리블 공 스킨 · 옷 오라
+    auto, autoUsed: !!auto, home: { x: 0, y: 0 }, autoA: 0, roam: null, roamT: 0,   // 자동사냥 — 'atk' | 'def' | null, 한 번이라도 켰으면 업적 · 랭킹 없음
     ch, map, t: 0, foes: [], shots: [], eshots: [], gems: [], items: [], fx: [], parts: [], nums: [], weapons: [], passives: {},
     kills: 0, lvl: 1, xp: 0, next: need(1), queue: [], cheer: 0, jackpots: 0, bosses: 0, lastHit: 0, freeze: 0, spawnT: 0.5,
     nextMascot: 140, nextSwarm: 100, got: [], dying: 0, bodyT: 0, banner: null,
@@ -960,7 +993,7 @@ function newGame(ch, map, demo = null) {
 }
 function start() {
   newGame(CHARS[menuChar], MAPS[menuMap])
-  mode = 'play'; ui.hidden = true; ui.classList.remove('is-box', 'is-shop'); pauseBtn.hidden = false
+  mode = 'play'; ui.hidden = true; ui.classList.remove('is-box', 'is-shop'); pauseBtn.hidden = false; autoUI()
 }
 /** 상점 미리 보기 — 그 캐릭터 · 스킨으로 판을 띄워 둘레의 수비(안 죽고 안 움직인다) 앞에서 원을 그리며 스킬을 쓴다 */
 function demo(o) {
@@ -1474,6 +1507,7 @@ function step(dt) {
   if (G.t >= MAX_T && !dead && !G.map.endless && !G.demo) return finish(true)   // 챌린지는 끝이 없다
   // 나
   let mx = key.r - key.l + joy.x, my = key.d - key.u + joy.y
+  if (G.auto && !dead && !mx && !my) [mx, my] = autoDir()   // 자동사냥 — 키 · 손가락을 대면 그동안은 내가
   const m = Math.hypot(mx, my)
   pl.moving = m > 0.12 && !dead
   if (pl.moving) {
@@ -1744,6 +1778,106 @@ function part(x, y, vx, vy, col, T, r) { if (G.parts.length < 360) G.parts.push(
 function num(x, y, v, kind) { if (G.nums.length > 70) G.nums.shift(); G.nums.push({ x: x + (rnd() - 0.5) * 10, y, v, kind, t: 0 }) }
 function say(s, T = 1.6, col = '#fff') { G.banner = { s, t: 0, T, col } }
 
+// ---------------------------------------------------------------- 자동사냥(네온 시티) — 16 방향 + 제자리 중 위험이 가장 적은 곳(밸런스 시뮬레이션의 봇)
+// 공격형: 넓게 돌아다니며 보석 · 아이템을 쓸어 담는다. 수비형: 처음 자리 둘레에서만, 아이템은 모아 뒀다가 필요할 때만 줍고 그 밖에는 밟지 않는다
+const statusOn = () => Object.keys(STATUS).some(sick)
+function needItem(k, close, bossNear) {   // 수비형 — 이 아이템을 지금 주울까
+  if (k === 'ring' || k === 'chest') return true
+  if (k === 'drink') return pl.hp < S.maxHp * 0.45
+  if (k === 'whistle') return G.gems.length > 60
+  if (k === 'clock') return close >= 12 || bossNear
+  if (k === 'buzzer') return close >= 16 || pl.hp < S.maxHp * 0.35
+  if (k === 'spray') return statusOn()
+  return false
+}
+function autoDir() {
+  const P = pl, def = G.auto === 'def'
+  const rushes = G.haz.filter(z => z.k === 'rush'), bombs = G.haz.filter(z => z.k !== 'rush')
+  const cand = G.foes.filter(e => !e.dead && Math.abs(e.x - P.x) < 330 && Math.abs(e.y - P.y) < 330)
+  const danger = (x, y) => {
+    let v = 0
+    for (const e of cand) {
+      let ex = e.x + e.vx * 0.15, ey = e.y + e.vy * 0.15, w = e.type === 'big' ? 2.2 : e.type === 'mascot' ? 3 : 1
+      if (e.rush) { ex += e.rush[0] * 0.25; ey += e.rush[1] * 0.25; w = 6 }
+      else if (e.boss) { w = e.st === 'dash' || e.st === 'wind' ? 8 : 4; if (e.st === 'wind' || e.st === 'dash') { const u = Math.max(0, (x - e.x) * e.dx + (y - e.y) * e.dy), px = e.x + e.dx * u, py = e.y + e.dy * u; if (u < 300 && Math.hypot(x - px, y - py) < e.r + 30) v += 40 } }
+      const d = Math.hypot(x - ex, y - ey); if (d < 200) v += w * (36 / (d + 8)) ** 2
+    }
+    for (const z of bombs) { const q = ((x - z.x) / (z.R + 26)) ** 2 + ((y - z.y) / ((z.R + 26) * 0.8)) ** 2; if (q < 1) v += 60 * (1.2 - q) }
+    for (const z of rushes) { const q = z.horiz ? Math.abs(y - z.gap) : Math.abs(x - z.gap); if (q > 34) v += 30 + q * 0.02 }
+    for (const e of G.eshots) { const d = Math.min(Math.hypot(x - e.x - e.vx * 0.3, y - e.y - e.vy * 0.3), Math.hypot(x - e.x, y - e.y)); if (d < 90) v += 6 * (30 / (d + 6)) ** 2 }
+    if (G.map.wall && Math.abs(y) > G.map.wall - 30) v += 5
+    return v
+  }
+  let g = null, gd = def ? 170 : 340
+  for (const q of G.gems) { const d = Math.hypot(q.x - P.x, q.y - P.y); if (d < gd) { gd = d; g = q } }
+  const close = cand.filter(e => !e.boss && Math.hypot(e.x - P.x, e.y - P.y) < 70).length, bossNear = cand.some(e => e.boss && Math.hypot(e.x - P.x, e.y - P.y) < 150)
+  const want = it => def ? needItem(it.k, close, bossNear) : it.k !== 'drink' || P.hp < S.maxHp * 0.85
+  if (!def && (!G.roam || G.t > G.roamT || Math.hypot(G.roam.x - P.x, G.roam.y - P.y) < 60)) {   // 공격형 — 갈 곳을 몇 초마다 새로(넓게 돈다)
+    const a = rnd() * TAU, d = 300 + rnd() * 400; G.roam = { x: P.x + Math.cos(a) * d, y: P.y + Math.sin(a) * d }; G.roamT = G.t + 6
+  }
+  let best = [0, 0], bv = Infinity
+  for (let i = -1; i < 16; i++) {
+    const dx = i < 0 ? 0 : Math.cos(i / 16 * TAU), dy = i < 0 ? 0 : Math.sin(i / 16 * TAU), nx = P.x + dx * 40, ny = P.y + dy * 40
+    let v = danger(nx, ny) + 0.6 * danger(P.x + dx * 90, P.y + dy * 90)
+    if (g) v -= (def ? 0.5 : 0.9) * Math.max(0, (dx * (g.x - P.x) + dy * (g.y - P.y)) / (gd || 1))
+    for (const it of G.items) {
+      const d = Math.hypot(it.x - P.x, it.y - P.y) || 1, big = it.k === 'ring' || it.k === 'chest'
+      if (want(it)) { if (big || d < 420) v -= (big ? 3 : 1.6) * Math.max(0, (dx * (it.x - P.x) + dy * (it.y - P.y)) / d) }
+      else if (def && Math.hypot(nx - it.x, ny - it.y) < 36) v += 6   // 모아 둘 아이템은 밟지 않는다
+    }
+    if (def) { const hd = Math.hypot(nx - G.home.x, ny - G.home.y); if (hd > 230) v += (hd - 230) * 0.05 }   // 수비형 — 처음 자리 둘레에서만
+    else if (!g) v -= 0.7 * Math.max(0, (dx * (G.roam.x - P.x) + dy * (G.roam.y - P.y)) / (Math.hypot(G.roam.x - P.x, G.roam.y - P.y) || 1))
+    v -= 0.25 * (dx * Math.cos(G.autoA) + dy * Math.sin(G.autoA))
+    if (i < 0) v += 0.4
+    if (v < bv) { bv = v; best = [dx, dy] }
+  }
+  if (best[0] || best[1]) G.autoA = Math.atan2(best[1], best[0])
+  return best
+}
+// 자동사냥 — 상자에서 고르기. 공격형은 움직이며 쓰는 스킬(유로스텝 · 덩크 · 크로스오버 · 프레스 …) · 이동 속도 · 자석, 수비형은 몸을 지키는 스킬(블록슛 · 프레스 · 스크린 …) · 체력 · 방어
+const AUTO_W = {
+  atk: { euro: 3.2, dunk: 3, cross: 2.8, press: 2.6, block: 2.5, rebound: 2.5, nolook: 2.4, bounce: 2.3, buzzer: 2.2, outlet: 2.2, three: 2.1, alley: 2.1, shotclock: 2.1, pass: 2, fade: 2, hook: 2, steal: 1.8, screen: 1.6 },
+  def: { block: 3.2, press: 3.1, screen: 3, dunk: 2.8, shotclock: 2.7, alley: 2.5, buzzer: 2.4, three: 2.4, rebound: 2.3, hook: 2.3, outlet: 2.2, steal: 2.2, nolook: 2.1, bounce: 2, cross: 2, pass: 1.8, fade: 1.8, euro: 0.8 },
+}
+const AUTO_P = {
+  atk: { shoes: 2.6, vision: 2.4, double: 2.4, rookie: 2.2, notes: 2.2, span: 2, weight: 2, handle: 1.8, stamina: 1.6, cardio: 1.5, clutch: 1.4, knee: 1.3, ice: 1.2 },
+  def: { knee: 2.6, cardio: 2.6, ice: 2.4, notes: 2.3, span: 2.3, double: 2.2, weight: 2.1, stamina: 2, vision: 1.6, handle: 1.4, rookie: 1.4, clutch: 1.4, shoes: 1.2 },
+}
+function autoScore(o) {
+  const m = G.auto || 'atk'
+  if (o.t === 'b') return AUTO_W[m][o.id] || 2
+  if (o.t === 'f') return o.id === 'drink' && pl.hp < S.maxHp * 0.5 ? 2.5 : 1.2
+  if (o.t === 'p') return (AUTO_P[m][o.id] || 1.5) + (o.fresh ? 0 : 0.3)
+  const own = G.weapons.find(w => w.id === o.id), mate = mateOf(o.id)
+  return (AUTO_W[m][o.id] || 2) + (own ? 0.5 : 0) + (!own && mate && G.weapons.some(w => w.id === mate) ? 0.6 : 0)
+}
+function autoBox(box) {   // 리롤 · 제외 · 스킵도 쓴다 — 셋 다 별로면 리롤, 안 맞는 새 스킬은 칸이 모자라기 전에 제외, 그래도 별로면 스킵
+  if (BOX !== box || !box.ready || !G.auto) return
+  if (box.jack) return box.act('take')
+  for (let guard = 0; guard < 8 && BOX === box; guard++) {
+    const sc = box.opts.map(autoScore), best = Math.max(...sc), bi = sc.indexOf(best)
+    if (box.brk) return box.pick(bi)
+    if (best < 2 && G.rr > 0) { box.act('rr'); continue }
+    const bad = box.opts.findIndex((o, i) => o.t === 'w' && o.fresh && sc[i] < 1.9)
+    if (bad >= 0 && bad !== bi && G.bans > 0 && G.weapons.length >= 3) { box.act('bans'); box.pick(bad); continue }
+    if (best < 1.5 && G.skips > 0) return box.act('skips')
+    return box.pick(bi)
+  }
+  if (BOX === box) box.pick(0)
+}
+/** 판 중 자동사냥 버튼(네온 시티) — 끔 → 공격형 → 수비형 → 끔 */
+const autoBtn = h('button', { type: 'button', className: 'sv-icon sv-autobtn', hidden: true, onclick: () => {
+  if (!G?.map.farm) return
+  G.auto = !G.auto ? 'atk' : G.auto === 'atk' ? 'def' : null
+  if (G.auto) { G.autoUsed = true; G.home = { x: pl.x, y: pl.y }; autoSet.on = true; autoSet.mode = G.auto } else autoSet.on = false
+  keepAuto(); autoUI()
+} })
+pauseBtn.before(autoBtn)
+function autoUI() {
+  autoBtn.hidden = !(G?.map.farm && (mode === 'play' || mode === 'box' || mode === 'pause'))
+  autoBtn.textContent = !G?.auto ? '자동 끔' : G.auto === 'atk' ? '자동 · 공격형' : '자동 · 수비형'
+  autoBtn.classList.toggle('is-on', !!G?.auto)
+}
 // ---------------------------------------------------------------- 레벨 업 상자 — 셋 중 하나, 잭팟이면 셋 다
 /** keep — 그대로 둘 카드(제외로 한 장만 바꿀 때). 제외한 카드 · keep 에 있는 카드는 안 나온다 */
 function offers(keep = []) {
@@ -1823,7 +1957,7 @@ function openBox() {
     (!brk || jack) && h('div', { className: 'sv-acts' }, takeBtn, btns),
     jack && h('div', { className: 'sv-confetti', 'aria-hidden': 'true' }, Array.from({ length: 46 }, () => h('i', { style: `--x:${rnd() * 100}%;--d:${(rnd() * 0.6).toFixed(2)}s;--t:${(1.6 + rnd() * 1.4).toFixed(2)}s;--r:${(rnd() * 900 - 450) | 0}deg;--c:${pickOf(['#ffd23f', '#ff6b6b', '#5ab0ff', '#62e38a', '#fff', '#ff9be9'])}` }))))
   ui.replaceChildren(root); ui.hidden = false; ui.classList.add('is-box')
-  const box = BOX = { opts, jack, opened: false, ready: false, ban: false, open, pick, act }
+  const box = BOX = { opts, jack, brk, opened: false, ready: false, ban: false, open, pick, act }
   const sync = () => {
     root.classList.toggle('is-ban', box.ban)
     hint.textContent = box.ban ? '이번 게임에서 뺄 카드를 고르세요(다시 누르면 취소)' : jack ? (brk ? '챔피언 반지 잭팟 — 모두 돌파해요!' : '셋 다 가져요!') : brk ? '챔피언 반지 — 돌파할 스킬을 고르세요(스킬마다 한 번)' : '하나를 고르세요'
@@ -1832,7 +1966,8 @@ function openBox() {
   sync()
   const timer = setTimeout(open, jack || brk ? 1400 : 600)
   ui.onpointerdown = e => { if (BOX === box && !box.opened) { open(); e.preventDefault() } }
-  const ready = () => { if (BOX !== box) return; box.ready = true; root.classList.add('is-ready'); (takeBtn || root.querySelector('.sv-card'))?.focus({ preventScroll: true }) }
+  const ready = () => { if (BOX !== box) return; box.ready = true; root.classList.add('is-ready'); (takeBtn || root.querySelector('.sv-card'))?.focus({ preventScroll: true }); if (G.auto) setTimeout(() => autoBox(box), 650) }
+  if (G.auto && document.hidden) { open(); box.ready = true; return autoBox(box) }   // 가려진 탭 — 기다리지 않고 바로 고른다
   function open() {   // 이 상자가 아직 떠 있을 때만 — 시간이 다 돼서든 눌러서든 한 번
     if (box.opened || BOX !== box) return
     clearTimeout(timer); box.opened = true; root.classList.add('is-open')
@@ -2377,7 +2512,7 @@ function show(keepScroll, ...kids) {
 }
 const saveNote = () => auth === 'in' ? `업적이 ${me?.name ?? ''} 계정에 저장돼요 — 다른 기기에서도 이어져요` : '로그인하지 않으면 업적은 이 브라우저에만 남아요. 로그인하면 계정에 합쳐져요'
 function title() {
-  mode = 'menu'; G = null; pauseBtn.hidden = true; ui.classList.remove('is-shop')
+  mode = 'menu'; G = null; pauseBtn.hidden = true; ui.classList.remove('is-shop'); autoUI()
   const got = ACH.filter(a => save.ach[a.id]).length
   show(false, h('div', { className: 'sv-title' },
     h('p', { className: 'sv-logo' }, h('span', {}, 'DUNK'), h('span', {}, 'SURVIVOR')),
@@ -2386,7 +2521,7 @@ function title() {
     h('p', { className: 'sv-note' }, saveNote())))
 }
 function chars(keep = false) {
-  mode = 'menu'; G = null; pauseBtn.hidden = true; ui.classList.remove('is-shop')
+  mode = 'menu'; G = null; pauseBtn.hidden = true; ui.classList.remove('is-shop'); autoUI()
   const ch = CHARS[menuChar], lock = lockOf(ch), W = WEAP[ch.w]
   show(keep === true, h('div', { className: 'sv-panel sv-wide' },
     h('p', { className: 'sv-h' }, '캐릭터 고르기'),
@@ -2412,14 +2547,24 @@ function preview(m) {
   return PREVIEW[m.id] = a
 }
 function maps(keep = false) {
+  const cur = MAPS[menuMap], lock = cur.farm && farmLock()
+  const seg = (opts, v, set) => h('div', { className: 'sv-seg', role: 'tablist' }, opts.map(([n, x]) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(x === v), onclick: () => { set(x); keepAuto(); maps(true) } }, n)))
   show(keep === true, h('div', { className: 'sv-panel sv-wide' },
     h('p', { className: 'sv-h' }, '맵 고르기'),
     h('div', { className: 'sv-maps' }, MAPS.map((m, i) => {
-      const best = save.stats[`best_${m.id}`]
-      return h('button', { type: 'button', className: 'sv-map', 'aria-pressed': String(i === menuMap), onclick: () => { menuMap = i; maps(true) }, ondblclick: start },
-        preview(m), h('b', {}, m.name), h('small', {}, m.note), h('small', { className: 'sv-best' }, best ? `최고 ${fmt(best)}` : '아직 기록 없음'))
+      const best = save.stats[`best_${m.id}`], lk = m.farm && farmLock()
+      return h('button', { type: 'button', className: `sv-map${lk ? ' is-locked' : ''}`, 'aria-pressed': String(i === menuMap), onclick: () => { menuMap = i; maps(true) }, ondblclick: () => !lk && start() },
+        preview(m), h('b', {}, m.name), h('small', {}, m.note), h('small', { className: 'sv-best' }, lk ? '잠김' : m.farm ? '포인트 사냥터' : best ? `최고 ${fmt(best)}` : '아직 기록 없음'))
     })),
-    row(btn('← 캐릭터', () => chars()), btn('시작!', start, 'is-main'))))
+    cur.farm && (lock ? h('p', { className: 'sv-lockmsg' }, `잠김 — 스트리트 파크 · 아레나 · 네온 루프탑에서 각각 10분 넘게 버티면 열려요(남은 맵: ${lock.map(mapName).join(' · ')})`)
+      : h('div', { className: 'sv-autoset' },   // 자동사냥 — 켬 · 끔, 공격형 · 수비형(판 중에도 위의 버튼으로 바꾼다)
+        h('b', {}, '자동사냥'), seg([['켬', true], ['끔', false]], autoSet.on, v => { autoSet.on = v }),
+        autoSet.on && seg([['공격형', 'atk'], ['수비형', 'def']], autoSet.mode, v => { autoSet.mode = v }),
+        h('small', {}, !autoSet.on ? '직접 움직여요 — 판 중에도 위의 「자동」 버튼으로 켤 수 있어요'
+          : autoSet.mode === 'atk' ? '넓게 돌아다니며 보석 · 아이템을 쓸어 담아요 — 움직이며 쓰는 스킬 위주로 고르고 리롤 · 스킵 · 제외도 써요'
+          : '처음 자리 둘레에서만 버텨요 — 아이템은 모아 뒀다가 필요할 때만 줍고, 몸을 지키는 스킬 위주로 골라요'),
+        h('small', {}, '자동사냥을 켠 판은 포인트만 받고 업적 · 랭킹에는 안 들어가요'))),
+    row(btn('← 캐릭터', () => chars()), Object.assign(btn('시작!', start, 'is-main'), { disabled: !!lock }))))
 }
 function progress(a) {
   if (a.stat) return `${Math.min(a.goal, save.stats[a.stat] || 0).toLocaleString()} / ${a.goal.toLocaleString()}`
@@ -2569,10 +2714,11 @@ function buyList() {
     logState() || (LOG.buys.length ? h('ol', { className: 'sv-log' }, LOG.buys.map(x => buyRow(x, true))) : h('p', { className: 'sv-note' }, '아직 구매가 없어요')),
     auth !== 'in' && loginNote('로그인하면 산 스킨이 구매 내역에 올라가요'))
 }
+const RMAPS = MAPS.filter(m => !m.farm)   // 랭킹 맵 — 포인트 사냥터(네온 시티)는 없다
 function rankList(tab, set) {
-  const m = MAPS[tab], rows = RANK?.ranking?.[m.id] || [], mine = RANK?.mine?.[m.id], isMe = r => mine && r.rank === mine.rank && r.name === me?.name
+  const m = RMAPS[tab], rows = RANK?.ranking?.[m.id] || [], mine = RANK?.mine?.[m.id], isMe = r => mine && r.rank === mine.rank && r.name === me?.name
   return h('div', { className: 'sv-rank' },
-    h('div', { className: 'sv-tabs', role: 'tablist' }, MAPS.map((x, i) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(i === tab), onclick: () => set(i) }, x.name))),
+    h('div', { className: 'sv-tabs', role: 'tablist' }, RMAPS.map((x, i) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(i === tab), onclick: () => set(i) }, x.name))),
     !RANK ? h('p', { className: 'sv-note' }, '불러오는 중…')
       : RANK.error ? h('p', { className: 'sv-note' }, '랭킹을 불러오지 못했어요')
       : !rows.length ? h('p', { className: 'sv-note' }, '아직 기록이 없어요 — 첫 기록의 주인공이 되어 보세요')
@@ -2614,20 +2760,23 @@ function pause() {
 function resume() { if (mode !== 'pause') return; mode = 'play'; ui.hidden = true; pauseBtn.hidden = false }
 function finish(win, quit = false) {
   if (mode === 'over' || G.demo) return
-  mode = 'over'; pauseBtn.hidden = true; calm()
-  const st = save.stats, add = (k, v) => { st[k] = (st[k] || 0) + v }
-  add('kills', G.kills); add('runs', 1); add('jackpots', G.jackpots); add('bosses', G.bosses)
-  st[`best_${G.map.id}`] = Math.max(st[`best_${G.map.id}`] || 0, G.t | 0)
-  st[`p_${G.ch.id}`] = 1
+  mode = 'over'; pauseBtn.hidden = true; calm(); autoUI()
+  const st = save.stats, add = (k, v) => { st[k] = (st[k] || 0) + v }, rec = !G.autoUsed   // 자동사냥을 켠 판은 포인트만 — 기록 · 업적은 안 센다
+  if (rec) {
+    add('kills', G.kills); add('runs', 1); add('jackpots', G.jackpots); add('bosses', G.bosses)
+    st[`best_${G.map.id}`] = Math.max(st[`best_${G.map.id}`] || 0, G.t | 0)
+    st[`p_${G.ch.id}`] = 1
+  }
   gain('run1')
   if (win) { gain('surv30'); gain(`clear_${G.map.id}`) }
   const pt = runPts(win); add('pts', pt.total)   // 포인트 — 상점에서 스킨을 산다
-  for (const a of ACH) if (a.stat && (st[a.stat] || 0) >= a.goal) gain(a.id)
-  if (CHARS.every(c => st[`p_${c.id}`])) gain('allchar')
+  if (rec) for (const a of ACH) if (a.stat && (st[a.stat] || 0) >= a.goal) gain(a.id)
+  if (rec && CHARS.every(c => st[`p_${c.id}`])) gain('allchar')
   persist(true)
   // 랭킹 — 로그인했으면 바로 올리고, 아니면 이 판을 남겨 뒀다가 로그인하고 돌아오면(pull)
   const run = { map: G.map.id, hero: G.ch.id, secs: G.t | 0, kills: G.kills, lvl: G.lvl, skills: G.weapons.map(iconOf) }, rankMsg = h('p', { className: 'sv-rankmsg' })
-  if (run.secs >= 10) {
+  if (G.map.farm) rankMsg.textContent = `포인트 사냥터라 랭킹에는 올라가지 않아요${G.autoUsed ? ' — 자동사냥 판은 업적도 없어요' : ''}`
+  else if (run.secs >= 10) {
     if (auth === 'in') { rankMsg.textContent = '랭킹에 기록을 올리는 중…'; submit(run, rankMsg) }
     else {
       try { const old = JSON.parse(localStorage.getItem(PENDING)); if (better(run, old?.map === run.map ? old : null)) localStorage.setItem(PENDING, JSON.stringify({ ...run, at: Date.now() })) } catch {}
@@ -2647,7 +2796,7 @@ function finish(win, quit = false) {
     row(btn('다시 하기', start, 'is-main'), btn('캐릭터 고르기', () => chars()), btn('처음으로', title))))
 }
 function gain(id) {
-  if (save.ach[id] || G?.demo) return   // 상점 미리 보기 판은 업적이 없다
+  if (save.ach[id] || G?.demo || G?.autoUsed) return   // 상점 미리 보기 · 자동사냥을 켠 판은 업적이 없다
   save.ach[id] = Date.now()
   const a = ACH.find(x => x.id === id), c = a.char && CHARS.find(x => x.id === a.char)
   G?.got.push(a)
@@ -2673,6 +2822,13 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '새 맵 — 네온 시티(포인트 사냥터)', items: [
+    '네온 시티 — 숨 쉬듯 빛나는 네온 코트. 스트리트 파크 · 아레나 · 네온 루프탑에서 각각 10분 넘게 버티면 열려요',
+    '자동사냥 — 맵을 고를 때 켬 · 끔과 공격형(기본) · 수비형을 고르고, 판 중에는 위의 「자동」 버튼으로 바꿔요. 키 · 손가락을 대면 그동안은 직접 움직여요',
+    '공격형 — 넓게 돌아다니며 보석 · 아이템을 쓸어 담고, 움직이며 쓰는 스킬(유로스텝 · 덩크 · 크로스오버 · 프레스 …) · 이동 속도 · 자석 위주로 골라요. 리롤 · 스킵 · 제외도 알아서 써요',
+    '수비형 — 처음 자리 둘레에서만 버티고, 아이템은 밟지 않고 모아 뒀다가 필요할 때만(체력이 낮을 때 드링크, 둘러싸이면 타임아웃 · 버저, 상태이상이면 스프레이 …) 주워요. 몸을 지키는 스킬(블록슛 · 프레스 · 스크린 …) · 체력 · 방어 위주',
+    '자동사냥 중에는 다른 창 · 탭으로 가도 일시정지되지 않고 계속 돌아요(멈추려면 일시정지 버튼)',
+    '포인트 사냥터라 랭킹에는 안 올라가요. 자동사냥을 켠 판은 포인트만 받고 업적 · 기록에는 안 들어가요'] },
   { date: '2026-11-02', title: '캐릭터 목 · 옷깃', items: [
     '선수 얼굴 그림의 턱 아래(그림 속 목 · 옷깃 · 어깨 옷)를 잘라 얼굴만 써요 — 몸 그림의 목 · 유니폼에 바로 이어져요(커리의 흰 옷깃, 요키치의 빨간 옷깃, 탐슨의 보라 옷깃 등이 사라졌어요)',
     '얼굴을 조금 작게(86%) 하고, 비스듬히 본 얼굴도 턱이 몸의 목 위에 오게 맞췄어요 — 머리가 어깨 위에 자연스럽게 얹혀요'] },
