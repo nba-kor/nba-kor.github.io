@@ -765,6 +765,7 @@ function start() {
     kills: 0, lvl: 1, xp: 0, next: need(1), queue: [], cheer: 0, jackpots: 0, bosses: 0, lastHit: 0, freeze: 0, spawnT: 0.5,
     nextMascot: 140, nextSwarm: 100, got: [], dying: 0, bodyT: 0, banner: null,
     haz: [], sts: {}, pi: 0, nextEvt: 930, nextWave: 1800, mids: 0, late: 0, breaks: 0,   // 바닥 경고(폭격 · 러시 · 착지) · 상태이상(끝나는 시각) · PLAN 다음 차례
+    rr: 2, skips: 2, bans: 2, banned: new Set(),   // 상자에서 쓰는 리롤 · 스킵 · 제외(한 판에 두 번씩) · 제외한 카드(t + id)
   }
   S = null; addWeapon(ch.w); stats(); pl.hp = S.maxHp
   cam.x = cam.y = 0; calm()
@@ -1439,14 +1440,16 @@ function num(x, y, v, kind) { if (G.nums.length > 70) G.nums.shift(); G.nums.pus
 function say(s, T = 1.6, col = '#fff') { G.banner = { s, t: 0, T, col } }
 
 // ---------------------------------------------------------------- 레벨 업 상자 — 셋 중 하나, 잭팟이면 셋 다
-function offers() {
+/** keep — 그대로 둘 카드(제외로 한 장만 바꿀 때). 제외한 카드 · keep 에 있는 카드는 안 나온다 */
+function offers(keep = []) {
   const pool = [], has = id => G.weapons.find(w => w.id === id)
-  let wFree = 6 - G.weapons.length, pFree = 6 - Object.keys(G.passives).length
-  for (const w of G.weapons) if (w.lv < 8) pool.push({ t: 'w', id: w.id, wt: 1.1 })
-  if (wFree > 0) for (const id in WEAP) if (!has(id)) pool.push({ t: 'w', id, wt: 0.8, fresh: true })
-  for (const id in G.passives) if (G.passives[id] < PASS[id].max) pool.push({ t: 'p', id, wt: 0.9 })
-  if (pFree > 0) for (const id in PASS) if (!(id in G.passives)) pool.push({ t: 'p', id, wt: 0.6, fresh: true })
-  const out = []
+  const add = o => G.banned.has(o.t + o.id) || keep.some(k => k.t === o.t && k.id === o.id) || pool.push(o)
+  let wFree = 6 - G.weapons.length - keep.filter(o => o.fresh && o.t === 'w').length, pFree = 6 - Object.keys(G.passives).length - keep.filter(o => o.fresh && o.t === 'p').length
+  for (const w of G.weapons) if (w.lv < 8) add({ t: 'w', id: w.id, wt: 1.1 })
+  if (wFree > 0) for (const id in WEAP) if (!has(id)) add({ t: 'w', id, wt: 0.8, fresh: true })
+  for (const id in G.passives) if (G.passives[id] < PASS[id].max) add({ t: 'p', id, wt: 0.9 })
+  if (pFree > 0) for (const id in PASS) if (!(id in G.passives)) add({ t: 'p', id, wt: 0.6, fresh: true })
+  const out = [...keep]
   while (out.length < 3 && pool.length) {
     let q = rnd() * pool.reduce((s, o) => s + o.wt, 0), i = 0
     while ((q -= pool[i].wt) > 0 && i < pool.length - 1) i++
@@ -1483,38 +1486,69 @@ function take(o) {
   else { G.cheer++; stats() }
 }
 let BOX = null
+const ACTS = [['rr', '리롤'], ['skips', '스킵'], ['bans', '제외']]
 function openBox() {
   const src = G.queue.shift(), chest = src === 'chest', brk = src === 'break'
   const jack = !brk && rnd() < (chest ? 0.5 : 0.01 * S.luck * (G.ch.mod.jackpot ? 2 : 1))   // 잭팟 — 기본 1%(행운 배수)
   const opts = brk ? breaks() : offers()
   if (!opts.length) return   // 반지를 주웠는데 돌파할 스킬이 없으면(ringable 이 막아 거의 없다) 그냥 지나간다
   mode = 'box'; calm(); pauseBtn.hidden = true
-  const cards = opts.map((o, i) => {
+  const card = (o, i) => {
     const L = label(o)
-    return h('button', { type: 'button', className: `sv-card sv-card-${o.t}`, style: `--i:${i}`, onclick: () => choose(i) },
+    return h('button', { type: 'button', className: `sv-card sv-card-${o.t}`, style: `--i:${i}`, onclick: () => pick(i) },
       h('img', { src: ICON_URL[o.t === 'b' ? `${o.id}+` : o.id], alt: '' }), h('small', {}, L.lv), h('b', {}, L.name), h('span', {}, L.note), h('kbd', {}, String(i + 1)))
-  })
+  }
+  const cards = h('div', { className: 'sv-cards' }, opts.map(card)), hint = h('p', { className: 'sv-hint' })
+  // 리롤 · 스킵 · 제외 — 반지(돌파) 상자에는 없다. 잭팟이면 「셋 다 받기」를 눌러야 받는다
+  const btns = brk ? [] : ACTS.map(([k, s], j) => h('button', { type: 'button', className: 'sv-act', onclick: () => act(k) }, s, h('em'), h('kbd', {}, String(j + 4))))
+  const takeBtn = jack && h('button', { type: 'button', className: 'sv-act sv-act-take', onclick: () => act('take') }, '셋 다 받기')
   const root = h('div', { className: `sv-box${jack ? ' is-jackpot' : ''}${chest ? ' is-chest' : ''}${brk ? ' is-break' : ''}` },
     h('div', { className: 'sv-rays' }),
     h('p', { className: 'sv-box-title' }, brk ? '돌파' : chest ? '트로피 상자!' : `LEVEL ${G.lvl - G.queue.filter(q => q === 'level').length}`),
     h('div', { className: 'sv-chest' }, h('i', { className: 'sv-glow' }), h('i', { className: 'sv-base' }), h('i', { className: 'sv-lid' }), h('i', { className: 'sv-lock' })),
     h('p', { className: 'sv-jack' }, 'JACKPOT!!'),
-    h('div', { className: 'sv-cards' }, cards),
-    h('p', { className: 'sv-hint' }, jack ? '셋 다 가져요!' : brk ? '챔피언 반지 — 돌파할 스킬을 고르세요(스킬마다 한 번)' : '하나를 고르세요'),
+    cards, hint,
+    !brk && h('div', { className: 'sv-acts' }, takeBtn, btns),
     jack && h('div', { className: 'sv-confetti', 'aria-hidden': 'true' }, Array.from({ length: 46 }, () => h('i', { style: `--x:${rnd() * 100}%;--d:${(rnd() * 0.6).toFixed(2)}s;--t:${(1.6 + rnd() * 1.4).toFixed(2)}s;--r:${(rnd() * 900 - 450) | 0}deg;--c:${pickOf(['#ffd23f', '#ff6b6b', '#5ab0ff', '#62e38a', '#fff', '#ff9be9'])}` }))))
   ui.replaceChildren(root); ui.hidden = false; ui.classList.add('is-box')
-  const box = BOX = { opts, jack, opened: false, ready: false, open }
+  const box = BOX = { opts, jack, opened: false, ready: false, ban: false, open, pick, act }
+  const sync = () => {
+    root.classList.toggle('is-ban', box.ban)
+    hint.textContent = box.ban ? '이번 게임에서 뺄 카드를 고르세요(다시 누르면 취소)' : jack ? '셋 다 가져요!' : brk ? '챔피언 반지 — 돌파할 스킬을 고르세요(스킬마다 한 번)' : '하나를 고르세요'
+    btns.forEach((b, j) => { const k = ACTS[j][0]; b.querySelector('em').textContent = G[k]; b.disabled = !G[k]; b.classList.toggle('is-on', box.ban && k === 'bans') })
+  }
+  sync()
   const timer = setTimeout(open, jack || brk ? 1400 : 600)
-  ui.onpointerdown = e => { if (BOX !== box) return; if (!box.opened) { open(); e.preventDefault() } else if (jack && box.ready) next() }
-  const ready = () => { if (BOX !== box) return; box.ready = true; root.classList.add('is-ready'); jack || root.querySelector('.sv-card')?.focus({ preventScroll: true }) }
+  ui.onpointerdown = e => { if (BOX === box && !box.opened) { open(); e.preventDefault() } }
+  const ready = () => { if (BOX !== box) return; box.ready = true; root.classList.add('is-ready'); (takeBtn || root.querySelector('.sv-card'))?.focus({ preventScroll: true }) }
   function open() {   // 이 상자가 아직 떠 있을 때만 — 시간이 다 돼서든 눌러서든 한 번
     if (box.opened || BOX !== box) return
     clearTimeout(timer); box.opened = true; root.classList.add('is-open')
-    if (jack) { G.jackpots++; gain('jackpot1'); opts.forEach(take); ui.append(h('i', { className: 'sv-flash' })); setTimeout(ready, 1100) }
+    if (jack) { G.jackpots++; gain('jackpot1'); ui.append(h('i', { className: 'sv-flash' })); setTimeout(ready, 1100) }
     else setTimeout(ready, 380)
   }
+  function pick(i) {
+    const o = box.opts[i]
+    if (!o || !box.ready || BOX !== box) return
+    if (box.ban) {   // 제외 — 이번 게임에서 안 나오고, 그 자리에 새 카드
+      if (o.t === 'f') return
+      G.bans--; G.banned.add(o.t + o.id); box.ban = false
+      box.opts = offers(box.opts.filter(x => x !== o)); box.opts.splice(i, 0, box.opts.pop())
+      cards.children[i].replaceWith(card(box.opts[i], i)); return sync()
+    }
+    if (jack) return
+    take(o); next()
+  }
+  function act(k) {
+    if (!box.ready || BOX !== box || brk) return
+    if (k === 'take') { box.opts.forEach(take); return next() }
+    if (!G[k]) return
+    if (k === 'bans') { box.ban = !box.ban; return sync() }
+    G[k]--
+    if (k === 'skips') return next()
+    box.opts = offers(); box.ban = false; cards.replaceChildren(...box.opts.map(card)); sync()   // 리롤 — 셋 다 새로
+  }
 }
-function choose(i) { if (!BOX?.ready || BOX.jack) return; take(BOX.opts[i]); next() }
 function next() {
   BOX = null; ui.classList.remove('is-box'); ui.onpointerdown = null
   if (G.queue.length) return openBox()
@@ -1522,10 +1556,10 @@ function next() {
   fx({ k: 'pillar', T: 0.7 }); fx({ k: 'ring', x: pl.x, y: pl.y, R: 90, T: 0.5, col: '#7ff3ff' })   // 레벨 업 빛기둥
 }
 function boxKey(e) {
-  if (!BOX) return
+  if (!BOX || e.repeat) return
   if (!BOX.opened && ['Enter', 'Space'].includes(e.code)) { BOX.open(); e.preventDefault() }
-  else if (BOX.jack && BOX.ready && ['Enter', 'Space', 'Escape'].includes(e.code)) { next(); e.preventDefault() }
-  else if (/^Digit[1-3]$/.test(e.code)) { choose(+e.code.slice(5) - 1); e.preventDefault() }
+  else if (BOX.jack && ['Enter', 'Space'].includes(e.code) && !e.target.closest?.('button')) { BOX.act('take'); e.preventDefault() }
+  else if (/^Digit[1-6]$/.test(e.code)) { const i = +e.code.slice(5) - 1; i < 3 ? BOX.pick(i) : BOX.act(ACTS[i - 3][0]); e.preventDefault() }
 }
 
 // ---------------------------------------------------------------- 그리기
@@ -2077,6 +2111,10 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '리롤 · 스킵 · 제외', items: [
+    '레벨 업 상자에서 한 게임에 두 번씩 쓸 수 있어요 — 리롤(카드 셋을 새로) · 스킵(이번엔 안 고르기) · 제외(카드 하나를 골라 이번 게임에서 다시 안 나오게, 그 자리엔 새 카드)',
+    '잭팟 · 트로피 상자에서도 써요. 잭팟은 이제 「셋 다 받기」를 눌러야 받아요(리롤 · 제외로 바꾼 뒤 받거나, 스킵으로 안 받을 수도). 챔피언 반지(돌파) 상자에는 없어요',
+    '키보드는 4 리롤 · 5 스킵 · 6 제외'] },
   { date: '2026-11-02', title: '성장 더 느리게 · 넉백 · 잭팟', items: [
     '줍는 경험치를 20% 줄이고, 레벨 업에 필요한 경험치를 늘렸어요(Lv 16 부터 20% — 처음 몇 레벨은 그대로) — 스킬을 다 키우는 때가 17분쯤에서 22분쯤으로',
     '잭팟이 아주 드물어졌어요 — 기본 확률 7% → 1%(행운 · 돈치치 2배는 그대로, 트로피 상자는 50% 그대로)',

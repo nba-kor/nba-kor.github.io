@@ -1707,12 +1707,26 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-card b { font-size: 1.12em; }
 .sv-card span { color: #c9d1e0; font-size: .86em; line-height: 1.35; }
 .sv-card kbd { position: absolute; top: 6px; left: 6px; min-width: 18px; padding: 0 4px; border: 1px solid #ffffff55; border-radius: 4px; font: 700 11px/16px ui-monospace, monospace; color: #c9d1e0; }
-@media (pointer: coarse) { .sv-card kbd { display: none; } }
+@media (pointer: coarse) { .sv-card kbd, .sv-act kbd { display: none; } }
 .sv-box.is-open .sv-card { animation: sv-card .5s calc(.12s + var(--i) * .09s) cubic-bezier(.2, 1.4, .4, 1) forwards; }
 .sv-box.is-ready:not(.is-jackpot) .sv-card { pointer-events: auto; cursor: pointer; }
 .sv-box.is-ready .sv-card:hover, .sv-box.is-ready .sv-card:focus-visible { transform: translateY(-5px); border-color: #ffd23f; outline: none; box-shadow: 0 0 0 3px #ffd23f55, 0 10px 24px #0008; }
 .sv-hint { margin: 0; color: #c9d1e0; opacity: 0; }
 .sv-box.is-ready .sv-hint { opacity: 1; transition: opacity .3s; }
+/* 리롤 · 스킵 · 제외(한 판에 두 번씩) — 제외를 누르면 카드가 빨갛게, 고른 카드는 이번 게임에서 빠진다 */
+.sv-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.4cqmin; opacity: 0; pointer-events: none; }
+.sv-box.is-ready .sv-acts { opacity: 1; pointer-events: auto; transition: opacity .3s; }
+.sv-act { display: inline-flex; align-items: center; gap: .45em; padding: .45em .95em; border-radius: 999px; border: 2px solid #ffffff38; background: #151a28e6; color: #fff; font: 800 .95em system-ui, sans-serif; cursor: pointer; transition: border-color .12s, background .12s; }
+.sv-act em { min-width: 1.5em; padding: 0 .3em; border-radius: 999px; background: #ffffff1c; font-style: normal; color: #ffd23f; text-align: center; }
+.sv-act kbd { padding: 0 4px; border: 1px solid #ffffff55; border-radius: 4px; font: 700 11px/16px ui-monospace, monospace; color: #c9d1e0; }
+.sv-act:hover:not(:disabled), .sv-act:focus-visible { border-color: #ffd23f; outline: none; }
+.sv-act:disabled { opacity: .35; cursor: default; }
+.sv-act.is-on { border-color: #ff6b6b; background: #5a1a24; }
+.sv-act-take { border-color: #ffd23f; background: linear-gradient(#ffe066, #d99a1f); color: #2a1200; }
+.sv-act-take:hover, .sv-act-take:focus-visible { border-color: #fff; }
+.sv-box.is-ready.is-ban .sv-card { pointer-events: auto; cursor: pointer; }
+.sv-box.is-ready.is-ban .sv-card:hover, .sv-box.is-ready.is-ban .sv-card:focus-visible { border-color: #ff6b6b; box-shadow: 0 0 0 3px #ff6b6b66, 0 10px 24px #0008; }
+.sv-box.is-ban .sv-card-f { filter: grayscale(1) brightness(.55); pointer-events: none; }
 .sv-jack { display: none; margin: 0; font: italic 900 11cqmin/1 system-ui, sans-serif; letter-spacing: .02em; background: linear-gradient(90deg, #fff3b0, #ffb400, #ff6a00, #ffd23f, #fff3b0) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 .05em 0 #7a2a00) drop-shadow(0 0 .25em #ffb400); }
 .sv-box.is-jackpot.is-open .sv-jack { display: block; animation: sv-jack .6s cubic-bezier(.2, 1.8, .4, 1) both, sv-shine 1.2s linear infinite; }
 .sv-box.is-jackpot.is-open .sv-box-title { display: none; }
