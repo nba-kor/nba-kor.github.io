@@ -2333,7 +2333,7 @@ function title() {
   show(false, h('div', { className: 'sv-title' },
     h('p', { className: 'sv-logo' }, h('span', {}, 'DUNK'), h('span', {}, 'SURVIVOR')),
     h('p', { className: 'sv-sub' }, '몰려오는 수비를 피해 30분을 버텨라'),
-    row(btn('게임 시작', chars, 'is-main'), btn(`상점 · ${points().toLocaleString()} P`, () => shop()), btn('리더보드', ranks), btn(`업적 ${got} / ${ACH.length}`, achs), btn(['패치 노트', notesNew() && h('i', { className: 'sv-new' }, 'NEW')], notes)),
+    row(btn('게임 시작', chars, 'is-main'), btn(`상점 · ${points().toLocaleString()} P`, () => shop()), btn('마이페이지', () => shop(true)), btn('리더보드', ranks), btn(`업적 ${got} / ${ACH.length}`, achs), btn(['패치 노트', notesNew() && h('i', { className: 'sv-new' }, 'NEW')], notes)),
     h('p', { className: 'sv-note' }, saveNote())))
 }
 function chars(keep = false) {
@@ -2387,8 +2387,7 @@ function achList() {
   }))
 }
 // ---- 상점 · 옷장 — 포인트로 스킨을 사고(옷장은 가진 것만) 캐릭터마다 입힌다. 고른 스킨은 뒤의 미리 보기 판에 바로 보인다
-const CLOSET = new URLSearchParams(location.search).has('closet')   // 내 정보 페이지 안(iframe)의 옷장
-if (CLOSET) document.body.classList.add('sv-embed')   // 페이지 머리 · 설명은 숨기고 게임 화면만
+let closetOn = false   // 마이페이지 — 상점과 같은 화면에 가진 스킨만(사지 않고 입히기만)
 const SHOP_TABS = [['fx', '스킬 이펙트'], ['ball', '농구공'], ['fit', '옷'], ['ach', '업적 스킨']]
 const FX_NOTE = [, '서리 빛 · 하얀 알갱이', '불꽃 혜성 꼬리 · 테두리에 타는 불꽃 · 맞은 자리에 남는 불길', '무지개 혜성 꼬리 · 공 둘레를 도는 별 · 맞은 자리 별빛 폭발', '금빛 혜성 꼬리 · 도는 별 · 별빛 폭발 · 맞은 자리에 빛기둥']
 const AURA_NOTE = { flame: '몸에서 불꽃이 피어오른다', halo: '머리 위 후광 · 뒤에 빛살', storm: '몸 둘레에 번개가 튄다', legend: '바닥에 도는 문양 · 빛기둥 · 별빛 · 걸을 때 빛 발자국' }
@@ -2397,7 +2396,7 @@ const slotOf = tab => tab === 'fx' ? 'fx' : tab === 'ball' ? 'ball' : 'fit'
 function shopItems(ch) {   // 업적 스킨 탭 — 이 캐릭터의 옷 · 업적 공 · 고른 스킬의 레전드 이펙트
   const all = shopTab === 'fx' ? SKIN_LIST.filter(k => k.kind === 'fx' && k.w === shopW) : shopTab === 'ball' ? SKIN_LIST.filter(k => k.kind === 'ball')
     : shopTab === 'fit' ? SKIN_LIST.filter(k => k.kind === 'fit' && !k.ach) : SKIN_LIST.filter(k => k.ach && (k.kind === 'fx' ? k.w === shopW : !k.char || k.char === ch.id))
-  return [...shopTab === 'ach' ? [] : ['base'], ...all.filter(k => !CLOSET || owns(k))]
+  return [...shopTab === 'ach' ? [] : ['base'], ...all.filter(k => !closetOn || owns(k))]
 }
 const THUMB = new Map()
 const kindOf = k => k === 'base' ? slotOf(shopTab) : k.kind
@@ -2413,8 +2412,9 @@ function thumb(k, ch) {   // 카드 그림 — 이펙트는 스킬 아이콘(등
   }
   return h('img', { src: cv0, alt: '', className: kind === 'ball' ? 'is-ball' : 'is-fit' })
 }
-function shop(closet = CLOSET, keep = false) {
+function shop(closet = false, keep = false) {
   if (!keep) shopSel = null
+  closetOn = closet
   const ch = CHARS[shopCi], lock = lockOf(ch)
   shopW ||= ch.w
   const keyOf = kind => kind === 'fx' ? shopW : ch.id, wornOf = k => { const kind = kindOf(k); return worn(kind, kind === 'fx' && k !== 'base' ? k.w : keyOf(kind)) }
@@ -2447,18 +2447,18 @@ function shop(closet = CLOSET, keep = false) {
   ui.classList.add('is-shop')
   const old = ui.querySelector('.sv-shop'), pos = old && [old.scrollTop, old.querySelector('.sv-shop-chars')?.scrollLeft, old.querySelector('.sv-shop-skills')?.scrollLeft]
   show(keep, h('div', { className: 'sv-shop' },
-    h('div', { className: 'sv-shop-head' }, h('p', { className: 'sv-h' }, closet ? '옷장' : '상점'), h('span', { className: 'sv-pts-pill' }, `${points().toLocaleString()} P`)),
+    h('div', { className: 'sv-shop-head' }, h('p', { className: 'sv-h' }, closet ? '마이페이지' : '상점'), h('span', { className: 'sv-pts-pill' }, `${points().toLocaleString()} P`)),
     h('div', { className: 'sv-tabs', role: 'tablist' }, SHOP_TABS.map(([id, name]) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(id === shopTab), onclick: () => { shopTab = id; shop(closet) } }, name))),
     h('div', { className: 'sv-shop-chars' }, CHARS.map((c, i) => h('button', { type: 'button', className: lockOf(c) ? 'is-locked' : '', 'aria-pressed': String(i === shopCi), title: nameOf(c), onclick: () => { shopCi = i; shopW = null; shop(closet) } }, h('img', { src: faceOf(P(c.id)), alt: nameOf(c) })))),
     (shopTab === 'fx' || shopTab === 'ach') && h('div', { className: 'sv-shop-skills' }, Object.keys(WEAP).map(w => h('button', { type: 'button', 'aria-pressed': String(w === shopW), title: WEAP[w].name, onclick: () => { shopW = w; shop(closet) } }, h('img', { src: ICON_URL[w], alt: WEAP[w].name })))),
     h('div', { className: 'sv-items' }, items.map(card)),
-    items.length <= (shopTab === 'ach' ? 0 : 1) && h('p', { className: 'sv-note' }, closet ? '아직 가진 스킨이 없어요 — 게임의 상점에서 포인트로 사요' : '이 캐릭터의 업적 스킨이 없어요'),
+    items.length <= (shopTab === 'ach' ? 0 : 1) && h('p', { className: 'sv-note' }, closet ? '아직 가진 스킨이 없어요 — 상점에서 포인트로 사요' : '이 캐릭터의 업적 스킨이 없어요'),
     h('div', { className: 'sv-shop-sel' },
       h('div', {}, h('b', {}, sel ? sel.name : '기본', sel && h('small', { className: `sv-tier is-t${sel.tier}` }, TIER[sel.tier].name)), h('small', {}, `${nameOf(ch)}${lock ? ' (잠김)' : ''} · ${note || (slot === 'fx' ? `${WEAP[shopW].name} 기본` : slot === 'ball' ? '농구공' : '그 팀 유니폼')}`), why && h('small', { className: 'sv-shop-why' }, why)),
       act),
     msg,
-    closet ? h('p', { className: 'sv-note' }, h('a', { href: '/survive/', target: '_top' }, '덩크 서바이버 하러 가기 →'))
-      : row(btn('← 처음으로', () => { ui.classList.remove('is-shop'); title() }))))
+    closet && h('p', { className: 'sv-mine' }, `내 포인트 — 모은 것 ${(save.stats.pts || 0).toLocaleString()} P · 쓴 것 ${((save.stats.pts || 0) - points()).toLocaleString()} P · 남은 것 ${points().toLocaleString()} P`),
+    row(btn('← 처음으로', () => { ui.classList.remove('is-shop'); title() }), closet ? btn('상점 →', () => shop()) : btn('마이페이지 →', () => shop(true)))))
   const box = ui.querySelector('.sv-shop'), strips = [box.querySelector('.sv-shop-chars'), box.querySelector('.sv-shop-skills')]
   if (pos) { box.scrollTop = pos[0]; strips.forEach((el, i) => { if (el && pos[i + 1] != null) el.scrollLeft = pos[i + 1] }) }
   else for (const el of strips) { const on = el?.querySelector('[aria-pressed="true"]'); if (on) el.scrollLeft = on.offsetLeft - (el.clientWidth - on.offsetWidth) / 2 }   // 처음 열 때 — 고른 것이 가운데
@@ -2610,7 +2610,7 @@ function notice(msg, head = '랭킹') {
 /** 저장이 바뀌었을 때(로그인 · 다른 기기 것을 합침) 지금 메뉴 · 아래 업적 목록을 다시 */
 function refresh() {
   guideAchs()
-  if (mode === 'shop') return shop(CLOSET, true)
+  if (mode === 'shop') return shop(closetOn, true)
   if (mode !== 'menu') return
   const h2 = ui.querySelector('.sv-h')?.textContent || ''
   if (h2.startsWith('캐릭터')) chars(true); else if (h2.startsWith('맵')) maps(true); else if (h2.startsWith('업적')) achs(); else if (h2 === '리더보드') ranks(true); else if (h2 === '패치 노트') notes(); else title()
@@ -2638,7 +2638,7 @@ const NOTES = [
     '농구공 — 드리블하는 공이 축구공 · 비치볼 · 황금 농구공으로, 비싼 동물 스킨은 고양이 · 강아지 · 판다가 통통 튀어요(모든 캐릭터)',
     '옷 — 연습복 · 후드티 · 레트로(노멀), 올스타 · 크리스마스 · 골드(레어), 불꽃 · 천상(후광) · 번개(유니크 — 몸에 효과가 붙어요). 모든 캐릭터',
     '업적 스킨 — 캐릭터마다 그 캐릭터로 10분 버티면 그 선수가 예전 · 다른 팀에서 입던 유니폼, 챌린지 60분이면 레전더리 옷(빛나는 옷 · 바닥 문양 · 빛기둥 · 별빛 · 빛 발자국)',
-    '마이페이지에 「덩크 서바이버 옷장」 — 산 스킨을 캐릭터마다 입혀 볼 수 있어요'] },
+    '첫 화면의 「마이페이지」 — 산 스킨을 캐릭터마다 입혀 보고 고를 수 있어요(스킬 이펙트도 미리 보기로)'] },
   { date: '2026-11-02', title: '새 캐릭터 셋 · 팀 유니폼', items: [
     '새 캐릭터 — 자말 크로포드(크로스오버 · 「식스맨」 리롤 · 스킵 · 제외 한 번씩 더, 이동 속도 +10%), 더크 노비츠키(스카이훅 · 「언블로커블」 범위 +15% · 치명타 +10%), 밤 아데바요(스크린 · 「핸드오프」 지속 +25% · 받는 피해 -1). 각각 그 스킬을 최고 레벨로 만드는 업적(크로스오버 킹 · 스카이훅 마스터 · 철벽 스크리너)으로 열어요',
     '캐릭터마다 그 선수의 팀 유니폼 — 반바지 옆줄 · 양말 · 신발 색이 팀마다 달라요(라멜로 볼은 호네츠 세로 줄무늬, 알렉산더는 썬더 홈 흰 유니폼, 아데바요는 히트 검정)',
@@ -2769,12 +2769,12 @@ for (const ch of CHARS) {   // 얼굴 그림 → 머리 · 피부색
   const img = new Image()
   img.onload = () => {
     try { ch.head = cutHead(img); [ch.skin] = skinOf(img) } catch {}
-    THUMB.clear(); if (mode === 'shop' && CHARS[shopCi] === ch) shop(CLOSET, true)   // 상점 · 옷장이 얼굴보다 먼저 떴으면 다시
+    THUMB.clear(); if (mode === 'shop' && CHARS[shopCi] === ch) shop(closetOn, true)   // 상점 · 마이페이지가 얼굴보다 먼저 떴으면 다시
   }
   img.src = faceOf(P(ch.id))
 }
 ready = true
 guide()
-if (CLOSET) shop(true); else title()
+title()
 loadRank()
 startAuth('', pull)

@@ -1029,7 +1029,6 @@ label.ac-pick { cursor: pointer; }
 .mp-lead { margin-bottom: 16px; }
 #me-body { display: flex; flex-direction: column; gap: 14px; }
 .mp-card { padding: 18px; }
-.mp-closet { display: block; width: 100%; height: min(78vh, 600px); margin-top: 10px; border: 0; border-radius: 12px; background: #0b0e14; }
 .mp-form { display: flex; flex-direction: column; gap: 12px; }
 .mp-form h3 { margin: 6px 0 0; font-size: 14px; color: var(--text); text-transform: none; letter-spacing: 0; }
 .mp-form h3 small { margin-left: 6px; color: var(--muted); font-weight: 500; }
@@ -1725,7 +1724,7 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-syn p { margin: 0; color: #c9d1e0; }
 .sv-syn mark { margin-left: .4em; padding: 0 .45em; border-radius: 999px; background: #ffd23f; color: #2a1200; font-weight: 900; }
 .sv-syn.is-own { border-style: solid; border-color: #ffd23f; background: #ffd23f1f; box-shadow: 0 0 12px #ffb40055; }
-/* 상점 · 옷장 — 패널은 오른쪽(세운 화면은 아래), 나머지 자리에 미리 보기 판(게임 화면 그대로) */
+/* 상점 · 마이페이지 — 패널은 오른쪽(세운 화면은 아래), 나머지 자리에 미리 보기 판(게임 화면 그대로) */
 .sv-ui.is-shop { display: block; padding: 0; overflow: hidden; background: none; pointer-events: none; }
 .sv-shop { pointer-events: auto; position: absolute; top: 52px; right: 10px; bottom: 10px; width: min(58%, 640px); overflow: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 9px; padding: 12px; border: 1px solid #ffffff24; border-radius: 14px; background: #0b0e14eb; box-shadow: 0 10px 30px #000a; }
 @container (orientation: portrait) { .sv-shop { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; height: 62%; padding: 10px; } }
@@ -1769,11 +1768,6 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-shop-msg:empty { display: none; }
 .sv-shop .sv-row { justify-content: flex-start; }
 .sv-pts { margin: 0; color: #c9d1e0; } .sv-pts b { color: #ffd23f; font-size: 1.15em; margin-right: 4px; }
-/* 내 정보 페이지 안의 옷장(iframe — ?closet) — 게임 화면만 */
-body.sv-embed { margin: 0; background: #0b0e14; }
-body.sv-embed > header, body.sv-embed main > h1, body.sv-embed .slam-guide, body.sv-embed #btn-fs { display: none !important; }
-body.sv-embed main.slam { padding: 0; margin: 0; max-width: none; }
-body.sv-embed .sv-screen { height: 100vh; border-radius: 0; }
 /* 낮은 화면(가로 휴대폰) — 상자 그림이 자리를 차지하지 않게 카드 위에 겹치고, 카드 · 시너지 글씨를 줄인다 */
 @container (max-height: 520px) {
   .sv-box .sv-chest { position: absolute; top: 22%; left: calc(50% - 11cqmin); }

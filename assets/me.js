@@ -35,13 +35,8 @@ function render() {
     h('p', { className: 'rc-note' }, '로그인하면 내 프로필 · 게임 계정 · 보유 캐릭터를 등록하고 아레나전에 신청할 수 있어요.'),
     h('div', { className: 'rc-actions' }, h('button', { type: 'button', className: 'primary rc-big', onclick: chooseLogin }, '로그인'))))
   if (me.admin) memberStore.load()
-  box.replaceChildren(...[profileCard(), closetCard(), historyCard(), linkCard(), me.admin && adminCard(), me.admin && attendanceCard(), me.admin && membersCard(), me.master && gateCard(), me.master && auditCard(), quitCard()].filter(Boolean))   // replaceChildren 은 false 를 글자로 찍는다
+  box.replaceChildren(...[profileCard(), historyCard(), linkCard(), me.admin && adminCard(), me.admin && attendanceCard(), me.admin && membersCard(), me.master && gateCard(), me.master && auditCard(), quitCard()].filter(Boolean))   // replaceChildren 은 false 를 글자로 찍는다
 }
-
-// ------------------------------------------------ 덩크 서바이버 옷장 — 게임 화면(/survive/?closet)을 그대로 띄워 산 스킨을 캐릭터마다 입혀 본다
-const closetCard = () => card('덩크 서바이버 옷장',
-  h('p', { className: 'rc-muted' }, '산 스킨을 캐릭터마다 입혀 보세요 — 옷 · 농구공은 캐릭터마다, 스킬 이펙트는 스킬마다. 스킨은 게임의 상점에서 포인트로 사요'),
-  h('iframe', { className: 'mp-closet', src: '/survive/?closet', title: '덩크 서바이버 옷장', loading: 'lazy' }))
 
 // ------------------------------------------------ 프로필 + 계정
 
