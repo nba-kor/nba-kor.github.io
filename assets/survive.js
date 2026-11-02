@@ -6,8 +6,8 @@
 //   업적 · 기록은 이 브라우저(localStorage)에 두고, 로그인하면 계정(/api/survive)과 합쳐 같이 쓴다 — 다른 기기에서도 이어진다.
 // 그림은 2D 캔버스 하나. 사람 · 공 · 아이콘 · 바닥은 처음에 한 번 그려 두고(sprite) 옮겨 그린다. 메뉴 · 상자는 캔버스 위에 겹친 HTML(#sv-ui).
 import { mountTop, faceOf } from './app.js?v=fb02b445'
-import { api, chooseLogin } from './auth.js?v=01106c22'
-import { loadData, P, startAuth, auth, me, h } from './board.js?v=0c3aa4b5'
+import { api, chooseLogin } from './auth.js?v=bdb31bdc'
+import { loadData, P, startAuth, auth, me, h } from './board.js?v=587563dd'
 import { cutHead, skinOf, NBA_NUM } from './vipers.js?v=8939ed12'
 
 mountTop('/survive/')

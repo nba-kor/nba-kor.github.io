@@ -112,7 +112,7 @@ const BOT = { DISCORD_BOT_TOKEN: 'bot-token', DISCORD_VOICE_CATEGORY_ID: '1' }
  */
 function fakeNet({ channels = CHANNELS, db } = {}) {
   const net = {
-    hooks: [], discord: [], auth: [], out: [], reply: () => [204], outReply: () => [204],
+    hooks: [], discord: [], auth: [], out: [], storage: [], reply: () => [204], outReply: () => [204], storageReply: () => [200, { Key: 'ok' }],
     authReply: token => {
       const [kind, id, name] = token.split('.')
       return kind === 'web' && id ? json(200, authUser(id, name ? { name: decodeURIComponent(name) } : {})) : json(403, { code: 403, error_code: 'bad_jwt', msg: 'invalid JWT' })
@@ -128,6 +128,12 @@ function fakeNet({ channels = CHANNELS, db } = {}) {
     if (u.pathname.startsWith('/auth/v1/') || u.origin === 'https://kapi.kakao.com') {
       net.out.push({ method: init.method, url: String(url), headers: init.headers, body: init.body && String(init.body) })
       const [status, body] = net.outReply(u)
+      return json(status, body)
+    }
+    // Storage(향우회 그림) — 로컬 compose 에는 없다. storageReply 로 응답을 바꾼다
+    if (u.pathname.startsWith('/storage/v1/')) {
+      net.storage.push({ method: init.method, path: u.pathname, headers: init.headers, body: init.body })
+      const [status, body] = net.storageReply(u)
       return json(status, body)
     }
     if (u.origin === 'https://hook.test') {
@@ -2526,4 +2532,63 @@ dbTest('향우회: 글 · 분류 · 답변 상태 · 채택 · 잠금 · 내공 
   assert.equal((await api('GET', '/api/club?limit=1')).body.total, undefined)
 
   assert.equal((await api('DELETE', `/api/club/${tip.id}`, undefined, { as: a.as })).status, 200)
+})
+
+dbTest('향우회 그림: 올리기 · 검사 · 글 · 댓글에 붙이기 · 지우면 Storage 에서도', async () => {
+  const app = start(), { api, net, idle } = app
+  const a = { id: uid() }, b = { id: uid() }
+  a.as = web(a.id, '그림러'); b.as = web(b.id, '댓글러')
+  const up = (who, bytes, type = 'image/webp') => app.handler(new Request('http://api.test/api/club/images', { method: 'POST', headers: { ...who?.as, 'content-type': type }, body: bytes }))
+    .then(async r => ({ status: r.status, body: await r.json() }))
+  const webp = n => Buffer.concat([Buffer.from('RIFF\0\0\0\0WEBPVP8 '), Buffer.alloc(n)])
+
+  assert.equal((await up(null, webp(10))).status, 401)
+  assert.equal((await up(a, Buffer.from('\x89PNG\r\n\x1a\n0000'), 'image/png')).status, 415)
+  assert.equal((await up(a, webp(300 * 1024))).status, 413)
+  assert.equal(net.storage.length, 0)
+  const [i1, i2] = [(await up(a, webp(100))).body.name, (await up(a, Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2]), 'image/jpeg')).body.name]
+  assert.match(i1, new RegExp(`^${a.id}_[A-Za-z0-9_-]{16}\\.webp$`))
+  assert.match(i2, /\.jpg$/)
+  assert.deepEqual(net.storage.map(x => [x.method, x.path, x.headers['content-type'], x.headers.apikey]),
+    [['POST', `/storage/v1/object/club/${i1}`, 'image/webp', KEY], ['POST', `/storage/v1/object/club/${i2}`, 'image/jpeg', KEY]])
+  const bi = (await up(b, webp(10))).body.name
+  net.storageReply = () => [500, { error: 'boom' }]
+  assert.equal((await up(a, webp(10))).status, 503)
+  net.storageReply = () => [200, {}]
+
+  // 글 — 내가 올린 그림만, 5장까지
+  const P = { category: 'free', chars: ['bl'], title: '사진', body: '봐 주세요' }
+  assert.equal((await api('POST', '/api/club', { ...P, images: [bi] }, { as: a.as })).status, 400)
+  assert.equal((await api('POST', '/api/club', { ...P, images: ['../evil.webp'] }, { as: a.as })).status, 400)
+  assert.equal((await api('POST', '/api/club', { ...P, images: Array(6).fill(0).map((_, k) => `${a.id}_${'x'.repeat(15)}${k}.webp`) }, { as: a.as })).status, 400)
+  const post = (await api('POST', '/api/club', { ...P, images: [i1, i2] }, { as: a.as })).body.post
+  assert.deepEqual(post.images, [i1, i2])
+  assert.deepEqual((await api('GET', '/api/club?cat=free&char=bl')).body.club.find(x => x.id === post.id).images, [i1, i2])
+
+  // 댓글 — 그림만 달아도 된다(1장까지)
+  const say = (who, body) => api('POST', `/api/club/${post.id}/comments`, body, { as: who.as })
+  assert.equal((await say(b, { body: '', images: [] })).status, 400)
+  assert.equal((await say(b, { body: '', images: [bi, bi] })).status, 400)
+  assert.equal((await say(b, { body: '', images: [i1] })).status, 400)   // 남의 그림
+  assert.equal((await say(b, { body: '', images: [bi] })).status, 201)
+  const [c] = (await api('GET', `/api/club/${post.id}`)).body.comments
+  assert.deepEqual([c.body, c.images], ['', [bi]])
+
+  // 고쳐서 뺀 그림 · 지운 댓글 · 지운 글의 그림은 Storage 에서도
+  const drops = async () => { await idle(); const d = net.storage.filter(x => x.method === 'DELETE').map(x => JSON.parse(x.body).prefixes); net.storage.length = 0; return d }
+  net.storage.length = 0
+  assert.equal((await api('PUT', `/api/club/${post.id}`, { ...P, images: [i2] }, { as: a.as })).status, 200)
+  assert.deepEqual(await drops(), [[i1]])
+  const extra = (await up(b, webp(10))).body.name
+  assert.equal((await say(b, { body: '하나 더', images: [extra] })).status, 201)
+  const cid = (await api('GET', `/api/club/${post.id}`)).body.comments.find(x => x.body === '하나 더').id
+  assert.equal((await api('DELETE', `/api/club/${post.id}/comments/${cid}`, undefined, { as: b.as })).status, 200)
+  assert.deepEqual(await drops(), [[extra]])
+  assert.equal((await api('DELETE', `/api/club/${post.id}`, undefined, { as: a.as })).status, 200)
+  assert.deepEqual(await drops(), [[i2, bi]])
+
+  // 붙이기 전에 뺀 그림 — 내 것만
+  assert.equal((await api('DELETE', `/api/club/images/${bi}`, undefined, { as: a.as })).status, 404)
+  assert.equal((await api('DELETE', `/api/club/images/${i1}`, undefined, { as: a.as })).status, 200)
+  assert.deepEqual(await drops(), [[i1]])
 })

@@ -8,7 +8,7 @@
 // ponytail: 파울 · 아웃 오브 바운즈 없음(코트 끝에서 멈춘다) · 소리 없음 · 온라인 없음 · 몸은 도형을 이은 것(모델 파일 없음)
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js'
 import { mountTop, faceOf } from './app.js?v=fb02b445'
-import { loadData, data, startAuth } from './board.js?v=0c3aa4b5'
+import { loadData, data, startAuth } from './board.js?v=587563dd'
 import { TEAMS, NUMS, NBA_NUM, lineup, cutHead, skinOf } from './vipers.js?v=8939ed12'
 import { CW, CH, R3, RIM_H, RIM, BRK, sm, K, wx, wz, RIM_Z, scene, part, floorMat, rimG, net, scenery, BALL, ballMat, hairOf, rigOf, NP, Q, trunk, arm, leg, arms, legs, yaw, dunkPose, setRig } from './court3d.js?v=68dc2ff3'
 

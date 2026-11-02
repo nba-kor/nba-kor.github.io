@@ -768,11 +768,17 @@ supabase/migrations/20260929000000_videos.sql  videos · video_likes · video_co
 
 ```
 club/index.html · assets/club.js                화면
-data/club.json                                  분류 목록 · 채택 하나의 내공(points). 분류를 더하면 함수도 다시 배포한다(id 는 저장된 글이 가리키니 바꾸지 않는다)
+data/club.json                                  분류 목록 · 채택 하나의 내공(points) · 사진 장 수(images). 분류를 더하면 함수도 다시 배포한다(id 는 저장된 글이 가리키니 바꾸지 않는다)
 supabase/migrations/20261102100000_club.sql     club_posts · club_likes · club_comments + 추천 RPC · 내공 랭킹 RPC(club_ranking)
+supabase/migrations/20261102200000_club_views.sql   조회수(views · club_view)
+supabase/migrations/20261102300000_club_images.sql  사진 칸(images) + Storage 공개 버킷 club(300KB · WebP / JPEG)
 ```
 
 - 글은 향우회 캐릭터 한 명(한국 서버) · 분류 · 제목 60자 · 내용 3000자. 목록은 DC 갤러리처럼 한 줄씩(번호 · 분류 · 제목 [댓글 수] · 향우회 · 글쓴이 · 작성일 · 조회 · 추천, 휴대폰은 두 줄) 30개씩 쪽을 나눠 쪽 번호(열 쪽 묶음, 휴대폰 다섯 쪽)로 넘긴다 — 게시판 공용 `?page=`(응답에 전체 수 `total`, `listView` 의 `pageSize`). 정렬 · 캐릭터 · 분류 · 쪽은 주소에 남아(`remember`) 글을 보고 「← 목록」 · 뒤로 가기로 돌아오면 그 쪽이다. 조회수는 글 화면이 탭마다 글마다 처음 열 때 `?view=1` 로 하나 올린다(`club_view`, `20261102200000_club_views.sql`). 거르기는 `?cat=<분류>` · `?state=open|done`(질문답변의 답변대기 · 답변완료) + 게시판 공용 `?char` · `?pos` · `?sort`.
+- **사진** — 글 5장 · 댓글 1장(`data/club.json` 의 `images`, 댓글은 사진만 달아도 된다). 📷 버튼 · 붙여넣기(Ctrl+V, 클립보드 그림) · 끌어 놓기로 넣으면 화면이 바로 **웹용으로 줄여**(긴 변 1280px · WebP 품질 0.75, 200KB 가 넘으면 0.8배씩 더 줄인다 — 옛 사파리는 JPEG. 다시 그려서 EXIF 위치 정보는 빠지고 움직이는 GIF 는 첫 장면만) `POST /api/club/images` 로 올린다.
+  함수가 바이트 머리로 WebP · JPEG 인지 보고(300KB 까지, 한 사람 하루 60장) Storage 의 **공개 버킷 `club`** 에 `<올린 사람 ID>_<무작위 16자>.webp` 로 둔다(`cache-control` 1년). 글 · 댓글에는 그 이름만 저장하고, 내가 올린 그림만 붙일 수 있다.
+  글을 고쳐 뺀 사진 · 지운 댓글 · 지운 글(댓글 사진까지)은 Storage 에서도 지우고, 글쓰기에서 ✕ 로 뺀 · 취소한 새 사진은 `DELETE /api/club/images/<이름>` 으로 바로 지운다. 읽기는 `https://<프로젝트>.supabase.co/storage/v1/object/public/club/<이름>`.
+  로컬 compose 에는 Storage 가 없어 사진 올리기만 503 이다. ponytail: 사진을 올려 놓고 글을 안 쓴 채 창을 닫으면 그 사진이 남는다 — 쌓이면 `images` 에 없는 이름을 지우는 청소를 둔다. 무료 Storage 는 1GB(한 장 100KB 안팎이면 만 장쯤)
 - **채택** `POST /api/club/<id>/adopt { comment }` — 질문답변 글을 쓴 사람만, 남의 댓글 하나, 한 번(되돌리지 않는다. 동시에 눌러도 `adopted is null` 인 행만 바꿔 한 번). 채택된 질문 · 답변 댓글은 고치거나 지울 수 없다(409) — 내공이 사라지지 않게.
 - **내공 랭킹** `GET /api/club/ranking?char=<id>` — 채택된 답변 수 × `points`(10), 50위까지(같은 수는 같은 순위, 먼저 닿은 사람이 위). 따로 쌓지 않고 채택된 글에서 센다. 이름은 마지막으로 채택될 때의 이름.
 - **알림** `GET /api/club/alerts`(로그인) — 내 글에 달린 남의 댓글 30개. 알림 탭은 이 목록 + 마지막으로 본 뒤 새 것(`club.seen`, 탭의 빨간 숫자).
@@ -780,7 +786,7 @@ supabase/migrations/20261102100000_club.sql     club_posts · club_likes · club
   ponytail: 사이트 탭이 하나도 없으면 안 온다 · 휴대폰 브라우저는 페이지에서 알림을 못 띄운다 — 닫혀 있어도 받으려면 Web Push(서비스 워커 + VAPID 키 + 구독 표)를 붙인다.
 - 탈퇴해도 글 · 댓글 · 내공은 남는다(다른 게시판과 같다).
 
-처음 운영에 올릴 때: 마이그레이션을 SQL Editor 에 붙여 넣어 Run → `sh tools/deploy-api.sh` → main 푸시.
+처음 운영에 올릴 때: 마이그레이션(위 셋, 순서대로)을 SQL Editor 에 붙여 넣어 Run → `sh tools/deploy-api.sh` → main 푸시. 버킷이 생겼는지는 대시보드 **Storage** 에서 본다.
 
 ## 커스텀 전술
 

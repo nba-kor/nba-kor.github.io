@@ -1,8 +1,8 @@
 // 향우회 — 캐릭터별 커뮤니티: 게시판(분류 · 답변 상태 · 캐릭터 필터, 최신순) · 글(질문답변은 쓴 사람이 댓글 하나를 채택) · 내공 랭킹 · 내 글에 달린 댓글(알림).
 // 게시판 공용 부분은 board.js, 알림을 3분마다 묻는 것은 auth.js 의 watchReplies(사이트 어느 페이지에서나)
 import { mountTop, loadKakao, faceOf, shareFace } from './app.js?v=fb02b445'
-import { api, notifyOn, setNotify, watchReplies } from './auth.js?v=01106c22'
-import { $, h, P, ago, loadData, startAuth, loggedIn, charGrid, listView, itemView, showItem, auth, me } from './board.js?v=0c3aa4b5'
+import { api, notifyOn, setNotify, watchReplies, SUPABASE_URL } from './auth.js?v=bdb31bdc'
+import { $, h, P, ago, loadData, startAuth, loggedIn, charGrid, listView, itemView, showItem, auth, me } from './board.js?v=587563dd'
 
 let cfg, catName   // data/club.json · 분류 id → 이름
 const SEEN = 'club.seen'   // 알림 탭에서 마지막으로 본 댓글 id — 탭의 빨간 숫자
@@ -25,13 +25,93 @@ const row = x => {
   return h('a', { className: 'cl-row', href: `?p=${x.id}` },
     h('span', { className: 'cl-no' }, x.id),
     h('span', { className: 'cl-cat' }, catTag(x.category)),
-    h('span', { className: 'cl-title' }, h('b', {}, x.title), x.comments > 0 && h('em', {}, `[${x.comments}]`), stateTag(x)),
+    h('span', { className: 'cl-title' }, h('b', {}, x.title), x.images.length > 0 && h('i', { title: `사진 ${x.images.length}장` }, '🖼'), x.comments > 0 && h('em', {}, `[${x.comments}]`), stateTag(x)),
     h('span', { className: 'cl-who', title: `${char.name} 향우회` }, h('img', { src: faceOf(char), alt: '' }), char.short || char.name),
     h('span', { className: 'cl-author' }, x.author),
     h('span', { className: 'cl-date', title: new Date(x.createdAt).toLocaleString('ko-KR') }, when(x.createdAt)),
     h('span', { className: 'cl-views' }, x.views),
     h('span', { className: 'cl-likes' }, x.likes))
 }
+
+// ---------------------------------------------------------------- 그림 — 웹용으로 줄여 올리고(Storage 공개 버킷 club) 이름만 글 · 댓글에
+
+const imgUrl = name => `${SUPABASE_URL}/storage/v1/object/public/club/${name}`
+const SIDE = 1280, TARGET = 200 * 1024   // 긴 변 1280px · 200KB 아래로(서버 한도 300KB)
+
+/** 그림 파일 → WebP(안 되는 브라우저는 JPEG) Blob. 긴 변 1280px · 품질 0.75 에서 시작해 200KB 를 넘으면 0.8배씩 줄인다.
+ *  다시 그리므로 사진 속 위치 정보(EXIF)는 빠지고, 움직이는 GIF 는 첫 장면만 남는다 */
+async function shrink(file) {
+  let bmp
+  try { bmp = await createImageBitmap(file) } catch { throw new Error('이 그림은 읽을 수 없어요 — PNG · JPEG · WebP 로 올려 주세요') }
+  let scale = Math.min(1, SIDE / Math.max(bmp.width, bmp.height)), blob
+  for (let i = 0; i < 6; i++) {
+    const c = Object.assign(document.createElement('canvas'), { width: Math.max(1, Math.round(bmp.width * scale)), height: Math.max(1, Math.round(bmp.height * scale)) })
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height)
+    blob = await new Promise(r => c.toBlob(r, 'image/webp', 0.75))
+    if (blob?.type !== 'image/webp') blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8))   // 옛 사파리는 WebP 로 못 굽는다
+    if (blob.size <= TARGET) break
+    scale *= 0.8
+  }
+  bmp.close()
+  return blob
+}
+
+/**
+ * 그림 고르기 — 📷 버튼 · 붙여넣기(클립보드) · 끌어 놓기. 넣는 즉시 줄여서 올리고 이름만 들고 있다.
+ * kept = 고치는 글에 이미 있던 그림(빼도 바로 지우지 않는다 — 저장하면 서버가 지운다). 새로 올린 것을 빼면 바로 지운다
+ */
+function imagePicker(max, kept = []) {
+  const items = kept.map(name => ({ name, kept: true }))
+  const input = h('input', { type: 'file', accept: 'image/*', multiple: max > 1, hidden: true, onchange: () => { add([...input.files]); input.value = '' } })
+  const btn = h('button', { type: 'button', className: 'cl-attach-btn', onclick: () => input.click() })
+  const thumbs = h('div', { className: 'cl-thumbs' }), err = h('small', { className: 'rc-err', hidden: true })
+  const paint = () => {
+    btn.textContent = `📷 사진 ${items.length}/${max}`
+    btn.disabled = items.length >= max
+    thumbs.replaceChildren(...items.map(it => h('span', { className: `cl-thumb${it.busy ? ' is-busy' : ''}` },
+      h('img', { src: it.url || imgUrl(it.name), alt: '' }),
+      !it.busy && h('button', { type: 'button', 'aria-label': '사진 빼기', onclick: () => drop1(it) }, '✕'))))
+  }
+  async function add(files) {
+    files = files.filter(f => f.type.startsWith('image/'))
+    if (!files.length || !await loggedIn()) return
+    err.hidden = true
+    if (files.length > max - items.length) { err.textContent = `사진은 ${max}장까지 붙일 수 있어요`; err.hidden = false }
+    for (const f of files.slice(0, max - items.length)) {
+      const it = { url: URL.createObjectURL(f), busy: true }
+      items.push(it)
+      paint()
+      try { it.name = (await api('/club/images', { method: 'POST', withToken: true, raw: await shrink(f) })).name }
+      catch (e) { items.splice(items.indexOf(it), 1); err.textContent = e.message; err.hidden = false }
+      it.busy = false
+      paint()
+    }
+  }
+  const forget = it => api(`/club/images/${it.name}`, { method: 'DELETE', withToken: true }).catch(() => {})
+  function drop1(it) {
+    items.splice(items.indexOf(it), 1)
+    paint()
+    if (!it.kept) forget(it)
+  }
+  paint()
+  return {
+    el: h('div', { className: 'cl-attach' }, thumbs, h('div', { className: 'cl-attach-row' }, btn, input, err)),
+    values: () => items.filter(it => it.name && !it.busy).map(it => it.name),
+    busy: () => items.some(it => it.busy),
+    discard: () => items.filter(it => !it.kept && it.name).forEach(forget),   // 글쓰기를 취소했다
+    paste: e => {
+      const files = [...e.clipboardData?.files || []].filter(f => f.type.startsWith('image/'))
+      if (!files.length) return
+      if (!e.clipboardData.types.includes('text/plain')) e.preventDefault()   // 글자와 같이 온 그림(문서 복사)은 글자도 붙인다
+      add(files)
+    },
+    drop: e => { const files = [...e.dataTransfer?.files || []]; if (files.length) { e.preventDefault(); add(files) } },
+  }
+}
+
+/** 글 · 댓글의 그림 — 누르면 원본 크기로 새 탭 */
+const gallery = (names, small = false) => names?.length > 0 && h('div', { className: `cl-imgs${small ? ' is-small' : ''}` },
+  names.map(n => h('a', { href: imgUrl(n), target: '_blank', rel: 'noopener' }, h('img', { src: imgUrl(n), alt: '', loading: 'lazy' }))))
 
 const q = new URLSearchParams(location.search)
 const view = /^\d+$/.test(q.get('p') || '') ? 'post' : q.has('rank') ? 'rank' : q.has('alerts') ? 'alerts' : 'list'
@@ -112,7 +192,7 @@ async function showAlerts() {
   box.replaceChildren(alerts.length ? h('ul', { className: 'cl-alerts' }, alerts.map(a => h('li', { className: a.id > seen ? 'is-new' : '' },
     h('a', { href: `?p=${a.postId}` },
       h('p', {}, h('b', {}, a.author), ' 님이 「', h('b', {}, a.title), '」에 댓글 · ', h('small', { className: 'rc-muted' }, ago(a.createdAt))),
-      h('p', { className: 'cl-alert-body' }, a.body)))))
+      h('p', { className: 'cl-alert-body' }, a.body || '📷 사진')))))
     : h('p', { className: 'rc-note' }, '아직 내 글에 달린 댓글이 없어요'))
 
   btn.hidden = false
@@ -172,11 +252,13 @@ const showPost = () => showItem(`/club/${postId}${viewOnce()}`, ({ post: x, like
     comments: [best, ...comments.filter(c => c !== best)].filter(Boolean).map(c => ({ ...c, locked: c === best })),   // 채택된 답변이 맨 위
     commentTail: c => c.locked ? h('span', { className: 'cl-best' }, `✅ 채택된 답변 · 내공 +${cfg.points}`)
       : asking && c.authorId !== me.id && h('button', { type: 'button', className: 'cl-adopt', onclick: () => adopt(x, c) }, '채택'),
+    commentExtra: c => gallery(c.images, true), attach: imagePicker(cfg.images.comment),
     share: { payload: () => kakaoPayload(x), title: `${x.title} · 향우회`, url: postUrl(x) },
     body: [h('section', { className: 'card' },
       h('p', { className: 'cl-tags' }, catTag(x.category), stateTag(x), h('span', { className: 'cl-club' }, h('img', { src: faceOf(char), alt: '' }), `${char.name} 향우회`),
         h('span', { className: 'cl-hits' }, `조회 ${x.views} · 추천 ${x.likes}`)),
       h('p', { className: 'pt-body' }, x.body),
+      gallery(x.images),
       asking && comments.some(c => c.authorId !== me.id) && h('p', { className: 'rc-note cl-hint' }, `마음에 드는 답변에 「채택」 을 눌러 주세요 — 답변한 사람에게 내공 +${cfg.points}`))],
   })
 })
@@ -197,12 +279,15 @@ function openForm(x = null) {
   $('#form-cats').replaceChildren(...cfg.categories.map(c => h('label', {},
     h('input', { type: 'radio', name: 'category', value: c.id, checked: (x?.category || cfg.categories[0].id) === c.id }), h('span', {}, c.name))))
   $('#form-chars').replaceChildren(charGrid({ isOn: id => f.char === id, pick: id => { f.char = id } }))
+  f.picker = imagePicker(cfg.images.post, x?.images || [])
+  $('#form-images').replaceChildren(f.picker.el)
   for (const s of ['#club-head', ...Object.values(SECTION)]) $(s).hidden = true
   $('#form-view').hidden = false
   scrollTo(0, 0)
 }
 
 function closeForm() {
+  form().picker.discard()
   $('#form-view').hidden = true
   $('#club-head').hidden = view === 'post'
   $(SECTION[view]).hidden = false
@@ -211,11 +296,15 @@ function closeForm() {
 function bindForm() {
   const f = form(), el = f.elements
   $('#form-cancel').onclick = closeForm
+  f.addEventListener('paste', e => f.picker?.paste(e))
+  f.addEventListener('dragover', e => e.preventDefault())
+  f.addEventListener('drop', e => f.picker?.drop(e))
   f.onsubmit = async e => {
     e.preventDefault()
     const btn = $('[type=submit]', f), err = $('.rc-form-err', f)
-    const v = { category: el.category.value, chars: f.char ? [f.char] : [], title: el.title.value, body: el.body.value }
-    const bad = !v.chars.length ? '향우회 캐릭터를 골라 주세요' : !v.title.trim() ? '제목을 입력해 주세요' : !v.body.trim() ? '내용을 입력해 주세요' : ''
+    const v = { category: el.category.value, chars: f.char ? [f.char] : [], title: el.title.value, body: el.body.value, images: f.picker.values() }
+    const bad = !v.chars.length ? '향우회 캐릭터를 골라 주세요' : !v.title.trim() ? '제목을 입력해 주세요' : !v.body.trim() ? '내용을 입력해 주세요'
+      : f.picker.busy() ? '사진을 올리는 중이에요 — 잠깐만 기다려 주세요' : ''
     err.textContent = bad
     err.hidden = !bad
     if (bad || btn.disabled) return

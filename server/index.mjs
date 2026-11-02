@@ -51,6 +51,9 @@ const CATEGORIES = new Set(videosData.categories.map(c => c.id))
 const CLUB_CATS = new Set(clubData.categories.map(c => c.id))
 const CLUB_RANK = 50   // 향우회 내공 랭킹 줄 수
 const CLUB_ALERTS = 30   // 내 글에 달린 댓글(알림) 줄 수
+const CLUB_IMG = /^(\d{17,20}|k\d{1,20})_[A-Za-z0-9_-]{16}\.(?:webp|jpg)$/   // 향우회 그림 이름 = <올린 사람 ID>_<무작위>.webp|jpg (Storage 버킷 club)
+const IMG_MAX = 300 * 1024   // 그림 한 장 — 화면이 웹용으로 줄여 보낸다(보통 100~200KB). 버킷 한도와 같다
+const IMG_DAY = 60   // 한 사람이 하루에 올리는 그림 — 무료 Storage 1GB 를 한 사람이 채우지 못하게
 const SNOWFLAKE = /^\d{17,20}$/
 const GUEST_ID = /^g(\d{1,15})$/   // 비회원 · 팀장이 넣은 팀원의 userId = 'g' + recruit_members.id
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -228,13 +231,27 @@ function video(v) {
   }
 }
 
-/** 향우회 글: 캐릭터(어느 향우회) 1명 · 분류 · 제목 · 내용 */
+/** 향우회 그림 이름 목록(올린 사람은 글 · 댓글을 저장할 때 따로 본다) */
+function imagesOf(v, max) {
+  const a = v ?? []
+  if (!listOf(a, max) || new Set(a).size !== a.length || !a.every(n => matches(CLUB_IMG, n))) fail(400, `그림은 ${max}장까지 붙일 수 있어요`)
+  return a
+}
+
+/** 향우회 글: 캐릭터(어느 향우회) 1명 · 분류 · 제목 · 내용 · 그림 */
 function clubPost(v) {
   if (!isObj(v)) fail(400, '요청 형식이 잘못됐어요')
   if (!CLUB_CATS.has(v.category)) fail(400, '분류를 골라 주세요')
   const chars = charsOf(v.chars, 1, 1, '향우회 캐릭터')
-  return { category: v.category, chars, positions: positionsOf(chars), title: text(v.title, 60, '제목'), body: text(v.body, 3000, '내용', 1, true) }
+  return {
+    category: v.category, chars, positions: positionsOf(chars), title: text(v.title, 60, '제목'), body: text(v.body, 3000, '내용', 1, true),
+    images: imagesOf(v.images, clubData.images.post),
+  }
 }
+
+/** 그림 파일 종류 — 받은 바이트의 머리로만 본다(content-type 은 믿지 않는다) */
+const imageType = b => b.length > 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP' ? 'webp'
+  : b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff ? 'jpg' : null
 
 /** 커스텀 전술: 이름 · 설명 · 전술판 보드(선수 1명 이상) · 고치기 시작한 기본 전술 */
 function customTactic(v) {
@@ -608,7 +625,13 @@ function mergeSurvive(a, b) {
  * 워커 메모리에는 로그인 확인 결과(60초)만 둔다 — 제한 횟수 · 방 배정 · 1인 1파티는 DB 가 센다.
  */
 export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fetch, waitUntil = p => p, log = console.log, potentials = potentialsData, ipOf = () => '' } = {}) {
-  const db = supabase({ url: env.SUPABASE_URL, key: keyOf(env, 'SUPABASE_SECRET_KEY'), fetch, log })
+  const secret = keyOf(env, 'SUPABASE_SECRET_KEY'), db = supabase({ url: env.SUPABASE_URL, key: secret, fetch, log })
+  // Storage(향우회 그림) — Data API 와 같은 앞단이라 secret key 는 apikey 에만(JWT 가 아니다). 로컬 compose 에는 없어 그림 올리기만 503
+  const storage = `${(env.SUPABASE_URL || '').replace(/\/+$/, '')}/storage/v1/object/club`
+  /** 그림 지우기 — 응답 뒤에. 실패해도 그림이 남을 뿐이라 함수 로그만 */
+  const dropImages = names => names.length > 0 && waitUntil(fetch(storage, {
+    method: 'DELETE', headers: { apikey: secret, 'content-type': 'application/json' }, body: JSON.stringify({ prefixes: names }), signal: AbortSignal.timeout(8000),
+  }).then(async r => { if (!r.ok) log(`그림 지우기 ${r.status}: ${(await r.text()).slice(0, 200)}`) }).catch(e => log(`그림 지우기 실패: ${errText(e)}`)))
   const publishable = keyOf(env, 'SUPABASE_PUBLISHABLE_KEY')
   const botKey = Buffer.from(env.TNAB_BOT_KEY || '')
   const notifier = createNotifier({
@@ -732,7 +755,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
    */
   function audit(request, status) {
     const { pathname } = new URL(request.url), action = `${request.method} ${pathname}`
-    if (request.method === 'GET' || status >= 300 || action === 'POST /api/gate' || action === 'PUT /api/survive' || action === 'POST /api/survive/run' || action === 'POST /api/survive/buy') return
+    if (request.method === 'GET' || status >= 300 || action === 'POST /api/gate' || action === 'PUT /api/survive' || action === 'POST /api/survive/run' || action === 'POST /api/survive/buy' || action.includes(' /api/club/images')) return
     const user = actors.get(request), { target = null, detail = [] } = notes.get(request) || {}
     const lines = detail.length > 60 ? [...detail.slice(0, 59), `…외 ${detail.length - 59}줄`] : detail
     waitUntil(db('/audit_log', { method: 'POST', body: {
@@ -883,6 +906,18 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     return { team, left: r.left, member }
   }
 
+  /** 그림 같은 바이너리 본문 — max 바이트까지만 읽으면서 센다 */
+  async function readBytes(request, max) {
+    if (+request.headers.get('content-length') > max) fail(413, '그림이 너무 커요')
+    const parts = []
+    let size = 0
+    if (request.body) for await (const chunk of request.body) {
+      if ((size += chunk.byteLength) > max) fail(413, '그림이 너무 커요')
+      parts.push(chunk)
+    }
+    return Buffer.concat(parts)
+  }
+
   // 본문은 32KB 까지만 읽는다 — content-length 가 없거나(chunked) 거짓이어도 읽으면서 센다
   async function readJson(request) {
     if (!JSON_TYPE.test(request.headers.get('content-type') || '')) fail(415, 'JSON 으로 보내 주세요')
@@ -932,7 +967,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     },
     club: {   // 향우회 — 질문답변은 쓴 사람이 댓글 하나를 채택한다(adopt). 채택된 글 · 댓글은 못 고치고 못 지운다(내공이 사라지지 않게)
       table: 'club_posts', likes: 'club_likes', comments: 'club_comments', fk: 'post_id', rpc: ['club_toggle_like', 'p_post'],
-      one: 'post', cols: 'category,adopted,views', validate: clubPost, extra: b => ({ category: b.category, adopted: b.adopted, views: b.views }), adopt: true,
+      one: 'post', cols: 'category,adopted,views,images', validate: clubPost, extra: b => ({ category: b.category, adopted: b.adopted, views: b.views, images: b.images }), adopt: true,
+      images: clubData.images.comment,   // 그림 — 글은 validate 가, 댓글은 이만큼까지. 글 · 댓글을 지우거나 그림을 빼면 Storage 에서도 지운다
       views: 'club_view',   // 조회수 — 글 화면이 처음 열 때 ?view=1
       // ?cat=<분류> · ?state=open(답변 대기) | done(답변 완료) — state 는 질문답변 글만
       filter: q => (CLUB_CATS.has(q.get('cat')) ? `&category=eq.${q.get('cat')}` : '')
@@ -971,7 +1007,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       // ponytail: 조회수는 화면이 ?view=1 을 붙일 때마다 오른다(화면은 탭마다 글마다 한 번) — 새로고침 · 직접 호출로 부풀릴 수 있다. 막으려면 IP · 사람마다 하루 한 번(recruit_hits 처럼)
       if (B.views && q.get('view') === '1') await db(`/rpc/${B.views}`, { method: 'POST', body: { p_post: +id } })
       const [b, comments, prev, next] = await Promise.all([
-        itemOf(id), B.comments ? db(`/${B.comments}?select=id,author_id,author_name,body,created_at&${B.fk}=eq.${id}&order=id.asc`) : [], near('lt', 'desc'), near('gt', 'asc'),
+        itemOf(id), B.comments ? db(`/${B.comments}?select=id,author_id,author_name,body,created_at${B.images ? ',images' : ''}&${B.fk}=eq.${id}&order=id.asc`) : [], near('lt', 'desc'), near('gt', 'asc'),
       ])
       // 로그인 토큰을 붙여 부르면 내가 추천했는지도 준다. 토큰이 틀려도 글은 보여 준다
       let liked = false
@@ -981,7 +1017,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       }
       return [200, {
         [B.one]: view(b), liked, ...(B.neighbors && { prev, next }),
-        comments: comments.map(c => ({ id: c.id, authorId: c.author_id, author: c.author_name, body: c.body, createdAt: c.created_at })),
+        comments: comments.map(c => ({ id: c.id, authorId: c.author_id, author: c.author_name, body: c.body, createdAt: c.created_at, ...(B.images && { images: c.images }) })),
       }]
     }
 
@@ -989,10 +1025,13 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (await hit(`w ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
     const mineOrAdmin = (authorId, what) => { if (authorId !== user.id && !user.admin) fail(403, `내가 쓴 ${what}만 고치거나 지울 수 있어요`) }
     const unlocked = b => { if (b.adopted && !user.admin) fail(409, '답변을 채택한 질문은 고치거나 지울 수 없어요') }
+    // 그림은 글 · 댓글을 쓴 사람이 올린 것만 — 글을 지울 때 그 그림을 지워도 남의 그림이 없어지지 않게
+    const ownImages = (names = [], owner) => { if (!names.every(n => n.startsWith(`${owner}_`))) fail(400, '내가 올린 그림만 붙일 수 있어요') }
 
     switch (action) {
       case 'POST': {
         const v = B.validate(await readJson(request))
+        ownImages(v.images, user.id)
         await B.unique?.(v)
         const [b] = await db(`/${B.table}`, {
           method: 'POST', prefer: 'return=representation', body: { ...v, author_id: user.id, author_name: await nameOf(user), created_at: t, updated_at: t },
@@ -1004,8 +1043,10 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         const v = B.validate(await readJson(request)), old = await itemOf(id)
         mineOrAdmin(old.author_id, '글')
         unlocked(old)
+        ownImages(v.images, old.author_id)
         await B.unique?.(v, id)
         await db(`/${B.table}?id=eq.${id}`, { method: 'PATCH', body: { ...v, author_name: await nameOf(user), updated_at: t } })
+        if (B.images) dropImages(old.images.filter(n => !v.images.includes(n)))   // 뺀 그림
         const b = await itemOf(id), pm = plusMinus(old.chars || [], b.chars || [], charKo)
         note(request, `#${id} ${clip(b.title)}`, [
           old.author_id !== user.id && `${old.author_name} 님의 글`, old.title !== b.title && `제목: ${clip(old.title)} → ${clip(b.title)}`, pm && `캐릭터 ${pm}`,
@@ -1017,7 +1058,9 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         const old = await itemOf(id)
         mineOrAdmin(old.author_id, '글')
         unlocked(old)
+        const imgs = B.images ? [...old.images, ...(await db(`/${B.comments}?select=images&${B.fk}=eq.${id}`)).flatMap(c => c.images)] : []
         await db(`/${B.table}?id=eq.${id}`, { method: 'DELETE' })   // 추천 · 댓글은 cascade
+        dropImages(imgs)
         note(request, `#${id} ${clip(old.title)}`, [old.author_id !== user.id && `${old.author_name} 님의 글`])
         return [200, { ok: true }]
       }
@@ -1029,17 +1072,20 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       }
       case 'POST item comments': {
         const v = await readJson(request)
-        const body = text(isObj(v) ? v.body : null, 500, '댓글', 1, true)
+        const images = B.images ? imagesOf(isObj(v) ? v.images : null, B.images) : []
+        const body = text(isObj(v) ? v.body : null, 500, '댓글', images.length ? 0 : 1, true)   // 그림만 단 댓글도 된다
+        ownImages(images, user.id)
         const b = await itemOf(id)
-        await db(`/${B.comments}`, { method: 'POST', body: { [B.fk]: +id, author_id: user.id, author_name: await nameOf(user), body, created_at: t } })
-        note(request, `#${id} ${clip(b.title)}`, [`「${clip(body)}」`])
+        await db(`/${B.comments}`, { method: 'POST', body: { [B.fk]: +id, author_id: user.id, author_name: await nameOf(user), body, created_at: t, ...(B.images && { images }) } })
+        note(request, `#${id} ${clip(b.title)}`, [`「${clip(body)}」`, images.length && `그림 ${images.length}장`])
         return [201, { ok: true }]
       }
       case 'DELETE item comments comment': {
-        const [[c], b] = await Promise.all([db(`/${B.comments}?select=author_id,author_name,body&id=eq.${cid}&${B.fk}=eq.${id}`), itemOf(id)])
+        const [[c], b] = await Promise.all([db(`/${B.comments}?select=author_id,author_name,body${B.images ? ',images' : ''}&id=eq.${cid}&${B.fk}=eq.${id}`), itemOf(id)])
         mineOrAdmin((c || fail(404, '댓글을 찾을 수 없어요')).author_id, '댓글')
         if (b.adopted === +cid && !user.admin) fail(409, '채택된 답변은 지울 수 없어요')
         await db(`/${B.comments}?id=eq.${cid}`, { method: 'DELETE' })
+        dropImages(c.images ?? [])
         note(request, `#${id} ${clip(b.title)}`, [`「${clip(c.body)}」`, c.author_id !== user.id && `${c.author_name} 님의 댓글`])
         return [200, { ok: true }]
       }
@@ -1064,8 +1110,9 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
   }
 
   // ------------------------------------------------ 향우회 — 내공 랭킹(공개, ?char= 그 캐릭터 향우회만) · 내 글에 달린 남의 댓글(로그인 — 알림)
-  async function club(request, sub) {
-    if (request.method !== 'GET') fail(404, '없는 주소예요')
+  async function club(request, sub, name) {
+    if (sub === 'images') return clubImage(request, name)
+    if (request.method !== 'GET' || name) fail(404, '없는 주소예요')
     if (sub === 'ranking') {
       const char = new URL(request.url).searchParams.get('char')
       const rows = await db('/rpc/club_ranking', { method: 'POST', body: { p_char: PLAYERS.has(char) ? char : null, p_limit: CLUB_RANK } })
@@ -1076,6 +1123,38 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const user = await identity(request), me = enc(user.id)
     const rows = await db(`/club_comments?select=id,post_id,author_name,body,created_at,post:club_posts!inner(title)&post.author_id=eq.${me}&author_id=neq.${me}&order=id.desc&limit=${CLUB_ALERTS}`)
     return [200, { alerts: rows.map(c => ({ id: c.id, postId: c.post_id, title: c.post.title, author: c.author_name, body: c.body, createdAt: c.created_at })) }]
+  }
+
+  /**
+   * 향우회 그림 — POST: 화면이 웹용으로 줄인 WebP(안 되면 JPEG) 바이트를 그대로 받아 Storage 의 공개 버킷 club 에 둔다 → { name }.
+   * DELETE /<이름>: 글 · 댓글에 붙이기 전에 화면에서 뺀 내 그림. 감사 로그에는 안 남긴다(붙인 글 · 댓글이 남는다).
+   * ponytail: 올려 놓고 글을 안 쓰고 떠나면 그림이 남는다 — 쌓이면 club_posts · club_comments 의 images 에 없는 이름을 지우는 청소를 둔다
+   */
+  async function clubImage(request, name) {
+    const user = await identity(request)
+    if (await hit(`w ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
+    if (request.method === 'DELETE' && name) {
+      if (!matches(CLUB_IMG, name) || !name.startsWith(`${user.id}_`)) fail(404, '그림을 찾을 수 없어요')
+      dropImages([name])
+      return [200, { ok: true }]
+    }
+    if (request.method !== 'POST' || name) fail(404, '없는 주소예요')
+    if (await hit(`img ${user.id}`, 86_400_000) > IMG_DAY) fail(429, `그림은 하루에 ${IMG_DAY}장까지 올릴 수 있어요`)
+    const bytes = await readBytes(request, IMG_MAX), type = imageType(bytes)
+    if (!type) fail(415, 'WebP · JPEG 그림만 올릴 수 있어요')
+    const file = `${user.id}_${randomBytes(12).toString('base64url')}.${type}`
+    let res
+    try {
+      res = await fetch(`${storage}/${file}`, {
+        method: 'POST', body: bytes, signal: AbortSignal.timeout(10_000),
+        headers: { apikey: secret, 'content-type': type === 'webp' ? 'image/webp' : 'image/jpeg', 'cache-control': 'max-age=31536000' },   // 이름이 바뀌지 않으니 오래 둔다
+      })
+    } catch (e) { log(`그림 올리기 실패: ${errText(e)}`) }
+    if (!res?.ok) {
+      if (res) log(`그림 올리기 ${res.status}: ${(await res.text()).slice(0, 200)}`)
+      fail(503, '그림을 올리지 못했어요. 잠시 뒤에 다시 시도해 주세요')
+    }
+    return [201, { name: file }]
   }
 
   // ------------------------------------------------ 아레나전 — 보기는 공개, 신청은 로그인(프로필 필요), 편성표는 관리자
@@ -1412,8 +1491,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (pathname === '/api/audit') return auditLog(request)
     const b = pathname.match(BOARD_PATH)
     if (b) return board(request, b, now())
-    const cl = pathname.match(/^\/api\/club\/(ranking|alerts)$/)
-    if (cl) return club(request, cl[1])
+    const cl = pathname.match(/^\/api\/club\/(ranking|alerts|images)(?:\/([^/]+))?$/)
+    if (cl) return club(request, cl[1], cl[2])
     if (pathname === '/api/slam') return slam(request, now())
     const sv = pathname.match(/^\/api\/survive(?:\/(ranking|run|log|buy))?$/)
     if (sv) return survive(request, sv[1], now())

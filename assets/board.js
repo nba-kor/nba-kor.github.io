@@ -1,6 +1,6 @@
 // 게시판 공용 — 잠재력추천 · 영상이 같이 쓴다: 로그인 표시, 캐릭터 고르기, 목록 카드 틀, 글 머리(추천 · 공유 · 수정 · 삭제), 댓글
 import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=fb02b445'
-import { api, initAuth, chooseLogin, logout, session, showWho, IN_KAKAO } from './auth.js?v=01106c22'
+import { api, initAuth, chooseLogin, logout, session, showWho, IN_KAKAO } from './auth.js?v=bdb31bdc'
 
 export const $ = (s, root = document) => root.querySelector(s)
 /** DOM 생성. 문자열 자식은 텍스트 노드가 되므로 사용자 입력을 그대로 넣어도 안전하다. */
@@ -178,9 +178,10 @@ async function del(path, ask) {
 /**
  * 글 화면 틀: 머리(작성자 · 제목 · 추천 · 카카오 공유 · 링크 복사 · 수정 · 삭제) + 본문(body) + 댓글.
  * path = '/builds/3' 같은 API 경로, share = { payload(), title, url }, reload() = 댓글을 달거나 지운 뒤 다시 읽기.
- * locked = 수정 · 삭제 버튼을 뺀다(향우회의 채택한 질문), 댓글의 locked = 그 댓글 삭제 버튼을 뺀다, commentTail(댓글) = 댓글 머리 끝에 붙일 것(채택)
+ * locked = 수정 · 삭제 버튼을 뺀다(향우회의 채택한 질문), 댓글의 locked = 그 댓글 삭제 버튼을 뺀다, commentTail(댓글) = 댓글 머리 끝에 붙일 것(채택),
+ * commentExtra(댓글) = 댓글 글 아래에 붙일 것(그림), attach = 댓글 쓰기의 그림 고르기 { el, values(), busy(), paste(e), drop(e) } — 그림만 단 댓글도 된다
  */
-export function itemView({ path, item: x, liked, comments, body, share, onEdit, listUrl, reload, locked = false, commentTail = () => null }) {
+export function itemView({ path, item: x, liked, comments, body, share, onEdit, listUrl, reload, locked = false, commentTail = () => null, commentExtra = () => null, attach = null }) {
   const mine = auth === 'in' && me.id === x.authorId && !locked
 
   const likeBtn = h('button', { type: 'button', className: 'pt-like' })
@@ -195,16 +196,23 @@ export function itemView({ path, item: x, liked, comments, body, share, onEdit, 
   }
 
   const form = h('form', { className: 'pt-cform', novalidate: true },
-    h('textarea', { name: 'body', rows: 2, maxLength: 500, placeholder: auth === 'in' ? '댓글을 남겨 주세요' : '댓글은 로그인 후 쓸 수 있어요' }),
+    h('textarea', { name: 'body', rows: 2, maxLength: 500, placeholder: auth !== 'in' ? '댓글은 로그인 후 쓸 수 있어요' : attach ? '댓글을 남겨 주세요 — 사진은 붙여넣기(Ctrl+V) · 끌어 놓기도 돼요' : '댓글을 남겨 주세요' }),
+    attach?.el,
     h('div', { className: 'rc-actions' }, h('button', { type: 'submit', className: 'primary' }, '댓글 달기')),
     h('p', { className: 'rc-form-err', role: 'alert', hidden: true }))
+  if (attach) {
+    form.addEventListener('paste', attach.paste)
+    form.addEventListener('dragover', e => e.preventDefault())
+    form.addEventListener('drop', attach.drop)
+  }
   form.onsubmit = async e => {
     e.preventDefault()
     if (!await loggedIn()) return
-    const ta = $('textarea', form), msg = $('.rc-form-err', form), btn = $('[type=submit]', form)
-    if (!ta.value.trim()) return ta.focus()
+    const ta = $('textarea', form), msg = $('.rc-form-err', form), btn = $('[type=submit]', form), images = attach?.values() ?? []
+    if (attach?.busy()) { msg.textContent = '사진을 올리는 중이에요 — 잠깐만 기다려 주세요'; msg.hidden = false; return }
+    if (!ta.value.trim() && !images.length) return ta.focus()
     btn.disabled = true
-    try { await api(`${path}/comments`, { method: 'POST', withToken: true, body: { body: ta.value } }); reload() }
+    try { await api(`${path}/comments`, { method: 'POST', withToken: true, body: { body: ta.value, ...(attach && { images }) } }); reload() }
     catch (e) { msg.textContent = e.message; msg.hidden = false }
     finally { btn.disabled = false }
   }
@@ -226,7 +234,8 @@ export function itemView({ path, item: x, liked, comments, body, share, onEdit, 
         h('div', {}, h('b', {}, c.author), h('small', { className: 'rc-muted' }, ` ${ago(c.createdAt)}`),
           auth === 'in' && me.id === c.authorId && !c.locked && h('button', { type: 'button', className: 'pt-cdel', onclick: async () => { if (await del(`${path}/comments/${c.id}`, '댓글을 지울까요?')) reload() } }, '삭제'),
           commentTail(c)),
-        h('p', {}, c.body)))),
+        c.body && h('p', {}, c.body),
+        commentExtra(c)))),
       form),
   ]
 }

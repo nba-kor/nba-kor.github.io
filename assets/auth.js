@@ -5,7 +5,7 @@
 // 그 밖(로컬 docker compose 의 nginx 가 /api/ 를 같은 함수로 넘긴다)에서는 같은 도메인의 /api
 const API_ORIGIN = location.hostname === 'nba-kor.github.io' ? 'https://lgchgqxjjlapszmxarun.supabase.co/functions/v1/recruit' : ''
 // publishable key 는 브라우저에 두라고 만든 공개 키다(표는 RLS 로 막혀 있어 이 키로는 아무것도 못 읽는다)
-const SUPABASE_URL = 'https://lgchgqxjjlapszmxarun.supabase.co'
+export const SUPABASE_URL = 'https://lgchgqxjjlapszmxarun.supabase.co'
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_NlTRTkRjbTv0iCHhNB8pZA_2Ov5In9Z'
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/+esm'   // 버전 고정. 동적 import 라 CDN 이 죽어도 공개 화면은 뜬다
 const NO_SERVER = '서버에 연결할 수 없어요'
@@ -17,8 +17,8 @@ export let sb = null   // supabase 클라이언트 — 못 불러오면 null 로
 let currentUser = null   // 마지막 세션의 사용자 — 머리 아래 이름 줄의 디스코드 · 카카오 표시
 
 /** withToken = 로그인 토큰을 붙인다. 공개 GET 에는 붙이지 않는다 — Authorization 헤더가 붙으면 preflight 로 함수 호출이 두 배가 된다.
- *  guest = { id: 'g<번호>', pw } — 팀원모집 비회원이 자기 팀을 관리할 때 */
-export async function api(path, { method = 'GET', body, withToken, guest } = {}) {
+ *  guest = { id: 'g<번호>', pw } — 팀원모집 비회원이 자기 팀을 관리할 때. raw = JSON 대신 그대로 보낼 Blob(향우회 그림) */
+export async function api(path, { method = 'GET', body, raw, withToken, guest } = {}) {
   let r
   const token = withToken && (await sb?.auth.getSession())?.data.session?.access_token   // getSession 이 만료된 토큰을 갱신해 준다
   // 헤더는 latin1 만 실린다 — 한글 비밀번호는 퍼센트 인코딩
@@ -27,8 +27,8 @@ export async function api(path, { method = 'GET', body, withToken, guest } = {})
   try {
     r = await fetch(`${API_ORIGIN}/api${path}${g ? `${path.includes('?') ? '&' : '?'}g=${encodeURIComponent(g)}` : ''}`, {
       method, cache: 'no-store',
-      headers: { ...(body && { 'content-type': 'application/json' }), ...(authorization && { authorization }) },
-      body: body && JSON.stringify(body),
+      headers: { ...(body && { 'content-type': 'application/json' }), ...(raw && { 'content-type': raw.type }), ...(authorization && { authorization }) },
+      body: raw || (body && JSON.stringify(body)),
     })
   } catch { throw new Error(NO_SERVER) }
   const j = await r.json().catch(() => null)
@@ -40,7 +40,7 @@ export async function api(path, { method = 'GET', body, withToken, guest } = {})
   // 401 일 때만 — 마스터의 GET /me 는 200 안에 gate: { code, changedAt } 를 싣는다
   if (r.status === 401 && j.gate) {
     if (gateToken() === g) { store.del(GATE); await showGate() }
-    return api(path, { method, body, withToken, guest })
+    return api(path, { method, body, raw, withToken, guest })
   }
   if (!r.ok) {
     throw Object.assign(new Error(j.error || NO_SERVER), { status: r.status })
@@ -202,7 +202,7 @@ export function watchReplies() {
     for (const a of alerts.filter(a => a.id > last).slice(0, 3)) {
       try {
         // tag — 탭이 여럿이라 같은 댓글을 두 번 알려도 하나로 바뀐다
-        const n = new Notification(`💬 내 글에 댓글 — ${a.title}`, { body: `${a.author}: ${a.body}`, tag: `club-${a.id}`, icon: '/assets/icon.png?v=2' })
+        const n = new Notification(`💬 내 글에 댓글 — ${a.title}`, { body: `${a.author}: ${a.body || '📷 사진'}`, tag: `club-${a.id}`, icon: '/assets/icon.png?v=2' })
         n.onclick = () => { window.focus(); location.href = `/club/?p=${a.postId}` }
       } catch { return }   // 휴대폰 크롬 등은 페이지에서 바로 띄울 수 없다
     }
