@@ -1,8 +1,8 @@
 // 향우회 — 캐릭터별 커뮤니티: 게시판(분류 · 답변 상태 · 캐릭터 필터, 최신순) · 글(질문답변은 쓴 사람이 댓글 하나를 채택) · 내공 랭킹 · 내 글에 달린 댓글(알림).
 // 게시판 공용 부분은 board.js, 알림을 3분마다 묻는 것은 auth.js 의 watchReplies(사이트 어느 페이지에서나)
-import { mountTop, loadKakao, faceOf, shareFace } from './app.js?v=fb02b445'
+import { mountTop, loadKakao, faceOf, shareFace } from './app.js?v=f44b46d8'
 import { api, notifyOn, setNotify, watchReplies, SUPABASE_URL } from './auth.js?v=bdb31bdc'
-import { $, h, P, ago, loadData, startAuth, loggedIn, charGrid, listView, itemView, showItem, auth, me } from './board.js?v=587563dd'
+import { $, h, P, ago, loadData, startAuth, loggedIn, charGrid, listView, itemView, showItem, auth, me } from './board.js?v=813dd8d2'
 
 let cfg, catName   // data/club.json · 분류 id → 이름
 const SEEN = 'club.seen'   // 알림 탭에서 마지막으로 본 댓글 id — 탭의 빨간 숫자

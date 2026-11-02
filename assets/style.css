@@ -1022,6 +1022,7 @@ a.cl-row:hover .cl-title b { text-decoration: underline; }
 .subnav a { flex: none; padding: 4px 12px; border-radius: 999px; color: var(--muted); text-decoration: none; font-weight: 700; font-size: 13px; }
 .subnav a:hover { color: var(--text); background: var(--panel-2); }
 .subnav a[aria-current] { color: #1a1200; background: var(--accent); }
+.subnav-sep { flex: none; width: 1px; height: 16px; margin: 0 6px; background: var(--line); }   /* 커뮤니티 › 게임들 */
 
 /* ---------- 홈: 내 프로필 · 메뉴 ---------- */
 .me-card { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; margin-bottom: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }

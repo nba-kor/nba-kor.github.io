@@ -5,9 +5,9 @@
 //   15분부터 변수 기술(EVENTS — 폭격 · 러시)과 중간보스, 20분부터 상태이상 보스(STATUS), 25분부터는 1분마다 다른 보스(PLAN · BOSS) — 서 있기만 하면 못 버틴다.
 //   업적 · 기록은 이 브라우저(localStorage)에 두고, 로그인하면 계정(/api/survive)과 합쳐 같이 쓴다 — 다른 기기에서도 이어진다.
 // 그림은 2D 캔버스 하나. 사람 · 공 · 아이콘 · 바닥은 처음에 한 번 그려 두고(sprite) 옮겨 그린다. 메뉴 · 상자는 캔버스 위에 겹친 HTML(#sv-ui).
-import { mountTop, faceOf } from './app.js?v=fb02b445'
+import { mountTop, faceOf } from './app.js?v=f44b46d8'
 import { api, chooseLogin } from './auth.js?v=bdb31bdc'
-import { loadData, P, startAuth, auth, me, h } from './board.js?v=587563dd'
+import { loadData, P, startAuth, auth, me, h } from './board.js?v=813dd8d2'
 import { cutHead, skinOf, NBA_NUM } from './vipers.js?v=8939ed12'
 
 mountTop('/survive/')

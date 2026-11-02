@@ -191,13 +191,17 @@ export function pickMenu(p, title, items, detail) {
   d.focus()   // 첫 항목에 포커스 테두리가 생기면 이미 고른 것처럼 보인다
 }
 
-/** 상단 네비게이션 + 데이터 갱신일 표시. 머리 메뉴는 data-group(전략·공략 = 전술판 · 티어표 · 조합표 · 잠재력추천)에 든 페이지에서도 켜진다 */
+/** 상단 네비게이션 + 데이터 갱신일 표시. 머리 메뉴는 data-group(전략·공략 = 전술판 · 티어표 · 조합표 · 잠재력추천, 커뮤니티 = 영상 자료실 · 향우회 · 게임들)에 든 페이지에서도 켜진다 */
 export function mountTop(current, updatedAt) {
   const el = document.querySelector('.stamp')   // 홈 맨 아래
   if (el && updatedAt) el.textContent = `선수 데이터 ${updatedAt} 기준`
   document.querySelectorAll('.top nav a, .subnav a').forEach(a => {
     if (a.getAttribute('href') === current || a.dataset.group?.split(' ').includes(current)) a.setAttribute('aria-current', 'page')
   })
+  // 좁은 화면에서 옆으로 넘치는 하위 메뉴(커뮤니티 › 게임들)는 지금 페이지가 왼쪽 끝에 오게 민다. 줄 크기가 바뀔 때마다 다시 —
+  // 접근 비밀번호 창이 가린 동안은 크기가 0 이고, 로그인 이름이 뒤늦게 붙으면 줄이 좁아진다
+  const sub = document.querySelector('.subnav'), cur = [...document.querySelectorAll('.subnav a[aria-current]')].pop()
+  if (sub && cur) new ResizeObserver(() => { sub.scrollLeft += cur.getBoundingClientRect().left - sub.getBoundingClientRect().left - 24 }).observe(sub)
   // 좁은 화면에서는 메뉴를 햄버거 버튼 뒤로 접는다(보이고 말고는 CSS 가 정한다).
   const top = document.querySelector('.top')
   const btn = Object.assign(document.createElement('button'), { className: 'menu-btn', textContent: '☰' })

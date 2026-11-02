@@ -22,7 +22,7 @@
 <meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
 <meta name="twitter:card" content="summary_large_image">
 <script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
-<link rel="stylesheet" href="/assets/style.css?v=2122e4ac">
+<link rel="stylesheet" href="/assets/style.css?v=3a373051">
 </head>
 <body>
 
@@ -32,13 +32,14 @@
     <a href="/">홈</a>
     <a href="/arena/">아레나 운영</a>
     <a href="/tactics/" data-group="/tactics/ /tiers/ /combos/ /potentials/">전략·공략</a>
-    <a href="/videos/">영상 자료실</a>
-    <a href="/club/">향우회</a>
-    <a href="/game/" data-group="/game/ /slam/ /street/ /survive/ /plaza/">게임</a>
+    <a href="/videos/" data-group="/videos/ /club/ /game/ /slam/ /street/ /survive/ /plaza/">커뮤니티</a>
     <a href="/me/">마이페이지</a>
   </nav>
   <div class="spacer"></div>
   <div class="rc-auth" id="auth" aria-live="polite"></div>
+  <div class="subnav" role="navigation" aria-label="커뮤니티">
+    <a href="/videos/">영상 자료실</a><a href="/club/">향우회</a><a href="/game/" data-group="/game/ /slam/ /street/ /survive/ /plaza/">게임</a>
+  </div>
 </header>
 
 <!-- 머리 메뉴 「게임」이 먼저 오는 곳 — 게임마다 실제 화면(assets/games/*.jpg, 800×450) · 설명 · 특징. 카드를 누르면 그 게임으로 -->
@@ -86,8 +87,8 @@
 </main>
 
 <script type="module">
-import { mountTop } from '/assets/app.js?v=fb02b445'
-import { startAuth } from '/assets/board.js?v=587563dd'
+import { mountTop } from '/assets/app.js?v=f44b46d8'
+import { startAuth } from '/assets/board.js?v=813dd8d2'
 mountTop('/game/')
 startAuth('', () => {})   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
 </script>
