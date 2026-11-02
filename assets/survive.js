@@ -1183,7 +1183,6 @@ function afflict(id) {
     w.hands = null; w.on = 0; w.R = 0; w.q = 0
   }
   fx({ k: 'text', x: pl.x, y: pl.y - 70, s, col: st.col, T: 1.6 }); fx({ k: 'flash', x: pl.x, y: pl.y - 20, R: 70, col: st.col, T: 0.5 })
-  if (rnd() < 0.6) { const a = rnd() * TAU, d = 170 + rnd() * 90; item(pl.x + Math.cos(a) * d, pl.y + Math.sin(a) * d, 'spray') }
 }
 function hurt(e, dmg, ox, oy, kb = 0) {
   if (e.dead || e.rush) return   // 러시는 스킬에 안 맞는다 — 막을 수 없고 피하는 수밖에
@@ -1205,7 +1204,7 @@ function kill(e) {
   if (e.elite || e.mid) { if (rnd() < 0.33 * S.luck) item(e.x, e.y); for (let i = 0; i < 3; i++) gem(e.x + (rnd() - 0.5) * 40, e.y + (rnd() - 0.5) * 40, e.mid ? 10 : 5) }
   else if (!e.boss && rnd() < 0.0013 * S.luck) item(e.x, e.y, rnd() < 0.6 ? 'drink' : 'whistle')   // 아이템은 예전의 1/3 — 마스코트 · 중간보스 33%, 보통 수비 0.13%
   else if (!e.boss && G.t >= 1200 && rnd() < 0.0005 * S.luck) item(e.x, e.y, 'spray')
-  if (rnd() < (e.boss ? (e.mid ? 0.1 : 0.2) : e.elite ? 0.055 : 0.00011) * S.luck && ringable()) item(e.x, e.y + 14, 'ring')
+  if (rnd() < (e.boss ? (e.mid ? 0.033 : 0.067) : e.elite ? 0.018 : 0.000037) * S.luck && ringable()) item(e.x, e.y + 14, 'ring')   // 챔피언 반지도 예전의 1/3
   if (e.boss) {
     const B = BOSS[e.kind]
     if (e.mid) { if (++G.mids >= 3) gain('mid3'); say(`${B.name} 격파!`, 1.6, '#ffb35e') }
@@ -2169,7 +2168,9 @@ function refresh() {
 const NOTES = [
   { date: '2026-11-02', title: '아이템이 덜 떨어져요', items: [
     '수비가 떨어뜨리는 아이템(생수 · 호루라기 · 타임아웃 · 버저 · 쿨링 스프레이)이 예전의 1/3 — 마스코트 · 중간보스는 늘 → 3번에 1번, 보통 수비는 0.4% → 0.13%(20분부터 스프레이 0.15% → 0.05%). 행운은 그대로 곱해져요',
-    '챔피언 반지 · 보스 트로피 상자 · 상태이상에 걸렸을 때 근처에 생기는 쿨링 스프레이는 그대로'] },
+    '챔피언 반지도 1/3 — 보통 수비 0.011% → 0.0037% · 마스코트 5.5% → 1.8% · 중간보스 10% → 3.3% · 보스 20% → 6.7%. 돌파가 훨씬 늦어져요',
+    '보스 트로피 상자는 그대로 늘 나와요',
+    '상태이상에 걸렸을 때 근처에 쿨링 스프레이가 생기던 것(60%)은 없앴어요 — 미리 떨어진 스프레이를 챙겨 두세요'] },
   { date: '2026-11-02', title: '새 스킬 — 샷 클락', items: [
     '새 스킬 「샷 클락」 — 수비가 가장 많이 몰린 곳에 24초 시계를 띄우고, 1초 뒤 0이 되면 버저와 함께 크게 터져요',
     '돌파는 「샷 클락 리셋」 — 터진 자리 둘레에 작은 시계 셋이 흩어져 한 번 더 터져요',
