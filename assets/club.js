@@ -2,7 +2,7 @@
 // 게시판 공용 부분은 board.js, 알림을 3분마다 묻는 것은 auth.js 의 watchReplies(사이트 어느 페이지에서나)
 import { mountTop, loadKakao, faceOf, shareFace } from './app.js?v=fb02b445'
 import { api, notifyOn, setNotify, watchReplies } from './auth.js?v=01106c22'
-import { $, h, P, ago, loadData, startAuth, loggedIn, charGrid, listView, itemView, showItem, auth, me } from './board.js?v=f9551348'
+import { $, h, P, ago, loadData, startAuth, loggedIn, charGrid, listView, itemView, showItem, auth, me } from './board.js?v=0c3aa4b5'
 
 let cfg, catName   // data/club.json · 분류 id → 이름
 const SEEN = 'club.seen'   // 알림 탭에서 마지막으로 본 댓글 id — 탭의 빨간 숫자
@@ -19,7 +19,7 @@ const when = ms => {
   if (d.toDateString() === now.toDateString()) return `${p(d.getHours())}:${p(d.getMinutes())}`
   return `${d.getFullYear() === now.getFullYear() ? '' : `${String(d.getFullYear()).slice(2)}.`}${p(d.getMonth() + 1)}.${p(d.getDate())}`
 }
-/** 목록 한 줄: 번호 · 분류 · 제목 [댓글] 상태 · 향우회 · 글쓴이 · 작성일 · 추천 — 줄 머리는 club/index.html 의 .cl-head */
+/** 목록 한 줄: 번호 · 분류 · 제목 [댓글] 상태 · 향우회 · 글쓴이 · 작성일 · 조회 · 추천 — 줄 머리는 club/index.html 의 .cl-head */
 const row = x => {
   const char = P(x.chars[0])
   return h('a', { className: 'cl-row', href: `?p=${x.id}` },
@@ -29,6 +29,7 @@ const row = x => {
     h('span', { className: 'cl-who', title: `${char.name} 향우회` }, h('img', { src: faceOf(char), alt: '' }), char.short || char.name),
     h('span', { className: 'cl-author' }, x.author),
     h('span', { className: 'cl-date', title: new Date(x.createdAt).toLocaleString('ko-KR') }, when(x.createdAt)),
+    h('span', { className: 'cl-views' }, x.views),
     h('span', { className: 'cl-likes' }, x.likes))
 }
 
@@ -38,12 +39,12 @@ const SECTION = { list: '#list-view', rank: '#rank-view', alerts: '#alerts-view'
 
 // ---------------------------------------------------------------- 게시판
 
-let cat = q.get('cat') || '', state = ''   // state = open 답변대기 | done 답변완료 (질문답변일 때만)
+let cat = q.get('cat') || '', state = ['open', 'done'].includes(q.get('state')) ? q.get('state') : ''   // state = open 답변대기 | done 답변완료 (질문답변일 때만)
 
 function showList() {
   const reload = listView({
-    sort: 'new',
-    load: async qs => (await api(`/club?${qs}`)).club,
+    sort: 'new', pageSize: 30, remember: true,
+    load: async qs => { const r = await api(`/club?${qs}`); return { items: r.club, total: r.total } },
     card: row,
     empty: who => `아직 ${who}${cat ? `${catName.get(cat)} ` : ''}글이 없어요. 첫 글을 써 보세요!`,
     extra: () => ({ ...(cat && { cat }), ...(cat === 'qna' && state && { state }) }),
@@ -147,6 +148,14 @@ function kakaoPayload(x) {
 // ---------------------------------------------------------------- 글
 
 const postId = q.get('p')
+/** 조회수는 이 탭에서 그 글을 처음 열 때만 올린다(새로고침 · 로그인 뒤 다시 읽기는 빼고) */
+let counted = false
+function viewOnce() {
+  if (counted) return ''
+  counted = true
+  try { if (sessionStorage.getItem(`club.v${postId}`)) return ''; sessionStorage.setItem(`club.v${postId}`, '1') } catch {}
+  return '?view=1'
+}
 
 async function adopt(x, c) {
   if (!confirm(`${c.author} 님의 답변을 채택할까요?\n답변한 사람에게 내공 +${cfg.points}. 채택은 바꿀 수 없고, 이 질문은 더 고치거나 지울 수 없어요.`)) return
@@ -154,7 +163,7 @@ async function adopt(x, c) {
   catch (e) { alert(e.message) }
 }
 
-const showPost = () => showItem(`/club/${postId}`, ({ post: x, liked, comments }) => {
+const showPost = () => showItem(`/club/${postId}${viewOnce()}`, ({ post: x, liked, comments }) => {
   document.title = `${x.title} · 향우회 · TNAB Vipers`
   const char = P(x.chars[0]), best = comments.find(c => c.id === x.adopted)
   const asking = x.category === 'qna' && !x.adopted && auth === 'in' && me.id === x.authorId   // 채택할 수 있는 사람이 보고 있다
@@ -165,7 +174,8 @@ const showPost = () => showItem(`/club/${postId}`, ({ post: x, liked, comments }
       : asking && c.authorId !== me.id && h('button', { type: 'button', className: 'cl-adopt', onclick: () => adopt(x, c) }, '채택'),
     share: { payload: () => kakaoPayload(x), title: `${x.title} · 향우회`, url: postUrl(x) },
     body: [h('section', { className: 'card' },
-      h('p', { className: 'cl-tags' }, catTag(x.category), stateTag(x), h('span', { className: 'cl-club' }, h('img', { src: faceOf(char), alt: '' }), `${char.name} 향우회`)),
+      h('p', { className: 'cl-tags' }, catTag(x.category), stateTag(x), h('span', { className: 'cl-club' }, h('img', { src: faceOf(char), alt: '' }), `${char.name} 향우회`),
+        h('span', { className: 'cl-hits' }, `조회 ${x.views} · 추천 ${x.likes}`)),
       h('p', { className: 'pt-body' }, x.body),
       asking && comments.some(c => c.authorId !== me.id) && h('p', { className: 'rc-note cl-hint' }, `마음에 드는 답변에 「채택」 을 눌러 주세요 — 답변한 사람에게 내공 +${cfg.points}`))],
   })
@@ -231,6 +241,10 @@ const boot = async () => {
   document.querySelector(`.cl-tabs [data-view="${view}"]`)?.setAttribute('aria-current', 'page')
   $('#club-head').hidden = view === 'post'
   $(SECTION[view]).hidden = view === 'post'   // 글은 showItem 이 연다
+  // 「← 목록」 은 들어온 목록(그 쪽 · 필터)으로
+  let ref = null
+  try { ref = new URL(document.referrer) } catch {}
+  if (view === 'post' && ref?.origin === location.origin && ref.pathname === '/club/' && !ref.searchParams.has('p')) $('#item-view .rc-back').href = ref.href
   startAuth('글을 쓰거나 추천 · 댓글을 달려면 로그인이 필요해요.', () => {
     if (view === 'post') showPost()
     else if (view === 'alerts') showAlerts()

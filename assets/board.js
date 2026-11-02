@@ -84,8 +84,7 @@ export async function loggedIn() {
 // ---------------------------------------------------------------- 캐릭터 고르기 (필터 · 글쓰기 공용)
 
 /** 포지션 탭 + 초상화 격자. pick(id) 는 누를 때마다, isOn(id) 로 선택 표시. 포지션 탭은 onPos(pos) 로도 알린다 */
-export function charGrid({ isOn, pick, onPos }) {
-  let pos = 0
+export function charGrid({ isOn, pick, onPos, pos = 0 }) {
   const tabs = [0, 1, 2, 3, 4, 5].map(i => h('button', { type: 'button', className: 'rc-fbtn', 'data-pos': i, onclick: () => { pos = i; onPos?.(i); sync() } }, i ? POS[i] : '전체'))
   const btns = kr.map(p => h('button', { type: 'button', className: 'pt-face', title: p.name, onclick: () => { pick(p.id); sync() } },
     h('img', { src: faceOf(p), alt: '', loading: 'lazy' }), h('span', {}, p.short || p.name)))
@@ -101,29 +100,62 @@ export function charGrid({ isOn, pick, onPos }) {
 
 /**
  * 목록 화면: 정렬 버튼([data-sort]) · 포지션/캐릭터 필터(#filter-chars) · 카드(#list). load(qs) 가 [글] 을 돌려주고 card(글) 가 카드를 만든다.
- * extra() = 게시판만의 필터를 쿼리에 더한다. sort = 처음 정렬(likes | new). 돌려주는 reload() 로 그 필터가 바뀌었을 때 다시 읽는다
+ * extra() = 게시판만의 필터를 쿼리에 더한다. sort = 처음 정렬(likes | new). 돌려주는 reload() 로 그 필터가 바뀌었을 때 다시 읽는다(첫 쪽부터).
+ * pageSize = 한 쪽 글 수 — 주면 load(qs) 가 { items, total } 을 돌려주고 #pager 에 쪽 번호를 그린다.
+ * remember = 정렬 · 캐릭터 · 쪽(+ extra)을 주소에 남긴다 — 글을 보고 뒤로 와도 그 자리
  */
-export function listView({ load, card, empty, extra = () => ({}), sort = 'likes' }) {
-  const filter = { sort, pos: 0, char: '' }
+export function listView({ load, card, empty, extra = () => ({}), sort = 'likes', pageSize = 0, remember = false }) {
+  const at = new URLSearchParams(remember ? location.search : ''), char = at.get('char')
+  const filter = {
+    sort: ['likes', 'new'].includes(at.get('sort')) ? at.get('sort') : sort, pos: /^[1-5]$/.test(at.get('pos') || '') ? +at.get('pos') : 0,
+    char: kr.some(p => p.id === char) ? char : '', page: /^[1-9]\d{0,4}$/.test(at.get('page') || '') ? +at.get('page') : 1,
+  }
   let seq = 0
-  async function reload() {
+  async function reload(keepPage = false) {
+    if (keepPage !== true) filter.page = 1
     for (const b of document.querySelectorAll('[data-sort]')) b.setAttribute('aria-pressed', b.dataset.sort === filter.sort)
     const box = $('#list'), my = ++seq
-    const qs = new URLSearchParams({ sort: filter.sort, ...(filter.char ? { char: filter.char } : filter.pos && { pos: filter.pos }), ...extra() })
-    let items
-    try { items = await load(qs) }
+    const qs = new URLSearchParams({
+      sort: filter.sort, ...(filter.char ? { char: filter.char } : filter.pos && { pos: filter.pos }), ...(pageSize && { page: filter.page, limit: pageSize }), ...extra(),
+    })
+    if (remember) {
+      const u = new URLSearchParams(qs)
+      u.delete('limit')
+      if (filter.page === 1) u.delete('page')
+      if (filter.sort === sort) u.delete('sort')
+      history.replaceState(history.state, '', `${u}` ? `?${u}` : location.pathname)
+    }
+    let items, total
+    try { ({ items, total } = pageSize ? await load(qs) : { items: await load(qs) }) }
     catch (e) { if (my === seq) box.replaceChildren(h('p', { className: 'rc-note rc-bad' }, e.message)); return }
     if (my !== seq) return
+    if (pageSize && !items.length && filter.page > 1) return reload()   // 없는 쪽(그새 글이 지워졌다) → 첫 쪽
     const who = filter.char ? `${P(filter.char).name} ` : filter.pos ? `${POS[filter.pos]} ` : ''
     box.replaceChildren(...items.length ? items.map(card) : [h('p', { className: 'rc-note' }, empty(who))])
+    if (pageSize) $('#pager').replaceChildren(...pager(Math.ceil(total / pageSize)))
+  }
+  // 쪽 번호 — 열 쪽(좁은 화면은 다섯 쪽)씩 묶고 처음 · 이전 묶음 · 다음 묶음 · 끝
+  function pager(pages) {
+    if (pages <= 1) return []
+    const span = innerWidth <= 560 ? 5 : 10, from = Math.floor((filter.page - 1) / span) * span + 1, to = Math.min(pages, from + span - 1)
+    const go = (n, label) => h('button', {
+      type: 'button', 'aria-current': n === filter.page && label === n ? 'page' : 'false',
+      onclick: () => { filter.page = n; reload(true); $('#list').parentElement.scrollIntoView({ block: 'start' }) },   // 목록 틀(줄 머리)부터
+    }, label)
+    return [
+      from > 1 && go(1, '처음'), from > 1 && go(from - 1, '‹ 이전'),
+      ...Array.from({ length: to - from + 1 }, (_, i) => go(from + i, from + i)),
+      to < pages && go(to + 1, '다음 ›'), to < pages && go(pages, '끝'),
+    ].filter(Boolean)
   }
   for (const b of document.querySelectorAll('[data-sort]')) b.onclick = () => { filter.sort = b.dataset.sort; reload() }
   $('#filter-chars').append(charGrid({
     isOn: id => filter.char === id,
     pick: id => { filter.char = filter.char === id ? '' : id; reload() },
     onPos: pos => { filter.pos = pos; filter.char = ''; reload() },
+    pos: filter.char ? 0 : filter.pos,
   }))
-  reload()
+  reload(true)
   return reload
 }
 

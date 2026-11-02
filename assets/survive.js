@@ -7,7 +7,7 @@
 // 그림은 2D 캔버스 하나. 사람 · 공 · 아이콘 · 바닥은 처음에 한 번 그려 두고(sprite) 옮겨 그린다. 메뉴 · 상자는 캔버스 위에 겹친 HTML(#sv-ui).
 import { mountTop, faceOf } from './app.js?v=fb02b445'
 import { api, chooseLogin } from './auth.js?v=01106c22'
-import { loadData, P, startAuth, auth, me, h } from './board.js?v=f9551348'
+import { loadData, P, startAuth, auth, me, h } from './board.js?v=0c3aa4b5'
 import { cutHead, skinOf, NBA_NUM } from './vipers.js?v=8939ed12'
 
 mountTop('/survive/')

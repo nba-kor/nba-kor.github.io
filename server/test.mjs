@@ -2454,7 +2454,7 @@ dbTest('조합표: 검증 · 추천 잠재력 · 상대 조합(3명 세트) · i
 
 // ---------------------------------------------------------------- 향우회
 
-dbTest('향우회: 글 · 분류 · 답변 상태 · 채택 · 잠금 · 내공 랭킹 · 알림', async () => {
+dbTest('향우회: 글 · 분류 · 답변 상태 · 채택 · 잠금 · 내공 랭킹 · 알림 · 조회수 · 쪽 나누기', async () => {
   const { api } = start()
   const a = { id: uid() }, b = { id: uid() }, c = { id: uid() }
   a.as = web(a.id, '질문러'); b.as = web(b.id, `답변왕${RUN}`); c.as = web(c.id, '구경꾼')
@@ -2511,6 +2511,19 @@ dbTest('향우회: 글 · 분류 · 답변 상태 · 채택 · 잠금 · 내공 
   assert.equal(await rank('?char=weisblk'), undefined)
   const all = (await api('GET', '/api/club/ranking')).body.ranking
   assert.ok(all.every((r, i) => !i || r.adopted < all[i - 1].adopted ? r.rank === i + 1 : r.rank === all[i - 1].rank))
+
+  // 조회수 — ?view=1 일 때만 오른다
+  assert.equal((await api('GET', `/api/club/${tip.id}?view=1`)).body.post.views, 1)
+  assert.equal((await api('GET', `/api/club/${tip.id}`)).body.post.views, 1)
+  assert.equal((await api('GET', `/api/club?char=bl&cat=tip`)).body.club.find(x => x.id === tip.id).views, 1)
+
+  // 쪽 나누기 — ?page 면 전체 글 수(total)도, limit 개씩 건너뛴다
+  const pg = async n => (await api('GET', `/api/club?limit=1&page=${n}`)).body
+  const [p1, p2] = [await pg(1), await pg(2)]
+  assert.ok(p1.total >= 2, JSON.stringify(p1))
+  assert.equal(p1.club.length, 1)
+  assert.ok(p2.club[0].id < p1.club[0].id)
+  assert.equal((await api('GET', '/api/club?limit=1')).body.total, undefined)
 
   assert.equal((await api('DELETE', `/api/club/${tip.id}`, undefined, { as: a.as })).status, 200)
 })

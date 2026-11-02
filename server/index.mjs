@@ -520,12 +520,14 @@ async function guestOf(v) {
 function supabase({ url = '', key = '', fetch, log }) {
   const base = `${url.replace(/\/+$/, '')}/rest/v1`
   const headers = { apikey: key, 'content-type': 'application/json', accept: 'application/json' }
-  return async (path, { method = 'GET', body, prefer } = {}) => {
+  // count = 조건에 맞는 전체 줄 수도 — { rows, total }(Content-Range 의 / 뒤)
+  return async (path, { method = 'GET', body, prefer, count = false } = {}) => {
     const where = `${method} ${path.split('?')[0]}`
     let res, raw, json, tries = 0
     for (;;) {
       try {
-        res = await fetch(base + path, { method, headers: prefer ? { ...headers, prefer } : headers, body: body && JSON.stringify(body), signal: AbortSignal.timeout(8000) })
+        const want = [prefer, count && 'count=exact'].filter(Boolean).join(',')
+        res = await fetch(base + path, { method, headers: want ? { ...headers, prefer: want } : headers, body: body && JSON.stringify(body), signal: AbortSignal.timeout(8000) })
         raw = await res.text()
       } catch (e) {
         log(`DB 연결 실패 ${where}: ${errText(e)}`)
@@ -538,7 +540,7 @@ function supabase({ url = '', key = '', fetch, log }) {
       if (!(res.status === 401 && json?.code === 'PGRST303') || ++tries > 2) break
       await new Promise(r => setTimeout(r, 1000))
     }
-    if (res.ok) return json
+    if (res.ok) return count ? { rows: json, total: +(res.headers.get('content-range') || '').split('/')[1] || 0 } : json
     const { code, message } = json || {}
     if (code === 'PGRST303') {
       log(`DB 인증 시각 어긋남 ${where}: ${message}`)
@@ -930,7 +932,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     },
     club: {   // 향우회 — 질문답변은 쓴 사람이 댓글 하나를 채택한다(adopt). 채택된 글 · 댓글은 못 고치고 못 지운다(내공이 사라지지 않게)
       table: 'club_posts', likes: 'club_likes', comments: 'club_comments', fk: 'post_id', rpc: ['club_toggle_like', 'p_post'],
-      one: 'post', cols: 'category,adopted', validate: clubPost, extra: b => ({ category: b.category, adopted: b.adopted }), adopt: true,
+      one: 'post', cols: 'category,adopted,views', validate: clubPost, extra: b => ({ category: b.category, adopted: b.adopted, views: b.views }), adopt: true,
+      views: 'club_view',   // 조회수 — 글 화면이 처음 열 때 ?view=1
       // ?cat=<분류> · ?state=open(답변 대기) | done(답변 완료) — state 는 질문답변 글만
       filter: q => (CLUB_CATS.has(q.get('cat')) ? `&category=eq.${q.get('cat')}` : '')
         + ({ open: '&category=eq.qna&adopted=is.null', done: '&category=eq.qna&adopted=not.is.null' }[q.get('state')] ?? ''),
@@ -950,20 +953,23 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const itemOf = async id => (await db(`/${B.table}?select=*&id=eq.${id}`))[0] || fail(404, '글을 찾을 수 없어요')
 
     // ?char=<id> · ?pos=1~5 · ?sort=new(기본)|likes · ?limit=1~100 · ?ids=1,2,3(30개까지 — 조합표가 고른 잠재력추천 글만 한 번에 읽는다) (+ 게시판별 필터)
+    // ?page=1~ — limit 개씩 나눈 그 쪽, 응답에 조건에 맞는 전체 글 수(total)도
     if (action === 'GET') {
       const char = q.get('char'), pos = q.get('pos'), ids = q.get('ids'), limit = Math.min(MAX_LIST, Math.max(1, +q.get('limit') || MAX_LIST))
-      const order = q.get('sort') === 'likes' ? 'likes.desc,id.desc' : 'id.desc'
-      const rows = await db(`/${B.table}?select=id,author_id,author_name,title,chars,likes,comments,created_at,updated_at,${B.cols}`
+      const order = q.get('sort') === 'likes' ? 'likes.desc,id.desc' : 'id.desc', page = /^[1-9]\d{0,4}$/.test(q.get('page') || '') ? +q.get('page') : 0
+      const r = await db(`/${B.table}?select=id,author_id,author_name,title,chars,likes,comments,created_at,updated_at,${B.cols}`
         + (char && PLAYERS.has(char) ? `&chars=cs.${enc(`{${char}}`)}` : '')
         + (/^[1-5]$/.test(pos || '') ? `&positions=cs.${enc(`{${pos}}`)}` : '')
         + (/^\d{1,15}(?:,\d{1,15}){0,29}$/.test(ids || '') ? `&id=in.(${ids})` : '')
         + (B.filter?.(q) || '')
-        + `&order=${order}&limit=${limit}`)
-      return [200, { [kind]: rows.map(view) }]
+        + `&order=${order}&limit=${limit}${page ? `&offset=${(page - 1) * limit}` : ''}`, { count: !!page })
+      return [200, { [kind]: (page ? r.rows : r).map(view), ...(page && { total: r.total }) }]
     }
     if (action === 'GET item') {
       // 이전 = 바로 전에 올라온 글, 다음 = 바로 뒤에 올라온 글 — { id, title } | null
       const near = (op, dir) => B.neighbors ? db(`/${B.table}?select=id,title&id=${op}.${id}&order=id.${dir}&limit=1`).then(r => r[0] || null) : null
+      // ponytail: 조회수는 화면이 ?view=1 을 붙일 때마다 오른다(화면은 탭마다 글마다 한 번) — 새로고침 · 직접 호출로 부풀릴 수 있다. 막으려면 IP · 사람마다 하루 한 번(recruit_hits 처럼)
+      if (B.views && q.get('view') === '1') await db(`/rpc/${B.views}`, { method: 'POST', body: { p_post: +id } })
       const [b, comments, prev, next] = await Promise.all([
         itemOf(id), B.comments ? db(`/${B.comments}?select=id,author_id,author_name,body,created_at&${B.fk}=eq.${id}&order=id.asc`) : [], near('lt', 'desc'), near('gt', 'asc'),
       ])

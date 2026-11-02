@@ -1,8 +1,8 @@
 // 마이페이지 — 프로필(표시 이름 · 마이크) · 게임 계정 · 보유 캐릭터 · 아레나 신청 이력 · 로그인 연결(카카오 연결 · 해제) · 탈퇴 · (관리자) 숨긴 메뉴 · (마스터) 사이트 접근 비밀번호 · 변경 기록
 import { mountTop, copyLink } from './app.js?v=fb02b445'
 import { api, session, hasProvider, linkKakao, unlinkKakao, withdraw, saveGate, chooseLogin, KAKAO_SVG } from './auth.js?v=01106c22'
-import { $, h, loadData, startAuth, auth, me } from './board.js?v=f9551348'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=dac4d8bd'
+import { $, h, loadData, startAuth, auth, me } from './board.js?v=0c3aa4b5'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=55686c85'
 
 await loadData()
 mountTop('/me/')

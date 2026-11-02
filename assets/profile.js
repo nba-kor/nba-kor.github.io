@@ -4,7 +4,7 @@
 // 팀원모집(숨김) · 디스코드 알림도 이 줄을 읽으므로 모양을 바꾸지 않았다. 티어는 더 받지 않는다(예전에 적은 값은 계정에 남겨 둔다)
 import { faceOf } from './app.js?v=fb02b445'
 import { api } from './auth.js?v=01106c22'
-import { h, P, me, charGrid } from './board.js?v=f9551348'
+import { h, P, me, charGrid } from './board.js?v=0c3aa4b5'
 
 const json = p => fetch(p, { cache: 'no-cache' }).then(r => r.json())
 let recruitP, arenaP

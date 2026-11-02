@@ -2,7 +2,7 @@
 import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, pickMenu, mountTop, decodeState, encodeState, share, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, kakaoList, shareFace } from './app.js?v=fb02b445'
 import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=5549c402'
 import { api } from './auth.js?v=01106c22'
-import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=f9551348'
+import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=0c3aa4b5'
 
 const STORE = 'dc.tactics'
 

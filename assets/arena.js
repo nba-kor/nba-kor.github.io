@@ -2,8 +2,8 @@
 // 아레나 편성(/arena/plan/) — 관리자가 끌어서 · 눌러서 배치. 같은 모듈이 주소를 보고 둘 중 하나를 그린다
 import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=fb02b445'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=01106c22'
-import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=f9551348'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES, ALLPOS } from './profile.js?v=dac4d8bd'
+import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=0c3aa4b5'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES, ALLPOS } from './profile.js?v=55686c85'
 
 await loadData()
 mountTop('/arena/')
