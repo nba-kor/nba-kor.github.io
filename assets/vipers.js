@@ -24,7 +24,7 @@ export const NBA_NUM = {
 export const lineup = (kr, ti) => [1, 2, 3, 4, 5].map(pos => { const list = kr.filter(p => p.pos === pos); return list[ti % list.length] })
 export const SKIN = '#b9825a'   // 얼굴에서 피부색을 못 뽑으면
 // 얼굴 배지(둥근 그림)에서 머리만 — 바깥 고리에서 시작해 노란 배경색만 번져 지우고(flood fill), 흰 고리 · 아래 옷은 머리 모양 타원으로 잘라 낸다
-export function cutHead(img) {
+export function cutHead(img, chin = false) {   // chin — 턱 아래(그림 속 목 · 옷깃 · 어깨)를 잘라 얼굴만(덩크 서바이버 — 몸 그림의 목에 바로 잇는다)
   const c = Object.assign(document.createElement('canvas'), { width: 180, height: 180 }), x = c.getContext('2d', { willReadFrequently: true })
   x.drawImage(img, 0, 0, 180, 180)
   const d = x.getImageData(0, 0, 180, 180), px = d.data, seen = new Uint8Array(180 * 180), q = []
@@ -35,9 +35,14 @@ export function cutHead(img) {
     px[k * 4 + 3] = 0
     for (const n of [cx > 0 ? k - 1 : -1, cx < 179 ? k + 1 : -1, k - 180, k + 180]) if (n >= 0 && n < 180 * 180 && !seen[n] && bg(n)) { seen[n] = 1; q.push(n) }
   }
+  if (chin) for (let y = 106; y < 180; y++) for (let cx = 0; cx < 180; cx++) {   // 턱 아래 — 옷깃 · 어깨 옷 빛(파랑 · 보라 · 진한 빨강 · 흰색)만 지운다. 피부 · 그늘 · 수염은 둔다
+    const i = (y * 180 + cx) * 4, r = px[i], gg = px[i + 1], b = px[i + 2], hi = Math.max(r, gg, b), lo = Math.min(r, gg, b)
+    if (b > gg + 6 || (r > 150 && gg < r * 0.42 && b >= gg * 0.8) || (lo > 190 && hi - lo < 30)) px[i + 3] = 0
+  }
   x.putImageData(d, 0, 0)
   const h = Object.assign(document.createElement('canvas'), { width: 124, height: 132 }), hx = h.getContext('2d')
   hx.beginPath(); hx.ellipse(62, 66, 60, 64, 0, 0, Math.PI * 2); hx.clip()
+  if (chin) { hx.beginPath(); hx.ellipse(62, 42, 66, 76, 0, 0, Math.PI * 2); hx.clip() }   // 아래로 갈수록 좁아져 턱(수염)까지만 — 양옆의 옷깃 · 어깨는 빠진다
   hx.drawImage(c, 28, 18, 124, 132, 0, 0, 124, 132)
   return h
 }

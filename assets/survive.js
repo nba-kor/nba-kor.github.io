@@ -8,7 +8,7 @@
 import { mountTop, faceOf } from './app.js?v=fb02b445'
 import { api, chooseLogin } from './auth.js?v=1fbb8e2f'
 import { loadData, P, startAuth, auth, me, h } from './board.js?v=4233415a'
-import { cutHead, skinOf, NBA_NUM } from './vipers.js?v=c92ed58c'
+import { cutHead, skinOf, NBA_NUM } from './vipers.js?v=8939ed12'
 
 mountTop('/survive/')
 
@@ -2660,6 +2660,8 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '캐릭터 목 · 옷깃', items: [
+    '선수 얼굴 그림의 턱 아래(그림 속 목 · 옷깃 · 어깨 옷)를 잘라 얼굴만 써요 — 몸 그림의 목 · 유니폼에 바로 이어져요(커리의 흰 옷깃, 요키치의 빨간 옷깃, 탐슨의 보라 옷깃 등이 사라졌어요)'] },
   { date: '2026-11-02', title: '레전더리를 더 화려하게', items: [
     '레전드 스킬 이펙트 — 날아가는 공은 두 배 긴 금빛 꼬리 · 둘레를 도는 별 셋 · 튀는 금빛 전기, 고리 · 구역에는 도는 문양 고리, 맞은 자리에는 하늘에서 번개가 내리꽂히고 큰 빛기둥 · 두 겹 충격파 · 솟는 금가루',
     '레전더리 옷 — 등 뒤에 퍼덕이는 금빛 날개, 몸을 도는 빛 구슬 셋이 더해졌어요'] },
@@ -2818,7 +2820,7 @@ await loadData()
 for (const ch of CHARS) {   // 얼굴 그림 → 머리 · 피부색
   const img = new Image()
   img.onload = () => {
-    try { ch.head = cutHead(img); [ch.skin] = skinOf(img) } catch {}
+    try { ch.head = cutHead(img, true); [ch.skin] = skinOf(img) } catch {}
     THUMB.clear(); if (mode === 'shop' && CHARS[shopCi] === ch) shop(closetOn, true)   // 상점 · 마이페이지가 얼굴보다 먼저 떴으면 다시
   }
   img.src = faceOf(P(ch.id))
