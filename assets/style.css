@@ -765,6 +765,33 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .cl-tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
 .cl-tabs b { margin-left: 5px; padding: 0 6px; border-radius: 999px; background: var(--def); color: #fff; font-size: 11px; vertical-align: 2px; }
 .cl-states button { padding: 3px 11px; font-size: 12.5px; }
+/* 목록 — DC 갤러리 같은 한 줄 게시판. 휴대폰은 두 줄(제목 / 향우회 · 글쓴이 · 날짜 · 추천) */
+.cl-board { border-top: 2px solid var(--accent); border-radius: 0 0 12px 12px; background: var(--panel); overflow: hidden; }
+.cl-row { display: grid; grid-template-columns: 56px 80px minmax(0, 1fr) 116px 116px 60px 44px; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--line); color: inherit; text-decoration: none; font-size: 13.5px; }
+a.cl-row:hover { background: var(--panel-2); }
+a.cl-row:hover .cl-title b { text-decoration: underline; }
+.cl-head { padding: 8px 12px; background: var(--panel-2); color: var(--muted); font-size: 12.5px; font-weight: 800; }
+.cl-head span, .cl-no, .cl-cat, .cl-date, .cl-likes { text-align: center; }
+.cl-no, .cl-date, .cl-likes { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.cl-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cl-title b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.cl-title em { flex: none; font-style: normal; font-weight: 800; font-size: 12.5px; color: var(--accent); }
+.cl-title .cl-state { flex: none; }
+.cl-who { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cl-who img { flex: none; width: 22px; height: 22px; border-radius: 50%; background: #0b0f16; }
+.cl-author { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+#list > .rc-note { padding: 28px 16px; text-align: center; }
+@media (max-width: 720px) {
+  .cl-board { margin: 0 -4px; }
+  .cl-row.cl-head, .cl-no { display: none; }
+  .cl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 10px 12px; }
+  .cl-cat { flex: none; }
+  .cl-title { flex: 1 1 calc(100% - 90px); }
+  .cl-who, .cl-author, .cl-date, .cl-likes { flex: none; color: var(--muted); font-size: 12px; }
+  .cl-who img { width: 18px; height: 18px; }
+  .cl-author { max-width: 40%; }
+  .cl-likes::before { content: "추천 "; }
+}
 .cl-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; }
 .cl-state { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 11.5px; font-weight: 800; }
 .cl-state.is-done { color: #35c6a7; border-color: #35c6a7; }

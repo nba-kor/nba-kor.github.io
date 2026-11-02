@@ -2,7 +2,7 @@
 // 게시판 공용 부분은 board.js, 알림을 3분마다 묻는 것은 auth.js 의 watchReplies(사이트 어느 페이지에서나)
 import { mountTop, loadKakao, faceOf, shareFace } from './app.js?v=fb02b445'
 import { api, notifyOn, setNotify, watchReplies } from './auth.js?v=01106c22'
-import { $, h, P, ago, loadData, startAuth, loggedIn, charGrid, listView, card, itemView, showItem, auth, me } from './board.js?v=f9551348'
+import { $, h, P, ago, loadData, startAuth, loggedIn, charGrid, listView, itemView, showItem, auth, me } from './board.js?v=f9551348'
 
 let cfg, catName   // data/club.json · 분류 id → 이름
 const SEEN = 'club.seen'   // 알림 탭에서 마지막으로 본 댓글 id — 탭의 빨간 숫자
@@ -13,6 +13,24 @@ const store = {
 const postUrl = x => `${location.origin}/club/?p=${x.id}`
 const catTag = id => h('span', { className: `vd-cat is-${id}` }, catName.get(id) || id)
 const stateTag = x => x.category === 'qna' && h('span', { className: `cl-state${x.adopted ? ' is-done' : ''}` }, x.adopted ? '답변완료' : '답변대기')
+/** 오늘 쓴 글은 시:분, 올해는 월.일, 그 전은 연.월.일 (DC 갤러리처럼) */
+const when = ms => {
+  const d = new Date(ms), now = new Date(), p = n => String(n).padStart(2, '0')
+  if (d.toDateString() === now.toDateString()) return `${p(d.getHours())}:${p(d.getMinutes())}`
+  return `${d.getFullYear() === now.getFullYear() ? '' : `${String(d.getFullYear()).slice(2)}.`}${p(d.getMonth() + 1)}.${p(d.getDate())}`
+}
+/** 목록 한 줄: 번호 · 분류 · 제목 [댓글] 상태 · 향우회 · 글쓴이 · 작성일 · 추천 — 줄 머리는 club/index.html 의 .cl-head */
+const row = x => {
+  const char = P(x.chars[0])
+  return h('a', { className: 'cl-row', href: `?p=${x.id}` },
+    h('span', { className: 'cl-no' }, x.id),
+    h('span', { className: 'cl-cat' }, catTag(x.category)),
+    h('span', { className: 'cl-title' }, h('b', {}, x.title), x.comments > 0 && h('em', {}, `[${x.comments}]`), stateTag(x)),
+    h('span', { className: 'cl-who', title: `${char.name} 향우회` }, h('img', { src: faceOf(char), alt: '' }), char.short || char.name),
+    h('span', { className: 'cl-author' }, x.author),
+    h('span', { className: 'cl-date', title: new Date(x.createdAt).toLocaleString('ko-KR') }, when(x.createdAt)),
+    h('span', { className: 'cl-likes' }, x.likes))
+}
 
 const q = new URLSearchParams(location.search)
 const view = /^\d+$/.test(q.get('p') || '') ? 'post' : q.has('rank') ? 'rank' : q.has('alerts') ? 'alerts' : 'list'
@@ -26,7 +44,7 @@ function showList() {
   const reload = listView({
     sort: 'new',
     load: async qs => (await api(`/club?${qs}`)).club,
-    card: x => card(`?p=${x.id}`, x, h('p', { className: 'cl-tags' }, catTag(x.category), stateTag(x))),
+    card: row,
     empty: who => `아직 ${who}${cat ? `${catName.get(cat)} ` : ''}글이 없어요. 첫 글을 써 보세요!`,
     extra: () => ({ ...(cat && { cat }), ...(cat === 'qna' && state && { state }) }),
   })
