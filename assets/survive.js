@@ -1536,9 +1536,10 @@ let BOX = null
 const ACTS = [['rr', '리롤'], ['skips', '스킵'], ['bans', '제외']]
 function openBox() {
   const src = G.queue.shift(), chest = src === 'chest', brk = src === 'break'
-  const jack = !brk && rnd() < (chest ? 0.5 : 0.01 * S.luck * (G.ch.mod.jackpot ? 2 : 1))   // 잭팟 — 기본 1%(행운 배수)
   const opts = brk ? breaks() : offers()
   if (!opts.length) return   // 반지를 주웠는데 돌파할 스킬이 없으면(ringable 이 막아 거의 없다) 그냥 지나간다
+  // 잭팟 — 레벨 업 1% · 챔피언 반지 20%(돌파할 스킬이 둘 이상일 때, 셋까지 한 번에) — 행운 배수 · 돈치치 2배. 트로피 상자는 50%
+  const jack = (!brk || opts.length > 1) && rnd() < (chest ? 0.5 : (brk ? 0.2 : 0.01) * S.luck * (G.ch.mod.jackpot ? 2 : 1))
   mode = 'box'; calm(); pauseBtn.hidden = true
   const card = (o, i) => {
     const L = label(o)
@@ -1548,20 +1549,20 @@ function openBox() {
   const cards = h('div', { className: 'sv-cards' }, opts.map(card)), hint = h('p', { className: 'sv-hint' })
   // 리롤 · 스킵 · 제외 — 반지(돌파) 상자에는 없다. 잭팟이면 「셋 다 받기」를 눌러야 받는다
   const btns = brk ? [] : ACTS.map(([k, s], j) => h('button', { type: 'button', className: 'sv-act', onclick: () => act(k) }, s, h('em'), h('kbd', {}, String(j + 4))))
-  const takeBtn = jack && h('button', { type: 'button', className: 'sv-act sv-act-take', onclick: () => act('take') }, '셋 다 받기')
+  const takeBtn = jack && h('button', { type: 'button', className: 'sv-act sv-act-take', onclick: () => act('take') }, brk ? '모두 돌파' : '셋 다 받기')
   const root = h('div', { className: `sv-box${jack ? ' is-jackpot' : ''}${chest ? ' is-chest' : ''}${brk ? ' is-break' : ''}` },
     h('div', { className: 'sv-rays' }),
     h('p', { className: 'sv-box-title' }, brk ? '돌파' : chest ? '트로피 상자!' : `LEVEL ${G.lvl - G.queue.filter(q => q === 'level').length}`),
     h('div', { className: 'sv-chest' }, h('i', { className: 'sv-glow' }), h('i', { className: 'sv-base' }), h('i', { className: 'sv-lid' }), h('i', { className: 'sv-lock' })),
     h('p', { className: 'sv-jack' }, 'JACKPOT!!'),
     cards, hint,
-    !brk && h('div', { className: 'sv-acts' }, takeBtn, btns),
+    (!brk || jack) && h('div', { className: 'sv-acts' }, takeBtn, btns),
     jack && h('div', { className: 'sv-confetti', 'aria-hidden': 'true' }, Array.from({ length: 46 }, () => h('i', { style: `--x:${rnd() * 100}%;--d:${(rnd() * 0.6).toFixed(2)}s;--t:${(1.6 + rnd() * 1.4).toFixed(2)}s;--r:${(rnd() * 900 - 450) | 0}deg;--c:${pickOf(['#ffd23f', '#ff6b6b', '#5ab0ff', '#62e38a', '#fff', '#ff9be9'])}` }))))
   ui.replaceChildren(root); ui.hidden = false; ui.classList.add('is-box')
   const box = BOX = { opts, jack, opened: false, ready: false, ban: false, open, pick, act }
   const sync = () => {
     root.classList.toggle('is-ban', box.ban)
-    hint.textContent = box.ban ? '이번 게임에서 뺄 카드를 고르세요(다시 누르면 취소)' : jack ? '셋 다 가져요!' : brk ? '챔피언 반지 — 돌파할 스킬을 고르세요(스킬마다 한 번)' : '하나를 고르세요'
+    hint.textContent = box.ban ? '이번 게임에서 뺄 카드를 고르세요(다시 누르면 취소)' : jack ? (brk ? '챔피언 반지 잭팟 — 모두 돌파해요!' : '셋 다 가져요!') : brk ? '챔피언 반지 — 돌파할 스킬을 고르세요(스킬마다 한 번)' : '하나를 고르세요'
     btns.forEach((b, j) => { const k = ACTS[j][0]; b.querySelector('em').textContent = G[k]; b.disabled = !G[k]; b.classList.toggle('is-on', box.ban && k === 'bans') })
   }
   sync()
@@ -1587,7 +1588,7 @@ function openBox() {
     take(o); next()
   }
   function act(k) {
-    if (!box.ready || BOX !== box || brk) return
+    if (!box.ready || BOX !== box || brk && k !== 'take') return
     if (k === 'take') { box.opts.forEach(take); return next() }
     if (!G[k]) return
     if (k === 'bans') { box.ban = !box.ban; return sync() }
@@ -2166,6 +2167,8 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '챔피언 반지 잭팟', items: [
+    '챔피언 반지에도 잭팟이 생겼어요 — 5번에 1번(행운 배수 · 돈치치 2배), 돌파할 스킬이 둘 이상이면 나온 스킬(셋까지)을 한 번에 모두 돌파해요. 운이 좋으면 반지가 드물어도 다 돌파할 수 있어요'] },
   { date: '2026-11-02', title: '아이템이 덜 떨어져요', items: [
     '수비가 떨어뜨리는 아이템(생수 · 호루라기 · 타임아웃 · 버저 · 쿨링 스프레이)이 예전의 1/3 — 마스코트 · 중간보스는 늘 → 3번에 1번, 보통 수비는 0.4% → 0.13%(20분부터 스프레이 0.15% → 0.05%). 행운은 그대로 곱해져요',
     '챔피언 반지도 1/3 — 보통 수비 0.011% → 0.0037% · 마스코트 5.5% → 1.8% · 중간보스 10% → 3.3% · 보스 20% → 6.7%. 돌파가 훨씬 늦어져요',

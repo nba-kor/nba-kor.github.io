@@ -1781,6 +1781,8 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-box.is-break .sv-glow { background: radial-gradient(#fff, #f0d9ff 30%, #b46bff88 55%, transparent 70%); }
 .sv-card-b { overflow: hidden; border-color: #e9b23a; background: linear-gradient(165deg, #3a1c6a, #160a2a 55%, #2a1a08); box-shadow: 0 0 0 1px #ffd23f44, 0 0 28px #b46bff55; }
 .sv-card-b img { filter: drop-shadow(0 0 1.6cqmin #ffc94a88); }
+.sv-box.is-jackpot .sv-card-b { overflow: visible; }   /* 반지 잭팟 — 「획득!」 딱지가 잘리지 않게(빛 지나가기는 끈다) */
+.sv-box.is-jackpot .sv-card-b::before { display: none; }
 .sv-card-b small { background: linear-gradient(90deg, #e9b23a, #fff3b0); color: #2a1200; }
 .sv-card-b b { font-size: 1.3em; background: linear-gradient(#fff8d6, #ffd23f 55%, #e08a00); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .sv-card-b span { color: #e6dcf7; }
