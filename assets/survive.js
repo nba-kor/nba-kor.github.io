@@ -1656,9 +1656,9 @@ function shots(dt) {
         break
     }
     if (!b.sk) continue
-    if (b.sk >= 2 && FLY.has(b.k) && b.t > 0) { (b.tr ||= []).push(thPos(b, true)); if (b.tr.length > 7) b.tr.shift() }   // 혜성 꼬리(레어부터)
+    if (b.sk >= 2 && FLY.has(b.k) && b.t > 0) { (b.tr ||= []).push(thPos(b, true)); if (b.tr.length > (b.sk === 4 ? 13 : 7)) b.tr.shift() }   // 혜성 꼬리(레어부터)
     if (b.dead) { if (!b.burst && b.k !== 'trail' && b.k !== 'orb' && b.k !== 'echo') { b.burst = 1; burst(b) } }
-    else if (b.t > 0 && rnd() < dt * [0, 14, 28, 34, 40][b.sk]) dot(b)
+    else if (b.t > 0 && rnd() < dt * [0, 14, 28, 34, 70][b.sk]) dot(b)
   }
 }
 // ---- 스킬 이펙트 스킨 — 아이스(노멀) 하얀 서리 · 인페르노(레어) 솟는 불티 · 갤럭시(유니크) 무지개 별빛. 빛 그림 캐시가 늘지 않게 무지개는 12색
@@ -1681,6 +1681,16 @@ function thPos(b, at = false) {
     default: return [b.x, b.y - 16]
   }
 }
+/** 레전드 — 도는 문양 고리(두 겹 점선 · 눈금) */
+function rune(c, x, y, R, col) {
+  const t = G.t
+  c.globalAlpha = 0.85; c.strokeStyle = col; c.lineWidth = 2
+  c.setLineDash([10, 6]); c.lineDashOffset = -t * 60; c.beginPath(); c.ellipse(x, y, R * 1.14, R * 0.91, 0, 0, TAU); c.stroke()
+  c.lineDashOffset = t * 40; c.beginPath(); c.ellipse(x, y, R * 0.86, R * 0.69, 0, 0, TAU); c.stroke(); c.setLineDash([])
+  c.lineWidth = 1.6; c.beginPath()
+  for (let i = 0; i < 12; i++) { const a = i / 12 * TAU + t * 0.8; c.moveTo(x + Math.cos(a) * R * 0.86, y + Math.sin(a) * R * 0.69); c.lineTo(x + Math.cos(a) * R * 1.14, y + Math.sin(a) * R * 0.91) }
+  c.stroke()
+}
 /** 고리 · 구역 테두리 한 점 — 레어는 일렁이는 불꽃, 유니크부터는 도는 별 */
 function edge(c, k, x, y, R, a, col, seed) {
   const px = x + Math.cos(a) * R, py = y + Math.sin(a) * R * 0.8
@@ -1700,7 +1710,12 @@ function burst(b) {   // 맞은 자리 · 끝난 자리 — 등급이 높을수�
   if (k >= 2) fx({ k: 'flash', x, y: y - 8, R: R * 0.6, col: c2, T: 0.3 })
   if (k === 2) fx({ k: 'burn', x, y, R: Math.max(16, R * 0.6), T: 0.8, col: c1, c2 })   // 인페르노 — 맞은 자리에 불길이 잠깐
   if (k >= 3) fx({ k: 'rays', x, y: y - 6, R: R * 1.2, T: 0.45, col: c1 })   // 갤럭시 · 레전드 — 별빛 폭발
-  if (k === 4) { fx({ k: 'ring', x, y, R: R * 1.5, T: 0.6, col: c2 }); fx({ k: 'colm', x, y, T: 0.6, col: c1 }) }   // 레전드 — 큰 고리 · 빛기둥
+  if (k === 4) {   // 레전드 — 하늘에서 번개 · 큰 빛기둥 · 두 겹 충격파 · 금가루
+    fx({ k: 'zap', x, y, T: 0.35, pts: zig(x + (rnd() - 0.5) * 70, y - 280, x, y - 6), col: c1 })
+    fx({ k: 'colm', x, y, T: 0.75, col: c1, w: 30 }); fx({ k: 'ring', x, y, R: R * 1.6, T: 0.6, col: c2 }); fx({ k: 'ring', x, y, R: R * 2.2, T: 0.8, col: c1 })
+    for (let i = 0; i < 8; i++) part(x + (rnd() - 0.5) * R, y - 4, (rnd() - 0.5) * 60, -120 - rnd() * 140, rnd() < 0.5 ? c1 : c2, 0.8, 2.6)
+    shake = Math.max(shake, 2)
+  }
   if (k >= 3) { fx({ k: 'ring', x, y, R: R * 0.5, T: 0.4, col: c2 }); for (let i = 0; i < 4; i++) fx({ k: 'spark', x: x + (rnd() - 0.5) * R, y: y - 6 + (rnd() - 0.5) * R * 0.6, s: 12 + rnd() * 10, a: rnd() * TAU, T: 0.45 }) }
   for (let i = 0; i < 3 + k * 3; i++) { const a = rnd() * TAU, v = 60 + rnd() * 100; part(x, y - 6, Math.cos(a) * v, Math.sin(a) * v * 0.6 - (k === 2 ? 70 : 20), rnd() < 0.5 ? c1 : c2, 0.45, 2.2) }
 }
@@ -2101,19 +2116,27 @@ function world(c) {
     if (b.k === 'ring' || b.k === 'zone' || b.k === 'shotclock' || b.k === 'trail') {   // 테두리 — 불꽃(레어) · 도는 별(유니크부터)
       const R = b.k === 'ring' ? b.R * (0.15 + Math.min(1, b.t / b.T) * 0.85) : b.k === 'trail' ? b.R * 0.7 : b.R, n = b.k === 'trail' ? 3 : 8
       for (let i = 0; i < n; i++) edge(c, k, b.x, b.y, R, i / n * TAU + t * (k >= 3 ? 1.6 : 0.4), col, b.x * 0.02 + i)
+      if (k === 4 && b.k !== 'trail') rune(c, b.x, b.y, R, col)
     }
-    if (k >= 3 && FLY.has(b.k)) for (let i = 0; i < 2; i++) { const a = t * 8 + i * Math.PI + b.x * 0.05, d = r * 1.9; c.globalAlpha = 0.95; c.drawImage(SPARK, x + Math.cos(a) * d - 6, y + Math.sin(a) * d * 0.7 - 6, 12, 12) }   // 도는 별
+    if (k >= 3 && FLY.has(b.k)) { const n = k === 4 ? 3 : 2; for (let i = 0; i < n; i++) { const a = t * 8 + i * TAU / n + b.x * 0.05, d = r * (k === 4 ? 2.3 : 1.9), z = k === 4 ? 16 : 12; c.globalAlpha = 0.95; c.drawImage(SPARK, x + Math.cos(a) * d - z / 2, y + Math.sin(a) * d * 0.7 - z / 2, z, z) } }   // 도는 별
+    if (k === 4 && FLY.has(b.k)) {   // 레전드 — 하얗게 타는 심 · 둘레에 튀는 금빛 전기
+      c.globalAlpha = 0.5; bloom(c, '#fff7d6', x, y, r * 4.2)
+      c.globalAlpha = 0.9; c.strokeStyle = '#fff7d6'; c.lineWidth = 1.3; c.lineJoin = 'round'
+      for (let j = 0; j < 2; j++) { const a = rnd() * TAU; let px = x + Math.cos(a) * r, py = y + Math.sin(a) * r; c.beginPath(); c.moveTo(px, py); for (let q = 0; q < 3; q++) { px += Math.cos(a) * 6 + (rnd() - 0.5) * 7; py += Math.sin(a) * 6 + (rnd() - 0.5) * 7; c.lineTo(px, py) } c.stroke() }
+    }
   }
   const pw = G.weapons.find(w => w.id === 'press' && w.sk && w.R)
   if (pw) {
     c.globalAlpha = 0.55; c.strokeStyle = thCol(pw.sk); c.lineWidth = 2 + pw.sk; c.beginPath(); c.ellipse(pl.x, pl.y, pw.R, pw.R * 0.8, 0, 0, TAU); c.stroke()
     if (pw.sk >= 2) for (let i = 0; i < 10; i++) edge(c, pw.sk, pl.x, pl.y, pw.R, i / 10 * TAU + t * (pw.sk >= 3 ? 1.2 : 0.3), thCol(pw.sk, i), i)
+    if (pw.sk === 4) rune(c, pl.x, pl.y, pw.R, thCol(4))
   }
   for (const f of G.fx) {   // 불길 · 별빛 폭발 · 빛기둥(이펙트 스킨 터짐)
     const u = f.t / f.T
     if (f.k === 'burn') for (let i = 0; i < 5; i++) { const h = (u * 1.4 + i * 0.21) % 1; c.globalAlpha = 0.6 * (1 - u) * (1 - h); bloom(c, i % 2 ? f.c2 : f.col, f.x + Math.cos(i * 1.3) * f.R * 0.6, f.y - 4 - h * f.R, f.R * (0.6 - h * 0.3)) }
     else if (f.k === 'rays') { c.globalAlpha = 1 - u; c.strokeStyle = f.col; c.lineWidth = 2.4 * (1 - u) + 0.6; c.beginPath(); for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + 0.3; c.moveTo(f.x + Math.cos(a) * f.R * u * 0.4, f.y + Math.sin(a) * f.R * u * 0.3); c.lineTo(f.x + Math.cos(a) * f.R * (0.35 + u * 0.75), f.y + Math.sin(a) * f.R * (0.3 + u * 0.55)) } c.stroke() }
-    else if (f.k === 'colm') { const g = c.createLinearGradient(0, f.y - 140, 0, f.y); g.addColorStop(0, rgba(f.col, 0)); g.addColorStop(1, rgba(f.col, 0.55)); c.globalAlpha = 1 - u; c.fillStyle = g; c.fillRect(f.x - 9 * (1 - u * 0.5), f.y - 140, 18 * (1 - u * 0.5), 140) }
+    else if (f.k === 'colm') { const H = f.w ? 260 : 140, w = (f.w || 18) * (1 - u * 0.5), g = c.createLinearGradient(0, f.y - H, 0, f.y); g.addColorStop(0, rgba(f.col, 0)); g.addColorStop(1, rgba(f.col, 0.6)); c.globalAlpha = 1 - u; c.fillStyle = g; c.fillRect(f.x - w / 2, f.y - H, w, H); c.fillStyle = 'rgba(255,255,255,.5)'; c.fillRect(f.x - w / 8, f.y - H, w / 4, H) }
+    else if (f.k === 'zap') { c.globalAlpha = 1 - u; c.lineJoin = 'round'; c.strokeStyle = rgba(f.col, 0.55); c.lineWidth = 12; c.beginPath(); f.pts.forEach(([px, py], i) => i ? c.lineTo(px, py) : c.moveTo(px, py)); c.stroke(); c.strokeStyle = '#fffbe6'; c.lineWidth = 3.5; c.stroke(); bloom(c, f.col, f.x, f.y - 6, 46) }
   }
   for (const f of G.fx) if (f.sk) {   // 번개 · 빛줄기 · 손 자국도 그 색
     const u = f.t / f.T, col = thCol(f.sk, f.x * 0.02)
@@ -2231,7 +2254,20 @@ function aura(c, [k, c1, c2], x, y, front) {
       c.globalAlpha = 0.85; c.lineWidth = 2
       for (const [R, col, dir] of [[26, c1, 1], [33, c2, -1]]) { c.strokeStyle = col; c.setLineDash([7, 5]); c.lineDashOffset = dir * t * 30; c.beginPath(); c.ellipse(x, pl.y, R, R * 0.38, 0, 0, TAU); c.stroke() }
       c.setLineDash([]); c.globalAlpha = 0.38 + Math.sin(t * 4) * 0.1; bloom(c, c1, x, y - 22, 52)
-    } else {
+      const fl = Math.sin(t * 3) * 0.18   // 빛 날개 — 등 뒤로 두 쪽, 천천히 퍼덕인다
+      for (const sd of [-1, 1]) {
+        c.save(); c.translate(x, y - 32); c.scale(sd, 1); c.rotate(-0.15 + fl); c.globalAlpha = 0.9
+        const wg = c.createLinearGradient(0, 0, 40, -24); wg.addColorStop(0, rgba(c1, 0.75)); wg.addColorStop(1, rgba(c2, 0.05))
+        c.fillStyle = wg; c.beginPath(); c.moveTo(2, 0); c.quadraticCurveTo(18, -32, 44, -30); c.quadraticCurveTo(33, -17, 40, -11); c.quadraticCurveTo(25, -8, 33, 2); c.quadraticCurveTo(15, 4, 2, 7); c.fill()
+        c.strokeStyle = rgba(c2, 0.7); c.lineWidth = 1; c.stroke(); c.restore()
+      }
+    }
+    for (let i = 0; i < 3; i++) {   // 몸을 도는 빛 구슬 셋 — 뒤로 갈 때는 몸 뒤에
+      const a = t * 2.4 + i * TAU / 3, sn = Math.sin(a)
+      if ((sn >= 0) !== front) continue
+      c.globalAlpha = 0.95; bloom(c, i % 2 ? c2 : c1, x + Math.cos(a) * 24, y - 18 + sn * 8, 10); c.drawImage(SPARK, x + Math.cos(a) * 24 - 5, y - 18 + sn * 8 - 5, 10, 10)
+    }
+    if (front) {
       c.globalAlpha = 0.35 + Math.sin(t * 5) * 0.2; bloom(c, c1, x, y - 22, 17)
       c.globalAlpha = 0.9; star(c, x + 0.6, y - 64 + Math.sin(t * 3) * 1.5, 4.2, c2); c.globalAlpha = 0.6; bloom(c, c2, x, y - 64, 13)
       if (G.fx.length < 150 && rnd() < 0.3) fx({ k: 'spark', x: x + (rnd() - 0.5) * 34, y: y - 6 - rnd() * 52, s: 9 + rnd() * 9, a: rnd() * TAU, T: 0.5 })
@@ -2389,8 +2425,8 @@ function achList() {
 // ---- 상점 · 옷장 — 포인트로 스킨을 사고(옷장은 가진 것만) 캐릭터마다 입힌다. 고른 스킨은 뒤의 미리 보기 판에 바로 보인다
 let closetOn = false   // 마이페이지 — 상점과 같은 화면에 가진 스킨만(사지 않고 입히기만)
 const SHOP_TABS = [['fx', '스킬 이펙트'], ['ball', '농구공'], ['fit', '옷'], ['ach', '업적 스킨']]
-const FX_NOTE = [, '서리 빛 · 하얀 알갱이', '불꽃 혜성 꼬리 · 테두리에 타는 불꽃 · 맞은 자리에 남는 불길', '무지개 혜성 꼬리 · 공 둘레를 도는 별 · 맞은 자리 별빛 폭발', '금빛 혜성 꼬리 · 도는 별 · 별빛 폭발 · 맞은 자리에 빛기둥']
-const AURA_NOTE = { flame: '몸에서 불꽃이 피어오른다', halo: '머리 위 후광 · 뒤에 빛살', storm: '몸 둘레에 번개가 튄다', legend: '바닥에 도는 문양 · 빛기둥 · 별빛 · 걸을 때 빛 발자국' }
+const FX_NOTE = [, '서리 빛 · 하얀 알갱이', '불꽃 혜성 꼬리 · 테두리에 타는 불꽃 · 맞은 자리에 남는 불길', '무지개 혜성 꼬리 · 공 둘레를 도는 별 · 맞은 자리 별빛 폭발', '두 배 긴 금빛 꼬리 · 도는 별 셋 · 튀는 금빛 전기 · 도는 문양 고리 · 맞은 자리에 하늘에서 번개 · 큰 빛기둥 · 두 겹 충격파']
+const AURA_NOTE = { flame: '몸에서 불꽃이 피어오른다', halo: '머리 위 후광 · 뒤에 빛살', storm: '몸 둘레에 번개가 튄다', legend: '금빛 날개 · 도는 빛 구슬 · 바닥에 도는 문양 · 빛기둥 · 별빛 · 걸을 때 빛 발자국' }
 let shopTab = 'fx', shopCi = 0, shopW = null, shopSel = 'base'
 const slotOf = tab => tab === 'fx' ? 'fx' : tab === 'ball' ? 'ball' : 'fit'
 function shopItems(ch) {   // 업적 스킨 탭 — 이 캐릭터의 옷 · 업적 공 · 고른 스킬의 레전드 이펙트
@@ -2624,6 +2660,9 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '레전더리를 더 화려하게', items: [
+    '레전드 스킬 이펙트 — 날아가는 공은 두 배 긴 금빛 꼬리 · 둘레를 도는 별 셋 · 튀는 금빛 전기, 고리 · 구역에는 도는 문양 고리, 맞은 자리에는 하늘에서 번개가 내리꽂히고 큰 빛기둥 · 두 겹 충격파 · 솟는 금가루',
+    '레전더리 옷 — 등 뒤에 퍼덕이는 금빛 날개, 몸을 도는 빛 구슬 셋이 더해졌어요'] },
   { date: '2026-11-02', title: '상점 · 마이페이지 화면', items: [
     '위에 「← 나가기」 · 「상점 | 마이페이지」 · 포인트가 늘 붙어 있어요(목록을 내려도 그대로)',
     '고른 스킨의 사기 · 입기 버튼은 아래에 늘 붙어 있어요',
