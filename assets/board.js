@@ -1,6 +1,6 @@
 // 게시판 공용 — 잠재력추천 · 영상이 같이 쓴다: 로그인 표시, 캐릭터 고르기, 목록 카드 틀, 글 머리(추천 · 공유 · 수정 · 삭제), 댓글
 import { loadPlayers, faceOf, POS, KAKAO_JS_KEY, shareKakao, copyLink } from './app.js?v=fb02b445'
-import { api, initAuth, chooseLogin, logout, session, showWho, IN_KAKAO } from './auth.js?v=1fbb8e2f'
+import { api, initAuth, chooseLogin, logout, session, showWho, IN_KAKAO } from './auth.js?v=01106c22'
 
 export const $ = (s, root = document) => root.querySelector(s)
 /** DOM 생성. 문자열 자식은 텍스트 노드가 되므로 사용자 입력을 그대로 넣어도 안전하다. */
@@ -145,10 +145,11 @@ async function del(path, ask) {
 
 /**
  * 글 화면 틀: 머리(작성자 · 제목 · 추천 · 카카오 공유 · 링크 복사 · 수정 · 삭제) + 본문(body) + 댓글.
- * path = '/builds/3' 같은 API 경로, share = { payload(), title, url }, reload() = 댓글을 달거나 지운 뒤 다시 읽기
+ * path = '/builds/3' 같은 API 경로, share = { payload(), title, url }, reload() = 댓글을 달거나 지운 뒤 다시 읽기.
+ * locked = 수정 · 삭제 버튼을 뺀다(향우회의 채택한 질문), 댓글의 locked = 그 댓글 삭제 버튼을 뺀다, commentTail(댓글) = 댓글 머리 끝에 붙일 것(채택)
  */
-export function itemView({ path, item: x, liked, comments, body, share, onEdit, listUrl, reload }) {
-  const mine = auth === 'in' && me.id === x.authorId
+export function itemView({ path, item: x, liked, comments, body, share, onEdit, listUrl, reload, locked = false, commentTail = () => null }) {
+  const mine = auth === 'in' && me.id === x.authorId && !locked
 
   const likeBtn = h('button', { type: 'button', className: 'pt-like' })
   const paintLike = n => { likeBtn.textContent = `👍 추천 ${n}`; likeBtn.setAttribute('aria-pressed', liked) }
@@ -191,7 +192,8 @@ export function itemView({ path, item: x, liked, comments, body, share, onEdit, 
       h('h3', {}, `댓글 ${comments.length}`),
       h('ul', { className: 'pt-comments' }, comments.map(c => h('li', {},
         h('div', {}, h('b', {}, c.author), h('small', { className: 'rc-muted' }, ` ${ago(c.createdAt)}`),
-          auth === 'in' && me.id === c.authorId && h('button', { type: 'button', className: 'pt-cdel', onclick: async () => { if (await del(`${path}/comments/${c.id}`, '댓글을 지울까요?')) reload() } }, '삭제')),
+          auth === 'in' && me.id === c.authorId && !c.locked && h('button', { type: 'button', className: 'pt-cdel', onclick: async () => { if (await del(`${path}/comments/${c.id}`, '댓글을 지울까요?')) reload() } }, '삭제'),
+          commentTail(c)),
         h('p', {}, c.body)))),
       form),
   ]

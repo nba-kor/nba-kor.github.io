@@ -2451,3 +2451,66 @@ dbTest('조합표: 검증 · 추천 잠재력 · 상대 조합(3명 세트) · i
   for (const [z, who] of [[x, a], [min, b]]) assert.equal((await api('DELETE', `/api/combos/${z.id}`, undefined, { as: who.as })).status, 200)
   assert.deepEqual(await rows(`/combo_comments?combo_id=eq.${x.id}`), [])
 })
+
+// ---------------------------------------------------------------- 향우회
+
+dbTest('향우회: 글 · 분류 · 답변 상태 · 채택 · 잠금 · 내공 랭킹 · 알림', async () => {
+  const { api } = start()
+  const a = { id: uid() }, b = { id: uid() }, c = { id: uid() }
+  a.as = web(a.id, '질문러'); b.as = web(b.id, `답변왕${RUN}`); c.as = web(c.id, '구경꾼')
+  const Q = { category: 'qna', chars: ['bl'], title: '스크린 언제 걸어요?', body: '픽앤롤\n타이밍' }
+
+  assert.deepEqual((await api('POST', '/api/club', Q)).body, LOGIN)
+  for (const [patch, msg] of [[{ category: 'nope' }, /분류/], [{ chars: [] }, /향우회 캐릭터/], [{ chars: ['bl', 'weisblk'] }, /향우회 캐릭터/], [{ body: '' }, /내용/]]) {
+    const r = await api('POST', '/api/club', { ...Q, ...patch }, { as: a.as })
+    assert.equal(r.status, 400, r.text)
+    assert.match(r.body.error, msg)
+  }
+  const q = (await api('POST', '/api/club', Q, { as: a.as })).body.post
+  assert.deepEqual([q.category, q.adopted, q.body], ['qna', null, '픽앤롤\n타이밍'])
+  const tip = (await api('POST', '/api/club', { ...Q, category: 'tip', title: '꿀팁' }, { as: a.as })).body.post
+
+  const list = async qs => (await api('GET', `/api/club${qs}`)).body.club.map(x => x.id)
+  assert.ok((await list('?cat=qna&char=bl')).includes(q.id))
+  assert.ok(!(await list('?cat=qna')).includes(tip.id))
+  assert.ok((await list('?state=open')).includes(q.id))
+  assert.ok(!(await list('?state=open')).includes(tip.id))   // 상태는 질문답변 글만
+
+  // 댓글 — 알림은 내 글에 달린 남의 댓글만
+  const say = (who, body) => api('POST', `/api/club/${q.id}/comments`, { body }, { as: who.as })
+  for (const [who, body] of [[b, '들어가기 직전에'], [a, '고마워요'], [c, '아무 때나']]) assert.equal((await say(who, body)).status, 201)
+  const cs = (await api('GET', `/api/club/${q.id}`)).body.comments, [cb, ca, cc] = cs.map(x => x.id)
+  assert.deepEqual((await api('GET', '/api/club/alerts', undefined, { as: a.as })).body.alerts.map(x => [x.id, x.postId, x.title, x.author]),
+    [[cc, q.id, Q.title, '구경꾼'], [cb, q.id, Q.title, `답변왕${RUN}`]])
+  assert.deepEqual((await api('GET', '/api/club/alerts', undefined, { as: b.as })).body.alerts, [])
+  assert.equal((await api('GET', '/api/club/alerts')).status, 401)
+
+  // 채택 — 질문 쓴 사람이 남의 댓글 하나만, 한 번만
+  const adopt = (who, comment, id = q.id) => api('POST', `/api/club/${id}/adopt`, { comment }, { as: who.as })
+  assert.equal((await adopt(c, cb)).status, 403)
+  assert.equal((await adopt(a, ca)).status, 400)
+  assert.equal((await adopt(a, 999999999999)).status, 404)
+  assert.equal((await adopt(a, cb, tip.id)).status, 400)
+  assert.equal((await api('POST', `/api/builds/${q.id}/adopt`, { comment: cb }, { as: a.as })).status, 404)   // 다른 게시판엔 없다
+  const ok = await adopt(a, cb)
+  assert.equal(ok.status, 200, ok.text)
+  assert.equal(ok.body.post.adopted, cb)
+  assert.equal((await adopt(a, cc)).status, 409)
+  assert.ok((await list('?state=done')).includes(q.id))
+  assert.ok(!(await list('?state=open')).includes(q.id))
+
+  // 채택된 질문 · 답변은 못 고치고 못 지운다. 다른 댓글은 지울 수 있다
+  assert.equal((await api('PUT', `/api/club/${q.id}`, Q, { as: a.as })).status, 409)
+  assert.equal((await api('DELETE', `/api/club/${q.id}`, undefined, { as: a.as })).status, 409)
+  assert.equal((await api('DELETE', `/api/club/${q.id}/comments/${cb}`, undefined, { as: b.as })).status, 409)
+  assert.equal((await api('DELETE', `/api/club/${q.id}/comments/${cc}`, undefined, { as: c.as })).status, 200)
+
+  // 내공 랭킹 — 캐릭터마다 · 전체, 채택 하나에 10
+  const rank = async qs => (await api('GET', `/api/club/ranking${qs}`)).body.ranking.find(r => r.name === `답변왕${RUN}`)
+  for (const qs of ['?char=bl', '']) assert.deepEqual(await rank(qs), { name: `답변왕${RUN}`, adopted: 1, points: 10, rank: (await rank(qs)).rank })
+  assert.equal(await rank('?char=weisblk'), undefined)
+  const all = (await api('GET', '/api/club/ranking')).body.ranking
+  assert.ok(all.every((r, i) => !i || r.adopted < all[i - 1].adopted ? r.rank === i + 1 : r.rank === all[i - 1].rank))
+
+  assert.equal((await api('DELETE', `/api/club/${tip.id}`, undefined, { as: a.as })).status, 200)
+})

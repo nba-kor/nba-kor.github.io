@@ -16,6 +16,7 @@ import upcomingData from '../data/upcoming.json' with { type: 'json' }
 import tacticsData from '../data/tactics.json' with { type: 'json' }
 import potentialsData from '../data/potentials.json' with { type: 'json' }
 import videosData from '../data/videos.json' with { type: 'json' }
+import clubData from '../data/club.json' with { type: 'json' }
 import ARENA from '../data/arena.json' with { type: 'json' }
 import { channelUrl, createNotifier, errText, guildNick, voiceRooms } from './discord.mjs'
 
@@ -40,13 +41,16 @@ const AUTH_MEMO = { ms: 60_000, max: 500 }         // 로그인 토큰 확인 �
 const ROUTE_KINDS = ['move', 'pass', 'screen']
 const LINK = /:\/\/|www\.|discord\.gg/i
 const TEAM_ID = /^[A-Za-z0-9_-]{8}$/
-// 게시판(잠재력추천 builds · 영상 videos · 커스텀 전술 tactics · 티어표 tiers · 조합표 combos): /api/<게시판>[/<id>[/like | /comments[/<댓글 id>]]]
-const BOARD_PATH = /^\/api\/(builds|videos|tactics|tiers|combos)(?:\/(\d{1,15})(?:\/(like|comments)(?:\/(\d{1,15}))?)?)?$/
+// 게시판(잠재력추천 builds · 영상 videos · 커스텀 전술 tactics · 티어표 tiers · 조합표 combos · 향우회 club): /api/<게시판>[/<id>[/like | /comments[/<댓글 id>] | /adopt]]
+const BOARD_PATH = /^\/api\/(builds|videos|tactics|tiers|combos|club)(?:\/(\d{1,15})(?:\/(like|comments|adopt)(?:\/(\d{1,15}))?)?)?$/
 const BUILD_CHARS = 5
 const COMBO_VS = 10   // 조합표: 상대하기 편한 · 힘든 쪽마다 캐릭터 수 · 조합(3명 세트) 수
 // 유튜브 주소 → 영상 id(11자). watch?v= · youtu.be · shorts · live · embed, www · m · music 서브도메인
 const YOUTUBE = /^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/
 const CATEGORIES = new Set(videosData.categories.map(c => c.id))
+const CLUB_CATS = new Set(clubData.categories.map(c => c.id))
+const CLUB_RANK = 50   // 향우회 내공 랭킹 줄 수
+const CLUB_ALERTS = 30   // 내 글에 달린 댓글(알림) 줄 수
 const SNOWFLAKE = /^\d{17,20}$/
 const GUEST_ID = /^g(\d{1,15})$/   // 비회원 · 팀장이 넣은 팀원의 userId = 'g' + recruit_members.id
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -224,6 +228,14 @@ function video(v) {
   }
 }
 
+/** 향우회 글: 캐릭터(어느 향우회) 1명 · 분류 · 제목 · 내용 */
+function clubPost(v) {
+  if (!isObj(v)) fail(400, '요청 형식이 잘못됐어요')
+  if (!CLUB_CATS.has(v.category)) fail(400, '분류를 골라 주세요')
+  const chars = charsOf(v.chars, 1, 1, '향우회 캐릭터')
+  return { category: v.category, chars, positions: positionsOf(chars), title: text(v.title, 60, '제목'), body: text(v.body, 3000, '내용', 1, true) }
+}
+
 /** 커스텀 전술: 이름 · 설명 · 전술판 보드(선수 1명 이상) · 고치기 시작한 기본 전술 */
 function customTactic(v) {
   if (!isObj(v)) fail(400, '요청 형식이 잘못됐어요')
@@ -323,14 +335,14 @@ function added(v) {
 
 // ---------------------------------------------------------------- 감사 로그 — 무슨 일(label) · 바뀐 내용 줄(detail)
 
-const BOARD_KO = { builds: '잠재력추천', videos: '영상', tactics: '커스텀 전술', tiers: '티어표', combos: '조합표' }
+const BOARD_KO = { builds: '잠재력추천', videos: '영상', tactics: '커스텀 전술', tiers: '티어표', combos: '조합표', club: '향우회' }
 const AUDIT_LABEL = {
   'PUT /api/gate': '접근 비밀번호 변경', 'PUT /api/me/profile': '프로필 저장', 'DELETE /api/me': '본인 탈퇴', 'DELETE /api/me/kakao': '카카오 연결 해제',
   'PUT /api/arena/signup': '아레나 신청', 'DELETE /api/arena/signup': '아레나 신청 취소', 'PUT /api/arena/plan': '아레나 편성 저장',
   'PUT /api/members/:id': '멤버 등급 변경', 'DELETE /api/members/:id': '멤버 탈퇴 처리',
   'POST /api/teams': '모집 팀 만들기', 'POST /api/teams/quick': '모집 빠른 참가', 'PUT /api/teams/:id': '모집 팀 정보 수정', 'DELETE /api/teams/:id': '모집 팀 해제',
   'POST /api/teams/:id/extend': '모집 팀 연장', 'POST /api/teams/:id/members': '모집 팀 가입', 'PUT /api/teams/:id/members/:id': '모집 참가 캐릭터 변경',
-  'DELETE /api/teams/:id/members/:id': '모집 팀 나가기 · 내보내기', 'POST /api/slam': '덩크 아케이드 대전 결과',
+  'DELETE /api/teams/:id/members/:id': '모집 팀 나가기 · 내보내기', 'POST /api/slam': '덩크 아케이드 대전 결과', 'POST /api/club/:id/adopt': '향우회 답변 채택',
   ...Object.fromEntries(Object.entries(BOARD_KO).flatMap(([k, ko]) => [
     [`POST /api/${k}`, `${ko} 글 쓰기`], [`PUT /api/${k}/:id`, `${ko} 글 수정`], [`DELETE /api/${k}/:id`, `${ko} 글 삭제`],
     [`POST /api/${k}/:id/like`, `${ko} 추천`], [`POST /api/${k}/:id/comments`, `${ko} 댓글 쓰기`], [`DELETE /api/${k}/:id/comments/:id`, `${ko} 댓글 삭제`],
@@ -338,7 +350,7 @@ const AUDIT_LABEL = {
 }
 /** 'DELETE /api/builds/12/comments/5' → '잠재력추천 댓글 삭제' (모르는 요청은 null — 화면은 메서드 · 경로를 보여 준다) */
 export const auditLabel = action => AUDIT_LABEL[action
-  .replace(/^(\S+ \/api\/(?:teams|members|builds|videos|tactics|tiers|combos))\/(?!quick$)[^/]+/, '$1/:id')
+  .replace(/^(\S+ \/api\/(?:teams|members|builds|videos|tactics|tiers|combos|club))\/(?!quick$)[^/]+/, '$1/:id')
   .replace(/\/(members|comments)\/[^/]+$/, '/$1/:id')] ?? null
 
 const charKo = id => PLAYERS.get(id)?.short || PLAYERS.get(id)?.name || id
@@ -884,7 +896,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     catch { fail(400, '요청 형식이 잘못됐어요') }
   }
 
-  // ------------------------------------------------ 게시판(잠재력추천 · 영상 · 커스텀 전술 · 티어표 · 조합표) — 읽기는 공개, 쓰기 · 추천 · 댓글은 로그인
+  // ------------------------------------------------ 게시판(잠재력추천 · 영상 · 커스텀 전술 · 티어표 · 조합표 · 향우회) — 읽기는 공개, 쓰기 · 추천 · 댓글은 로그인
   // 글 · 추천 · 댓글 표가 게시판마다 한 벌씩 있고 모양이 같다. 다른 것은 표 이름 · 글 검증 · 게시판만의 칸 · 목록 필터
 
   const BOARDS = {
@@ -916,14 +928,21 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       table: 'combos', likes: 'combo_likes', comments: 'combo_comments', fk: 'combo_id', rpc: ['combo_toggle_like', 'p_combo'],
       one: 'combo', cols: 'builds,matchups', validate: combo, extra: b => ({ builds: b.builds, matchups: b.matchups }),
     },
+    club: {   // 향우회 — 질문답변은 쓴 사람이 댓글 하나를 채택한다(adopt). 채택된 글 · 댓글은 못 고치고 못 지운다(내공이 사라지지 않게)
+      table: 'club_posts', likes: 'club_likes', comments: 'club_comments', fk: 'post_id', rpc: ['club_toggle_like', 'p_post'],
+      one: 'post', cols: 'category,adopted', validate: clubPost, extra: b => ({ category: b.category, adopted: b.adopted }), adopt: true,
+      // ?cat=<분류> · ?state=open(답변 대기) | done(답변 완료) — state 는 질문답변 글만
+      filter: q => (CLUB_CATS.has(q.get('cat')) ? `&category=eq.${q.get('cat')}` : '')
+        + ({ open: '&category=eq.qna&adopted=is.null', done: '&category=eq.qna&adopted=not.is.null' }[q.get('state')] ?? ''),
+    },
   }
   const nameOf = async user => (await mine(user))?.discord_name ?? user.name
 
   async function board(request, [, kind, id, sub, cid], t) {
     const B = BOARDS[kind], { searchParams: q } = new URL(request.url), method = request.method
     const action = [method, id && 'item', sub, cid && 'comment'].filter(Boolean).join(' ')
-    const known = ['GET', 'POST', 'GET item', 'PUT item', 'DELETE item', 'POST item like', 'POST item comments', 'DELETE item comments comment']
-    if (!known.includes(action) || (sub === 'comments' && !B.comments)) fail(404, '없는 주소예요')
+    const known = ['GET', 'POST', 'GET item', 'PUT item', 'DELETE item', 'POST item like', 'POST item comments', 'DELETE item comments comment', 'POST item adopt']
+    if (!known.includes(action) || (sub === 'comments' && !B.comments) || (sub === 'adopt' && !B.adopt)) fail(404, '없는 주소예요')
     const view = b => ({
       id: b.id, authorId: b.author_id, author: b.author_name, title: b.title, chars: b.chars, body: b.body,
       likes: b.likes, comments: b.comments, createdAt: b.created_at, updatedAt: b.updated_at, ...B.extra(b),
@@ -963,6 +982,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const user = await identity(request)
     if (await hit(`w ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
     const mineOrAdmin = (authorId, what) => { if (authorId !== user.id && !user.admin) fail(403, `내가 쓴 ${what}만 고치거나 지울 수 있어요`) }
+    const unlocked = b => { if (b.adopted && !user.admin) fail(409, '답변을 채택한 질문은 고치거나 지울 수 없어요') }
 
     switch (action) {
       case 'POST': {
@@ -977,6 +997,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       case 'PUT item': {
         const v = B.validate(await readJson(request)), old = await itemOf(id)
         mineOrAdmin(old.author_id, '글')
+        unlocked(old)
         await B.unique?.(v, id)
         await db(`/${B.table}?id=eq.${id}`, { method: 'PATCH', body: { ...v, author_name: await nameOf(user), updated_at: t } })
         const b = await itemOf(id), pm = plusMinus(old.chars || [], b.chars || [], charKo)
@@ -989,6 +1010,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       case 'DELETE item': {
         const old = await itemOf(id)
         mineOrAdmin(old.author_id, '글')
+        unlocked(old)
         await db(`/${B.table}?id=eq.${id}`, { method: 'DELETE' })   // 추천 · 댓글은 cascade
         note(request, `#${id} ${clip(old.title)}`, [old.author_id !== user.id && `${old.author_name} 님의 글`])
         return [200, { ok: true }]
@@ -1010,11 +1032,44 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       case 'DELETE item comments comment': {
         const [[c], b] = await Promise.all([db(`/${B.comments}?select=author_id,author_name,body&id=eq.${cid}&${B.fk}=eq.${id}`), itemOf(id)])
         mineOrAdmin((c || fail(404, '댓글을 찾을 수 없어요')).author_id, '댓글')
+        if (b.adopted === +cid && !user.admin) fail(409, '채택된 답변은 지울 수 없어요')
         await db(`/${B.comments}?id=eq.${cid}`, { method: 'DELETE' })
         note(request, `#${id} ${clip(b.title)}`, [`「${clip(c.body)}」`, c.author_id !== user.id && `${c.author_name} 님의 댓글`])
         return [200, { ok: true }]
       }
+      case 'POST item adopt': {   // { comment } — 질문을 쓴 사람이 남의 댓글 하나를 채택한다. 한 번뿐이고 되돌릴 수 없다
+        const v = await readJson(request), cid = isObj(v) ? v.comment : null, b = await itemOf(id)
+        if (b.category !== 'qna') fail(400, '질문답변 글만 답변을 채택할 수 있어요')
+        if (b.author_id !== user.id) fail(403, '질문을 쓴 사람만 채택할 수 있어요')
+        if (b.adopted) fail(409, '이미 답변을 채택했어요')
+        if (!Number.isInteger(cid) || cid <= 0) fail(400, '채택할 댓글을 골라 주세요')
+        const [c] = await db(`/${B.comments}?select=id,author_id,author_name,body&id=eq.${cid}&${B.fk}=eq.${id}`)
+        if (!c) fail(404, '댓글을 찾을 수 없어요')
+        if (c.author_id === user.id) fail(400, '내 댓글은 채택할 수 없어요')
+        // 아직 채택 안 한 글만 바꾼다 — 동시에 두 번 눌러도 한 번만 된다
+        const [done] = await db(`/${B.table}?id=eq.${id}&adopted=is.null`, {
+          method: 'PATCH', prefer: 'return=representation', body: { adopted: c.id, adopted_by: c.author_id, adopted_name: c.author_name, adopted_at: t },
+        })
+        if (!done) fail(409, '이미 답변을 채택했어요')
+        note(request, `#${id} ${clip(b.title)}`, [`${c.author_name} 님의 답변 「${clip(c.body)}」`])
+        return [200, { [B.one]: view(done) }]
+      }
     }
+  }
+
+  // ------------------------------------------------ 향우회 — 내공 랭킹(공개, ?char= 그 캐릭터 향우회만) · 내 글에 달린 남의 댓글(로그인 — 알림)
+  async function club(request, sub) {
+    if (request.method !== 'GET') fail(404, '없는 주소예요')
+    if (sub === 'ranking') {
+      const char = new URL(request.url).searchParams.get('char')
+      const rows = await db('/rpc/club_ranking', { method: 'POST', body: { p_char: PLAYERS.has(char) ? char : null, p_limit: CLUB_RANK } })
+      const ranking = rows.map(r => ({ name: r.name, adopted: r.adopted, points: r.adopted * clubData.points }))
+      ranking.forEach((r, i) => { r.rank = i && r.adopted === ranking[i - 1].adopted ? ranking[i - 1].rank : i + 1 })   // 같은 수는 같은 순위
+      return [200, { ranking }]
+    }
+    const user = await identity(request), me = enc(user.id)
+    const rows = await db(`/club_comments?select=id,post_id,author_name,body,created_at,post:club_posts!inner(title)&post.author_id=eq.${me}&author_id=neq.${me}&order=id.desc&limit=${CLUB_ALERTS}`)
+    return [200, { alerts: rows.map(c => ({ id: c.id, postId: c.post_id, title: c.post.title, author: c.author_name, body: c.body, createdAt: c.created_at })) }]
   }
 
   // ------------------------------------------------ 아레나전 — 보기는 공개, 신청은 로그인(프로필 필요), 편성표는 관리자
@@ -1351,6 +1406,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (pathname === '/api/audit') return auditLog(request)
     const b = pathname.match(BOARD_PATH)
     if (b) return board(request, b, now())
+    const cl = pathname.match(/^\/api\/club\/(ranking|alerts)$/)
+    if (cl) return club(request, cl[1])
     if (pathname === '/api/slam') return slam(request, now())
     const sv = pathname.match(/^\/api\/survive(?:\/(ranking|run|log|buy))?$/)
     if (sv) return survive(request, sv[1], now())

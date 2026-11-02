@@ -755,6 +755,40 @@ label.check { display: inline-flex; align-items: center; gap: 6px; cursor: point
 .vd-preview img { width: 100%; border-radius: 10px; display: block; }
 .vd #form-cats { flex-wrap: wrap; }
 
+/* ---------- 향우회 (.cl — 영상 .vd 의 목록 · 글 모양을 같이 쓴다) ---------- */
+.vd-cat.is-qna { background: #4d9eff; }
+.vd-cat.is-tip { background: #35c6a7; }
+.vd-cat.is-free { background: #f5a623; }
+.cl-tabs { display: flex; gap: 4px; margin: 0 0 14px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.cl-tabs a { flex: none; padding: 8px 14px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--muted); font-weight: 800; text-decoration: none; }
+.cl-tabs a:hover { color: var(--text); }
+.cl-tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+.cl-tabs b { margin-left: 5px; padding: 0 6px; border-radius: 999px; background: var(--def); color: #fff; font-size: 11px; vertical-align: 2px; }
+.cl-states button { padding: 3px 11px; font-size: 12.5px; }
+.cl-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; }
+.cl-state { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 11.5px; font-weight: 800; }
+.cl-state.is-done { color: #35c6a7; border-color: #35c6a7; }
+.cl-club { display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; font-weight: 700; font-size: 13px; }
+.cl-club img { width: 28px; height: 28px; border-radius: 50%; background: #0b0f16; }
+.cl-hint { margin-top: 12px; }
+.cl-adopt { margin-left: 8px; padding: 1px 10px; font-size: 11.5px; font-weight: 800; color: #35c6a7; border-color: #35c6a7; }
+.cl-best { margin-left: 8px; color: #35c6a7; font-size: 12px; font-weight: 800; }
+.pt-comments li:has(.cl-best) { padding: 10px 12px; border: 1px solid #35c6a7; border-radius: 12px; background: #35c6a714; }
+.cl-rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cl-rank li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 10px; background: var(--panel-2); }
+.cl-rank li.is-top1 { background: #f5a6231f; border: 1px solid #f5a62366; }
+.cl-rank-no { width: 28px; flex: none; text-align: center; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cl-rank b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-rank em { font-style: normal; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cl-notify { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cl-alerts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cl-alerts a { display: block; padding: 8px 12px; border-radius: 10px; background: var(--panel-2); color: inherit; text-decoration: none; border: 1px solid transparent; }
+.cl-alerts a:hover { border-color: var(--accent-2); }
+.cl-alerts .is-new a { border-color: #4d9eff; }
+.cl-alerts .is-new a::before { content: "NEW"; float: right; margin-left: 8px; color: #4d9eff; font-size: 11px; font-weight: 800; }
+.cl-alerts p { margin: 0; font-size: 13.5px; }
+.cl-alert-body { margin-top: 4px !important; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
 /* 홈: 최신 강의 */
 .lectures { margin-top: 40px; }
 .lectures-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }

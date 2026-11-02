@@ -1,0 +1,8 @@
+{
+  "points": 10,
+  "categories": [
+    { "id": "qna", "name": "질문답변" },
+    { "id": "tip", "name": "꿀팁공유" },
+    { "id": "free", "name": "자유" }
+  ]
+}

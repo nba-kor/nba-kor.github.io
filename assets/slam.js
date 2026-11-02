@@ -4,8 +4,8 @@
 // 키: 방향키 · WASD 이동, 드리블 Z · J, 패스 X · K, 슛 C · L · 스페이스, 궁극기 V · U. 수비 때는 스틸 · 선수 바꾸기 · 블록 · 수비 궁극기. 휴대폰은 캔버스 아래 스틱 · 버튼.
 // ponytail: 파울 · 자유투 · 아웃 오브 바운즈 · 하프코트 바이얼레이션 · 소리 없음 — 공은 코트 끝에서 튕겨 나온다
 import { mountTop, POS, copyLink } from './app.js?v=fb02b445'
-import { loadData, data, startAuth, me as who, loggedIn, h, ago } from './board.js?v=4233415a'
-import { sb, api } from './auth.js?v=1fbb8e2f'
+import { loadData, data, startAuth, me as who, loggedIn, h, ago } from './board.js?v=f9551348'
+import { sb, api } from './auth.js?v=01106c22'
 import { TEAMS, NUMS, NBA_NUM, lineup, cutHead, skinOf, SKIN } from './vipers.js?v=8939ed12'
 
 mountTop('/slam/')

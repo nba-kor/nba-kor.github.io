@@ -12,8 +12,8 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.m
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/GLTFLoader.js'   // 'three' 는 페이지의 importmap 이 위 주소로 — three 가 한 벌만 뜬다
 import { clone as cloneRig } from 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/utils/SkeletonUtils.js'
 import { mountTop, faceOf } from './app.js?v=fb02b445'
-import { loadData, data, kr, startAuth, me as who, auth, loggedIn, charGrid, h } from './board.js?v=4233415a'
-import { sb } from './auth.js?v=1fbb8e2f'
+import { loadData, data, kr, startAuth, me as who, auth, loggedIn, charGrid, h } from './board.js?v=f9551348'
+import { sb } from './auth.js?v=01106c22'
 import { TEAMS, NUMS, NBA_NUM, cutHead, skinOf, SKIN } from './vipers.js?v=8939ed12'
 import { R3, RIM, sm, wx, wz, LIFT, RIM_Y, RIM_Z, scene, part, toon, tex, floorMat, rimG, net as hoopNet, scenery, BALL, ballMat, hairOf, yaw } from './court3d.js?v=68dc2ff3'
 

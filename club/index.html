@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>향우회 · TNAB Vipers</title>
+<meta name="description" content="NBA 덩크 시티 캐릭터별 향우회. 질문답변 · 꿀팁공유 · 자유 게시판에서 같은 캐릭터 유저끼리 묻고 답하고, 채택된 답변으로 내공을 쌓아 랭킹에 올라 보세요.">
+<link rel="canonical" href="https://nba-kor.github.io/club/">
+<link rel="icon" href="/assets/icon.png?v=2" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icon.png?v=2">
+<meta name="theme-color" content="#0d1117">
+<!-- 카카오톡 · 디스코드 · 트위터 미리보기. 이미지를 바꾸면 ?v= 도 올린다(카카오는 URL 로 캐시한다) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TNAB Vipers">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:url" content="https://nba-kor.github.io/club/">
+<meta property="og:title" content="향우회 · TNAB Vipers">
+<meta property="og:description" content="NBA 덩크 시티 캐릭터별 향우회. 질문답변 · 꿀팁공유 · 자유 게시판에서 같은 캐릭터 유저끼리 묻고 답하고, 채택된 답변으로 내공을 쌓아 랭킹에 올라 보세요.">
+<meta property="og:image" content="https://nba-kor.github.io/assets/og.jpg?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="TNAB Vipers — 3:3 전술판 · 티어표 · 팀원모집">
+<meta name="twitter:card" content="summary_large_image">
+<script>/* 접근 비밀번호를 받은 적 없는 브라우저는 확인될 때까지 가린다 — assets/auth.js 의 접근 비밀번호 */try{localStorage.getItem('dc.gate')||document.documentElement.classList.add('gated')}catch(e){document.documentElement.classList.add('gated')}</script>
+<link rel="stylesheet" href="/assets/style.css?v=52fab277">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><img src="/assets/icon.png?v=2" alt="">TNAB <span>Vipers</span></div>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/arena/">아레나 운영</a>
+    <a href="/tactics/" data-group="/tactics/ /tiers/ /combos/ /potentials/">전략·공략</a>
+    <a href="/videos/">영상 자료실</a>
+    <a href="/club/">향우회</a>
+    <a href="/game/" data-group="/game/ /slam/ /street/ /survive/ /plaza/">게임</a>
+    <a href="/me/">마이페이지</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="rc-auth" id="auth" aria-live="polite"></div>
+</header>
+
+<main class="recruit pt vd cl">
+
+  <!-- 글쓰기 · 고치기 — 로그인한 사람만 -->
+  <section id="form-view" class="card rc-create" hidden>
+    <form id="post-form" novalidate>
+      <h2 id="form-title">글쓰기</h2>
+      <fieldset>
+        <legend>분류</legend>
+        <div class="rc-seg-opts" id="form-cats"></div>
+      </fieldset>
+      <fieldset>
+        <legend>향우회 <small>캐릭터 한 명</small></legend>
+        <div id="form-chars"></div>
+      </fieldset>
+      <label class="rc-fld">
+        <span>제목</span>
+        <input type="text" name="title" maxlength="60" autocomplete="off" required>
+      </label>
+      <label class="rc-fld">
+        <span>내용</span>
+        <textarea name="body" rows="8" maxlength="3000" required></textarea>
+      </label>
+      <p class="rc-form-err" role="alert" hidden></p>
+      <div class="rc-actions">
+        <button type="button" id="form-cancel">취소</button>
+        <button type="submit" class="primary rc-big">저장</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- 게시판 · 내공 랭킹 · 알림 탭의 머리 -->
+  <div id="club-head" hidden>
+    <div class="rc-hero">
+      <div>
+        <h1>향우회</h1>
+        <p class="rc-lead">같은 캐릭터 유저끼리 묻고 답하는 곳. 질문에 답하고 채택되면 그 캐릭터 향우회의 내공이 쌓여요.</p>
+        <p class="rc-muted rc-need" id="need" hidden></p>
+      </div>
+      <button id="new" class="primary rc-big" type="button">+ 글쓰기</button>
+    </div>
+    <nav class="cl-tabs" aria-label="향우회">
+      <a href="/club/" data-view="list">게시판</a>
+      <a href="/club/?rank" data-view="rank">내공 랭킹</a>
+      <a href="/club/?alerts" data-view="alerts">알림<b id="alert-count" hidden></b></a>
+    </nav>
+  </div>
+
+  <!-- 주소에 아무것도 없음: 게시판 -->
+  <section id="list-view" hidden>
+    <div class="card pt-filter">
+      <div class="vd-cats" id="filter-cats" role="group" aria-label="분류"></div>
+      <div class="vd-cats cl-states" id="filter-state" role="group" aria-label="답변 상태" hidden></div>
+      <div class="pt-sort" role="group" aria-label="정렬">
+        <button type="button" data-sort="new">최신순</button>
+        <button type="button" data-sort="likes">추천순</button>
+      </div>
+      <div id="filter-chars"></div>
+    </div>
+    <div id="list" class="rc-list pt-list"></div>
+  </section>
+
+  <!-- ?rank: 내공 랭킹 -->
+  <section id="rank-view" hidden>
+    <div class="card pt-filter">
+      <p class="rc-note">질문을 쓴 사람이 답변을 채택하면 답변한 사람에게 내공 <b id="rank-points"></b>. 캐릭터를 누르면 그 향우회만 봐요.</p>
+      <div id="rank-chars"></div>
+    </div>
+    <section class="card">
+      <h3 id="rank-title">전체 내공 랭킹</h3>
+      <div id="rank-list"></div>
+    </section>
+  </section>
+
+  <!-- ?alerts: 내 글에 달린 댓글 -->
+  <section id="alerts-view" hidden>
+    <section class="card cl-notify">
+      <p class="rc-note">켜 두면 사이트가 열려 있는 동안 내 글에 댓글이 달릴 때 윈도우 알림으로 알려 드려요(PC 크롬 · 엣지).</p>
+      <button type="button" id="notify-btn"></button>
+    </section>
+    <section class="card">
+      <h3>내 글에 달린 댓글</h3>
+      <div id="alerts-list"></div>
+    </section>
+  </section>
+
+  <!-- ?p=<id>: 글 -->
+  <section id="item-view" hidden>
+    <a class="rc-back" href="/club/">← 목록</a>
+    <p class="rc-form-err" id="item-error" hidden></p>
+    <div id="item-body"></div>
+  </section>
+
+</main>
+
+<script type="module" src="/assets/club.js?v=34b52500"></script>
+</body>
+</html>
