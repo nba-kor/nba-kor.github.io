@@ -74,6 +74,7 @@ const SURVIVE_SKILL = /^[a-z0-9_]{1,32}\+?$/   // 덩크 서바이버 랭킹: �
 const SURVIVE_MAX = 400   // 업적(산 스킨 own_… 도 여기) · 기록 각각 이만큼까지
 const SURVIVE_MAPS = ['park', 'arena', 'roof', 'chal']   // 덩크 서바이버 맵 — 랭킹은 맵마다. chal = 챌린지(시간 제한 없음)
 const SURVIVE_LIST = 20   // 랭킹 줄 수
+const SURVIVE_LOG = 30   // 리더보드 최근 기록 · 구매 내역 줄 수
 // 받는 요청 — 메서드 + 경로 조각. 예: 'POST team members' = 가입, 'DELETE team members member' = 방출 · 나가기
 const ACTIONS = new Set([
   'GET me', 'PUT me profile', 'DELETE me', 'DELETE me kakao', 'GET', 'POST', 'POST quick', 'GET team', 'DELETE team', 'POST team members', 'DELETE team members member', 'POST team extend',
@@ -570,6 +571,13 @@ function surviveRun(b) {
     || !Array.isArray(skills) || skills.length > 6 || !skills.every(k => typeof k === 'string' && SURVIVE_SKILL.test(k)) || new Set(skills).size < skills.length) fail(400, '요청 형식이 잘못됐어요')
   return { map: b.map, hero: b.hero, secs: b.secs, kills: b.kills, lvl: b.lvl, skills }
 }
+/** 한 판의 포인트 — 화면(assets/survive.js runPts)과 같은 셈: 처치/150 + 레벨×2 + 초/6, 30분 생존(챌린지 말고)은 1.5배 */
+const survivePts = r => Math.round((Math.floor(r.kills / 150) + r.lvl * 2 + Math.floor(r.secs / 6)) * (r.map !== 'chal' && r.secs >= 1800 ? 1.5 : 1))
+/** 포인트로 산 스킨 — { skin: 스킨 id(화면이 정한다), price: 낸 포인트 } */
+function surviveBuy(b) {
+  if (!isObj(b) || typeof b.skin !== 'string' || !SURVIVE_KEY.test(b.skin) || !Number.isSafeInteger(b.price) || b.price < 1 || b.price > 1_000_000) fail(400, '요청 형식이 잘못됐어요')
+  return { skin: b.skin, price: b.price }
+}
 /** 두 저장을 합친다 — 업적은 둘 다(먼저 단 시각), 기록은 큰 쪽. 그래서 옛 기기가 올려도 줄지 않는다 */
 function mergeSurvive(a, b) {
   const ach = { ...a.ach }, stats = { ...a.stats }
@@ -710,7 +718,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
    */
   function audit(request, status) {
     const { pathname } = new URL(request.url), action = `${request.method} ${pathname}`
-    if (request.method === 'GET' || status >= 300 || action === 'POST /api/gate' || action === 'PUT /api/survive' || action === 'POST /api/survive/run') return
+    if (request.method === 'GET' || status >= 300 || action === 'POST /api/gate' || action === 'PUT /api/survive' || action === 'POST /api/survive/run' || action === 'POST /api/survive/buy') return
     const user = actors.get(request), { target = null, detail = [] } = notes.get(request) || {}
     const lines = detail.length > 60 ? [...detail.slice(0, 59), `…외 ${detail.length - 59}줄`] : detail
     waitUntil(db('/audit_log', { method: 'POST', body: {
@@ -1071,17 +1079,37 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       const by = rows => Object.fromEntries(SURVIVE_MAPS.map(m => [m, rows.filter(r => r.map === m).map(({ map, ...r }) => r)]))
       return [200, { ranking: by(top), ...(user && { mine: Object.fromEntries(mine.map(({ map, ...r }) => [map, r])) }) }]
     }
+    if (sub === 'log') {   // 리더보드 — 최근 기록 · 구매(모두), 로그인했으면 내 것도
+      if (request.method !== 'GET') fail(404, '없는 주소예요')
+      const user = request.headers.has('authorization') ? await identity(request) : null
+      const RUN = 'select=name,map,hero,secs,kills,lvl,skills,pts,at', BUY = 'select=name,skin,price,at'
+      const [runs, buys, myRuns, myBuys] = await Promise.all([
+        db(`/survive_runs?${RUN}&order=at.desc&limit=${SURVIVE_LOG}`), db(`/survive_buys?${BUY}&order=at.desc&limit=${SURVIVE_LOG}`),
+        user ? db(`/survive_runs?${RUN}&user_id=eq.${enc(user.id)}&order=at.desc&limit=${SURVIVE_LOG}`) : null,
+        user ? db(`/survive_buys?${BUY}&user_id=eq.${enc(user.id)}&order=at.desc`) : null,
+      ])
+      return [200, { runs, buys, ...(user && { mine: { runs: myRuns, buys: myBuys } }) }]
+    }
+    if (sub === 'buy') {
+      if (request.method !== 'POST') fail(404, '없는 주소예요')
+      const user = await identity(request)
+      if (await hit(`sv ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
+      const b = surviveBuy(await readJson(request))
+      await db('/survive_buys?on_conflict=user_id,skin', { method: 'POST', prefer: 'resolution=ignore-duplicates', body: { user_id: user.id, name: await nameOf(user), ...b, at: t } })
+      return [200, { ok: true }]
+    }
     if (sub === 'run') {
       if (request.method !== 'POST') fail(404, '없는 주소예요')
       const user = await identity(request)
       if (await hit(`sv ${user.id}`, LIMIT.windowMs) > LIMIT.max) fail(429, '요청이 너무 많아요. 잠시 뒤에 다시 시도해 주세요')
-      const r = surviveRun(await readJson(request)), name = await nameOf(user), key = `user_id=eq.${enc(user.id)}&map=eq.${r.map}`
+      const r = surviveRun(await readJson(request)), name = await nameOf(user), key = `user_id=eq.${enc(user.id)}&map=eq.${r.map}`, pts = survivePts(r)
+      await db('/survive_runs', { method: 'POST', body: { user_id: user.id, name, ...r, pts, at: t } })   // 최근 기록 — 판마다 한 줄
       const [old] = await db(`/survive_best?select=secs,kills&${key}`)
       const best = !old || r.secs > old.secs || (r.secs === old.secs && r.kills > old.kills)
       if (best) await db('/survive_best', { method: 'POST', prefer: 'resolution=merge-duplicates', body: { user_id: user.id, ...r, name, at: t } })
       else await db(`/survive_best?${key}`, { method: 'PATCH', body: { name } })   // 이름은 늘 지금 이름
       const [me] = await db(`/survive_ranking?select=rank,hero,secs,kills,lvl&${key}`)
-      return [200, { best, mine: me }]
+      return [200, { best, mine: me, pts }]
     }
     if (!['GET', 'PUT'].includes(request.method)) fail(404, '없는 주소예요')
     const user = await identity(request)
@@ -1265,6 +1293,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     await db(`/site_admins?user_id=eq.${enc(id)}`, { method: 'DELETE' })
     await db(`/survive_saves?user_id=eq.${enc(id)}`, { method: 'DELETE' })
     await db(`/survive_best?user_id=eq.${enc(id)}`, { method: 'DELETE' })
+    await db(`/survive_runs?user_id=eq.${enc(id)}`, { method: 'DELETE' })
+    await db(`/survive_buys?user_id=eq.${enc(id)}`, { method: 'DELETE' })
     await db(`/recruit_profiles?discord_user_id=eq.${enc(id)}`, { method: 'DELETE' })
     return !!led
   }
@@ -1322,7 +1352,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     const b = pathname.match(BOARD_PATH)
     if (b) return board(request, b, now())
     if (pathname === '/api/slam') return slam(request, now())
-    const sv = pathname.match(/^\/api\/survive(?:\/(ranking|run))?$/)
+    const sv = pathname.match(/^\/api\/survive(?:\/(ranking|run|log|buy))?$/)
     if (sv) return survive(request, sv[1], now())
     const a = pathname.match(/^\/api\/arena(?:\/(signup|plan|mine|weekly))?$/)
     if (a) return arena(request, a[1], now())

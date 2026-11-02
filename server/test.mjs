@@ -1969,7 +1969,8 @@ dbTest('덩크 서바이버 랭킹: 맵마다 사람마다 최고 기록 한 줄
   const K = top + 1000
   const r1 = await run(a, { secs: 1800, kills: K, hero: 'klfd', skills: ['three+', 'block', 'press'] })
   assert.equal(r1.status, 200, r1.text)
-  assert.deepEqual(r1.body, { best: true, mine: { rank: 1, hero: 'klfd', secs: 1800, kills: K, lvl: 20 } })
+  assert.deepEqual(r1.body, { best: true, mine: { rank: 1, hero: 'klfd', secs: 1800, kills: K, lvl: 20 }, pts: Math.round((Math.floor(K / 150) + 40 + 300) * 1.5) }, '포인트 — 처치/150 + 레벨×2 + 초/6, 30분 생존 1.5배')
+  assert.equal(ch.body.pts, Math.floor(9000 / 150) + 40 + 600, '챌린지는 1.5배가 없다')
   assert.deepEqual((await run(a, { secs: 1700, kills: K + 500 })).body.best, false, '더 짧게 버틴 판은 기록이 안 바뀐다')
   assert.deepEqual((await run(b, { secs: 1800, kills: K + 10 })).body.mine.rank, 1, '같은 시간이면 많이 쓰러뜨린 쪽이 위')
   assert.deepEqual((await run(c, { secs: 1800, kills: K + 10 })).body.mine.rank, 1, '똑같으면 같은 순위')
@@ -1985,6 +1986,24 @@ dbTest('덩크 서바이버 랭킹: 맵마다 사람마다 최고 기록 한 줄
   const m = await api('GET', '/api/survive/ranking', undefined, { as: b.as })
   assert.deepEqual(m.body.mine, { roof: { rank: 2, hero: 'james', secs: 1800, kills: K + 10, lvl: 20 } }, '로그인하면 내 기록 · 순위')
   assert.deepEqual(await rows(`/audit_log?select=action&user_id=eq.${a.id}&action=eq.POST%20%2Fapi%2Fsurvive%2Frun`), [], '판마다 오는 기록은 감사 로그에 안 남긴다')
+  // 리더보드 — 최근 기록(판마다 한 줄, 포인트) · 구매 내역. 보기는 공개, 로그인하면 내 것도. ID 는 내보내지 않는다
+  const buy = (who, body) => api('POST', '/api/survive/buy', body, { as: who.as })
+  assert.equal((await api('POST', '/api/survive/buy', { skin: 'fit_gold', price: 2600 })).status, 401)
+  for (const body of [null, { skin: 'Bad-Skin', price: 10 }, { skin: 'fit_gold' }, { skin: 'fit_gold', price: 0 }, { skin: 'fit_gold', price: 1.5 }, { skin: 'fit_gold', price: '9' }]) assert.equal((await buy(a, body)).status, 400, JSON.stringify(body))
+  assert.equal((await buy(a, { skin: 'fit_gold', price: 2600 })).status, 200)
+  assert.equal((await buy(a, { skin: 'fit_gold', price: 2600 })).status, 200, '같은 스킨을 또 올려도 한 줄')
+  assert.equal((await buy(b, { skin: 'ball_cat', price: 4000 })).status, 200)
+  const lg = await api('GET', '/api/survive/log')
+  assert.equal(lg.status, 200)
+  assert.equal(lg.body.mine, undefined)
+  assert.ok(lg.body.runs.every(r => Object.keys(r).join() === 'name,map,hero,secs,kills,lvl,skills,pts,at'))
+  assert.deepEqual(lg.body.buys.slice(0, 2).map(x => [x.name, x.skin, x.price]), [[b.name, 'ball_cat', 4000], [a.name, 'fit_gold', 2600]], '최근 구매 — 새 것부터')
+  const la = await api('GET', '/api/survive/log', undefined, { as: a.as })
+  assert.deepEqual(la.body.mine.buys.map(x => x.skin), ['fit_gold'], '내 구매는 내 것만')
+  assert.equal(la.body.mine.runs[0].kills, K + 20, '내 최근 기록 — 새 것부터')
+  assert.equal(la.body.mine.runs[0].pts, Math.round((Math.floor((K + 20) / 150) + 99 * 2 + 300) * 1.5))
+  assert.ok(la.body.mine.runs.every(r => r.name === a.name))
+  assert.deepEqual(await rows(`/audit_log?select=action&user_id=eq.${a.id}&action=eq.POST%20%2Fapi%2Fsurvive%2Fbuy`), [], '구매도 감사 로그에 안 남긴다')
 })
 
 dbTest('감사 로그: 바꾼 요청(성공)만 누가 · 무엇을 · 무엇에 · 바뀐 내용 — 읽기 · 실패는 안 남긴다 · 함수 키로도 못 고친다 · 보기는 슈퍼관리자만(최근 것부터 · 사람별 · 더 보기)', async () => {
@@ -2126,6 +2145,7 @@ dbTest('본인 탈퇴: 프로필 · 신청 · 이끌던 팀 · 관리자 권한 
   assert.deepEqual(await rows(`/site_admins?select=user_id&user_id=eq.${a.id}`), [])
   assert.deepEqual(await rows(`/survive_saves?select=user_id&user_id=eq.${a.id}`), [], '덩크 서바이버 업적도 지운다')
   assert.deepEqual(await rows(`/survive_best?select=user_id&user_id=eq.${a.id}`), [], '덩크 서바이버 랭킹 기록도 지운다')
+  assert.deepEqual(await rows(`/survive_runs?select=user_id&user_id=eq.${a.id}`), [], '덩크 서바이버 최근 기록도 지운다')
   assert.equal((await api('GET', `/api/teams/${team.body.team.id}`)).status, 404, '이끌던 팀은 해제')
   const [kak, del] = net.out
   assert.deepEqual([kak.url, kak.headers, kak.body], ['https://kapi.kakao.com/v1/user/unlink', { authorization: 'KakaoAK kakao-admin' }, 'target_id_type=user_id&target_id=4321'])

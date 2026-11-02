@@ -292,7 +292,9 @@ const owns = k => !!(k.ach ? save.ach[k.ach] : save.ach[`own_${k.id}`])
 const points = () => (save.stats.pts || 0) - Object.entries(save.ach).reduce((n, [k, v]) => k.startsWith('own_') ? n + v : n, 0)
 function buy(k) {
   if (owns(k) || k.ach || points() < k.price) return false
-  save.ach[`own_${k.id}`] = k.price; persist(true); return true
+  save.ach[`own_${k.id}`] = k.price; persist(true)
+  if (auth === 'in') api('/survive/buy', { method: 'POST', body: { skin: k.id, price: k.price }, withToken: true }).then(() => loadRank(), () => {})   // 구매 내역(리더보드)
+  return true
 }
 /** 한 판의 포인트 — 처치 · 레벨 · 버틴 시간에 비례(30분 생존은 1.5배) */
 function runPts(win) { const p = { kills: G.kills / 150 | 0, lvl: G.lvl * 2, time: G.t / 6 | 0 }; return { ...p, total: Math.round((p.kills + p.lvl + p.time) * (win ? 1.5 : 1)) } }
@@ -2331,7 +2333,7 @@ function title() {
   show(false, h('div', { className: 'sv-title' },
     h('p', { className: 'sv-logo' }, h('span', {}, 'DUNK'), h('span', {}, 'SURVIVOR')),
     h('p', { className: 'sv-sub' }, '몰려오는 수비를 피해 30분을 버텨라'),
-    row(btn('게임 시작', chars, 'is-main'), btn(`상점 · ${points().toLocaleString()} P`, () => shop()), btn('랭킹', ranks), btn(`업적 ${got} / ${ACH.length}`, achs), btn(['패치 노트', notesNew() && h('i', { className: 'sv-new' }, 'NEW')], notes)),
+    row(btn('게임 시작', chars, 'is-main'), btn(`상점 · ${points().toLocaleString()} P`, () => shop()), btn('리더보드', ranks), btn(`업적 ${got} / ${ACH.length}`, achs), btn(['패치 노트', notesNew() && h('i', { className: 'sv-new' }, 'NEW')], notes)),
     h('p', { className: 'sv-note' }, saveNote())))
 }
 function chars(keep = false) {
@@ -2463,12 +2465,54 @@ function shop(closet = CLOSET, keep = false) {
 }
 // ---- 랭킹 — 맵마다 오래 버틴 순(같으면 많이 쓰러뜨린 순), 사람마다 최고 기록 한 줄. 로그인하면 판이 끝날 때 올라간다
 const PENDING = 'survive.pending'   // 로그인 안 하고 끝낸 판(더 나은 것 하나) — 로그인하고 돌아오면 올린다(2시간 안)
-let RANK = null, rankTab = 0, guideTab = 0
+let RANK = null, LOG = null, rankSt = { view: 'rank', tab: 0 }, guideSt = { view: 'rank', tab: 0 }
 const better = (a, b) => !b || a.secs > b.secs || (a.secs === b.secs && a.kills > b.kills)
-async function loadRank() {
-  try { RANK = await api('/survive/ranking', { withToken: auth === 'in' }) } catch { RANK = { error: true } }
-  if (mode === 'menu' && ui.querySelector('.sv-h')?.textContent === '랭킹') ranks(true)
+async function loadRank() {   // 랭킹 · 최근 기록 · 구매 내역(/api/survive/log) — 로그인했으면 내 것도
+  const tok = auth === 'in'
+  await Promise.all([
+    api('/survive/ranking', { withToken: tok }).then(v => { RANK = v }, () => { RANK = { error: true } }),
+    api('/survive/log', { withToken: tok }).then(v => { LOG = v }, () => { LOG = { error: true } })])
+  if (mode === 'menu' && ui.querySelector('.sv-h')?.textContent === '리더보드') ranks(true)
   guideRank()
+}
+const ago = at => { const m = (Date.now() - at) / 60000 | 0; return m < 1 ? '방금' : m < 60 ? `${m}분 전` : m < 1440 ? `${m / 60 | 0}시간 전` : `${m / 1440 | 0}일 전` }
+const mapName = id => MAPS.find(m => m.id === id)?.name || id
+const VIEWS = [['rank', '랭킹'], ['runs', '최근 기록'], ['mine', '내 기록'], ['buys', '구매 내역']]
+/** 리더보드 — 랭킹(맵마다 최고) · 최근 기록(모두, 포인트) · 내 기록 · 구매 내역(나 · 모두) */
+function board(st, set) {
+  return h('div', { className: 'sv-board' },
+    h('div', { className: 'sv-tabs sv-views', role: 'tablist' }, VIEWS.map(([id, name]) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(id === st.view), onclick: () => set({ ...st, view: id }) }, name))),
+    st.view === 'rank' ? rankList(st.tab, i => set({ ...st, tab: i })) : st.view === 'buys' ? buyList() : runList(st.view === 'mine'))
+}
+const loginNote = msg => h('p', { className: 'sv-note' }, msg, ' ', h('button', { type: 'button', className: 'sv-link', onclick: chooseLogin }, '로그인'))
+const logState = () => !LOG ? h('p', { className: 'sv-note' }, '불러오는 중…') : LOG.error ? h('p', { className: 'sv-note' }, '기록을 불러오지 못했어요') : null
+function runList(mine) {
+  const spent = (save.stats.pts || 0) - points()
+  const sum = mine && h('p', { className: 'sv-mine' }, `내 포인트 — 모은 것 ${(save.stats.pts || 0).toLocaleString()} P · 쓴 것 ${spent.toLocaleString()} P · 남은 것 ${points().toLocaleString()} P`)
+  if (mine && auth !== 'in') return h('div', {}, sum, loginNote('로그인하면 판마다 기록 · 받은 포인트가 남아요'))
+  const rows = mine ? LOG?.mine?.runs || [] : LOG?.runs || []
+  return h('div', {}, sum, logState() || (!rows.length ? h('p', { className: 'sv-note' }, mine ? '아직 올린 판이 없어요' : '아직 기록이 없어요')
+    : h('ol', { className: 'sv-log' }, rows.map(r => h('li', {},
+      h('img', { src: faceOf(P(r.hero)), alt: '' }),
+      h('div', {}, h('b', {}, mine ? `${mapName(r.map)} · ${fmt(r.secs)}` : r.name), h('small', {}, `${mine ? '' : `${mapName(r.map)} · ${fmt(r.secs)} · `}처치 ${r.kills.toLocaleString()} · Lv ${r.lvl} · ${nameOf({ id: r.hero })}`)),
+      h('span', { className: 'sv-log-pts' }, `+${r.pts.toLocaleString()} P`), h('small', { className: 'sv-ago' }, ago(r.at)))))),
+    !mine && auth !== 'in' && loginNote('로그인하면 판이 끝날 때 기록이 올라가요'))
+}
+function buyRow(x, who) {   // 구매 한 줄 — 스킨 이름(등급 색) · 종류 · 값 · 누가 · 언제
+  const k = SKIN[x.skin]
+  return h('li', {}, h('span', { className: `sv-tier is-t${k?.tier || 1}` }, k ? TIER[k.tier].name : '스킨'),
+    h('div', {}, h('b', {}, k?.name || x.skin), h('small', {}, [k && { fx: '스킬 이펙트', ball: '농구공', fit: '옷' }[k.kind], who && x.name].filter(Boolean).join(' · '))),
+    h('span', { className: 'sv-log-pts is-spent' }, `${x.price.toLocaleString()} P`), x.at && h('small', { className: 'sv-ago' }, ago(x.at)))
+}
+function buyList() {
+  // 내 구매 — 로그인했으면 계정 기록, 아니면 이 브라우저에서 산 것(언제는 모른다)
+  const mineRows = auth === 'in' ? LOG?.mine?.buys || [] : Object.entries(save.ach).filter(([k]) => k.startsWith('own_')).map(([k, v]) => ({ skin: k.slice(4), price: v }))
+  return h('div', {},
+    h('p', { className: 'sv-sub2' }, `내 구매 ${mineRows.length}개 · 쓴 포인트 ${((save.stats.pts || 0) - points()).toLocaleString()} P`),
+    auth === 'in' && logState() || (mineRows.length ? h('ol', { className: 'sv-log' }, mineRows.map(x => buyRow(x, false))) : h('p', { className: 'sv-note' }, '아직 산 스킨이 없어요 — 상점에서 포인트로 사요')),
+    h('p', { className: 'sv-sub2' }, '최근 구매 — 모두'),
+    logState() || (LOG.buys.length ? h('ol', { className: 'sv-log' }, LOG.buys.map(x => buyRow(x, true))) : h('p', { className: 'sv-note' }, '아직 구매가 없어요')),
+    auth !== 'in' && loginNote('로그인하면 산 스킨이 구매 내역에 올라가요'))
 }
 function rankList(tab, set) {
   const m = MAPS[tab], rows = RANK?.ranking?.[m.id] || [], mine = RANK?.mine?.[m.id], isMe = r => mine && r.rank === mine.rank && r.name === me?.name
@@ -2485,10 +2529,10 @@ function rankList(tab, set) {
     auth !== 'in' && h('p', { className: 'sv-note' }, '로그인하면 판이 끝날 때 내 기록이 랭킹에 올라가요 ', h('button', { type: 'button', className: 'sv-link', onclick: chooseLogin }, '로그인')))
 }
 function ranks(keep = false) {
-  show(keep === true, h('div', { className: 'sv-panel sv-wide' }, h('p', { className: 'sv-h' }, '랭킹'), rankList(rankTab, i => { rankTab = i; ranks(true) }), row(btn('← 처음으로', title, 'is-main'))))
+  show(keep === true, h('div', { className: 'sv-panel sv-wide' }, h('p', { className: 'sv-h' }, '리더보드'), board(rankSt, st => { rankSt = st; ranks(true) }), row(btn('← 처음으로', title, 'is-main'))))
   if (!RANK) loadRank()
 }
-const guideRank = () => { if (ready) document.getElementById('sv-guide-rank').replaceChildren(rankList(guideTab, i => { guideTab = i; guideRank() })) }
+const guideRank = () => { if (ready) document.getElementById('sv-guide-rank').replaceChildren(board(guideSt, st => { guideSt = st; guideRank() })) }
 /** 한 판 올리기 → 알릴 말(실패하면 null). el 이 있으면 거기에 쓴다 */
 async function submit(run, el) {
   const name = MAPS.find(m => m.id === run.map).name
@@ -2569,11 +2613,16 @@ function refresh() {
   if (mode === 'shop') return shop(CLOSET, true)
   if (mode !== 'menu') return
   const h2 = ui.querySelector('.sv-h')?.textContent || ''
-  if (h2.startsWith('캐릭터')) chars(true); else if (h2.startsWith('맵')) maps(true); else if (h2.startsWith('업적')) achs(); else if (h2 === '랭킹') ranks(true); else if (h2 === '패치 노트') notes(); else title()
+  if (h2.startsWith('캐릭터')) chars(true); else if (h2.startsWith('맵')) maps(true); else if (h2.startsWith('업적')) achs(); else if (h2 === '리더보드') ranks(true); else if (h2 === '패치 노트') notes(); else title()
 }
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '리더보드', items: [
+    '「랭킹」이 「리더보드」로 — 랭킹 · 최근 기록 · 내 기록 · 구매 내역 탭',
+    '최근 기록 — 모두의 최근 판(맵 · 버틴 시간 · 처치 · 레벨 · 캐릭터 · 받은 포인트). 내 기록 — 내 최근 판과 내 포인트(모은 것 · 쓴 것 · 남은 것)',
+    '구매 내역 — 내가 산 스킨 · 쓴 포인트, 그리고 모두의 최근 구매(누가 무엇을 얼마에)',
+    '로그인했을 때 끝낸 판 · 산 스킨부터 올라가요'] },
   { date: '2026-11-02', title: '상점 손보기 · 새 스킨', items: [
     '이펙트 등급이 색만 다르지 않게 — 레어(인페르노)부터 혜성 꼬리 · 고리 테두리에 타는 불꽃 · 맞은 자리에 남는 불길, 유니크(갤럭시)는 공 둘레를 도는 별 · 별빛 폭발',
     '블록슛 손 · 스틸 손 · 프레스 바닥 · 스크린 구역 · 덩크 고리 · 유로스텝 잔상 · 앨리웁 표시 · 버저비터 번개 · 아웃렛 빛줄기 · 샷 클락 원도 스킨 색으로 — 어느 스킬이든 바뀐 게 눈에 보여요',

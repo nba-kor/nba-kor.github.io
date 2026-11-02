@@ -1647,6 +1647,19 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-bottom: 8px; }
 .sv-tabs button { padding: .4em .95em; border-radius: 999px; border: 1px solid #ffffff33; background: transparent; color: inherit; font-weight: 700; }
 .sv-tabs button[aria-selected="true"] { border-color: transparent; background: #ffd23f; color: #1a1200; }
+.sv-views { margin-bottom: 8px; }
+.sv-sub2 { margin: 10px 0 5px; color: #ffd23f; font-weight: 800; text-align: left; }
+/* 리더보드 — 최근 기록 · 구매 내역 한 줄: 얼굴(또는 등급) · 이름 · 포인트 · 언제 */
+.sv-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; text-align: left; }
+.sv-log li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 9px; align-items: center; padding: 6px 10px; border-radius: 10px; background: #ffffff0d; }
+.sv-log li > img { grid-row: span 2; width: 32px; height: 32px; border-radius: 50%; background: #ffffff18; }
+.sv-log li > .sv-tier { grid-row: span 2; }
+.sv-log li > div { grid-row: span 2; display: grid; min-width: 0; }
+.sv-log b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-log small { color: #c9d1e0; font-size: .8em; }
+.sv-log-pts { font: 900 1.05em/1 system-ui, sans-serif; color: #ffd23f; text-align: right; }
+.sv-log-pts.is-spent { color: #ff9b9b; }
+.sv-log .sv-ago { text-align: right; font-size: .72em; }
 .sv-ranks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; text-align: left; }
 .sv-ranks li { display: grid; grid-template-columns: 2em 32px minmax(0, 1fr) auto; column-gap: 8px; align-items: center; padding: 5px 10px; border-radius: 10px; background: #ffffff0d; }
 .sv-ranks .sv-rk, .sv-ranks img { grid-row: span 2; }
