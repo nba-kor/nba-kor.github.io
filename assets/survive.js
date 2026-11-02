@@ -1202,9 +1202,9 @@ function kill(e) {
   const col = SPR[e.type][e.v].col
   if (G.fx.length < 180) fx({ k: 'puff', x: e.x, y: e.y, r: e.r * 1.5, a: rnd() * TAU, T: 0.45 })
   for (let i = 0; i < (e.boss ? 40 : e.elite ? 16 : 4); i++) { const a = rnd() * TAU, s = 40 + rnd() * (e.boss ? 260 : 120); part(e.x, e.y - e.r * 1.5, Math.cos(a) * s, Math.sin(a) * s - 60, i % 3 ? col : '#fff', 0.35 + rnd() * 0.35, 2 + rnd() * (e.boss ? 4 : 2.5)) }
-  if (e.elite || e.mid) { item(e.x, e.y); for (let i = 0; i < 3; i++) gem(e.x + (rnd() - 0.5) * 40, e.y + (rnd() - 0.5) * 40, e.mid ? 10 : 5) }
-  else if (!e.boss && rnd() < 0.004 * S.luck) item(e.x, e.y, rnd() < 0.6 ? 'drink' : 'whistle')
-  else if (!e.boss && G.t >= 1200 && rnd() < 0.0015 * S.luck) item(e.x, e.y, 'spray')
+  if (e.elite || e.mid) { if (rnd() < 0.33 * S.luck) item(e.x, e.y); for (let i = 0; i < 3; i++) gem(e.x + (rnd() - 0.5) * 40, e.y + (rnd() - 0.5) * 40, e.mid ? 10 : 5) }
+  else if (!e.boss && rnd() < 0.0013 * S.luck) item(e.x, e.y, rnd() < 0.6 ? 'drink' : 'whistle')   // 아이템은 예전의 1/3 — 마스코트 · 중간보스 33%, 보통 수비 0.13%
+  else if (!e.boss && G.t >= 1200 && rnd() < 0.0005 * S.luck) item(e.x, e.y, 'spray')
   if (rnd() < (e.boss ? (e.mid ? 0.1 : 0.2) : e.elite ? 0.055 : 0.00011) * S.luck && ringable()) item(e.x, e.y + 14, 'ring')
   if (e.boss) {
     const B = BOSS[e.kind]
@@ -2167,6 +2167,9 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '아이템이 덜 떨어져요', items: [
+    '수비가 떨어뜨리는 아이템(생수 · 호루라기 · 타임아웃 · 버저 · 쿨링 스프레이)이 예전의 1/3 — 마스코트 · 중간보스는 늘 → 3번에 1번, 보통 수비는 0.4% → 0.13%(20분부터 스프레이 0.15% → 0.05%). 행운은 그대로 곱해져요',
+    '챔피언 반지 · 보스 트로피 상자 · 상태이상에 걸렸을 때 근처에 생기는 쿨링 스프레이는 그대로'] },
   { date: '2026-11-02', title: '새 스킬 — 샷 클락', items: [
     '새 스킬 「샷 클락」 — 수비가 가장 많이 몰린 곳에 24초 시계를 띄우고, 1초 뒤 0이 되면 버저와 함께 크게 터져요',
     '돌파는 「샷 클락 리셋」 — 터진 자리 둘레에 작은 시계 셋이 흩어져 한 번 더 터져요',
