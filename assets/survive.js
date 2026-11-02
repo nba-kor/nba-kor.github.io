@@ -82,6 +82,20 @@ const BREAK = {
   steal: { name: '락다운', note: '낚아챈 수비는 5초 동안 받는 피해 +30%' },
   outlet: { name: '터치다운 패스', note: '빛줄기가 세 갈래로 퍼진다' },
 }
+// 시너지 — 짝인 두 스킬을 다 가지면 둘 다 세진다(wstat). 스킬마다 짝은 하나, 버저비터는 짝이 없다
+const SYN = [
+  ['킥아웃', { pass: { pierce: 1, dmg: 5 }, three: { n: 1 } }],
+  ['앨리웁 덩크', { alley: { n: 1 }, dunk: { area: 0.2, dmg: 10 } }],
+  ['속공', { rebound: { n: 1 }, outlet: { n: 1 } }],
+  ['트랩 수비', { press: { area: 0.2 }, steal: { n: 1 } }],
+  ['크로스오버 스텝백', { cross: { area: 0.2, dmg: 5 }, fade: { n: 1 } }],
+  ['쇼타임', { bounce: { bounce: 2, dmg: 3 }, nolook: { n: 1 } }],
+  ['트윈 타워', { block: { n: 1 }, hook: { n: 1 } }],
+  ['픽 앤 롤', { screen: { n: 1, dur: 1 }, euro: { area: 0.25 } }],
+]
+const synOf = id => SYN.find(s => id in s[1])
+const mateOf = id => Object.keys(synOf(id)?.[1] || {}).find(k => k !== id)
+const synText = ([, u]) => Object.entries(u).map(([id, up]) => `${WEAP[id].name} ${Object.entries(up).map(([k, v]) => UP[k](v)).join(' · ')}`).join(' / ')
 
 // 아이템(지니면 계속 듣는 것) — 레벨마다 note 만큼
 const PASS = {
@@ -802,9 +816,15 @@ function stats() {
 function wstat(w) {
   const d = WEAP[w.id], st = { cd: d.cd, dmg: d.dmg, n: d.n || 1, area: 1, spd: 1, dur: d.dur || 0, pierce: d.pierce || 0, bounce: d.bounce || 0 }
   for (const up of d.ups.slice(0, w.lv - 1)) for (const k in up) st[k] += up[k]
+  const s = synOf(w.id)
+  if (s && G.weapons.some(x => x.id === mateOf(w.id))) for (const k in s[1][w.id]) st[k] += s[1][w.id][k]
   return st
 }
-function addWeapon(id) { const w = { id, lv: 1, t: 0.3, q: 0, qt: 0, n: 0, ang: 0, on: 0, list: [] }; w.st = wstat(w); G.weapons.push(w) }
+function addWeapon(id) {
+  const w = { id, lv: 1, t: 0.3, q: 0, qt: 0, n: 0, ang: 0, on: 0, list: [] }; w.st = wstat(w); G.weapons.push(w)
+  const m = G.weapons.find(x => x.id === mateOf(id))
+  if (m) { m.st = wstat(m); say(`시너지 — ${synOf(id)[0]}`, 2.4, '#ffb366') }   // 짝이 이미 있으면 둘 다 세진다
+}
 
 // 수비 찾기 — 72 칸 격자(매 프레임 다시). near = 몸이 원에 닿는 수비마다(fn 이 true 면 그만)
 const CELL = 72, grid = new Map(), gk = (gx, gy) => (gx + 32768) * 65536 + gy + 32768
@@ -957,7 +977,7 @@ function weapons(dt) {
 }
 
 // ---- 수비
-const HPK = [1, 1.25, 1.5, 2.1, 4, 13, 26]   // 보통 수비 피 배수 — 0 · 5 · 10 … 30분, 사이는 잇는다
+const HPK = [1, 1.4, 1.8, 2.3, 4.3, 13, 26]   // 보통 수비 피 배수(시너지만큼 5 ~ 20분을 단단하게) — 0 · 5 · 10 … 30분, 사이는 잇는다
 const hpK = m => { const i = Math.min(5, m / 5 | 0); return HPK[i] + (HPK[i + 1] - HPK[i]) * Math.min(1, m / 5 - i) }
 function spawn(type, x, y) {
   const F = FOES[type], m = G.t / 60, mm = Math.min(m, 30), big = type in BOSS
@@ -1485,6 +1505,13 @@ function take(o) {
   else if (o.id === 'drink') pl.hp = Math.min(S.maxHp, pl.hp + S.maxHp * 0.4)
   else { G.cheer++; stats() }
 }
+/** 새 스킬 카드 아래 — 시너지 이름 · 짝 스킬(가지고 있으면 「보유중」) · 효과 */
+function synCard(o) {
+  const s = o.t === 'w' && !G.weapons.some(w => w.id === o.id) && synOf(o.id)
+  if (!s) return null
+  const m = mateOf(o.id), own = G.weapons.some(w => w.id === m)
+  return h('div', { className: `sv-syn${own ? ' is-own' : ''}` }, h('strong', {}, `시너지 · ${s[0]}`), h('p', {}, `짝: ${WEAP[m].name}`, own && h('mark', {}, '보유중')), h('p', {}, synText(s)))
+}
 let BOX = null
 const ACTS = [['rr', '리롤'], ['skips', '스킵'], ['bans', '제외']]
 function openBox() {
@@ -1496,7 +1523,7 @@ function openBox() {
   const card = (o, i) => {
     const L = label(o)
     return h('button', { type: 'button', className: `sv-card sv-card-${o.t}`, style: `--i:${i}`, onclick: () => pick(i) },
-      h('img', { src: ICON_URL[o.t === 'b' ? `${o.id}+` : o.id], alt: '' }), h('small', {}, L.lv), h('b', {}, L.name), h('span', {}, L.note), h('kbd', {}, String(i + 1)))
+      h('img', { src: ICON_URL[o.t === 'b' ? `${o.id}+` : o.id], alt: '' }), h('small', {}, L.lv), h('b', {}, L.name), h('span', {}, L.note), synCard(o), h('kbd', {}, String(i + 1)))
   }
   const cards = h('div', { className: 'sv-cards' }, opts.map(card)), hint = h('p', { className: 'sv-hint' })
   // 리롤 · 스킵 · 제외 — 반지(돌파) 상자에는 없다. 잭팟이면 「셋 다 받기」를 눌러야 받는다
@@ -2111,6 +2138,11 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '스킬 시너지', items: [
+    '스킬(주황색)마다 짝이 하나씩 생겼어요 — 짝인 두 스킬을 다 가지면 둘 다 세져요(8쌍, 버저비터만 짝이 없어요)',
+    '킥아웃(체스트 패스 + 3점슛) · 앨리웁 덩크(앨리웁 + 덩크) · 속공(리바운드 + 아웃렛 패스) · 트랩 수비(풀코트 프레스 + 스틸) · 크로스오버 스텝백(크로스오버 + 스텝백 슛) · 쇼타임(바운스 패스 + 노룩 패스) · 트윈 타워(블록슛 + 스카이훅) · 픽 앤 롤(스크린 + 유로스텝)',
+    '레벨 업 상자의 새 스킬 카드에 짝 · 효과가 나오고, 짝을 이미 가지고 있으면 「보유중」. 효과는 아래 「스킬 · 돌파」 탭에 전부',
+    '시너지로 쉬워지는 만큼 5 ~ 20분 수비를 더 단단하게 — 피가 5분 1.25 → 1.4배 · 10분 1.5 → 1.8배 · 15분 2.1 → 2.3배 · 20분 4 → 4.3배'] },
   { date: '2026-11-02', title: '리롤 · 스킵 · 제외', items: [
     '레벨 업 상자에서 한 게임에 두 번씩 쓸 수 있어요 — 리롤(카드 셋을 새로) · 스킵(이번엔 안 고르기) · 제외(카드 하나를 골라 이번 게임에서 다시 안 나오게, 그 자리엔 새 카드)',
     '잭팟 · 트로피 상자에서도 써요. 잭팟은 이제 「셋 다 받기」를 눌러야 받아요(리롤 · 제외로 바꾼 뒤 받거나, 스킵으로 안 받을 수도). 챔피언 반지(돌파) 상자에는 없어요',
@@ -2165,6 +2197,7 @@ function guide() {
     return tr(named(faceOf(P(c.id)), nameOf(c)), h('td', {}, WEAP[c.w].name), h('td', {}, h('b', {}, c.trait), ` — ${c.note}`), h('td', {}, a ? `업적 「${a.name}」 — ${a.note}` : '처음부터'))
   }))
   document.getElementById('sv-guide-skills').replaceChildren(...Object.entries(WEAP).map(([id, d]) => tr(named(ICON_URL[id], d.name, 'sv-ico'), h('td', {}, d.note))))
+  document.getElementById('sv-guide-syn').replaceChildren(...SYN.map(s => tr(h('th', {}, h('b', {}, s[0])), h('td', {}, Object.keys(s[1]).map(id => WEAP[id].name).join(' + ')), h('td', {}, synText(s)))))
   document.getElementById('sv-guide-breaks').replaceChildren(...Object.entries(BREAK).map(([id, d], i) => h('li', { style: `--i:${i}` },
     h('img', { src: ICON_URL[`${id}+`], alt: '' }), h('div', {}, h('small', {}, `${WEAP[id].name} 돌파`), h('b', {}, d.name), h('span', {}, d.note)))))
   document.getElementById('sv-ring').src = ITEMS.ring.c.toDataURL()

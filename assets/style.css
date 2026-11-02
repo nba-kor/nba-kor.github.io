@@ -1706,6 +1706,17 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-card-p small { color: #8fc8ff; }
 .sv-card b { font-size: 1.12em; }
 .sv-card span { color: #c9d1e0; font-size: .86em; line-height: 1.35; }
+.sv-syn { display: grid; gap: .15em; width: 100%; margin-top: .35em; padding: .45em .5em; border-radius: 8px; border: 1px dashed #ff9f4366; background: #ff9f4314; font-size: .8em; line-height: 1.35; }
+.sv-syn strong { color: #ffb366; }
+.sv-syn p { margin: 0; color: #c9d1e0; }
+.sv-syn mark { margin-left: .4em; padding: 0 .45em; border-radius: 999px; background: #ffd23f; color: #2a1200; font-weight: 900; }
+.sv-syn.is-own { border-style: solid; border-color: #ffd23f; background: #ffd23f1f; box-shadow: 0 0 12px #ffb40055; }
+/* 낮은 화면(가로 휴대폰) — 상자 그림이 자리를 차지하지 않게 카드 위에 겹치고, 카드 · 시너지 글씨를 줄인다 */
+@container (max-height: 520px) {
+  .sv-box .sv-chest { position: absolute; top: 22%; left: calc(50% - 11cqmin); }
+  .sv-card { gap: .2em; padding: .9em .6em .7em; }
+  .sv-syn { margin-top: .15em; padding: .3em .4em; font-size: .74em; }
+}
 .sv-card kbd { position: absolute; top: 6px; left: 6px; min-width: 18px; padding: 0 4px; border: 1px solid #ffffff55; border-radius: 4px; font: 700 11px/16px ui-monospace, monospace; color: #c9d1e0; }
 @media (pointer: coarse) { .sv-card kbd, .sv-act kbd { display: none; } }
 .sv-box.is-open .sv-card { animation: sv-card .5s calc(.12s + var(--i) * .09s) cubic-bezier(.2, 1.4, .4, 1) forwards; }
