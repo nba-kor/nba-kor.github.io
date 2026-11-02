@@ -59,8 +59,9 @@ const WEAP = {
   euro: { name: '유로스텝', note: '움직이면 지나간 자리에 잔상이 남아 밟은 수비를 때린다 — 서 있으면 안 나간다', cd: 0.2, dmg: 6, dur: 1.4, ups: [{ dmg: 2 }, { area: 0.2 }, { dur: 0.5 }, { dmg: 3 }, { area: 0.2 }, { dur: 0.6 }, { dmg: 5 }] },
   steal: { name: '스틸', note: '가장 강한 수비(보스 · 정예 먼저)의 공을 낚아채는 큰 한 방', cd: 1.9, dmg: 38, ups: [{ dmg: 14 }, { n: 1 }, { cd: -0.3 }, { dmg: 18 }, { n: 1 }, { cd: -0.3 }, { dmg: 30 }] },
   outlet: { name: '아웃렛 패스', note: '화면을 가로지르는 빛줄기 — 줄 위의 수비를 모두 꿰뚫는다', cd: 2.4, dmg: 20, ups: [{ dmg: 7 }, { area: 0.25 }, { n: 1 }, { cd: -0.4 }, { dmg: 9 }, { area: 0.25 }, { n: 1, dmg: 10 }] },
+  shotclock: { name: '샷 클락', note: '수비가 가장 많이 몰린 곳에 24초 시계를 띄운다 — 0이 되면 버저와 함께 크게 터진다', cd: 3.2, dmg: 22, ups: [{ dmg: 7 }, { area: 0.15 }, { n: 1 }, { cd: -0.4 }, { dmg: 9 }, { area: 0.15 }, { n: 1, dmg: 10 }] },
 }
-const GAP = { pass: 0.09, three: 0.18, dunk: 0.36, bounce: 0.12, alley: 0.14, fade: 0.07, cross: 0.14, nolook: 0.16, hook: 0.12, buzzer: 0.1, screen: 0.1, rebound: 0.2, steal: 0.12, outlet: 0.15 }   // 한 번에 여러 개면 사이 간격
+const GAP = { pass: 0.09, three: 0.18, dunk: 0.36, bounce: 0.12, alley: 0.14, fade: 0.07, cross: 0.14, nolook: 0.16, hook: 0.12, buzzer: 0.1, screen: 0.1, rebound: 0.2, steal: 0.12, outlet: 0.15, shotclock: 0.2 }   // 한 번에 여러 개면 사이 간격
 const UP = { n: v => `개수 +${v}`, dmg: v => `피해 +${v}`, cd: v => `쿨타임 ${v}초`, area: v => `범위 +${Math.round(v * 100)}%`, spd: v => `속도 +${Math.round(v * 100)}%`, dur: v => `지속 +${v}초`, pierce: v => `관통 +${v}`, bounce: v => `튕김 +${v}` }
 // 돌파 — 최고 레벨(8) 스킬에 한 번씩. 피해는 그대로 두고 쓰는 법이 바뀐다(w.br). 수비가 아주 가끔 떨어뜨리는 챔피언 반지를 주우면 고른다(ringable)
 const BREAK = {
@@ -81,8 +82,9 @@ const BREAK = {
   euro: { name: '유로 갤럽', note: '잔상이 두 배 오래 남고, 밟은 수비를 느리게 한다' },
   steal: { name: '락다운', note: '낚아챈 수비는 5초 동안 받는 피해 +30%' },
   outlet: { name: '터치다운 패스', note: '빛줄기가 세 갈래로 퍼진다' },
+  shotclock: { name: '샷 클락 리셋', note: '터진 자리 둘레에 작은 시계 셋이 흩어져 한 번 더 터진다' },
 }
-// 시너지 — 짝인 두 스킬을 다 가지면 둘 다 세진다(wstat). 스킬마다 짝은 하나, 버저비터는 짝이 없다
+// 시너지 — 짝인 두 스킬을 다 가지면 둘 다 세진다(wstat). 스킬마다 짝은 하나
 const SYN = [
   ['킥아웃', { pass: { pierce: 1, dmg: 5 }, three: { n: 1 } }],
   ['앨리웁 덩크', { alley: { n: 1 }, dunk: { area: 0.2, dmg: 10 } }],
@@ -92,6 +94,7 @@ const SYN = [
   ['쇼타임', { bounce: { bounce: 2, dmg: 3 }, nolook: { n: 1 } }],
   ['트윈 타워', { block: { n: 1 }, hook: { n: 1 } }],
   ['픽 앤 롤', { screen: { n: 1, dur: 1 }, euro: { area: 0.25 } }],
+  ['클러치 타임', { buzzer: { n: 1 }, shotclock: { area: 0.2 } }],
 ]
 const synOf = id => SYN.find(s => id in s[1])
 const mateOf = id => Object.keys(synOf(id)?.[1] || {}).find(k => k !== id)
@@ -498,6 +501,7 @@ const GLYPH = {
   rebound: c => { rr(c, 18, -26, 6, 52, 2, '#cfd5de'); c.strokeStyle = '#7ff3ff'; c.lineWidth = 3; c.setLineDash([5, 4]); c.beginPath(); c.moveTo(-24, -20); c.lineTo(16, 0); c.lineTo(-20, 22); c.stroke(); c.setLineDash([]); ballAt(c, -16, 16, 10) },
   euro: c => { for (const [x, a] of [[-18, 0.3], [-6, 0.55]]) { c.globalAlpha = a; ell(c, x, -2, 9, 15, '#7ff3ff') } c.globalAlpha = 1; ell(c, 8, -2, 9, 15, '#fff'); ballAt(c, 16, 14, 7) },
   steal: c => { c.save(); c.rotate(-0.5); blit(c, HAND, -6, 4, 1.25); c.restore(); ballAt(c, 14, -12, 10); lines(c, [[-26, 18, -16, 10], [-28, 6, -18, 2]], '#ffd23f', 3) },
+  shotclock: c => { rr(c, -25, -19, 50, 34, 7, '#14171d'); rr(c, -21, -15, 42, 26, 4, '#2a0d10'); txt(c, '24', 0, 7, 22, '#ff3b3b'); rr(c, -4, 15, 8, 9, 2, '#5a6270') },
   outlet: c => { const g = c.createLinearGradient(-30, 0, 30, 0); g.addColorStop(0, '#7ff3ff00'); g.addColorStop(1, '#ffffff'); c.fillStyle = g; c.beginPath(); c.moveTo(-30, -4); c.lineTo(22, -9); c.lineTo(22, 9); c.lineTo(-30, 4); c.closePath(); c.fill(); ballAt(c, 18, 0, 11) },
   drink: c => { c.scale(2, 2); ITEM_ART.drink(c) },
   cheer: c => { c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(-20, -8); c.lineTo(8, -20); c.lineTo(8, 20); c.lineTo(-20, 8); c.closePath(); c.fill(); rr(c, -24, -8, 6, 16, 2, '#e4572e'); lines(c, [[14, -12, 22, -18], [16, 0, 26, 0], [14, 12, 22, 18]], '#fff', 3) },
@@ -898,6 +902,17 @@ const SHOT = {
       done.add(e); px = x; py = y - 6; e = closest(1, x, y, done, 240)[0]
     }
     shake = Math.max(shake, 2)
+  },
+  shotclock(w, st, i, A, D) {   // 가까운 수비 12명 중 둘레에 수비가 가장 많은 자리(이미 시계가 떠 있는 자리는 빼고). 1초 뒤 터진다
+    const R = 62 * A
+    let best = null, bn = 0
+    for (const e of closest(12, pl.x, pl.y, null, 420)) {
+      if (G.shots.some(b => b.k === 'shotclock' && (b.x - e.x) ** 2 + (b.y - e.y) ** 2 < R * R)) continue
+      let n = 0; near(e.x, e.y, R, () => { n++ })
+      if (n > bn) { bn = n; best = e }
+    }
+    const x = best ? best.x : pl.x + pl.face[0] * 140, y = best ? best.y : pl.y + pl.face[1] * 140
+    G.shots.push({ k: 'shotclock', x, y: wallY(y), t: 0, T: 1, R, dmg: D, br: w.br })
   },
   screen(w, st, i, A, D) { const a = rnd() * TAU, d = 50 + rnd() * 90, ox = Math.cos(a) * d, oy = Math.sin(a) * d; G.shots.push({ k: 'zone', x: pl.x + ox, y: wallY(pl.y + oy), ox, oy, R: 45 * A, dmg: D, tick: 0, t: 0, life: st.dur * S.dur, br: w.br }) },
   rebound(w, st, i, A, D) { const a = rnd() * TAU, v = 380 * st.spd * S.speed; G.shots.push({ k: 'rebound', x: pl.x, y: pl.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 9 * A, dmg: D, hit: new Map(), t: 0, life: st.dur * S.dur, a: 0, br: w.br }) },
@@ -1374,6 +1389,12 @@ function shots(dt) {
       case 'echo':
         if (b.t >= b.T) { splash(b.x, b.y, b.R, b.dmg, '#ffd23f', true, true); shake = Math.max(shake, 3); b.dead = true }
         break
+      case 'shotclock':   // 샷 클락 — 0이 되면 터진다. 돌파면 둘레에 작은 시계 셋이 흩어져 한 번 더
+        if (b.t >= b.T) {
+          splash(b.x, b.y, b.R, b.dmg, b.br ? '#ffd23f' : '#ff4d4d', !b.mini, b.br); shake = Math.max(shake, b.mini ? 1 : 3); b.dead = true
+          if (b.br && !b.mini) for (let k = 0; k < 3; k++) { const a = k / 3 * TAU + rnd(), d = b.R * 0.9; G.shots.push({ k: 'shotclock', x: b.x + Math.cos(a) * d, y: wallY(b.y + Math.sin(a) * d * 0.8), t: 0, T: 0.45, R: b.R * 0.55, dmg: b.dmg * 0.6, br: true, mini: true }) }
+        }
+        break
       case 'drop':   // 앨리웁 — 하늘에서
         if (b.t >= b.T) { splash(b.x, b.y, b.R, b.dmg, '#ffd23f', true, b.br); shake = Math.max(shake, 3); b.dead = true }
         break
@@ -1669,6 +1690,11 @@ function world(c) {
     c.strokeStyle = b.br ? '#ffd23f' : '#7fc8ff'; c.lineWidth = 2; c.setLineDash([8, 6]); c.lineDashOffset = t * 30; c.stroke(); c.setLineDash([])
     c.globalAlpha = a * (1 - u); c.beginPath(); c.ellipse(b.x, b.y, b.R * u, b.R * u * 0.8, 0, 0, TAU); c.stroke(); c.globalAlpha = 1
   }
+  for (const b of G.shots) if (b.k === 'shotclock') {   // 샷 클락 — 바닥 원, 테두리가 시계 방향으로 줄어든다
+    const u = Math.min(1, b.t / b.T), rgb = b.br ? '255,210,63' : '255,77,77'
+    c.fillStyle = `rgba(${rgb},${0.1 + u * 0.16})`; c.beginPath(); c.ellipse(b.x, b.y, b.R, b.R * 0.8, 0, 0, TAU); c.fill()
+    c.strokeStyle = `rgba(${rgb},.9)`; c.lineWidth = 3; c.beginPath(); c.ellipse(b.x, b.y, b.R, b.R * 0.8, 0, -Math.PI / 2 + TAU * u, Math.PI * 1.5); c.stroke()
+  }
   for (const b of G.shots) if (b.k === 'ring' && b.t >= 0) {   // 덩크 충격파 — 두 겹 고리
     const u = Math.min(1, b.t / b.T), R = b.R * (0.15 + u * 0.85)
     c.globalAlpha = 1 - u * 0.8; c.strokeStyle = b.br ? '#fff3b0' : '#fff'; c.lineWidth = 9 * (1 - u) + 2; c.beginPath(); c.ellipse(b.x, b.y, R, R * 0.78, 0, 0, TAU); c.stroke()
@@ -1784,6 +1810,9 @@ function world(c) {
       c.beginPath(); c.moveTo(x0, y + 2); c.quadraticCurveTo(mx, y + b.H * 0.75, x1, y + 4); c.quadraticCurveTo(mx, y + b.H * 0.25, x0, y + 2); c.fill()
       c.globalAlpha = 1
       blit(c, b.br ? BALLG : BALL, x0 + (x1 - x0) * Math.min(1, u * 1.6), y + 4, 0.8)
+    } else if (b.k === 'shotclock') {   // 전광판 — 24 에서 0 까지 빠르게
+      const y = b.y - (b.mini ? 30 : 46), s = b.mini ? 0.7 : 1
+      rr(c, b.x - 17 * s, y - 15 * s, 34 * s, 22 * s, 4, '#14171dee'); label2(c, String(Math.ceil(24 * Math.max(0, 1 - b.t / b.T))), b.x, y + 3 * s, 17 * s, b.br ? '#ffd23f' : '#ff3b3b')
     } else if (b.k === 'zone') blit(c, pl.spr.mate, b.x, b.y)
     else if (b.k === 'rebound') { c.save(); c.translate(b.x, b.y - 16); c.rotate(b.a); blit(c, b.br ? BALLG : BALL, 0, 0, b.r / 7.5); c.restore() }
   }
@@ -2138,6 +2167,10 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '새 스킬 — 샷 클락', items: [
+    '새 스킬 「샷 클락」 — 수비가 가장 많이 몰린 곳에 24초 시계를 띄우고, 1초 뒤 0이 되면 버저와 함께 크게 터져요',
+    '돌파는 「샷 클락 리셋」 — 터진 자리 둘레에 작은 시계 셋이 흩어져 한 번 더 터져요',
+    '버저비터의 짝이 생겼어요 — 시너지 「클러치 타임」(버저비터 + 샷 클락): 버저비터 개수 +1 / 샷 클락 범위 +20%. 이제 모든 스킬에 짝이 있어요'] },
   { date: '2026-11-02', title: '스킬 시너지', items: [
     '스킬(주황색)마다 짝이 하나씩 생겼어요 — 짝인 두 스킬을 다 가지면 둘 다 세져요(8쌍, 버저비터만 짝이 없어요)',
     '킥아웃(체스트 패스 + 3점슛) · 앨리웁 덩크(앨리웁 + 덩크) · 속공(리바운드 + 아웃렛 패스) · 트랩 수비(풀코트 프레스 + 스틸) · 크로스오버 스텝백(크로스오버 + 스텝백 슛) · 쇼타임(바운스 패스 + 노룩 패스) · 트윈 타워(블록슛 + 스카이훅) · 픽 앤 롤(스크린 + 유로스텝)',
