@@ -49,7 +49,7 @@ const WEAP = {
   block: { name: '블록슛', note: '두 손이 몸 둘레를 돌며 쳐 낸다 — 날아오는 호루라기를 가끔(10%) 막는다', cd: 2.2, dmg: 9, n: 2, dur: 3.2, ups: [{ n: 1 }, { area: 0.15, spd: 0.25 }, { dmg: 3 }, { n: 1 }, { dur: 1 }, { n: 1 }, { dmg: 4, dur: 1 }] },
   press: { name: '풀코트 프레스', note: '둘레의 수비를 계속 압박해 피해를 준다', cd: 0.45, dmg: 4, ups: [{ area: 0.1 }, { dmg: 1 }, { area: 0.1 }, { cd: -0.08 }, { dmg: 2 }, { area: 0.1 }, { dmg: 2 }] },
   alley: { name: '앨리웁', note: '하늘에서 공이 떨어져 그 자리를 내리찍는다', cd: 2.6, dmg: 18, n: 2, ups: [{ n: 1 }, { dmg: 6 }, { area: 0.2 }, { n: 1 }, { cd: -0.5 }, { n: 1 }, { dmg: 12 }] },
-  fade: { name: '스텝백 슛', note: '보는 쪽으로 꿰뚫는 슛', cd: 0.95, dmg: 8, pierce: 2, ups: [{ n: 1 }, { dmg: 4 }, { n: 1 }, { pierce: 2 }, { n: 1 }, { dmg: 5 }, { cd: -0.3 }] },
+  fade: { name: '스텝백 슛', note: '물러서며 꿰뚫는 슛 — 보스 · 정예를 먼저 겨누고 1.4배로 맞힌다(없으면 보는 쪽)', cd: 0.95, dmg: 11, pierce: 2, ups: [{ n: 1 }, { dmg: 6 }, { n: 1 }, { pierce: 2 }, { n: 1 }, { dmg: 8 }, { cd: -0.3 }] },
   cross: { name: '크로스오버', note: '옆으로 길게 휘둘러 베는 드리블', cd: 1.4, dmg: 13, ups: [{ n: 1 }, { dmg: 5 }, { area: 0.15 }, { dmg: 5 }, { cd: -0.3 }, { area: 0.2 }, { dmg: 9 }] },
   nolook: { name: '노룩 패스', note: '던지면 되돌아오는 패스 — 오가며 계속 맞힌다', cd: 1.8, dmg: 10, ups: [{ dmg: 4 }, { n: 1 }, { area: 0.25 }, { dmg: 5 }, { n: 1 }, { spd: 0.3 }, { n: 1 }] },
   hook: { name: '스카이훅', note: '높이 떴다 떨어지는 큰 공 — 여럿을 꿰뚫는다', cd: 1.7, dmg: 18, pierce: 3, ups: [{ n: 1 }, { dmg: 6 }, { area: 0.2 }, { pierce: 2 }, { n: 1 }, { dmg: 8 }, { n: 1 }] },
@@ -865,12 +865,13 @@ const SHOT = {
     for (const s of [-8, 8]) ball(dx, dy, { ...o, x: pl.x - dy * s, y: pl.y + dx * s })   // 돌파 — 나란히 두 공
   },
   bounce(w, st, i, A, D) { const e = alive(w.list[i % (w.list.length || 1)]) || closest(1)[0]; ball(...(e ? toward(e) : pl.face), { v: 500 * st.spd * S.speed, r: 7, dmg: D, pierce: 1, bounce: st.bounce, kb: 40, col: '#7ff3ff', br: w.br }) },
-  fade(w, st, i, A, D) {   // 보는 쪽으로 — 앞 60° 안에 수비가 있으면 그쪽을 겨눈다. 돌파면 등 뒤로도
-    let [fx, fy] = pl.face
-    const e = closest(6, pl.x, pl.y, null, 420).find(e => { const [dx, dy] = toward(e); return dx * fx + dy * fy > 0.5 })
+  fade(w, st, i, A, D) {   // 화면 안 · 520 안의 보스 · 정예가 먼저(등지고 물러서도 돌아 쏜다), 없으면 보는 쪽 — 앞 60° 안 수비를 겨눈다. 돌파면 등 뒤로도
+    let [fx, fy] = pl.face, e = null, bd = 520 * 520
+    for (const f of G.foes) if (!f.dead && (f.boss || f.elite) && onScreen(f, 30)) { const d = (f.x - pl.x) ** 2 + (f.y - pl.y) ** 2; if (d < bd) { bd = d; e = f } }
+    e ||= closest(6, pl.x, pl.y, null, 420).find(e => { const [dx, dy] = toward(e); return dx * fx + dy * fy > 0.5 })
     if (e) [fx, fy] = toward(e)
     const o = (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 8
-    for (const s of w.br ? [1, -1] : [1]) ball(fx * s, fy * s, { v: 740 * st.spd * S.speed, r: 6, dmg: D, pierce: st.pierce, kb: 30, x: pl.x - fy * o, y: pl.y + fx * o, life: 1, col: '#ffd23f', br: w.br })
+    for (const s of w.br ? [1, -1] : [1]) ball(fx * s, fy * s, { v: 740 * st.spd * S.speed, r: 6, dmg: D, pierce: st.pierce, kb: 30, x: pl.x - fy * o, y: pl.y + fx * o, life: 1, col: '#ffd23f', br: w.br, bx: 1.4 })
   },
   three(w, st, i, A, D) {
     const far = G.foes.filter(e => !e.dead && onScreen(e) && (e.x - pl.x) ** 2 + (e.y - pl.y) ** 2 > 150 * 150), e = far.length ? pickOf(far) : closest(1)[0], T0 = 0.6 / Math.sqrt(st.spd * S.speed)
@@ -944,7 +945,7 @@ function beam(x, y, a, L, W, D, br) {
 const alive = e => e && !e.dead ? e : null
 /** T 초 동안 속도 k 배 — 더 느린 게 걸려 있으면 그게 끝날 때까지 약한 건 무시(앵클 브레이커 0 · 스크린 · 유로 갤럽 0.7). 보스 · 중간보스 · 흥분한 수비는 안 걸린다 */
 const slow = (e, T, k) => { if (e.boss || e.rage > G.t) return; if (e.slow <= 0 || k <= e.sk) { e.sk = k; e.slow = Math.max(e.slow, T) } }
-function ball(dx, dy, o) { G.shots.push({ k: 'ball', x: o.x ?? pl.x, y: o.y ?? pl.y, vx: dx * o.v, vy: dy * o.v, r: o.r, dmg: o.dmg, pierce: o.pierce, bounce: o.bounce || 0, life: o.life || 1.3, t: 0, a: 0, hit: new Set(), kb: o.kb, col: o.col, br: o.br }) }
+function ball(dx, dy, o) { G.shots.push({ k: 'ball', x: o.x ?? pl.x, y: o.y ?? pl.y, vx: dx * o.v, vy: dy * o.v, r: o.r, dmg: o.dmg, pierce: o.pierce, bounce: o.bounce || 0, life: o.life || 1.3, t: 0, a: 0, hit: new Set(), kb: o.kb, col: o.col, br: o.br, bx: o.bx || 1 }) }   // bx — 보스 · 정예에게 배수(스텝백)
 /** 번개 — (x0, y0) 에서 (x1, y1) 까지 지그재그 아홉 점. 끝으로 갈수록 덜 흔들린다 */
 function zig(x0, y0, x1, y1) {
   const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1, pts = [[x0, y0]]
@@ -1364,7 +1365,7 @@ function shots(dt) {
         if (b.t > b.life) { b.dead = true; break }
         near(b.x, b.y, b.r, e => {
           if (b.hit.has(e)) return
-          b.hit.add(e); hurt(e, b.dmg, b.x - b.vx * 0.05, b.y - b.vy * 0.05, b.kb)
+          b.hit.add(e); hurt(e, b.dmg * (e.boss || e.elite ? b.bx : 1), b.x - b.vx * 0.05, b.y - b.vy * 0.05, b.kb)
           if (b.bounce > 0) {   // 옆 수비에게 튕겨 간다 — 돌파면 처음 한 번은 둘로 갈라져 두 수비에게
             const ns = closest(b.br && !b.split ? 2 : 1, e.x, e.y, b.hit, 230), v = Math.hypot(b.vx, b.vy)
             if (ns.length) {
@@ -2167,6 +2168,10 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '스텝백 슛 강화', items: [
+    '스텝백 슛이 화면 안의 보스 · 정예(마스코트)를 먼저 겨눠요 — 등지고 물러서면서도 돌아서 쏴요(없으면 예전처럼 보는 쪽)',
+    '보스 · 정예에게는 1.4배로 맞혀요. 피해도 8 → 11, 레벨 업 +4 → +6 · +5 → +8(Lv 8 이 17 → 25)',
+    '보스 하나를 상대로 Lv 8 피해가 보스가 앞에 있으면 79 → 164, 등 뒤에 있으면 0 → 160 — 스틸(200쯤) 다음이에요'] },
   { date: '2026-11-02', title: '챔피언 반지 잭팟', items: [
     '챔피언 반지에도 잭팟이 생겼어요 — 5번에 1번(행운 배수 · 돈치치 2배), 돌파할 스킬이 둘 이상이면 나온 스킬(셋까지)을 한 번에 모두 돌파해요. 운이 좋으면 반지가 드물어도 다 돌파할 수 있어요'] },
   { date: '2026-11-02', title: '아이템이 덜 떨어져요', items: [
