@@ -1721,7 +1721,7 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-shop-head .sv-h { margin: 0; }
 .sv-pts-pill { padding: 3px 12px; border-radius: 999px; background: linear-gradient(#ffe066, #d99a1f); color: #2a1200; font-weight: 900; }
 .sv-shop .sv-tabs { margin: 0; }
-.sv-shop-chars, .sv-shop-skills { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 3px; scrollbar-width: thin; }
+.sv-shop-chars, .sv-shop-skills { position: relative; display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding: 2px 2px 4px; scrollbar-width: thin; }   /* 가로로만 — 위아래로 끌면 패널이 움직인다 */
 .sv-shop-chars button, .sv-shop-skills button { flex: none; width: 36px; height: 36px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: #1a2030; cursor: pointer; }
 .sv-shop-skills button { border-radius: 9px; }
 .sv-shop-chars img, .sv-shop-skills img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
@@ -1733,13 +1733,14 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-item-art { display: grid; place-items: center; height: 56px; }
 .sv-item-art img { width: 44px; height: 44px; border-radius: 10px; }
 .sv-item-art img.is-fit { width: auto; height: 60px; border-radius: 0; }
-.sv-item-art img.is-ball { width: 34px; height: 34px; border-radius: 0; }
+.sv-item-art img.is-ball { width: auto; height: 36px; border-radius: 0; }
 .sv-item-st { color: #c9d1e0; font-size: .74em; }
 .sv-item[aria-pressed="true"] { border-color: #ffd23f; box-shadow: 0 0 0 3px #ffd23f44; transform: translateY(-2px); }
 .sv-item.is-t1 { border-color: #aab4c366; } .sv-item.is-t2 { border-color: #4dabf799; } .sv-item.is-t3 { border-color: #c77dffaa; }
 .sv-item.is-t4 { border-color: #ffb400; background: linear-gradient(160deg, #3a2a08, #141926 60%); box-shadow: 0 0 14px #ffb40055; }
 .sv-item.is-ice .sv-item-art img { box-shadow: 0 0 0 2px #7fe3ff, 0 0 12px #7fe3ff; }
 .sv-item.is-fire .sv-item-art img { box-shadow: 0 0 0 2px #ff5a1f, 0 0 14px #ffb020; }
+.sv-item.is-legend .sv-item-art img { box-shadow: 0 0 0 2px #ffcf3f, 0 0 18px #ffcf3f; }
 .sv-item.is-galaxy .sv-item-art img { box-shadow: 0 0 0 2px #c77dff, 0 0 16px #ff70c4; animation: sv-hue 3s linear infinite; }
 @keyframes sv-hue { to { filter: hue-rotate(360deg); } }
 .sv-tier { padding: 0 7px; border-radius: 999px; background: #ffffff1c; font-size: .7em; font-weight: 800; color: #aab4c3; }
