@@ -1598,7 +1598,7 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-h { margin: 0 0 10px; font: italic 900 1.5em/1.1 system-ui, sans-serif; }
 .sv-big { font-size: 2.6em; color: #ff6b6b; }
 .sv-over.is-win .sv-big { color: #ffd23f; }
-.sv-chars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }   /* 14명 — 두 줄(세운 휴대폰은 다섯 줄씩) */
+.sv-chars { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }   /* 15명 — 두 줄(세운 휴대폰은 다섯 명씩 세 줄) */
 .sv-char { position: relative; display: grid; justify-items: center; gap: 1px; padding: 8px 2px 6px; border-radius: 12px; border: 2px solid transparent; background: #ffffff10; color: #fff; }
 .sv-char img { width: min(64px, 70%); aspect-ratio: 1; border-radius: 50%; background: #ffffff18; }
 .sv-char b { font-size: .9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }

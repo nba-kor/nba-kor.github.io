@@ -37,6 +37,7 @@ const CHARS = [
   { id: 'dqq', w: 'rebound', c: ['#5d76a9', '#12173f'], hp: 150, trait: '빅 스티브', note: '최대 체력 +30% · 받는 피해 -1 · 경험치 줍는 거리 +40%', mod: { hp: 0.3, armor: 1, magnet: 0.4 } },
   { id: 'blqz', w: 'steal', c: ['#c8102e', '#1d42ba'], hp: 110, trait: 'PG-13', note: '보스 · 중간보스 · 정예에게 주는 피해 +30% · 쿨타임 -5%', mod: { bossX: 0.3, cdr: 0.05 } },
   { id: 'kl', w: 'outlet', c: ['#ffc72c', '#1d428a'], hp: 100, trait: '37점 쿼터', note: '투사체 속도 +25% · 범위 +10% · 쿨타임 -5%', mod: { speed: 0.25, area: 0.1, cdr: 0.05 } },
+  { id: 'dlz', w: 'shotclock', c: ['#ce1141', '#111111'], hp: 110, trait: '클러치 킹', note: '체력이 절반 아래면 공격력 +30% · 쿨타임 -5%', mod: { clutch: 0.3, cdr: 0.05 } },
 ]
 
 // 스킬 — cd 쿨타임(초) · dmg 피해 · n 개수 · area 크기 배수 · spd 속도 배수 · dur 지속(초) · pierce 맞힐 수 있는 수 · bounce 튕김.
@@ -201,6 +202,9 @@ const ACH = [
   { id: 'mvp1', name: 'MVP 격파', note: 'MVP 쓰러뜨리기' },
   { id: 'bossrush', name: '보스 러시', note: '25분부터 나오는 보스 다섯을 한 판에 모두 쓰러뜨리기' },
   { id: 'chal30', name: '무한의 지배자', note: '챌린지에서 30분 버티기' },
+  { id: 'clock8', name: '24초의 지배자', note: '샷 클락을 최고 레벨(8)로', char: 'dlz' },
+  { id: 'syn1', name: '케미스트리', note: '시너지 처음 완성하기' },
+  { id: 'syn3', name: '드림 케미', note: '한 판에 시너지 3개 완성하기' },
 ]
 const SURV = [[300, 'surv5'], [600, 'surv10'], [900, 'surv15'], [1200, 'surv20'], [1500, 'surv25']]
 
@@ -827,7 +831,10 @@ function wstat(w) {
 function addWeapon(id) {
   const w = { id, lv: 1, t: 0.3, q: 0, qt: 0, n: 0, ang: 0, on: 0, list: [] }; w.st = wstat(w); G.weapons.push(w)
   const m = G.weapons.find(x => x.id === mateOf(id))
-  if (m) { m.st = wstat(m); say(`시너지 — ${synOf(id)[0]}`, 2.4, '#ffb366') }   // 짝이 이미 있으면 둘 다 세진다
+  if (m) {   // 짝이 이미 있으면 둘 다 세진다
+    m.st = wstat(m); say(`시너지 — ${synOf(id)[0]}`, 2.4, '#ffb366'); gain('syn1')
+    if (SYN.filter(s => Object.keys(s[1]).every(k => G.weapons.some(x => x.id === k))).length >= 3) gain('syn3')
+  }
 }
 
 // 수비 찾기 — 72 칸 격자(매 프레임 다시). near = 몸이 원에 닿는 수비마다(fn 이 true 면 그만)
@@ -957,7 +964,7 @@ function zig(x0, y0, x1, y1) {
 function weapons(dt) {
   for (const w of G.weapons) {
     if (w === G.seal && sick('seal')) continue
-    const st = w.st, A = st.area * S.area, D = st.dmg * S.might
+    const st = w.st, A = st.area * S.area, D = st.dmg * S.might * (G.ch.mod.clutch && pl.hp < S.maxHp / 2 ? 1 + G.ch.mod.clutch : 1)   // 클러치 킹 — 체력 절반 아래
     if (w.id === 'press') {   // 풀코트 프레스 — 쿨타임마다 둘레 전부
       w.R = 70 * A * (w.br ? 1.3 : 1)
       if ((w.t -= dt) <= 0) { w.t = Math.max(0.2, st.cd * S.cdr); near(pl.x, pl.y, w.R, e => { hurt(e, D, pl.x, pl.y, 30) }) }
@@ -1521,6 +1528,7 @@ function take(o) {
     if (w) { w.lv++; w.st = wstat(w) } else addWeapon(o.id)
     if (o.id === 'three' && w?.lv === 8) gain('three8')
     if (o.id === 'dunk' && w?.lv === 8) gain('dunk8')
+    if (o.id === 'shotclock' && w?.lv === 8) gain('clock8')
     if (G.weapons.length === 6) { gain('full6'); if (G.weapons.every(x => x.lv === 8)) gain('max6') }
   } else if (o.t === 'p') { G.passives[o.id] = (G.passives[o.id] || 0) + 1; stats() }
   else if (o.id === 'drink') pl.hp = Math.min(S.maxHp, pl.hp + S.maxHp * 0.4)
@@ -2168,6 +2176,9 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '새 캐릭터 — 더마 드로잔', items: [
+    '더마 드로잔 — 시작 스킬 샷 클락, 특성 「클러치 킹」: 체력이 절반 아래면 공격력 +30% · 쿨타임 -5%. 업적 「24초의 지배자」(샷 클락을 최고 레벨로)로 열어요',
+    '새 업적 — 「케미스트리」(시너지 처음 완성하기) · 「드림 케미」(한 판에 시너지 3개)'] },
   { date: '2026-11-02', title: '스텝백 슛 강화', items: [
     '스텝백 슛이 화면 안의 보스 · 정예(마스코트)를 먼저 겨눠요 — 등지고 물러서면서도 돌아서 쏴요(없으면 예전처럼 보는 쪽)',
     '보스 · 정예에게는 1.4배로 맞혀요. 피해도 8 → 11, 레벨 업 +4 → +6 · +5 → +8(Lv 8 이 17 → 25)',
