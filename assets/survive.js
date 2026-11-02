@@ -214,8 +214,79 @@ const ACH = [
 ]
 const SURV = [[300, 'surv5'], [600, 'surv10'], [900, 'surv15'], [1200, 'surv20'], [1500, 'surv25']]
 
+// ---------------------------------------------------------------- 스킨 — 판이 끝날 때 쌓이는 포인트로 사거나(price) 업적으로 받는다(ach)
+// kind: fx 스킬 이펙트(스킬마다, 어느 캐릭터든) · ball 드리블하는 공(공용) · fit 옷(공용 — 업적 옷은 그 캐릭터만). tier 1 노멀 · 2 레어 · 3 유니크 · 4 레전더리
+const TIER = [null, { name: '노멀', col: '#aab4c3' }, { name: '레어', col: '#4dabf7' }, { name: '유니크', col: '#c77dff' }, { name: '레전더리', col: '#ffb400' }]
+const THEME = [null,   // 스킬 이펙트 — 등급마다 한 벌(모든 스킬에). 높을수록 빛 · 꼬리 · 터짐이 화려하다
+  { id: 'ice', name: '아이스', c: '#7fe3ff', c2: '#e8fbff', price: 600 },
+  { id: 'fire', name: '인페르노', c: '#ff5a1f', c2: '#ffd23f', price: 1500 },
+  { id: 'galaxy', name: '갤럭시', c: '#c77dff', c2: '#ffffff', price: 3500 },
+]
+// 업적 옷 — 그 캐릭터로 10분(쉬움)은 그 선수가 다른 팀 · 예전에 입던 유니폼 [이름, 상의, 보조색, fit], 챌린지 60분은 레전더리(검은 옷에 빛나는 팀 색 · 오라)
+const LEGACY = {
+  james: ['클리블랜드 와인', '#6f263d', '#ffb81c', { side: '#041e42', shoe: '#ffb81c' }],
+  klfd: ['워리어스 화이트', '#f4f4f4', '#1d428a', { side: '#ffc72c', shoe: '#1d428a' }],
+  yns: ['크림 시티', '#eee1c6', '#00471b', { side: '#0077c0', shoe: '#00471b' }],
+  yjq: ['레인보우 클래식', '#f4f4f4', '#418fde', { side: '#fdb927', shoe: '#418fde' }],
+  lkdqq: ['레이커스 퍼플', '#552583', '#fdb927', { side: '#fdb927', shoe: '#fdb927' }],
+  ebd: ['하드우드 클래식', '#f4f4f4', '#ed174c', { side: '#006bb6', shoe: '#ed174c' }],
+  weisblk: ['로키츠 레드', '#ce1141', '#c4ced4', { side: '#111111', shoe: '#ce1141' }],
+  wsblk: ['듀크 블루', '#003087', '#f4f4f4', { side: '#f4f4f4', shoe: '#f4f4f4' }],
+  durant: ['브루클린 블랙', '#151515', '#f4f4f4', { side: '#f4f4f4', sock: '#151515', shoe: '#f4f4f4' }],
+  bl: ['호네츠 퍼플', '#1d1160', '#00a3b4', { side: '#a1a1a4', shoe: '#00a3b4', pin: 'rgba(0,163,180,.35)' }],
+  sga: ['캐나다 레드', '#d80621', '#f4f4f4', { side: '#f4f4f4', shoe: '#f4f4f4' }],
+  dqq: ['썬더 블루', '#007ac1', '#ef3b24', { side: '#002d62', shoe: '#ef3b24' }],
+  blqz: ['페이서스 네이비', '#002d62', '#fdbb30', { side: '#bec0c2', shoe: '#fdbb30' }],
+  kl: ['매버릭스 블루', '#00538c', '#b8c4ca', { side: '#002b5e', shoe: '#f4f4f4' }],
+  dlz: ['랩터스 퍼플', '#753bbd', '#c8102e', { side: '#111111', shoe: '#753bbd' }],
+  klks: ['호크스 레드', '#e03a3e', '#c1d32f', { side: '#26282a', shoe: '#c1d32f' }],
+  nwsj: ['독일 대표팀', '#f4f4f4', '#111111', { side: '#dd0000', shoe: '#ffce00' }],
+  bm: ['마이애미 바이스', '#151515', '#ff70c4', { side: '#41b6e6', shoe: '#ff70c4' }],
+}
+/** 레전더리 옷의 빛 — 팀 두 색 중 더 진한(채도 높은) 쪽을 밝게 */
+const neonOf = c => { const ch = col => { const v = rgbOf(col); return Math.max(...v) - Math.min(...v) }; return brighten(ch(c.c[0]) >= ch(c.c[1]) ? c.c[0] : c.c[1], 150) }
+const SKIN_LIST = [
+  ...Object.keys(WEAP).flatMap(w => [1, 2, 3].map(t => ({ id: `fx_${w}_${THEME[t].id}`, kind: 'fx', w, tier: t, name: `${WEAP[w].name} ${THEME[t].name}`, price: THEME[t].price }))),
+  { id: 'ball_soccer', kind: 'ball', tier: 1, name: '축구공', price: 500 },
+  { id: 'ball_beach', kind: 'ball', tier: 1, name: '비치볼', price: 700 },
+  { id: 'ball_gold', kind: 'ball', tier: 2, name: '황금 농구공', price: 1800 },
+  { id: 'ball_cat', kind: 'ball', tier: 3, name: '고양이', price: 4000, pet: 1 },
+  { id: 'ball_dog', kind: 'ball', tier: 3, name: '강아지', price: 4000, pet: 1 },
+  { id: 'ball_panda', kind: 'ball', tier: 3, name: '판다', price: 4500, pet: 1 },
+  { id: 'fit_practice', kind: 'fit', tier: 1, name: '연습복', price: 800, look: { jersey: '#eef0f3', trim: '#3a3f4a', shorts: '#4a505c', side: '#3a3f4a', shoe: '#2a2f3a', tee: 1 } },
+  { id: 'fit_hoodie', kind: 'fit', tier: 1, name: '후드티', price: 900, look: { jersey: '#6b7280', trim: '#e5e7eb', shorts: '#1f2937', side: '#e5e7eb', sock: '#1f2937', shoe: '#f4f4f4', tee: 1, hood: 1 } },
+  { id: 'fit_retro', kind: 'fit', tier: 1, name: '레트로 유니폼', price: 900, look: { jersey: '#f3e3b0', trim: '#c0392b', shorts: '#f3e3b0', side: '#2b59c3', shoe: '#f4f4f4', bands: 1 } },
+  { id: 'fit_allstar', kind: 'fit', tier: 2, name: '올스타 유니폼', price: 2200, look: { jersey: '#1d4ed8', trim: '#ffffff', shorts: '#1d4ed8', side: '#e63946', shoe: '#e63946', star: 1 } },
+  { id: 'fit_xmas', kind: 'fit', tier: 2, name: '크리스마스 유니폼', price: 2200, look: { jersey: '#c8102e', trim: '#ffffff', shorts: '#0b6623', side: '#ffffff', shoe: '#0b6623', bands: 1 } },
+  { id: 'fit_gold', kind: 'fit', tier: 2, name: '골드 유니폼', price: 2600, look: { jersey: '#e6b422', trim: '#5a3a00', shorts: '#e6b422', side: '#5a3a00', shoe: '#e6b422', shine: 1 } },
+  { id: 'fit_flame', kind: 'fit', tier: 3, name: '불꽃 유니폼', price: 6000, look: { jersey: '#1c1414', trim: '#ff6a00', shorts: '#1c1414', side: '#ff3d00', sock: '#1c1414', shoe: '#ff6a00' }, aura: ['flame', '#ff6a00', '#ffd23f'] },
+  { id: 'fit_angel', kind: 'fit', tier: 3, name: '천상의 유니폼', price: 6500, look: { jersey: '#ffffff', trim: '#e9b23a', shorts: '#ffffff', side: '#e9b23a', shoe: '#ffffff', shine: 1 }, aura: ['halo', '#ffd23f', '#fff6c8'] },
+  { id: 'fit_storm', kind: 'fit', tier: 3, name: '번개 유니폼', price: 6500, look: { jersey: '#1b2a6b', trim: '#7ff3ff', shorts: '#1b2a6b', side: '#7ff3ff', sock: '#1b2a6b', shoe: '#7ff3ff' }, aura: ['storm', '#7ff3ff', '#ffffff'] },
+  ...CHARS.flatMap(c => { const [name, j, t, fit] = LEGACY[c.id], neon = neonOf(c); return [
+    { id: `fit_${c.id}_x`, kind: 'fit', tier: 2, char: c.id, ach: `ez_${c.id}`, name, look: { jersey: j, trim: t, shorts: j, ...fit } },
+    { id: `fit_${c.id}_l`, kind: 'fit', tier: 4, char: c.id, ach: `leg_${c.id}`, name: `${c.trait} 레전드`, look: { jersey: '#0d0f16', trim: neon, shorts: '#0d0f16', side: neon, sock: '#0d0f16', shoe: neon, shine: 1 }, aura: ['legend', neon, '#fff3c4'] }] }),
+]
+const SKIN = Object.fromEntries(SKIN_LIST.map(k => [k.id, k]))
+for (const c of CHARS) ACH.push(   // 업적 스킨 — 캐릭터마다 쉬운 것 하나 · 레전더리 하나
+  { id: `ez_${c.id}`, get name() { return `${P(c.id).short || nameOf(c)}의 클래식` }, get note() { return `${nameOf(c)} 캐릭터로 10분 버티기` }, skin: `fit_${c.id}_x` },
+  { id: `leg_${c.id}`, get name() { return `${P(c.id).short || nameOf(c)} 레전드` }, get note() { return `${nameOf(c)} 캐릭터로 챌린지 60분 버티기` }, skin: `fit_${c.id}_l` })
+
 const nameOf = c => P(c.id).name
 const lockOf = c => { const a = ACH.find(x => x.char === c.id); return a && !save.ach[a.id] ? a : null }
+// ---- 포인트 · 가진 스킨 · 입은 스킨. 산 스킨은 업적 저장에 own_스킨 = 낸 값(계정과 합칠 때 둘 다 남는다), 포인트 = 쌓인 것(stats.pts) - 낸 값 합
+const owns = k => !!(k.ach ? save.ach[k.ach] : save.ach[`own_${k.id}`])
+const points = () => (save.stats.pts || 0) - Object.entries(save.ach).reduce((n, [k, v]) => k.startsWith('own_') ? n + v : n, 0)
+function buy(k) {
+  if (owns(k) || k.ach || points() < k.price) return false
+  save.ach[`own_${k.id}`] = k.price; persist(true); return true
+}
+/** 한 판의 포인트 — 처치 · 레벨 · 버틴 시간에 비례(30분 생존은 1.5배) */
+function runPts(win) { const p = { kills: G.kills / 150 | 0, lvl: G.lvl * 2, time: G.t / 6 | 0 }; return { ...p, total: Math.round((p.kills + p.lvl + p.time) * (win ? 1.5 : 1)) } }
+// 입은 스킨 — 옷 · 공은 캐릭터마다, 이펙트는 스킬마다(이 브라우저에 — 내 정보 페이지와 같이 쓴다). 가진 것만, 업적 옷은 그 캐릭터만
+const EQ = 'survive.equip', equip = { fit: {}, ball: {}, fx: {} }
+try { const v = JSON.parse(localStorage.getItem(EQ)); for (const k in equip) if (v?.[k] && typeof v[k] === 'object') Object.assign(equip[k], v[k]) } catch {}
+const worn = (k, key) => { const x = SKIN[equip[k][key]]; return x && owns(x) && (!x.char || x.char === key) ? x : null }
+function wearSkin(k, key, id) { if (id) equip[k][key] = id; else delete equip[k][key]; try { localStorage.setItem(EQ, JSON.stringify(equip)) } catch {} }
 
 // ---------------------------------------------------------------- 저장 — 업적 · 기록. 이 브라우저 + (로그인하면) 계정
 const LS = 'survive.v1'
@@ -289,15 +360,15 @@ function rgbOf(col) {
 }
 function shade(col, f) { const [r, g, b] = rgbOf(col); return `rgb(${Math.min(255, r * f) | 0},${Math.min(255, g * f) | 0},${Math.min(255, b * f) | 0})` }
 const rgba = (col, a) => { const [r, g, b] = rgbOf(col); return `rgba(${r},${g},${b},${a})` }
-/** 팔다리 피부 — 아주 어두우면 밝기를 min 까지 올린다(어두운 바닥 · 테두리에 손발이 묻히지 않게) */
-function liftSkin(col, min = 96) { const [r, g, b] = rgbOf(col), l = 0.3 * r + 0.59 * g + 0.11 * b; return l >= min ? col : shade(col, min / Math.max(l, 8)) }
+/** 아주 어두우면 밝기를 min 까지 올린다 — 팔다리 피부(어두운 바닥 · 테두리에 손발이 묻히지 않게) · 레전더리 옷의 빛 */
+function brighten(col, min = 96) { const [r, g, b] = rgbOf(col), l = 0.3 * r + 0.59 * g + 0.11 * b; return l >= min ? col : shade(col, min / Math.max(l, 8)) }
 function rng(seed) { return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 } }
 function hash(i, j, s) { let x = Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(s, 1442695041) | 0; x = Math.imul(x ^ x >>> 13, 1274126177); return ((x ^ x >>> 16) >>> 0) / 4294967296 }
 
 /** 사람 — 발밑 (0,0), 오른쪽을 본다(키 약 52). o = { jersey, trim, shorts, skin, hair, hs 머리 모양, shoe, frame 0~3, wide, kind, num, mirror, head(얼굴 그림) }
  *  걸음 네 칸 — 0 · 2 는 두 발을 벌리고 1 · 3 은 뒷발을 들어 앞으로(몸이 살짝 뜬다). 앞(오른쪽) 팔다리는 밝게, 뒤는 어둡게 */
 function person(c, o) {
-  const k = o.kind, wd = o.wide || 1, sk = liftSkin(o.skin), skD = shade(sk, 0.76), f = o.frame || 0, sock = o.sock || '#f5f5f5', side = o.side || o.trim
+  const k = o.kind, wd = o.wide || 1, sk = brighten(o.skin), skD = shade(sk, 0.76), f = o.frame || 0, sock = o.sock || '#f5f5f5', side = o.side || o.trim
   const sw = [1, 0, -1, 0][f], bob = f % 2 ? -1.1 : 0
   const leg = (x, dx, up, front) => {
     rr(c, x + dx - 2.1, -12.5 - up, 4.3, 10.5, 2.1, front ? sk : skD)
@@ -314,11 +385,16 @@ function person(c, o) {
   const sg = c.createLinearGradient(-7 * wd, 0, 7 * wd, 0); sg.addColorStop(0, shade(o.shorts, 1.12)); sg.addColorStop(1, shade(o.shorts, 0.74))
   c.fillStyle = sg; c.beginPath(); c.roundRect(-7.2 * wd, -18.6, 14.4 * wd, 9.4, [2, 2, 2.8, 2.8]); c.fill()
   rr(c, -7.2 * wd, -18.6, 14.4 * wd, 1.7, 0.8, shade(o.shorts, 0.7))
+  if (o.bands) { rr(c, -7.2 * wd, -12, 14.4 * wd, 1.2, 0, o.trim); rr(c, -7.2 * wd, -10.4, 14.4 * wd, 0.9, 0, side) }   // 레트로 — 반바지 끝 두 줄
   rr(c, 4.6 * wd, -17, 1.7, 7.6, 0.8, side)
   // 몸통(민소매)
   const j = o.jersey, tg = c.createLinearGradient(-7 * wd, -30, 7 * wd, -16)
   tg.addColorStop(0, shade(j, 1.16)); tg.addColorStop(0.55, j); tg.addColorStop(1, shade(j, 0.76))
   c.fillStyle = tg; c.beginPath(); c.roundRect(-7.5 * wd, -30.2, 15 * wd, 13.8, [4.4, 4.4, 2.4, 2.4]); c.fill()
+  if (o.shine) {   // 광택 — 비스듬한 빛줄기
+    c.save(); c.clip(); c.fillStyle = 'rgba(255,255,255,.38)'; c.beginPath(); c.moveTo(-5 * wd, -31); c.lineTo(-1.6 * wd, -31); c.lineTo(-6.4 * wd, -16); c.lineTo(-9.8 * wd, -16); c.fill(); c.restore()
+  }
+  if (o.bands) rr(c, -7.5 * wd, -18.2, 15 * wd, 1.1, 0, o.trim)
   if (k === 'ref') {   // 심판 — 검정 세로 줄무늬
     c.save(); c.beginPath(); c.roundRect(-7.5 * wd, -30.2, 15 * wd, 13.8, [4.4, 4.4, 2.4, 2.4]); c.clip()
     for (let x = -7.5 * wd + 1.6; x < 7.5 * wd; x += 3.8) rr(c, x, -31, 1.9, 16, 0, '#17191f')
@@ -332,7 +408,8 @@ function person(c, o) {
     rr(c, 5.5 * wd, -26.5, 1.8, 10, 0.9, side)   // 옆 판
     c.strokeStyle = o.trim; c.lineWidth = 1.1; c.beginPath(); c.moveTo(-3.6, -30); c.lineTo(0.4, -25.4); c.lineTo(4.4, -30); c.stroke()
   }
-  c.fillStyle = sk; c.beginPath(); c.moveTo(-3, -30.2); c.lineTo(3.8, -30.2); c.lineTo(0.4, -26.2); c.closePath(); c.fill()
+  if (o.hood) { ell(c, 0.6, -31.2, 8, 3.4, shade(o.jersey, 0.8)); rr(c, -1.8, -29.6, 0.8, 4.6, 0.4, o.trim); rr(c, 2.6, -29.6, 0.8, 4.6, 0.4, o.trim) }   // 후드 — 목 뒤에 모자, 끈 둘
+  else { c.fillStyle = sk; c.beginPath(); c.moveTo(-3, -30.2); c.lineTo(3.8, -30.2); c.lineTo(0.4, -26.2); c.closePath(); c.fill() }
   ell(c, 0.6, -29.8, 6.2, 1.6, 'rgba(0,0,0,.22)')   // 턱 그늘
   if (o.extra === 'tie') { c.fillStyle = '#f4f4f4'; c.beginPath(); c.moveTo(-3.4, -30.2); c.lineTo(4.2, -30.2); c.lineTo(0.4, -22); c.closePath(); c.fill(); rr(c, -0.7, -29.6, 2.2, 9, 0.8, '#d6323a') }   // 감독 — 셔츠 · 넥타이
   else if (k === 'boss') star(c, 0.6, -22.4, 4.6, o.trim)
@@ -342,6 +419,7 @@ function person(c, o) {
     const x = o.mirror ? -0.6 : 0.6; c.strokeText(String(o.num), x, -18.6); c.fillStyle = o.trim; c.fillText(String(o.num), x, -18.6)
     c.restore()
   }
+  if (o.star) { star(c, -4.4 * wd, -27, 1.9, o.trim); star(c, -3.6 * wd, -12.6, 1.7, side) }   // 올스타 — 가슴 · 반바지에 별
   const up = k === 'fan' || k === 'screen'   // 팬(폼 손가락) · 스크린 서는 동료는 앞 손을 머리 위로 — 머리 다음에 그린다
   if (!up) arm(c, o, 6.2 * wd, -sw * 0.55, sk, true)
   if (o.extra === 'ball') ballAt(c, 8.6 * wd, -15.4, 4.8)   // 샤프슈터 — 손에 공
@@ -358,13 +436,14 @@ function arm(c, o, x, ang, col, front) {
   c.save(); c.translate(x, -27.6); c.rotate(ang)
   rr(c, -w / 2, -1.2, w, 12.6, w / 2, col)
   ell(c, 0, 12, 2.4, 2.4, col)
+  if (o.tee) rr(c, -w / 2 - 0.7, -1.8, w + 1.4, 5.6, 1.8, front ? o.jersey : shade(o.jersey, 0.8))   // 반소매
   if (front && (o.kind === 'me' || o.kind === 'boss')) rr(c, -w / 2 - 0.2, 7.6, w + 0.4, 1.9, 0.6, o.kind === 'boss' ? '#ffd23f' : o.trim)
   if (front && o.kind === 'fan') { rr(c, -3.4, 10, 6.8, 8.6, 2.4, '#ffd23f'); rr(c, -1.3, 16.4, 2.6, 7, 1.3, '#ffd23f'); txt(c, '#1', 0, 16.4, 3.4, '#1a1200') }
   c.restore()
 }
 /** 그린 얼굴(수비) — 머리 모양 hs: 0 짧은 머리 · 1 아프로 · 2 하이 탑 · 3 민머리 · 4 콘로우 */
 function face(c, o) {
-  const sk = liftSkin(o.skin), k = o.kind, hc = o.hair, hs = o.hs || 0
+  const sk = brighten(o.skin), k = o.kind, hc = o.hair, hs = o.hs || 0
   rr(c, -2.4, -33.6, 4.8, 5, 1.6, shade(sk, 0.7))
   if (hs === 1) for (const [x, y, r] of [[-5.4, -46.4, 5.4], [0.6, -49, 5.8], [6.2, -46.6, 5], [-7.8, -41.4, 4.2], [8.4, -42, 3.6]]) ell(c, x, y, r, r, hc)
   if (hs === 2) rr(c, -8.6, -53.4, 18.6, 12, [2.6, 2.6, 0, 0], hc)
@@ -430,7 +509,7 @@ const LOOK = {
   mvp: [{ jersey: '#ffd23f', trim: '#7b3fbf', wide: 1.3, kind: 'boss', extra: 'crown' }],
 }
 const pickOf = a => a[rnd() * a.length | 0]
-let SPR = null, BALL, BIG, HAND, BALLG, BIGG, HANDG, GEMS, ITEMS, WHISTLE, CARD, K = 2   // K = 사람 그림의 단위당 픽셀 — 화면 배율에 맞춰 판마다(작게 그려 두고 키우면 흐리고, 크게 그려 두고 줄이면 느리다)
+let SPR = null, BALL, BIG, HAND, BALLG, BIGG, HANDG, BALLSK, TB, GEMS, ITEMS, WHISTLE, CARD, K = 2   // K = 사람 그림의 단위당 픽셀 — 화면 배율에 맞춰 판마다(작게 그려 두고 키우면 흐리고, 크게 그려 두고 줄이면 느리다)
 function sprites(k = 2) {
   K = k; SPR = {}
   for (const [type, looks] of Object.entries(LOOK)) {
@@ -447,6 +526,10 @@ function sprites(k = 2) {
   BIG = sprite(28, 28, 14, 14, c => ballPaint(c, 11.5), K * 1.3)
   BALLG = sprite(20, 20, 10, 10, c => ballPaint(c, 7.5, true), K * 1.3, '#2a1245')
   BIGG = sprite(28, 28, 14, 14, c => ballPaint(c, 11.5, true), K * 1.3, '#2a1245')
+  BALLSK = { ball_soccer: sprite(20, 20, 10, 10, c => soccer(c, 7.5), K * 1.3), ball_beach: sprite(20, 20, 10, 10, c => beach(c, 7.5), K * 1.3), ball_gold: BALLG,
+    ball_cat: sprite(28, 26, 14, 14, c => pet(c, 'cat'), K * 1.3), ball_dog: sprite(28, 26, 14, 14, c => pet(c, 'dog'), K * 1.3), ball_panda: sprite(28, 26, 14, 14, c => pet(c, 'panda'), K * 1.3) }
+  const tinted = (sp, col) => { const t = mk(sp.c.width, sp.c.height), x = t.getContext('2d'); x.drawImage(sp.c, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = rgba(col, 0.55); x.fillRect(0, 0, t.width, t.height); return { ...sp, c: t } }
+  TB = THEME.map(th => th && [tinted(BALL, th.c), tinted(BIG, th.c)])   // 스킬 이펙트 스킨 — 그 색으로 물든 공
   const hand = (s, band) => c => {
     ell(c, 0, 3, 7.4, 8, s)
     for (let i = 0; i < 4; i++) rr(c, -7 + i * 3.6, -12 + Math.abs(i - 1.5) * 1.6, 3.1, 11, 1.5, s)
@@ -523,6 +606,33 @@ const GLYPH = {
   drink: c => { c.scale(2, 2); ITEM_ART.drink(c) },
   cheer: c => { c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(-20, -8); c.lineTo(8, -20); c.lineTo(8, 20); c.lineTo(-20, 8); c.closePath(); c.fill(); rr(c, -24, -8, 6, 16, 2, '#e4572e'); lines(c, [[14, -12, 22, -18], [16, 0, 26, 0], [14, 12, 22, 18]], '#fff', 3) },
 }
+// 공 스킨 — 축구공 · 비치볼 · 동물(고양이 · 강아지 · 판다, 오른쪽을 본다)
+function soccer(c, r) {
+  ell(c, 0, 0, r, r, '#f4f4f4')
+  c.save(); c.beginPath(); c.arc(0, 0, r, 0, TAU); c.clip(); c.fillStyle = '#1c1f26'
+  const pent = (x, y, q, a0) => { c.beginPath(); for (let i = 0; i < 5; i++) { const a = a0 + i * TAU / 5; c.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q) } c.fill() }
+  pent(0, 0, r * 0.38, -Math.PI / 2)
+  for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + Math.PI / 5 + i * TAU / 5; pent(Math.cos(a) * r, Math.sin(a) * r, r * 0.34, a) }
+  c.restore(); ell(c, -r * 0.35, -r * 0.42, r * 0.28, r * 0.2, 'rgba(255,255,255,.55)')
+}
+function beach(c, r) {
+  ['#e63946', '#ffd23f', '#2b8cff', '#f4f4f4', '#3ccf6e', '#ff8c1a'].forEach((col, i) => { c.fillStyle = col; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, r, i * TAU / 6, (i + 1) * TAU / 6); c.fill() })
+  ell(c, 0, 0, r * 0.22, r * 0.22, '#f4f4f4'); ell(c, -r * 0.38, -r * 0.42, r * 0.26, r * 0.18, 'rgba(255,255,255,.6)')
+}
+function pet(c, k) {
+  const body = { cat: '#f2a03d', dog: '#e6c592', panda: '#f6f6f2' }[k], dark = { cat: '#c46f17', dog: '#8a5a2b', panda: '#1d1d22' }[k]
+  if (k === 'cat') { c.strokeStyle = body; c.lineWidth = 2.6; c.lineCap = 'round'; c.beginPath(); c.arc(-8.6, 2, 4.4, Math.PI * 0.5, Math.PI * 1.5); c.stroke() }   // 꼬리
+  ell(c, 0, 0, 9.6, 8.8, body)
+  if (k === 'cat') for (const s of [-1, 1]) { c.fillStyle = body; c.beginPath(); c.moveTo(s * 3 + 1, -7); c.lineTo(s * 7.6 + 1, -12.6); c.lineTo(s * 8.6 + 1, -4.6); c.fill(); c.fillStyle = '#ffb3c6'; c.beginPath(); c.moveTo(s * 5 + 1, -7.4); c.lineTo(s * 7.4 + 1, -10.6); c.lineTo(s * 7.8 + 1, -6.4); c.fill() }
+  if (k === 'dog') for (const s of [-1, 1]) ell(c, s * 8 + 1, -2, 2.8, 5.4, dark)
+  if (k === 'panda') { for (const s of [-1, 1]) ell(c, s * 6.4 + 1, -7.4, 3, 3, dark); for (const s of [-1, 1]) ell(c, s * 3.2 + 2.4, -1.4, 2.4, 3, dark) }
+  if (k === 'cat') for (const x of [-1.4, 1.2, 3.8]) rr(c, x, -8.6, 1.1, 3, 0.5, dark)   // 이마 줄무늬
+  for (const s of [-1, 1]) { ell(c, s * 3.2 + 2.4, -1.4, 1.3, 1.5, k === 'panda' ? '#fff' : '#1d1d22'); ell(c, s * 3.2 + 2.8, -1.9, 0.45, 0.45, '#fff') }
+  ell(c, 2.6, 2.4, 1.5, 1.1, k === 'cat' ? '#ff7a9c' : '#1d1d22')
+  if (k === 'dog') ell(c, 2.6, 5, 1.3, 1.7, '#ff7a9c')
+  if (k === 'cat') { c.strokeStyle = 'rgba(60,40,20,.7)'; c.lineWidth = 0.5; c.beginPath(); for (const s of [-1, 1]) for (const d of [-1, 1]) { c.moveTo(2.6 + s * 2.6, 2.8); c.lineTo(2.6 + s * 7.6, 2.8 + d * 1.6) } c.stroke() }
+  ell(c, -3.6, -4.4, 2.6, 1.6, 'rgba(255,255,255,.35)')
+}
 function ballAt(c, x, y, r) { c.save(); c.translate(x, y); ballPaint(c, r); c.restore() }
 function lines(c, ls, col = '#fff', w = 3) { c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); for (const [a, b, d, e] of ls) { c.moveTo(a, b); c.lineTo(d, e) } c.stroke() }
 function arcLine(c, x0, y0, x1, y1, top) { c.strokeStyle = '#fff'; c.lineWidth = 3; c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo((x0 + x1) / 2, top, x1, y1); c.stroke() }
@@ -554,6 +664,8 @@ function icons() {
   }
 }
 const iconOf = w => w.br ? `${w.id}+` : w.id
+/** 날아가는 공 그림 — 돌파는 금빛, 이펙트 스킨이면 그 색으로 물든 공 */
+const ballOf = (b, big = false) => b.br ? (big ? BIGG : BALLG) : b.sk ? TB[b.sk][big ? 1 : 0] : big ? BIG : BALL
 
 // ---------------------------------------------------------------- 맵 그림 — 바닥 타일(512) · 바닥 그림(코트) · 소품
 const T = 512, wrap9 = fn => { for (const ox of [-T, 0, T]) for (const oy of [-T, 0, T]) fn(ox, oy) }
@@ -791,25 +903,45 @@ let mode = 'load', G = null, pl = null, S = null, menuChar = 0, menuMap = 0, sha
 const cam = { x: 0, y: 0 }
 const need = lv => Math.round((1 + 0.2 * Math.min(1, (lv - 1) / 15)) * (lv < 20 ? 5 + (lv - 1) * 7 : 138 + (lv - 20) * 12 + (lv - 20) ** 2))   // 다음 레벨까지 경험치 — 처음엔 예전 그대로, Lv 16 부터 1.2배. 20부터는 오를수록 더 많이, 늘어나는 폭도 커진다(30 → 430 · 40 → 934 · 50 → 1678)
 
-function start() {
-  const ch = CHARS[menuChar], map = MAPS[menuMap]
+/** 판 하나 — 입은 스킨(옷 · 공 · 이펙트)으로. demo 면 상점 미리 보기 판(고른 스킨 · 업적 없음) */
+function newGame(ch, map, demo = null) {
   if (kOf() !== K) sprites(kOf())
-  pl = { x: 0, y: 0, r: 12, hp: 1, inv: 0, face: [1, 0], fx: 1, jump: 0, moving: false, spr: playerSprites(ch) }
+  const fit = demo ? SKIN[demo.fit] : worn('fit', ch.id), ball = demo ? demo.ball : worn('ball', ch.id)?.id
+  pl = { x: 0, y: 0, r: 12, hp: 1, inv: 0, face: [1, 0], fx: 1, jump: 0, moving: false, spr: playerSprites(ch, fit?.look) }
   G = {
+    demo, ball, aura: fit?.aura,   // 미리 보기 · 드리블 공 스킨 · 옷 오라
     ch, map, t: 0, foes: [], shots: [], eshots: [], gems: [], items: [], fx: [], parts: [], nums: [], weapons: [], passives: {},
     kills: 0, lvl: 1, xp: 0, next: need(1), queue: [], cheer: 0, jackpots: 0, bosses: 0, lastHit: 0, freeze: 0, spawnT: 0.5,
     nextMascot: 140, nextSwarm: 100, got: [], dying: 0, bodyT: 0, banner: null,
     haz: [], sts: {}, pi: 0, nextEvt: 930, nextWave: 1800, mids: 0, late: 0, breaks: 0,   // 바닥 경고(폭격 · 러시 · 착지) · 상태이상(끝나는 시각) · PLAN 다음 차례
     rr: 2 + (ch.mod.boxes || 0), skips: 2 + (ch.mod.boxes || 0), bans: 2 + (ch.mod.boxes || 0), banned: new Set(),   // 상자에서 쓰는 리롤 · 스킵 · 제외(한 판에 두 번씩) · 제외한 카드(t + id)
   }
-  S = null; addWeapon(ch.w); stats(); pl.hp = S.maxHp
+  S = null; addWeapon(demo?.w || ch.w); stats(); pl.hp = S.maxHp
   cam.x = cam.y = 0; calm()
-  mode = 'play'; ui.hidden = true; ui.classList.remove('is-box'); pauseBtn.hidden = false
 }
-function playerSprites(ch) {
-  const o = { jersey: ch.c[0], trim: ch.c[1], shorts: ch.c[0], skin: ch.skin || '#b9825a', hair: '#1d140e', shoe: '#f4f4f4', num: NBA_NUM[ch.id] ?? '', head: ch.head, kind: 'me', ...ch.fit }
+function start() {
+  newGame(CHARS[menuChar], MAPS[menuMap])
+  mode = 'play'; ui.hidden = true; ui.classList.remove('is-box', 'is-shop'); pauseBtn.hidden = false
+}
+/** 상점 미리 보기 — 그 캐릭터 · 스킨으로 판을 띄워 둘레의 수비(안 죽고 안 움직인다) 앞에서 원을 그리며 스킬을 쓴다 */
+function demo(o) {
+  newGame(CHARS[o.ci], MAPS[menuMap], o)
+  const w = G.weapons[0]; w.lv = o.lv; w.st = wstat(w)
+  Object.assign(G, { spawnT: 1e9, pi: PLAN.length, nextMascot: 1e9, nextSwarm: 1e9, nextEvt: 1e9, nextWave: 1e9, next: 1e12 })
+  for (let i = 0; i < 9; i++) { const a = i / 9 * TAU + 0.3, d = i % 2 ? 125 : 85, e = spawn('rookie', Math.cos(a) * d, Math.sin(a) * d * 0.8); e.hp = e.max = 1e12 }
+}
+const ZOOM = 1.6
+function demoStep(dt) {
+  G.freeze = 9; pl.inv = 1e9; if (G.t > 600) G.t = 1
+  step(dt)
+  const a = G.t * 1.1, port = VH > VW * 1.1
+  pl.x = Math.cos(a) * 26; pl.y = Math.sin(a) * 14; pl.moving = true; pl.fx = Math.sin(a) <= 0 ? 1 : -1; pl.face = [pl.fx, 0]
+  cam.x = pl.x + (port ? 0 : VW / ZOOM * 0.29); cam.y = pl.y + (port ? VH / ZOOM * 0.3 : 0)   // 패널이 덮지 않는 쪽에 내가 보이게(1.6배로 가까이)
+}
+function playerSprites(ch, look) {
+  const o = { jersey: ch.c[0], trim: ch.c[1], shorts: ch.c[0], skin: ch.skin || '#b9825a', hair: '#1d140e', shoe: '#f4f4f4', num: NBA_NUM[ch.id] ?? '', head: ch.head, kind: 'me', ...ch.fit, ...look }
   const paint = (frame, mirror) => sprite(36, 66, 18, 62, c => { if (mirror) c.scale(-1, 1); person(c, { ...o, frame, mirror }) })
-  return { R: [0, 1, 2, 3].map(f => paint(f)), L: [0, 1, 2, 3].map(f => paint(f, true)), mate: sprite(36, 66, 18, 62, c => person(c, { ...o, jersey: ch.c[1], trim: ch.c[0], shorts: ch.c[1], side: ch.c[0], pin: null, head: null, kind: 'screen' })) }
+  return { R: [0, 1, 2, 3].map(f => paint(f)), L: [0, 1, 2, 3].map(f => paint(f, true)), mate: sprite(36, 66, 18, 62, c => person(c, { ...o, ...ch.fit, jersey: ch.c[1], trim: ch.c[0], shorts: ch.c[1], side: ch.c[0], pin: null, tee: 0, hood: 0, shine: 0, star: 0, bands: 0, head: null, kind: 'screen' })) }
 }
 function stats() {
   const m = G.ch.mod, L = id => G.passives[id] || 0, old = S?.maxHp
@@ -842,7 +974,8 @@ function wstat(w) {
   return st
 }
 function addWeapon(id) {
-  const w = { id, lv: 1, t: 0.3, q: 0, qt: 0, n: 0, ang: 0, on: 0, list: [] }; w.st = wstat(w); G.weapons.push(w)
+  const w = { id, lv: 1, t: 0.3, q: 0, qt: 0, n: 0, ang: 0, on: 0, list: [], sk: G.demo ? G.demo.fx?.[id] || 0 : worn('fx', id)?.tier || 0 }   // sk — 스킬 이펙트 스킨 등급(미리 보기면 고른 것)
+  w.st = wstat(w); G.weapons.push(w)
   const m = G.weapons.find(x => x.id === mateOf(id))
   if (m) {   // 짝이 이미 있으면 둘 다 세진다
     m.st = wstat(m); say(`시너지 — ${synOf(id)[0]}`, 2.4, '#ffb366'); gain('syn1')
@@ -976,39 +1109,47 @@ function zig(x0, y0, x1, y1) {
 
 function weapons(dt) {
   for (const w of G.weapons) {
-    if (w === G.seal && sick('seal')) continue
-    const st = w.st, A = st.area * S.area, D = st.dmg * S.might * (G.ch.mod.clutch && pl.hp < S.maxHp / 2 ? 1 + G.ch.mod.clutch : 1)   // 클러치 킹 — 체력 절반 아래
-    if (w.id === 'press') {   // 풀코트 프레스 — 쿨타임마다 둘레 전부
-      w.R = 70 * A * (w.br ? 1.3 : 1)
-      if ((w.t -= dt) <= 0) { w.t = Math.max(0.2, st.cd * S.cdr); near(pl.x, pl.y, w.R, e => { hurt(e, D, pl.x, pl.y, 30) }) }
-      continue
-    }
-    if (w.id === 'block') {   // 블록슛 — 켜져 있는 동안 손이 돈다
-      w.ang += dt * 3.4 * st.spd * S.speed
-      const n = st.n + S.amount, R = 80 * A, r = 10 * Math.sqrt(A)
-      if (w.br) {   // 돌파 — 쉬지 않고 계속. 손 개수가 바뀌면(더블 클러치) 새로 쥐고, 범위 · 피해는 늘 지금 것
-        if (w.hands?.length !== n) {
-          for (const b of G.shots) if (b.w === w) b.dead = true
-          w.hands = Array.from({ length: n }, (_, i) => ({ k: 'orb', w, i, n, life: Infinity, hit: new Map(), x: pl.x, y: pl.y, br: true }))
-          G.shots.push(...w.hands)
-        }
-        for (const b of w.hands) { b.R = R; b.r = r; b.dmg = D }
-      } else if (w.on > 0) { if ((w.on -= dt) <= 0) w.t = st.cd * S.cdr }
-      else if ((w.t -= dt) <= 0) {
-        w.on = st.dur * S.dur
-        for (let i = 0; i < n; i++) G.shots.push({ k: 'orb', w, i, n, R, r, dmg: D, life: w.on, hit: new Map(), x: pl.x, y: pl.y })
+    const s0 = G.shots.length, f0 = G.fx.length
+    weapon1(w, dt)
+    if (!w.sk) continue
+    for (let i = s0; i < G.shots.length; i++) G.shots[i].sk ??= w.sk   // 스킬 이펙트 스킨 — 이번에 나온 것에 등급(THEME)을
+    const f1 = G.fx.length
+    for (let i = f0; i < f1; i++) { const f = G.fx[i]; f.sk ??= w.sk; if (f.k === 'bolt' || f.k === 'grab') burst(f); else if (f.k === 'beam') burst({ ...f, x: f.x + Math.cos(f.a) * f.L * 0.5, y: f.y + Math.sin(f.a) * f.L * 0.5 }) }
+  }
+}
+function weapon1(w, dt) {
+  if (w === G.seal && sick('seal')) return
+  const st = w.st, A = st.area * S.area, D = st.dmg * S.might * (G.ch.mod.clutch && pl.hp < S.maxHp / 2 ? 1 + G.ch.mod.clutch : 1)   // 클러치 킹 — 체력 절반 아래
+  if (w.id === 'press') {   // 풀코트 프레스 — 쿨타임마다 둘레 전부
+    w.R = 70 * A * (w.br ? 1.3 : 1)
+    if ((w.t -= dt) <= 0) { w.t = Math.max(0.2, st.cd * S.cdr); near(pl.x, pl.y, w.R, e => { hurt(e, D, pl.x, pl.y, 30) }) }
+    return
+  }
+  if (w.id === 'block') {   // 블록슛 — 켜져 있는 동안 손이 돈다
+    w.ang += dt * 3.4 * st.spd * S.speed
+    const n = st.n + S.amount, R = 80 * A, r = 10 * Math.sqrt(A)
+    if (w.br) {   // 돌파 — 쉬지 않고 계속. 손 개수가 바뀌면(더블 클러치) 새로 쥐고, 범위 · 피해는 늘 지금 것
+      if (w.hands?.length !== n) {
+        for (const b of G.shots) if (b.w === w) b.dead = true
+        w.hands = Array.from({ length: n }, (_, i) => ({ k: 'orb', w, i, n, life: Infinity, hit: new Map(), x: pl.x, y: pl.y, br: true }))
+        G.shots.push(...w.hands)
       }
-      continue
-    }
-    if (w.id === 'euro') {   // 유로스텝 — 움직일 때만 발자국마다 잔상
-      if ((w.t -= dt) <= 0 && pl.moving) { w.t = Math.max(0.1, st.cd * S.cdr); G.shots.push({ k: 'trail', x: pl.x, y: pl.y, R: 22 * A, dmg: D, t: 0, life: st.dur * S.dur * (w.br ? 2 : 1), tick: 0, fx: pl.fx, fr: (G.t * 10 | 0) & 3, br: w.br }) }
-      continue
-    }
-    if (w.q > 0) { if ((w.qt -= dt) <= 0) { SHOT[w.id](w, st, w.n - w.q, A, D); w.q--; w.qt = GAP[w.id] } }
+      for (const b of w.hands) { b.R = R; b.r = r; b.dmg = D }
+    } else if (w.on > 0) { if ((w.on -= dt) <= 0) w.t = st.cd * S.cdr }
     else if ((w.t -= dt) <= 0) {
-      w.n = w.q = st.n + S.amount; w.qt = 0; w.t = st.cd * S.cdr
-      w.list = w.id === 'pass' || w.id === 'bounce' ? closest(w.n) : w.id === 'steal' ? strongest(w.n) : []
+      w.on = st.dur * S.dur
+      for (let i = 0; i < n; i++) G.shots.push({ k: 'orb', w, i, n, R, r, dmg: D, life: w.on, hit: new Map(), x: pl.x, y: pl.y })
     }
+    return
+  }
+  if (w.id === 'euro') {   // 유로스텝 — 움직일 때만 발자국마다 잔상
+    if ((w.t -= dt) <= 0 && pl.moving) { w.t = Math.max(0.1, st.cd * S.cdr); G.shots.push({ k: 'trail', x: pl.x, y: pl.y, R: 22 * A, dmg: D, t: 0, life: st.dur * S.dur * (w.br ? 2 : 1), tick: 0, fx: pl.fx, fr: (G.t * 10 | 0) & 3, br: w.br }) }
+    return
+  }
+  if (w.q > 0) { if ((w.qt -= dt) <= 0) { SHOT[w.id](w, st, w.n - w.q, A, D); w.q--; w.qt = GAP[w.id] } }
+  else if ((w.t -= dt) <= 0) {
+    w.n = w.q = st.n + S.amount; w.qt = 0; w.t = st.cd * S.cdr
+    w.list = w.id === 'pass' || w.id === 'bounce' ? closest(w.n) : w.id === 'steal' ? strongest(w.n) : []
   }
 }
 
@@ -1291,7 +1432,7 @@ function step(dt) {
   G.t += dt
   const dead = G.dying > 0
   if (dead && (G.dying -= dt / 0.3) <= 0) return finish(false)   // 쓰러지는 동안은 느린 화면(dt 는 0.3배로 들어온다)
-  if (G.t >= MAX_T && !dead && !G.map.endless) return finish(true)   // 챌린지는 끝이 없다
+  if (G.t >= MAX_T && !dead && !G.map.endless && !G.demo) return finish(true)   // 챌린지는 끝이 없다
   // 나
   let mx = key.r - key.l + joy.x, my = key.d - key.u + joy.y
   const m = Math.hypot(mx, my)
@@ -1369,6 +1510,8 @@ function step(dt) {
     if (G.t >= 600 && G.map.id === 'roof') gain('roof10')
     if (G.map.endless && G.t >= 600) gain('chal10')
     if (G.map.endless && G.t >= 1800) gain('chal30')
+    if (G.t >= 600) gain(`ez_${G.ch.id}`)
+    if (G.map.endless && G.t >= 3600) gain(`leg_${G.ch.id}`)
     if (G.t - G.lastHit >= 180) gain('nohit')
   }
   if (G.queue.length && !dead) openBox()
@@ -1402,7 +1545,7 @@ function shots(dt) {
         const u = Math.min(1, b.t / b.T); b.x = b.x0 + (b.x1 - b.x0) * u; b.y = b.y0 + (b.y1 - b.y0) * u; b.a += dt * 10
         if (u >= 1) {
           splash(b.x1, b.y1, b.R, b.dmg, '#ff9f43', false, b.br); b.dead = true
-          if (b.br) G.shots.push({ k: 'echo', x: b.x1, y: b.y1, t: 0, T: 0.32, R: b.R * 1.35, dmg: b.dmg })   // 돌파 — 한 번 더 크게
+          if (b.br) G.shots.push({ k: 'echo', x: b.x1, y: b.y1, t: 0, T: 0.32, R: b.R * 1.35, dmg: b.dmg, sk: b.sk })   // 돌파 — 한 번 더 크게
         }
         break
       }
@@ -1412,7 +1555,7 @@ function shots(dt) {
       case 'shotclock':   // 샷 클락 — 0이 되면 터진다. 돌파면 둘레에 작은 시계 셋이 흩어져 한 번 더
         if (b.t >= b.T) {
           splash(b.x, b.y, b.R, b.dmg, b.br ? '#ffd23f' : '#ff4d4d', !b.mini, b.br); shake = Math.max(shake, b.mini ? 1 : 3); b.dead = true
-          if (b.br && !b.mini) for (let k = 0; k < 3; k++) { const a = k / 3 * TAU + rnd(), d = b.R * 0.9; G.shots.push({ k: 'shotclock', x: b.x + Math.cos(a) * d, y: wallY(b.y + Math.sin(a) * d * 0.8), t: 0, T: 0.45, R: b.R * 0.55, dmg: b.dmg * 0.6, br: true, mini: true }) }
+          if (b.br && !b.mini) for (let k = 0; k < 3; k++) { const a = k / 3 * TAU + rnd(), d = b.R * 0.9; G.shots.push({ k: 'shotclock', x: b.x + Math.cos(a) * d, y: wallY(b.y + Math.sin(a) * d * 0.8), t: 0, T: 0.45, R: b.R * 0.55, dmg: b.dmg * 0.6, br: true, mini: true, sk: b.sk }) }
         }
         break
       case 'drop':   // 앨리웁 — 하늘에서
@@ -1486,7 +1629,40 @@ function shots(dt) {
         if (b.t > b.life) b.dead = true
         break
     }
+    if (!b.sk) continue
+    if (b.dead) { if (!b.burst && b.k !== 'trail' && b.k !== 'orb' && b.k !== 'echo') { b.burst = 1; burst(b) } }
+    else if (b.t > 0 && rnd() < dt * [0, 14, 28, 34][b.sk]) dot(b)
   }
+}
+// ---- 스킬 이펙트 스킨 — 아이스(노멀) 하얀 서리 · 인페르노(레어) 솟는 불티 · 갤럭시(유니크) 무지개 별빛. 빛 그림 캐시가 늘지 않게 무지개는 12색
+const HUES = Array.from({ length: 12 }, (_, i) => { const f = n => { const k = (n + i / 30 * 12) % 12; return Math.round(255 * (0.68 - 0.32 * Math.max(-1, Math.min(k - 3, 9 - k, 1)))) }; return `rgb(${f(0)},${f(8)},${f(4)})` })
+const thCol = (sk, seed = 0, alt = false) => sk === 3 ? HUES[((G.t * 4 + seed) % 12 + 12) % 12 | 0] : alt ? THEME[sk].c2 : THEME[sk].c
+/** 그 스킬의 빛이 있는 자리 — 날아가는 공은 그 높이, 고리 · 구역은 가운데(at) 또는 그 안 아무 데나 */
+function thPos(b, at = false) {
+  const u = Math.min(1, Math.max(0, b.t) / (b.T || 1))
+  switch (b.k) {
+    case 'arc': return [b.x, b.y - 16 - 4 * b.H * u * (1 - u)]
+    case 'drop': return [b.x, b.y - 16 - (1 - u) * 300]
+    case 'orb': return [b.x, b.y - 14]
+    case 'trail': case 'echo': return [b.x, b.y]
+    case 'slash': return [pl.x + b.side * b.W * (at ? 0.55 : 0.2 + rnd() * 0.8), pl.y - 12]
+    case 'ring': case 'zone': case 'shotclock': { if (at) return [b.x, b.y]; const a = rnd() * TAU, r = b.k === 'ring' ? b.R * (0.15 + u * 0.85) : b.R * Math.sqrt(rnd()); return [b.x + Math.cos(a) * r, b.y + Math.sin(a) * r * 0.8] }
+    default: return [b.x, b.y - 16]
+  }
+}
+function dot(b) {   // 꼬리 한 알
+  const [x, y] = thPos(b), k = b.sk, c1 = thCol(k, x * 0.02), c2 = thCol(k, 0, true)
+  if (k === 1) part(x, y, (rnd() - 0.5) * 30, (rnd() - 0.5) * 30, rnd() < 0.5 ? c1 : c2, 0.45, 2)
+  else if (k === 2) part(x, y, (rnd() - 0.5) * 40, -40 - rnd() * 70, rnd() < 0.6 ? c1 : c2, 0.55, 2.6)
+  else { part(x, y, (rnd() - 0.5) * 50, (rnd() - 0.5) * 50, c1, 0.6, 2.4); if (G.fx.length < 150 && rnd() < 0.5) fx({ k: 'spark', x, y, s: 9 + rnd() * 8, a: rnd() * TAU, T: 0.4 }) }
+}
+function burst(b) {   // 맞은 자리 · 끝난 자리 — 등급이 높을수록 크게
+  if (G.fx.length > 170) return
+  const k = b.sk, [x, y] = b.k === 'arc' ? [b.x1 ?? b.x, b.y1 ?? b.y] : b.k === 'bolt' || b.k === 'grab' || b.k === 'beam' ? [b.x, b.y] : thPos(b, true), R = Math.min(90, b.R || (b.r || 8) * 3), c1 = thCol(k, x * 0.02), c2 = thCol(k, 0, true)
+  fx({ k: 'ring', x, y, R: R * (0.7 + k * 0.2), T: 0.3 + k * 0.08, col: c1 })
+  if (k >= 2) fx({ k: 'flash', x, y: y - 8, R: R * 0.6, col: c2, T: 0.3 })
+  if (k === 3) { fx({ k: 'ring', x, y, R: R * 0.5, T: 0.4, col: c2 }); for (let i = 0; i < 4; i++) fx({ k: 'spark', x: x + (rnd() - 0.5) * R, y: y - 6 + (rnd() - 0.5) * R * 0.6, s: 12 + rnd() * 10, a: rnd() * TAU, T: 0.45 }) }
+  for (let i = 0; i < 3 + k * 3; i++) { const a = rnd() * TAU, v = 60 + rnd() * 100; part(x, y - 6, Math.cos(a) * v, Math.sin(a) * v * 0.6 - (k === 2 ? 70 : 20), rnd() < 0.5 ? c1 : c2, 0.45, 2.2) }
 }
 function splash(x, y, R, dmg, col, crack = false, br = false) {
   near(x, y, R, e => { hurt(e, dmg, x, y, 160) })
@@ -1685,12 +1861,12 @@ function digits(c, s, x, y, size, kind) {
 function render() {
   const W = cv.width, H = cv.height
   cx.setTransform(1, 0, 0, 1, 0, 0); cx.fillStyle = '#0b0e14'; cx.fillRect(0, 0, W, H)
-  const X = cam.x + (shake ? (rnd() - 0.5) * shake : 0), Y = cam.y + (shake ? (rnd() - 0.5) * shake : 0)
-  cx.setTransform(SC, 0, 0, SC, W / 2 - X * SC, H / 2 - Y * SC)
-  floor(cx, G ? G.map : MAPS[menuMap], X - VW / 2, Y - VH / 2, VW, VH, tnow)
+  const X = cam.x + (shake ? (rnd() - 0.5) * shake : 0), Y = cam.y + (shake ? (rnd() - 0.5) * shake : 0), z = G?.demo ? ZOOM : 1, sc = SC * z
+  cx.setTransform(sc, 0, 0, sc, W / 2 - X * sc, H / 2 - Y * sc)
+  floor(cx, G ? G.map : MAPS[menuMap], X - VW / z / 2, Y - VH / z / 2, VW / z, VH / z, tnow)
   if (!G) return
   world(cx)
-  hud()
+  if (!G.demo) hud()
 }
 function world(c) {
   const t = G.t
@@ -1759,7 +1935,7 @@ function world(c) {
   let si = 0   // 상태이상 — 발밑에 그 색 고리
   for (const id in STATUS) if (sick(id)) { const r = 22 + si++ * 5; c.strokeStyle = rgba(STATUS[id].col, 0.6 + Math.sin(t * 8) * 0.3); c.lineWidth = 2.6; c.beginPath(); c.ellipse(pl.x, pl.y, r, r * 0.4, 0, 0, TAU); c.stroke() }
   // 내 발밑 — 유니폼 색 고리 + 도는 빛
-  const ring = G.ch.c[0] === '#fdb927' ? '#ffd23f' : liftSkin(G.ch.c[0], 40) === G.ch.c[0] ? shade(G.ch.c[0], 1.6) : G.ch.c[1]   // 아주 어두운 유니폼(히트 검정)은 보조색
+  const ring = G.ch.c[0] === '#fdb927' ? '#ffd23f' : brighten(G.ch.c[0], 40) === G.ch.c[0] ? shade(G.ch.c[0], 1.6) : G.ch.c[1]   // 아주 어두운 유니폼(히트 검정)은 보조색
   c.strokeStyle = rgba(ring, 0.55); c.lineWidth = 2.4; c.beginPath(); c.ellipse(pl.x, pl.y, 17, 6.6, 0, 0, TAU); c.stroke()
   c.strokeStyle = '#fff'; c.lineWidth = 2.6; c.beginPath(); c.ellipse(pl.x, pl.y, 17, 6.6, 0, t * 3, t * 3 + 1.1); c.stroke()
   // ---- 아이템 · 경험치
@@ -1803,19 +1979,19 @@ function world(c) {
   // ---- 날아가는 것
   for (const b of G.shots) {
     if (b.k === 'ball' || b.k === 'boom' || b.k === 'hook') {
-      const big = b.k === 'hook', s = big ? (b.br ? BIGG : BIG) : b.br ? BALLG : BALL, k = big ? b.r / 11.5 : b.k === 'boom' ? b.r / 8 : 1
+      const big = b.k === 'hook', s = ballOf(b, big), k = big ? b.r / 11.5 : b.k === 'boom' ? b.r / 8 : 1
       const vx = b.k === 'boom' ? b.dx * b.v : b.vx, vy = b.k === 'boom' ? b.dy * b.v : b.vy
       for (let i = 3; i >= 1; i--) { c.globalAlpha = 0.16 * (4 - i) / 3; blit(c, s, b.x - vx * 0.018 * i, b.y - 16 - vy * 0.018 * i, k) }   // 잔상
       c.globalAlpha = 1
       c.save(); c.translate(b.x, b.y - 16); c.rotate(b.a); blit(c, s, 0, 0, k); c.restore()
     } else if (b.k === 'arc') {
       const u = Math.min(1, b.t / b.T), z = 4 * b.H * u * (1 - u)
-      c.save(); c.translate(b.x, b.y - 16 - z); c.rotate(b.a); blit(c, b.br ? BALLG : BALL, 0, 0, 1 + z / 240); c.restore()
+      c.save(); c.translate(b.x, b.y - 16 - z); c.rotate(b.a); blit(c, ballOf(b), 0, 0, 1 + z / 240); c.restore()
     } else if (b.k === 'drop') {
       const u = Math.min(1, b.t / b.T), R = b.R * (1.3 - u * 0.3)
       c.strokeStyle = b.br ? `rgba(199,125,255,${0.3 + u * 0.6})` : `rgba(255,210,63,${0.3 + u * 0.6})`; c.lineWidth = 2.4; c.beginPath(); c.ellipse(b.x, b.y, R, R * 0.5, 0, 0, TAU); c.stroke()
       c.setLineDash([6, 6]); c.lineDashOffset = t * 40; c.beginPath(); c.ellipse(b.x, b.y, R * 0.6, R * 0.3, 0, 0, TAU); c.stroke(); c.setLineDash([])
-      blit(c, b.br ? BALLG : BALL, b.x, b.y - 16 - (1 - u) * 300, 1.3)
+      blit(c, ballOf(b), b.x, b.y - 16 - (1 - u) * 300, 1.3)
     } else if (b.k === 'orb') {
       for (let i = 2; i >= 0; i--) {   // 손 잔상
         const a = b.w.ang - i * 0.22 + b.i / b.n * TAU
@@ -1830,12 +2006,12 @@ function world(c) {
       c.beginPath(); c.moveTo(x0, y - b.H * 0.1); c.quadraticCurveTo(mx, y - b.H * (0.95 + u * 0.3), x1, y); c.quadraticCurveTo(mx, y - b.H * 0.3, x0, y + b.H * 0.1); c.fill()
       c.beginPath(); c.moveTo(x0, y + 2); c.quadraticCurveTo(mx, y + b.H * 0.75, x1, y + 4); c.quadraticCurveTo(mx, y + b.H * 0.25, x0, y + 2); c.fill()
       c.globalAlpha = 1
-      blit(c, b.br ? BALLG : BALL, x0 + (x1 - x0) * Math.min(1, u * 1.6), y + 4, 0.8)
+      blit(c, ballOf(b), x0 + (x1 - x0) * Math.min(1, u * 1.6), y + 4, 0.8)
     } else if (b.k === 'shotclock') {   // 전광판 — 24 에서 0 까지 빠르게
       const y = b.y - (b.mini ? 30 : 46), s = b.mini ? 0.7 : 1
       rr(c, b.x - 17 * s, y - 15 * s, 34 * s, 22 * s, 4, '#14171dee'); label2(c, String(Math.ceil(24 * Math.max(0, 1 - b.t / b.T))), b.x, y + 3 * s, 17 * s, b.br ? '#ffd23f' : '#ff3b3b')
     } else if (b.k === 'zone') blit(c, pl.spr.mate, b.x, b.y)
-    else if (b.k === 'rebound') { c.save(); c.translate(b.x, b.y - 16); c.rotate(b.a); blit(c, b.br ? BALLG : BALL, 0, 0, b.r / 7.5); c.restore() }
+    else if (b.k === 'rebound') { c.save(); c.translate(b.x, b.y - 16); c.rotate(b.a); blit(c, ballOf(b), 0, 0, b.r / 7.5); c.restore() }
   }
   for (const b of G.eshots) { c.save(); c.translate(b.x, b.y - 18); c.rotate(b.a); blit(c, b.k === 'ball' ? BALL : b.k === 'card' ? CARD : WHISTLE, 0, 0, b.k === 'ball' ? 1.3 : 1); c.restore() }
   for (const f of G.fx) if (f.k === 'puff') {   // 쓰러질 때 연기
@@ -1869,6 +2045,26 @@ function world(c) {
     else if (b.k === 'drop') bloom(c, '#b46bff', b.x, b.y - 16 - (1 - Math.min(1, Math.max(0, b.t) / b.T)) * 300, 30)
     else if (b.k === 'arc') { const u = Math.min(1, b.t / b.T); bloom(c, '#b46bff', b.x, b.y - 16 - 4 * b.H * u * (1 - u), 26) }
     else bloom(c, '#b46bff', b.x, b.y - 16, (b.r || 7) * 3.4)
+  }
+  for (const b of G.shots) if (b.sk && b.t >= 0) {   // 스킬 이펙트 스킨 — 그 색 빛을 한 겹 더
+    const k = b.sk, col = thCol(k, b.x * 0.02), [x, y] = thPos(b, true)
+    c.globalAlpha = [0, 0.45, 0.6, 0.72][k]
+    if (b.k === 'ring' || b.k === 'zone' || b.k === 'shotclock') {
+      const R = b.k === 'ring' ? b.R * (0.15 + Math.min(1, b.t / b.T) * 0.85) : b.R
+      c.strokeStyle = col; c.lineWidth = 1.5 + k; c.beginPath(); c.ellipse(b.x, b.y, R, R * 0.8, 0, 0, TAU); c.stroke()
+      if (k === 3) { c.setLineDash([6, 8]); c.lineDashOffset = -t * 40; c.beginPath(); c.ellipse(b.x, b.y, R * 1.12, R * 0.9, 0, 0, TAU); c.stroke(); c.setLineDash([]) }
+    } else if (b.k === 'trail') { c.globalAlpha *= Math.max(0, 1 - b.t / b.life); bloom(c, col, b.x, b.y, b.R * 1.3) }
+    else if (b.k === 'slash') bloom(c, col, x, y, b.W * 0.5)
+    else { bloom(c, col, x, y, (b.r || 8) * (1.8 + k * 0.7)); if (k === 3) { c.globalAlpha = 0.85; bloom(c, '#ffffff', x, y, (b.r || 8) * 0.9) } }
+  }
+  const pw = G.weapons.find(w => w.id === 'press' && w.sk && w.R)
+  if (pw) { c.globalAlpha = 0.55; c.strokeStyle = thCol(pw.sk); c.lineWidth = 2 + pw.sk; c.beginPath(); c.ellipse(pl.x, pl.y, pw.R, pw.R * 0.8, 0, 0, TAU); c.stroke() }
+  for (const f of G.fx) if (f.sk) {   // 번개 · 빛줄기 · 손 자국도 그 색
+    const u = f.t / f.T, col = thCol(f.sk, f.x * 0.02)
+    c.globalAlpha = 1 - u; c.strokeStyle = col
+    if (f.k === 'bolt') { c.lineWidth = 3 + f.sk * 2; c.lineJoin = 'round'; c.beginPath(); f.pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.stroke() }
+    else if (f.k === 'beam') { c.save(); c.translate(f.x, f.y); c.rotate(f.a); c.fillStyle = col; c.globalAlpha = 0.5 * (1 - u); c.fillRect(0, -f.W * 0.5, f.L, f.W); c.restore() }
+    else if (f.k === 'grab') { c.lineWidth = 4 + f.sk; c.beginPath(); c.moveTo(f.x0, f.y0); c.lineTo(f.x, f.y); c.stroke() }
   }
   for (const f of G.fx) {
     const u = f.t / f.T
@@ -1924,13 +2120,57 @@ function drawMe(c) {
   const s = pl.spr, fr = pl.moving ? (G.t * 10 | 0) & 3 : 0, img = (pl.fx > 0 ? s.R : s.L)[fr]
   const jz = pl.jump > 0 ? Math.sin((1 - pl.jump / 0.3) * Math.PI) * 30 : 0
   if (G.dying) { c.save(); c.globalAlpha = Math.max(0, G.dying); c.translate(pl.x, pl.y); c.rotate((1 - G.dying) * 1.4 * pl.fx); blit(c, img, 0, 0); c.restore(); return }
-  if (pl.inv > 0 && (G.t * 18 | 0) % 2) c.globalAlpha = 0.45
+  if (G.aura) aura(c, G.aura, pl.x, pl.y - jz, false)
+  if (pl.inv > 0 && pl.inv < 99 && (G.t * 18 | 0) % 2) c.globalAlpha = 0.45
   blit(c, img, pl.x, pl.y - jz)
   c.globalAlpha = 1
-  if (!jz) { const bz = Math.abs(Math.sin(G.t * 9)) * 13; blit(c, BALL, pl.x + pl.fx * 11, pl.y - 3 - bz, 0.75) }   // 드리블
+  if (G.aura) aura(c, G.aura, pl.x, pl.y - jz, true)
+  if (!jz) {   // 드리블 — 공 스킨이면 그 공 · 동물(튈 때 살짝 눌린다)
+    const bz = Math.abs(Math.sin(G.t * 9)) * 13, bx = pl.x + pl.fx * 11, by = pl.y - 3 - bz, sp = G.ball && BALLSK[G.ball]
+    if (!sp) blit(c, BALL, bx, by, 0.75)
+    else {
+      const q = 1 - Math.max(0, 1 - bz / 4) * 0.18
+      c.save(); c.translate(bx, by + 4); c.scale(pl.fx * (2 - q), q); blit(c, sp, 0, -4, SKIN[G.ball].pet ? 0.85 : 0.75); c.restore()
+      if (G.ball === 'ball_gold') { c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.5; bloom(c, '#ffd23f', bx, by, 14); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over' }
+    }
+  }
   const w = 30, f = pl.hp / S.maxHp   // 체력
   c.fillStyle = '#000b'; c.fillRect(pl.x - w / 2 - 1, pl.y + 8, w + 2, 5)
   c.fillStyle = f > 0.5 ? '#62e38a' : f > 0.25 ? '#ffd23f' : '#ff4d4d'; c.fillRect(pl.x - w / 2, pl.y + 9, w * f, 3)
+}
+/** 옷 오라 — 유니크(불꽃 · 후광 · 번개) · 레전더리(바닥 문양 · 빛기둥 · 별빛 · 발자국). front 면 몸 앞에 */
+function aura(c, [k, c1, c2], x, y, front) {
+  const t = G.t
+  c.save(); c.globalCompositeOperation = 'lighter'
+  if (k === 'flame') {
+    if (!front) for (let i = 0; i < 5; i++) { const h = (t * 1.6 + i / 5) % 1; c.globalAlpha = 0.55 * (1 - h); bloom(c, i % 2 ? c1 : c2, x + Math.sin(t * 7 + i * 1.9) * 8, y - 10 - h * 46, 17 - h * 9) }
+    else if (rnd() < 0.5) part(x + (rnd() - 0.5) * 18, y - 8 - rnd() * 30, (rnd() - 0.5) * 20, -60 - rnd() * 50, rnd() < 0.5 ? c1 : c2, 0.6, 2.2)
+  } else if (k === 'halo') {
+    if (!front) {
+      c.globalAlpha = 0.32 + Math.sin(t * 3) * 0.08; bloom(c, c2, x, y - 26, 46)
+      c.fillStyle = rgba(c2, 0.13); for (let i = 0; i < 8; i++) { const a = t * 0.6 + i * TAU / 8; c.beginPath(); c.moveTo(x, y - 26); c.lineTo(x + Math.cos(a - 0.12) * 56, y - 26 + Math.sin(a - 0.12) * 56); c.lineTo(x + Math.cos(a + 0.12) * 56, y - 26 + Math.sin(a + 0.12) * 56); c.fill() }
+    } else { const hy = y - 61 + Math.sin(t * 3) * 1.5; c.globalAlpha = 0.95; c.strokeStyle = c1; c.lineWidth = 2.2; c.beginPath(); c.ellipse(x, hy, 9, 3, 0, 0, TAU); c.stroke(); c.globalAlpha = 0.6; bloom(c, c1, x, hy, 15) }
+  } else if (k === 'storm') {
+    if (!front) { c.globalAlpha = 0.3 + Math.sin(t * 17) * 0.1; bloom(c, c1, x, y - 24, 40) }
+    else if ((t * 14 | 0) % 3 === 0) {
+      c.globalAlpha = 0.9; c.strokeStyle = c2; c.lineWidth = 1.4; c.lineJoin = 'round'
+      for (let j = 0; j < 2; j++) { const a = rnd() * TAU; let px = x + Math.cos(a) * 6, py = y - 24 + Math.sin(a) * 14; c.beginPath(); c.moveTo(px, py); for (let i = 0; i < 4; i++) { px += Math.cos(a) * 5 + (rnd() - 0.5) * 6; py += Math.sin(a) * 5 + (rnd() - 0.5) * 6; c.lineTo(px, py) } c.stroke() }
+      c.globalAlpha = 0.5; bloom(c, c1, x, y - 24, 22)
+    }
+  } else if (k === 'legend') {
+    if (!front) {
+      const g = c.createLinearGradient(0, y - 110, 0, y); g.addColorStop(0, rgba(c1, 0)); g.addColorStop(1, rgba(c1, 0.32)); c.globalAlpha = 0.7 + Math.sin(t * 2.4) * 0.3; c.fillStyle = g; c.fillRect(x - 15, y - 110, 30, 110)
+      c.globalAlpha = 0.85; c.lineWidth = 2
+      for (const [R, col, dir] of [[26, c1, 1], [33, c2, -1]]) { c.strokeStyle = col; c.setLineDash([7, 5]); c.lineDashOffset = dir * t * 30; c.beginPath(); c.ellipse(x, pl.y, R, R * 0.38, 0, 0, TAU); c.stroke() }
+      c.setLineDash([]); c.globalAlpha = 0.38 + Math.sin(t * 4) * 0.1; bloom(c, c1, x, y - 22, 52)
+    } else {
+      c.globalAlpha = 0.35 + Math.sin(t * 5) * 0.2; bloom(c, c1, x, y - 22, 17)
+      c.globalAlpha = 0.9; star(c, x + 0.6, y - 64 + Math.sin(t * 3) * 1.5, 4.2, c2); c.globalAlpha = 0.6; bloom(c, c2, x, y - 64, 13)
+      if (G.fx.length < 150 && rnd() < 0.3) fx({ k: 'spark', x: x + (rnd() - 0.5) * 34, y: y - 6 - rnd() * 52, s: 9 + rnd() * 9, a: rnd() * TAU, T: 0.5 })
+      if (pl.moving && (t * 7 | 0) !== (G.stepT | 0)) { G.stepT = t * 7; fx({ k: 'ring', x, y: pl.y, R: 16, T: 0.5, col: c1 }) }   // 발자국 빛
+    }
+  }
+  c.restore()
 }
 function label2(c, s, x, y, size, col) { c.font = `900 ${size}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.lineJoin = 'round'; c.lineWidth = size * 0.24; c.strokeStyle = '#0b0e14'; c.strokeText(s, x, y); c.fillStyle = col; c.fillText(s, x, y) }
 let VIG = null, VIGR = null   // 화면 가장자리 그늘(체력이 낮으면 붉게) — 크기가 바뀔 때만 다시
@@ -2020,16 +2260,16 @@ function show(keepScroll, ...kids) {
 }
 const saveNote = () => auth === 'in' ? `업적이 ${me?.name ?? ''} 계정에 저장돼요 — 다른 기기에서도 이어져요` : '로그인하지 않으면 업적은 이 브라우저에만 남아요. 로그인하면 계정에 합쳐져요'
 function title() {
-  mode = 'menu'; G = null; pauseBtn.hidden = true
+  mode = 'menu'; G = null; pauseBtn.hidden = true; ui.classList.remove('is-shop')
   const got = ACH.filter(a => save.ach[a.id]).length
   show(false, h('div', { className: 'sv-title' },
     h('p', { className: 'sv-logo' }, h('span', {}, 'DUNK'), h('span', {}, 'SURVIVOR')),
     h('p', { className: 'sv-sub' }, '몰려오는 수비를 피해 30분을 버텨라'),
-    row(btn('게임 시작', chars, 'is-main'), btn('랭킹', ranks), btn(`업적 ${got} / ${ACH.length}`, achs), btn(['패치 노트', notesNew() && h('i', { className: 'sv-new' }, 'NEW')], notes)),
+    row(btn('게임 시작', chars, 'is-main'), btn(`상점 · ${points().toLocaleString()} P`, () => shop()), btn('랭킹', ranks), btn(`업적 ${got} / ${ACH.length}`, achs), btn(['패치 노트', notesNew() && h('i', { className: 'sv-new' }, 'NEW')], notes)),
     h('p', { className: 'sv-note' }, saveNote())))
 }
 function chars(keep = false) {
-  mode = 'menu'; G = null; pauseBtn.hidden = true
+  mode = 'menu'; G = null; pauseBtn.hidden = true; ui.classList.remove('is-shop')
   const ch = CHARS[menuChar], lock = lockOf(ch), W = WEAP[ch.w]
   show(keep === true, h('div', { className: 'sv-panel sv-wide' },
     h('p', { className: 'sv-h' }, '캐릭터 고르기'),
@@ -2074,9 +2314,78 @@ function achList() {
     const at = save.ach[a.id], c = a.char && CHARS.find(x => x.id === a.char), pr = !at && progress(a)
     return h('li', { className: at ? 'is-done' : '' },
       h('span', { className: 'sv-medal', 'aria-label': at ? '달성' : '아직' }, at ? '★' : '☆'),
-      h('div', {}, h('b', {}, a.name), h('small', {}, a.note, pr && ` (${pr})`), c && h('small', { className: 'sv-reward' }, `${at ? '열림' : '해금'} · ${nameOf(c)}`)),
+      h('div', {}, h('b', {}, a.name), h('small', {}, a.note, pr && ` (${pr})`), c && h('small', { className: 'sv-reward' }, `${at ? '열림' : '해금'} · ${nameOf(c)}`), a.skin && h('small', { className: 'sv-reward' }, `${at ? '받음' : '보상'} · 스킨 「${SKIN[a.skin].name}」`)),
       c && h('img', { src: faceOf(P(c.id)), alt: '' }))
   }))
+}
+// ---- 상점 · 옷장 — 포인트로 스킨을 사고(옷장은 가진 것만) 캐릭터마다 입힌다. 고른 스킨은 뒤의 미리 보기 판에 바로 보인다
+const CLOSET = new URLSearchParams(location.search).has('closet')   // 내 정보 페이지 안(iframe)의 옷장
+if (CLOSET) document.body.classList.add('sv-embed')   // 페이지 머리 · 설명은 숨기고 게임 화면만
+const SHOP_TABS = [['fx', '스킬 이펙트'], ['ball', '농구공'], ['fit', '옷'], ['ach', '업적 스킨']]
+const FX_NOTE = [, '하얀 서리 빛 · 꼬리', '솟는 불티 · 맞은 자리 불꽃', '무지개 별빛 · 반짝이 · 두 겹 고리']
+const AURA_NOTE = { flame: '몸에서 불꽃이 피어오른다', halo: '머리 위 후광 · 뒤에 빛살', storm: '몸 둘레에 번개가 튄다', legend: '바닥에 도는 문양 · 빛기둥 · 별빛 · 걸을 때 빛 발자국' }
+let shopTab = 'fx', shopCi = 0, shopW = null, shopSel = 'base'
+const slotOf = tab => tab === 'fx' ? 'fx' : tab === 'ball' ? 'ball' : 'fit'
+function shopItems(ch) {
+  const all = shopTab === 'fx' ? SKIN_LIST.filter(k => k.kind === 'fx' && k.w === shopW) : shopTab === 'ball' ? SKIN_LIST.filter(k => k.kind === 'ball')
+    : shopTab === 'fit' ? SKIN_LIST.filter(k => k.kind === 'fit' && !k.ach) : SKIN_LIST.filter(k => k.ach && k.char === ch.id)
+  return [...shopTab === 'ach' ? [] : ['base'], ...all.filter(k => !CLOSET || owns(k))]
+}
+const THUMB = new Map()
+function thumb(k, ch) {   // 카드 그림 — 이펙트는 스킬 아이콘(등급 색 테), 공은 그 공, 옷은 그 캐릭터가 입은 모습
+  if (shopTab === 'fx') return h('img', { src: ICON_URL[shopW], alt: '' })
+  const key = `${shopTab}|${k === 'base' ? 'base' : k.id}|${ch.id}`
+  let cv0 = THUMB.get(key)
+  if (!cv0) {
+    const sp = shopTab === 'ball' ? (k === 'base' ? BALL : BALLSK[k.id])
+      : sprite(36, 66, 18, 62, c => person(c, { jersey: ch.c[0], trim: ch.c[1], shorts: ch.c[0], skin: ch.skin || '#b9825a', hair: '#1d140e', shoe: '#f4f4f4', num: NBA_NUM[ch.id] ?? '', head: ch.head, kind: 'me', ...ch.fit, ...(k === 'base' ? null : k.look) }))
+    cv0 = sp.c.toDataURL(); THUMB.set(key, cv0)
+  }
+  return h('img', { src: cv0, alt: '', className: shopTab === 'ball' ? 'is-ball' : 'is-fit' })
+}
+function shop(closet = CLOSET, keep = false) {
+  if (!keep) shopSel = null
+  const ch = CHARS[shopCi], lock = lockOf(ch), slot = slotOf(shopTab)
+  shopW ||= ch.w
+  const key = slot === 'fx' ? shopW : ch.id, wornNow = worn(slot, key), items = shopItems(ch)
+  if (shopSel === null || !items.some(k => (k === 'base' ? 'base' : k.id) === shopSel)) shopSel = wornNow?.id || (items[0] === 'base' ? 'base' : items[0]?.id) || 'base'
+  const sel = shopSel === 'base' ? null : SKIN[shopSel], fxNow = { [ch.w]: worn('fx', ch.w)?.tier || 0 }
+  mode = 'shop'; pauseBtn.hidden = true
+  demo({ ci: shopCi, lv: shopTab === 'fx' ? 8 : 3, w: shopTab === 'fx' ? shopW : null, fx: shopTab === 'fx' ? { [shopW]: sel?.tier || 0 } : fxNow,
+    fit: slot === 'fit' ? sel?.id : worn('fit', ch.id)?.id, ball: slot === 'ball' ? sel?.id : worn('ball', ch.id)?.id })
+  const pick = id => { shopSel = id; shop(closet, true) }
+  const card = k => {
+    const id = k === 'base' ? 'base' : k.id, own = k === 'base' || owns(k), on = k === 'base' ? !wornNow : wornNow?.id === id
+    const name = k === 'base' ? { fx: '기본 이펙트', ball: '농구공', fit: '팀 유니폼' }[slot] : shopTab === 'fx' ? THEME[k.tier].name : k.name
+    return h('button', { type: 'button', className: `sv-item${k === 'base' ? '' : ` is-t${k.tier}`}${shopTab === 'fx' && k !== 'base' ? ` is-${THEME[k.tier].id}` : ''}`, 'aria-pressed': String(id === shopSel), onclick: () => pick(id) },
+      h('span', { className: 'sv-item-art' }, thumb(k, ch)),
+      k !== 'base' && h('small', { className: 'sv-tier' }, TIER[k.tier].name),
+      h('b', {}, name),
+      h('small', { className: 'sv-item-st' }, on ? '착용 중' : own ? '보유' : k.ach ? '업적 보상' : `${k.price.toLocaleString()} P`))
+  }
+  // 고른 것 — 설명 · 사기 · 입기
+  const msg = h('p', { className: 'sv-shop-msg', role: 'status' })
+  let act = null
+  if (!sel) act = wornNow ? btn('기본으로', () => { wearSkin(slot, key, null); shop(closet, true) }, 'is-main') : h('span', { className: 'sv-shop-on' }, '착용 중')
+  else if (owns(sel)) act = wornNow?.id === sel.id ? btn('벗기', () => { wearSkin(slot, key, null); shop(closet, true) }) : Object.assign(btn('착용', () => { wearSkin(slot, key, sel.id); shop(closet, true) }, 'is-main'), { disabled: !!lock })
+  else if (sel.ach) act = h('span', { className: 'sv-shop-lock' }, `업적 「${ACH.find(a => a.id === sel.ach).name}」 — ${ACH.find(a => a.id === sel.ach).note}`)
+  else act = Object.assign(btn(`구매 · ${sel.price.toLocaleString()} P`, () => { if (buy(sel)) { wearSkin(slot, key, sel.id); shop(closet, true); notice(`「${sel.name}」 — 바로 입혔어요`, '구매') } }, 'is-main'), { disabled: !!lock || points() < sel.price })
+  const why = sel && !owns(sel) && !sel.ach && (lock ? '잠긴 캐릭터예요 — 캐릭터를 먼저 열어야 살 수 있어요' : points() < sel.price ? `포인트가 ${(sel.price - points()).toLocaleString()} 모자라요 — 판을 끝내면 쌓여요` : '')
+  const note = !sel ? '' : sel.kind === 'fx' ? `${WEAP[sel.w].name} — ${FX_NOTE[sel.tier]}` : sel.kind === 'ball' ? (sel.pet ? `드리블할 때 공 대신 ${sel.name}가 통통` : `드리블하는 공이 ${sel.name}로`) : [sel.char ? `${nameOf(ch)} 전용` : '모든 캐릭터', sel.aura && AURA_NOTE[sel.aura[0]]].filter(Boolean).join(' · ')
+  ui.classList.add('is-shop')
+  show(keep, h('div', { className: 'sv-shop' },
+    h('div', { className: 'sv-shop-head' }, h('p', { className: 'sv-h' }, closet ? '옷장' : '상점'), h('span', { className: 'sv-pts-pill' }, `${points().toLocaleString()} P`)),
+    h('div', { className: 'sv-tabs', role: 'tablist' }, SHOP_TABS.map(([id, name]) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(id === shopTab), onclick: () => { shopTab = id; shop(closet) } }, name))),
+    h('div', { className: 'sv-shop-chars' }, CHARS.map((c, i) => h('button', { type: 'button', className: lockOf(c) ? 'is-locked' : '', 'aria-pressed': String(i === shopCi), title: nameOf(c), onclick: () => { shopCi = i; shopW = null; shop(closet) } }, h('img', { src: faceOf(P(c.id)), alt: nameOf(c) })))),
+    shopTab === 'fx' && h('div', { className: 'sv-shop-skills' }, Object.keys(WEAP).map(w => h('button', { type: 'button', 'aria-pressed': String(w === shopW), title: WEAP[w].name, onclick: () => { shopW = w; shop(closet) } }, h('img', { src: ICON_URL[w], alt: WEAP[w].name })))),
+    h('div', { className: 'sv-items' }, items.map(card)),
+    items.length <= (shopTab === 'ach' ? 0 : 1) && h('p', { className: 'sv-note' }, closet ? '아직 가진 스킨이 없어요 — 게임의 상점에서 포인트로 사요' : '이 캐릭터의 업적 스킨이 없어요'),
+    h('div', { className: 'sv-shop-sel' },
+      h('div', {}, h('b', {}, sel ? sel.name : '기본', sel && h('small', { className: `sv-tier is-t${sel.tier}` }, TIER[sel.tier].name)), h('small', {}, `${nameOf(ch)}${lock ? ' (잠김)' : ''} · ${note || (slot === 'fx' ? `${WEAP[shopW].name} 기본` : slot === 'ball' ? '농구공' : '그 팀 유니폼')}`), why && h('small', { className: 'sv-shop-why' }, why)),
+      act),
+    msg,
+    closet ? h('p', { className: 'sv-note' }, h('a', { href: '/survive/', target: '_top' }, '덩크 서바이버 하러 가기 →'))
+      : row(btn('← 처음으로', () => { ui.classList.remove('is-shop'); title() }))))
 }
 // ---- 랭킹 — 맵마다 오래 버틴 순(같으면 많이 쓰러뜨린 순), 사람마다 최고 기록 한 줄. 로그인하면 판이 끝날 때 올라간다
 const PENDING = 'survive.pending'   // 로그인 안 하고 끝낸 판(더 나은 것 하나) — 로그인하고 돌아오면 올린다(2시간 안)
@@ -2131,7 +2440,7 @@ function pause() {
 }
 function resume() { if (mode !== 'pause') return; mode = 'play'; ui.hidden = true; pauseBtn.hidden = false }
 function finish(win, quit = false) {
-  if (mode === 'over') return
+  if (mode === 'over' || G.demo) return
   mode = 'over'; pauseBtn.hidden = true; calm()
   const st = save.stats, add = (k, v) => { st[k] = (st[k] || 0) + v }
   add('kills', G.kills); add('runs', 1); add('jackpots', G.jackpots); add('bosses', G.bosses)
@@ -2139,6 +2448,7 @@ function finish(win, quit = false) {
   st[`p_${G.ch.id}`] = 1
   gain('run1')
   if (win) { gain('surv30'); gain(`clear_${G.map.id}`) }
+  const pt = runPts(win); add('pts', pt.total)   // 포인트 — 상점에서 스킨을 산다
   for (const a of ACH) if (a.stat && (st[a.stat] || 0) >= a.goal) gain(a.id)
   if (CHARS.every(c => st[`p_${c.id}`])) gain('allchar')
   persist(true)
@@ -2156,31 +2466,33 @@ function finish(win, quit = false) {
     h('p', { className: 'sv-h sv-big' }, quit ? '경기 포기' : G.map.endless ? `챌린지 ${fmt(G.t)}` : win ? '30분 생존!' : 'K.O.'),
     h('p', { className: 'sv-note' }, `${nameOf(G.ch)} · ${G.map.name}`),
     h('dl', { className: 'sv-stats' }, [['버틴 시간', fmt(G.t)], ['레벨', G.lvl], ['처치', G.kills.toLocaleString()], ['잭팟', G.jackpots], ['보스', G.bosses], ['중간보스', G.mids], ['돌파', G.breaks]].map(([k, v]) => h('div', {}, h('dt', {}, k), h('dd', {}, String(v))))),
+    h('p', { className: 'sv-pts' }, h('b', {}, `+${pt.total.toLocaleString()} P`), ` 처치 ${pt.kills} · 레벨 ${pt.lvl} · 시간 ${pt.time}${win ? ' · 30분 생존 1.5배' : ''} — 지금 ${points().toLocaleString()} P`),
     rankMsg,
     build(),
-    G.got.length > 0 && h('div', { className: 'sv-got' }, h('b', {}, `새 업적 ${G.got.length}개`), h('ul', {}, G.got.map(a => h('li', {}, `★ ${a.name}`, a.char && h('em', {}, ` — ${nameOf(CHARS.find(c => c.id === a.char))} 해금!`))))),
+    G.got.length > 0 && h('div', { className: 'sv-got' }, h('b', {}, `새 업적 ${G.got.length}개`), h('ul', {}, G.got.map(a => h('li', {}, `★ ${a.name}`, a.char && h('em', {}, ` — ${nameOf(CHARS.find(c => c.id === a.char))} 해금!`), a.skin && h('em', {}, ` — 스킨 「${SKIN[a.skin].name}」`))))),
     unlocked.length > 0 && h('div', { className: 'sv-unlock' }, unlocked.map(a => { const c = CHARS.find(x => x.id === a.char); return h('img', { src: faceOf(P(c.id)), alt: nameOf(c), title: nameOf(c) }) })),
     row(btn('다시 하기', start, 'is-main'), btn('캐릭터 고르기', () => chars()), btn('처음으로', title))))
 }
 function gain(id) {
-  if (save.ach[id]) return
+  if (save.ach[id] || G?.demo) return   // 상점 미리 보기 판은 업적이 없다
   save.ach[id] = Date.now()
   const a = ACH.find(x => x.id === id), c = a.char && CHARS.find(x => x.id === a.char)
   G?.got.push(a)
   const el = h('div', { className: 'sv-toast' }, c ? h('img', { src: faceOf(P(c.id)), alt: '' }) : h('span', { className: 'sv-medal' }, '★'),
-    h('div', {}, h('small', {}, '업적 달성'), h('b', {}, a.name), c && h('small', { className: 'sv-reward' }, `캐릭터 해금 — ${nameOf(c)}`)))
+    h('div', {}, h('small', {}, '업적 달성'), h('b', {}, a.name), c && h('small', { className: 'sv-reward' }, `캐릭터 해금 — ${nameOf(c)}`), a.skin && h('small', { className: 'sv-reward' }, `스킨 — ${SKIN[a.skin].name}`)))
   toasts.append(el); setTimeout(() => el.remove(), 4200)
   while (toasts.children.length > 3) toasts.firstElementChild.remove()
   persist()
   guideAchs()
 }
-function notice(msg) {
-  const el = h('div', { className: 'sv-toast' }, h('span', { className: 'sv-medal' }, '★'), h('div', {}, h('small', {}, '랭킹'), h('b', {}, msg)))
+function notice(msg, head = '랭킹') {
+  const el = h('div', { className: 'sv-toast' }, h('span', { className: 'sv-medal' }, '★'), h('div', {}, h('small', {}, head), h('b', {}, msg)))
   toasts.append(el); setTimeout(() => el.remove(), 4200)
 }
 /** 저장이 바뀌었을 때(로그인 · 다른 기기 것을 합침) 지금 메뉴 · 아래 업적 목록을 다시 */
 function refresh() {
   guideAchs()
+  if (mode === 'shop') return shop(CLOSET, true)
   if (mode !== 'menu') return
   const h2 = ui.querySelector('.sv-h')?.textContent || ''
   if (h2.startsWith('캐릭터')) chars(true); else if (h2.startsWith('맵')) maps(true); else if (h2.startsWith('업적')) achs(); else if (h2 === '랭킹') ranks(true); else if (h2 === '패치 노트') notes(); else title()
@@ -2188,6 +2500,14 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '상점 · 스킨', items: [
+    '판이 끝나면 포인트가 쌓여요 — 처치 · 레벨 · 버틴 시간만큼(30분 생존은 1.5배). 결과 화면에 얼마 받았는지 나와요',
+    '첫 화면의 「상점」에서 포인트로 스킨을 사요 — 고르면 뒤 화면에서 그 캐릭터가 바로 입고 스킬을 써 보여요(잠긴 캐릭터로는 못 사요)',
+    '스킬 이펙트 — 스킬마다 세 가지: 아이스(노멀) · 인페르노(레어) · 갤럭시(유니크). 등급이 높을수록 빛 · 꼬리 · 터짐이 화려해요',
+    '농구공 — 드리블하는 공이 축구공 · 비치볼 · 황금 농구공으로, 비싼 동물 스킨은 고양이 · 강아지 · 판다가 통통 튀어요(모든 캐릭터)',
+    '옷 — 연습복 · 후드티 · 레트로(노멀), 올스타 · 크리스마스 · 골드(레어), 불꽃 · 천상(후광) · 번개(유니크 — 몸에 효과가 붙어요). 모든 캐릭터',
+    '업적 스킨 — 캐릭터마다 그 캐릭터로 10분 버티면 그 선수가 예전 · 다른 팀에서 입던 유니폼, 챌린지 60분이면 레전더리 옷(빛나는 옷 · 바닥 문양 · 빛기둥 · 별빛 · 빛 발자국)',
+    '마이페이지에 「덩크 서바이버 옷장」 — 산 스킨을 캐릭터마다 입혀 볼 수 있어요'] },
   { date: '2026-11-02', title: '새 캐릭터 셋 · 팀 유니폼', items: [
     '새 캐릭터 — 자말 크로포드(크로스오버 · 「식스맨」 리롤 · 스킵 · 제외 한 번씩 더, 이동 속도 +10%), 더크 노비츠키(스카이훅 · 「언블로커블」 범위 +15% · 치명타 +10%), 밤 아데바요(스크린 · 「핸드오프」 지속 +25% · 받는 피해 -1). 각각 그 스킬을 최고 레벨로 만드는 업적(크로스오버 킹 · 스카이훅 마스터 · 철벽 스크리너)으로 열어요',
     '캐릭터마다 그 선수의 팀 유니폼 — 반바지 옆줄 · 양말 · 신발 색이 팀마다 달라요(라멜로 볼은 호네츠 세로 줄무늬, 알렉산더는 썬더 홈 흰 유니폼, 아데바요는 히트 검정)',
@@ -2299,9 +2619,10 @@ function frame(ts) {
   let dt = Math.min(0.05, ms / 1000)
   tnow += dt
   if (mode === 'play' && G) { if (G.dying > 0) dt *= 0.3; step(dt) }
+  else if (mode === 'shop' && G) demoStep(dt)
   else if (!G) cam.x += dt * 24
   if (mode !== lastMode) { lastMode = mode; still = 2 }
-  if (mode === 'play' || !G || still-- > 0) render()   // 멈춰 있는 동안(상자 · 일시정지 · 결과)은 다시 그리지 않는다 — 상자 연출(HTML)이 부드럽게
+  if (mode === 'play' || mode === 'shop' || !G || still-- > 0) render()   // 멈춰 있는 동안(상자 · 일시정지 · 결과)은 다시 그리지 않는다 — 상자 연출(HTML)이 부드럽게
   // 느린 기기 — 판 중에 1.5초 넘게 45fps 밑이면 픽셀 한도를 30%씩 줄인다(50만까지)
   if (mode === 'play' && ms < 100) {
     ema += (ms - ema) * 0.08; slowT = ema > 22 ? slowT + ms / 1000 : 0
@@ -2315,11 +2636,14 @@ requestAnimationFrame(frame)
 await loadData()
 for (const ch of CHARS) {   // 얼굴 그림 → 머리 · 피부색
   const img = new Image()
-  img.onload = () => { try { ch.head = cutHead(img); [ch.skin] = skinOf(img) } catch {} }
+  img.onload = () => {
+    try { ch.head = cutHead(img); [ch.skin] = skinOf(img) } catch {}
+    THUMB.clear(); if (mode === 'shop' && CHARS[shopCi] === ch) shop(CLOSET, true)   // 상점 · 옷장이 얼굴보다 먼저 떴으면 다시
+  }
   img.src = faceOf(P(ch.id))
 }
 ready = true
 guide()
-title()
+if (CLOSET) shop(true); else title()
 loadRank()
 startAuth('', pull)

@@ -1029,6 +1029,7 @@ label.ac-pick { cursor: pointer; }
 .mp-lead { margin-bottom: 16px; }
 #me-body { display: flex; flex-direction: column; gap: 14px; }
 .mp-card { padding: 18px; }
+.mp-closet { display: block; width: 100%; height: min(78vh, 600px); margin-top: 10px; border: 0; border-radius: 12px; background: #0b0e14; }
 .mp-form { display: flex; flex-direction: column; gap: 12px; }
 .mp-form h3 { margin: 6px 0 0; font-size: 14px; color: var(--text); text-transform: none; letter-spacing: 0; }
 .mp-form h3 small { margin-left: 6px; color: var(--muted); font-weight: 500; }
@@ -1711,6 +1712,54 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-syn p { margin: 0; color: #c9d1e0; }
 .sv-syn mark { margin-left: .4em; padding: 0 .45em; border-radius: 999px; background: #ffd23f; color: #2a1200; font-weight: 900; }
 .sv-syn.is-own { border-style: solid; border-color: #ffd23f; background: #ffd23f1f; box-shadow: 0 0 12px #ffb40055; }
+/* 상점 · 옷장 — 패널은 오른쪽(세운 화면은 아래), 나머지 자리에 미리 보기 판(게임 화면 그대로) */
+.sv-ui.is-shop { display: block; padding: 0; overflow: hidden; background: none; pointer-events: none; }
+.sv-shop { pointer-events: auto; position: absolute; top: 52px; right: 10px; bottom: 10px; width: min(58%, 640px); overflow: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 9px; padding: 12px; border: 1px solid #ffffff24; border-radius: 14px; background: #0b0e14eb; box-shadow: 0 10px 30px #000a; }
+@container (orientation: portrait) { .sv-shop { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; height: 62%; padding: 10px; } }
+.sv-shop > * { flex: none; }   /* 가로로 넘기는 줄(캐릭터 · 스킬)이 눌려 납작해지지 않게 */
+.sv-shop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sv-shop-head .sv-h { margin: 0; }
+.sv-pts-pill { padding: 3px 12px; border-radius: 999px; background: linear-gradient(#ffe066, #d99a1f); color: #2a1200; font-weight: 900; }
+.sv-shop .sv-tabs { margin: 0; }
+.sv-shop-chars, .sv-shop-skills { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 3px; scrollbar-width: thin; }
+.sv-shop-chars button, .sv-shop-skills button { flex: none; width: 36px; height: 36px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: #1a2030; cursor: pointer; }
+.sv-shop-skills button { border-radius: 9px; }
+.sv-shop-chars img, .sv-shop-skills img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.sv-shop-chars button.is-locked img { filter: grayscale(1) brightness(.55); }
+.sv-shop-chars button[aria-pressed="true"], .sv-shop-skills button[aria-pressed="true"] { border-color: #ffd23f; box-shadow: 0 0 0 2px #ffd23f55; }
+.sv-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 7px; }
+.sv-item { position: relative; display: grid; justify-items: center; align-content: start; gap: 2px; padding: 8px 5px 7px; border: 2px solid #ffffff26; border-radius: 11px; background: linear-gradient(#1f2638, #141926); color: #fff; font: inherit; cursor: pointer; }
+.sv-item b { font-size: .86em; line-height: 1.25; text-align: center; }
+.sv-item-art { display: grid; place-items: center; height: 56px; }
+.sv-item-art img { width: 44px; height: 44px; border-radius: 10px; }
+.sv-item-art img.is-fit { width: auto; height: 60px; border-radius: 0; }
+.sv-item-art img.is-ball { width: 34px; height: 34px; border-radius: 0; }
+.sv-item-st { color: #c9d1e0; font-size: .74em; }
+.sv-item[aria-pressed="true"] { border-color: #ffd23f; box-shadow: 0 0 0 3px #ffd23f44; transform: translateY(-2px); }
+.sv-item.is-t1 { border-color: #aab4c366; } .sv-item.is-t2 { border-color: #4dabf799; } .sv-item.is-t3 { border-color: #c77dffaa; }
+.sv-item.is-t4 { border-color: #ffb400; background: linear-gradient(160deg, #3a2a08, #141926 60%); box-shadow: 0 0 14px #ffb40055; }
+.sv-item.is-ice .sv-item-art img { box-shadow: 0 0 0 2px #7fe3ff, 0 0 12px #7fe3ff; }
+.sv-item.is-fire .sv-item-art img { box-shadow: 0 0 0 2px #ff5a1f, 0 0 14px #ffb020; }
+.sv-item.is-galaxy .sv-item-art img { box-shadow: 0 0 0 2px #c77dff, 0 0 16px #ff70c4; animation: sv-hue 3s linear infinite; }
+@keyframes sv-hue { to { filter: hue-rotate(360deg); } }
+.sv-tier { padding: 0 7px; border-radius: 999px; background: #ffffff1c; font-size: .7em; font-weight: 800; color: #aab4c3; }
+.is-t2 > .sv-tier, .sv-tier.is-t2 { color: #74c0fc; } .is-t3 > .sv-tier, .sv-tier.is-t3 { color: #d8a6ff; } .is-t4 > .sv-tier, .sv-tier.is-t4 { color: #ffd23f; }
+.sv-shop-sel { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border-radius: 11px; background: #ffffff0f; }
+.sv-shop-sel > div { display: grid; gap: 2px; }
+.sv-shop-sel b { display: flex; align-items: center; gap: 6px; }
+.sv-shop-sel small { color: #c9d1e0; }
+.sv-shop-sel .sv-btn { flex: none; }
+.sv-shop-why { color: #ff9b9b !important; }
+.sv-shop-on { color: #62e38a; font-weight: 800; flex: none; }
+.sv-shop-lock { color: #ffd23f; font-size: .85em; text-align: right; }
+.sv-shop-msg:empty { display: none; }
+.sv-shop .sv-row { justify-content: flex-start; }
+.sv-pts { margin: 0; color: #c9d1e0; } .sv-pts b { color: #ffd23f; font-size: 1.15em; margin-right: 4px; }
+/* 내 정보 페이지 안의 옷장(iframe — ?closet) — 게임 화면만 */
+body.sv-embed { margin: 0; background: #0b0e14; }
+body.sv-embed > header, body.sv-embed main > h1, body.sv-embed .slam-guide, body.sv-embed #btn-fs { display: none !important; }
+body.sv-embed main.slam { padding: 0; margin: 0; max-width: none; }
+body.sv-embed .sv-screen { height: 100vh; border-radius: 0; }
 /* 낮은 화면(가로 휴대폰) — 상자 그림이 자리를 차지하지 않게 카드 위에 겹치고, 카드 · 시너지 글씨를 줄인다 */
 @container (max-height: 520px) {
   .sv-box .sv-chest { position: absolute; top: 22%; left: calc(50% - 11cqmin); }

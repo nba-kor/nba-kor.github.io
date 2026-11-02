@@ -71,7 +71,7 @@ const SLAM_MATCH = /^[A-Za-z0-9_-]{8,24}$/   // 방장 브라우저가 만든 �
 const SLAM_STALE = 86_400_000   // 한쪽만 올린 결과는 하루 뒤 지운다
 const SURVIVE_KEY = /^[a-z0-9_]{1,32}$/   // 덩크 서바이버: 업적 · 기록 이름(화면 assets/survive.js 가 정한다)
 const SURVIVE_SKILL = /^[a-z0-9_]{1,32}\+?$/   // 덩크 서바이버 랭킹: 스킬 id(돌파는 뒤에 +)
-const SURVIVE_MAX = 120   // 업적 · 기록 각각 이만큼까지
+const SURVIVE_MAX = 400   // 업적(산 스킨 own_… 도 여기) · 기록 각각 이만큼까지
 const SURVIVE_MAPS = ['park', 'arena', 'roof', 'chal']   // 덩크 서바이버 맵 — 랭킹은 맵마다. chal = 챌린지(시간 제한 없음)
 const SURVIVE_LIST = 20   // 랭킹 줄 수
 // 받는 요청 — 메서드 + 경로 조각. 예: 'POST team members' = 가입, 'DELETE team members member' = 방출 · 나가기

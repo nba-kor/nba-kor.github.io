@@ -1939,7 +1939,7 @@ dbTest('덩크 서바이버: 업적 · 기록은 로그인한 사람마다 — �
   assert.equal((await save({ as: {} }, { ach: {}, stats: {} })).status, 401)
   assert.deepEqual((await api('GET', '/api/survive', undefined, { as: a.as })).body, { ach: {}, stats: {} }, '처음엔 빈 저장')
   for (const body of [null, { ach: {} }, { ach: [], stats: {} }, { ach: { 'Bad-Key': 1 }, stats: {} }, { ach: {}, stats: { kills: -1 } }, { ach: {}, stats: { kills: 1.5 } },
-    { ach: {}, stats: { kills: '9' } }, { ach: Object.fromEntries(Array.from({ length: 121 }, (_, i) => [`a${i}`, 1])), stats: {} }]) {
+    { ach: {}, stats: { kills: '9' } }, { ach: Object.fromEntries(Array.from({ length: 401 }, (_, i) => [`a${i}`, 1])), stats: {} }]) {
     assert.equal((await save(a, body)).status, 400, JSON.stringify(body)?.slice(0, 80))
   }
   const one = await save(a, { ach: { run1: 500, surv5: 900 }, stats: { kills: 300, best_0: 320 } })
