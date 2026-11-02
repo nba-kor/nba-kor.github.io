@@ -21,23 +21,26 @@ const MAX_FOES = 380   // 한 화면 수비 수 한도 — 휴대폰 그리기 �
 
 // ---------------------------------------------------------------- 표
 
-// 캐릭터 — 덩크 시티 선수 id(얼굴 · 이름은 data/players.json). w = 시작 스킬, c = [유니폼, 보조색], mod = 고유 특성
+// 캐릭터 — 덩크 시티 선수 id(얼굴 · 이름은 data/players.json). w = 시작 스킬, c = [유니폼, 보조색], fit = 그 팀 유니폼(side 옆줄 · sock 양말 · shoe 신발 · pin 세로 줄무늬), mod = 고유 특성
 const CHARS = [
-  { id: 'james', w: 'pass', c: ['#fdb927', '#552583'], hp: 120, trait: '킹', note: '레벨 10마다 공격력 +10% (최대 +50%)', mod: { king: 1 } },
-  { id: 'klfd', w: 'three', c: ['#1d428a', '#ffc72c'], hp: 100, trait: '셰프', note: '치명타 확률 +15% · 치명타 피해 2.5배', mod: { crit: 0.15, critX: 0.5 } },
-  { id: 'yns', w: 'dunk', c: ['#00471b', '#eee1c6'], hp: 120, trait: '그릭 프릭', note: '최대 체력 +40% · 이동 속도 +10%', mod: { hp: 0.4, move: 0.1 } },
-  { id: 'yjq', w: 'bounce', c: ['#0e2240', '#fec524'], hp: 120, trait: '조커', note: '모든 스킬 투사체 +1 · 이동 속도 -10%', mod: { amount: 1, move: -0.1 } },
-  { id: 'lkdqq', w: 'fade', c: ['#00538c', '#b8c4ca'], hp: 110, trait: '매직', note: '잭팟 확률 2배 · 행운 +20%', mod: { jackpot: 1, luck: 0.2 } },
-  { id: 'ebd', w: 'block', c: ['#006bb6', '#ed174c'], hp: 140, trait: '프로세스', note: '받는 피해 -2 · 초당 체력 0.5 회복', mod: { armor: 2, regen: 0.5 } },
-  { id: 'weisblk', w: 'press', c: ['#007ac1', '#ef3b24'], hp: 110, trait: '트리플 더블', note: '이동 속도 +25% · 지속 시간 +15%', mod: { move: 0.25, dur: 0.15 } },
-  { id: 'wsblk', w: 'alley', c: ['#0c2340', '#c8102e'], hp: 130, trait: '헤비 덩커', note: '최대 체력 +20% · 몸에 닿은 수비를 밀쳐 내며 피해', mod: { hp: 0.2, body: 1 } },
-  { id: 'durant', w: 'buzzer', c: ['#1d1160', '#e56020'], hp: 100, trait: '이지 머니', note: '범위 +20% · 투사체 속도 +20%', mod: { area: 0.2, speed: 0.2 } },
-  { id: 'bl', w: 'nolook', c: ['#00788c', '#1d1160'], hp: 100, trait: '쇼타임', note: '경험치 +25% · 쿨타임 -5%', mod: { growth: 0.25, cdr: 0.05 } },
-  { id: 'sga', w: 'euro', c: ['#007ac1', '#f05133'], hp: 110, trait: '미드레인지 장인', note: '이동 속도 +15% · 치명타 확률 +10%', mod: { move: 0.15, crit: 0.1 } },
-  { id: 'dqq', w: 'rebound', c: ['#5d76a9', '#12173f'], hp: 150, trait: '빅 스티브', note: '최대 체력 +30% · 받는 피해 -1 · 경험치 줍는 거리 +40%', mod: { hp: 0.3, armor: 1, magnet: 0.4 } },
-  { id: 'blqz', w: 'steal', c: ['#c8102e', '#1d42ba'], hp: 110, trait: 'PG-13', note: '보스 · 중간보스 · 정예에게 주는 피해 +30% · 쿨타임 -5%', mod: { bossX: 0.3, cdr: 0.05 } },
-  { id: 'kl', w: 'outlet', c: ['#ffc72c', '#1d428a'], hp: 100, trait: '37점 쿼터', note: '투사체 속도 +25% · 범위 +10% · 쿨타임 -5%', mod: { speed: 0.25, area: 0.1, cdr: 0.05 } },
-  { id: 'dlz', w: 'shotclock', c: ['#ce1141', '#111111'], hp: 110, trait: '클러치 킹', note: '체력이 절반 아래면 공격력 +30% · 쿨타임 -5%', mod: { clutch: 0.3, cdr: 0.05 } },
+  { id: 'james', w: 'pass', c: ['#fdb927', '#552583'], fit: { side: '#552583', shoe: '#552583' }, hp: 120, trait: '킹', note: '레벨 10마다 공격력 +10% (최대 +50%)', mod: { king: 1 } },
+  { id: 'klfd', w: 'three', c: ['#1d428a', '#ffc72c'], fit: { side: '#ffc72c', shoe: '#f4f4f4' }, hp: 100, trait: '셰프', note: '치명타 확률 +15% · 치명타 피해 2.5배', mod: { crit: 0.15, critX: 0.5 } },
+  { id: 'yns', w: 'dunk', c: ['#00471b', '#eee1c6'], fit: { side: '#eee1c6', shoe: '#eee1c6' }, hp: 120, trait: '그릭 프릭', note: '최대 체력 +40% · 이동 속도 +10%', mod: { hp: 0.4, move: 0.1 } },
+  { id: 'yjq', w: 'bounce', c: ['#0e2240', '#fec524'], fit: { side: '#8b2131', sock: '#0e2240', shoe: '#fec524' }, hp: 120, trait: '조커', note: '모든 스킬 투사체 +1 · 이동 속도 -10%', mod: { amount: 1, move: -0.1 } },
+  { id: 'lkdqq', w: 'fade', c: ['#00538c', '#b8c4ca'], fit: { side: '#002b5e', shoe: '#f4f4f4' }, hp: 110, trait: '매직', note: '잭팟 확률 2배 · 행운 +20%', mod: { jackpot: 1, luck: 0.2 } },
+  { id: 'ebd', w: 'block', c: ['#006bb6', '#ed174c'], fit: { side: '#ed174c', shoe: '#002b5c' }, hp: 140, trait: '프로세스', note: '받는 피해 -2 · 초당 체력 0.5 회복', mod: { armor: 2, regen: 0.5 } },
+  { id: 'weisblk', w: 'press', c: ['#007ac1', '#ef3b24'], fit: { side: '#002d62', sock: '#002d62', shoe: '#ef3b24' }, hp: 110, trait: '트리플 더블', note: '이동 속도 +25% · 지속 시간 +15%', mod: { move: 0.25, dur: 0.15 } },
+  { id: 'wsblk', w: 'alley', c: ['#0c2340', '#c8102e'], fit: { side: '#85714d', sock: '#0c2340', shoe: '#c8102e' }, hp: 130, trait: '헤비 덩커', note: '최대 체력 +20% · 몸에 닿은 수비를 밀쳐 내며 피해', mod: { hp: 0.2, body: 1 } },
+  { id: 'durant', w: 'buzzer', c: ['#1d1160', '#e56020'], fit: { side: '#e56020', sock: '#17141f', shoe: '#17141f' }, hp: 100, trait: '이지 머니', note: '범위 +20% · 투사체 속도 +20%', mod: { area: 0.2, speed: 0.2 } },
+  { id: 'bl', w: 'nolook', c: ['#00788c', '#1d1160'], fit: { side: '#1d1160', sock: '#00788c', shoe: '#c6f432', pin: 'rgba(29,17,96,.38)' }, hp: 100, trait: '쇼타임', note: '경험치 +25% · 쿨타임 -5%', mod: { growth: 0.25, cdr: 0.05 } },
+  { id: 'sga', w: 'euro', c: ['#f4f4f4', '#007ac1'], fit: { side: '#ef3b24', shoe: '#17141f' }, hp: 110, trait: '미드레인지 장인', note: '이동 속도 +15% · 치명타 확률 +10%', mod: { move: 0.15, crit: 0.1 } },
+  { id: 'dqq', w: 'rebound', c: ['#5d76a9', '#12173f'], fit: { side: '#12173f', sock: '#12173f', shoe: '#12173f' }, hp: 150, trait: '빅 스티브', note: '최대 체력 +30% · 받는 피해 -1 · 경험치 줍는 거리 +40%', mod: { hp: 0.3, armor: 1, magnet: 0.4 } },
+  { id: 'blqz', w: 'steal', c: ['#c8102e', '#1d42ba'], fit: { side: '#1d42ba', shoe: '#1d42ba' }, hp: 110, trait: 'PG-13', note: '보스 · 중간보스 · 정예에게 주는 피해 +30% · 쿨타임 -5%', mod: { bossX: 0.3, cdr: 0.05 } },
+  { id: 'kl', w: 'outlet', c: ['#ffc72c', '#1d428a'], fit: { side: '#1d428a', sock: '#1d428a', shoe: '#f4f4f4' }, hp: 100, trait: '37점 쿼터', note: '투사체 속도 +25% · 범위 +10% · 쿨타임 -5%', mod: { speed: 0.25, area: 0.1, cdr: 0.05 } },
+  { id: 'dlz', w: 'shotclock', c: ['#ce1141', '#111111'], fit: { side: '#111111', sock: '#111111', shoe: '#ce1141' }, hp: 110, trait: '클러치 킹', note: '체력이 절반 아래면 공격력 +30% · 쿨타임 -5%', mod: { clutch: 0.3, cdr: 0.05 } },
+  { id: 'klks', w: 'cross', c: ['#f4f4f4', '#c8102e'], fit: { side: '#1d42ba', shoe: '#c8102e' }, hp: 100, trait: '식스맨', note: '리롤 · 스킵 · 제외를 한 번씩 더 · 이동 속도 +10%', mod: { boxes: 1, move: 0.1 } },
+  { id: 'nwsj', w: 'hook', c: ['#002b5e', '#b8c4ca'], fit: { side: '#00538c', shoe: '#00538c' }, hp: 130, trait: '언블로커블', note: '범위 +15% · 치명타 확률 +10%', mod: { area: 0.15, crit: 0.1 } },
+  { id: 'bm', w: 'screen', c: ['#111111', '#d4213d'], fit: { side: '#f9a01b', sock: '#111111', shoe: '#d4213d' }, hp: 140, trait: '핸드오프', note: '지속 시간 +25% · 받는 피해 -1', mod: { dur: 0.25, armor: 1 } },
 ]
 
 // 스킬 — cd 쿨타임(초) · dmg 피해 · n 개수 · area 크기 배수 · spd 속도 배수 · dur 지속(초) · pierce 맞힐 수 있는 수 · bounce 튕김.
@@ -205,6 +208,9 @@ const ACH = [
   { id: 'clock8', name: '24초의 지배자', note: '샷 클락을 최고 레벨(8)로', char: 'dlz' },
   { id: 'syn1', name: '케미스트리', note: '시너지 처음 완성하기' },
   { id: 'syn3', name: '드림 케미', note: '한 판에 시너지 3개 완성하기' },
+  { id: 'cross8', name: '크로스오버 킹', note: '크로스오버를 최고 레벨(8)로', char: 'klks' },
+  { id: 'hook8', name: '스카이훅 마스터', note: '스카이훅을 최고 레벨(8)로', char: 'nwsj' },
+  { id: 'screen8', name: '철벽 스크리너', note: '스크린을 최고 레벨(8)로', char: 'bm' },
 ]
 const SURV = [[300, 'surv5'], [600, 'surv10'], [900, 'surv15'], [1200, 'surv20'], [1500, 'surv25']]
 
@@ -283,17 +289,19 @@ function rgbOf(col) {
 }
 function shade(col, f) { const [r, g, b] = rgbOf(col); return `rgb(${Math.min(255, r * f) | 0},${Math.min(255, g * f) | 0},${Math.min(255, b * f) | 0})` }
 const rgba = (col, a) => { const [r, g, b] = rgbOf(col); return `rgba(${r},${g},${b},${a})` }
+/** 팔다리 피부 — 아주 어두우면 밝기를 min 까지 올린다(어두운 바닥 · 테두리에 손발이 묻히지 않게) */
+function liftSkin(col, min = 96) { const [r, g, b] = rgbOf(col), l = 0.3 * r + 0.59 * g + 0.11 * b; return l >= min ? col : shade(col, min / Math.max(l, 8)) }
 function rng(seed) { return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 } }
 function hash(i, j, s) { let x = Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(s, 1442695041) | 0; x = Math.imul(x ^ x >>> 13, 1274126177); return ((x ^ x >>> 16) >>> 0) / 4294967296 }
 
 /** 사람 — 발밑 (0,0), 오른쪽을 본다(키 약 52). o = { jersey, trim, shorts, skin, hair, hs 머리 모양, shoe, frame 0~3, wide, kind, num, mirror, head(얼굴 그림) }
  *  걸음 네 칸 — 0 · 2 는 두 발을 벌리고 1 · 3 은 뒷발을 들어 앞으로(몸이 살짝 뜬다). 앞(오른쪽) 팔다리는 밝게, 뒤는 어둡게 */
 function person(c, o) {
-  const k = o.kind, wd = o.wide || 1, sk = o.skin, skD = shade(sk, 0.76), f = o.frame || 0
+  const k = o.kind, wd = o.wide || 1, sk = liftSkin(o.skin), skD = shade(sk, 0.76), f = o.frame || 0, sock = o.sock || '#f5f5f5', side = o.side || o.trim
   const sw = [1, 0, -1, 0][f], bob = f % 2 ? -1.1 : 0
   const leg = (x, dx, up, front) => {
     rr(c, x + dx - 2.1, -12.5 - up, 4.3, 10.5, 2.1, front ? sk : skD)
-    rr(c, x + dx - 2.2, -6 - up, 4.5, 3.4, 1.1, front ? '#f5f5f5' : '#cfd3da')
+    rr(c, x + dx - 2.2, -6 - up, 4.5, 3.4, 1.1, front ? sock : shade(sock, 0.84))
     rr(c, x + dx - 2.2, -5.5 - up, 4.5, 0.9, 0.4, o.trim)
     rr(c, x + dx - 2.6, -3.7 - up, 7.2, 3.2, [1.6, 2.4, 1, 1], front ? o.shoe : shade(o.shoe, 0.72))
     rr(c, x + dx - 2.8, -1.3 - up, 7.6, 1.4, 0.7, front ? '#fff' : '#c9cdd4')
@@ -306,7 +314,7 @@ function person(c, o) {
   const sg = c.createLinearGradient(-7 * wd, 0, 7 * wd, 0); sg.addColorStop(0, shade(o.shorts, 1.12)); sg.addColorStop(1, shade(o.shorts, 0.74))
   c.fillStyle = sg; c.beginPath(); c.roundRect(-7.2 * wd, -18.6, 14.4 * wd, 9.4, [2, 2, 2.8, 2.8]); c.fill()
   rr(c, -7.2 * wd, -18.6, 14.4 * wd, 1.7, 0.8, shade(o.shorts, 0.7))
-  rr(c, 4.6 * wd, -17, 1.7, 7.6, 0.8, o.trim)
+  rr(c, 4.6 * wd, -17, 1.7, 7.6, 0.8, side)
   // 몸통(민소매)
   const j = o.jersey, tg = c.createLinearGradient(-7 * wd, -30, 7 * wd, -16)
   tg.addColorStop(0, shade(j, 1.16)); tg.addColorStop(0.55, j); tg.addColorStop(1, shade(j, 0.76))
@@ -316,7 +324,12 @@ function person(c, o) {
     for (let x = -7.5 * wd + 1.6; x < 7.5 * wd; x += 3.8) rr(c, x, -31, 1.9, 16, 0, '#17191f')
     c.restore()
   } else {
-    rr(c, 5.5 * wd, -26.5, 1.8, 10, 0.9, o.trim)   // 옆 판
+    if (o.pin) {   // 세로 줄무늬(호네츠) — 상의 · 반바지
+      c.save(); c.beginPath(); c.roundRect(-7.5 * wd, -30.2, 15 * wd, 13.8, [4.4, 4.4, 2.4, 2.4]); c.roundRect(-7.2 * wd, -18.6, 14.4 * wd, 9.4, [2, 2, 2.8, 2.8]); c.clip()
+      for (let x = -7 * wd; x < 7.5 * wd; x += 2.6) rr(c, x, -31, 0.7, 22, 0, o.pin)
+      c.restore()
+    }
+    rr(c, 5.5 * wd, -26.5, 1.8, 10, 0.9, side)   // 옆 판
     c.strokeStyle = o.trim; c.lineWidth = 1.1; c.beginPath(); c.moveTo(-3.6, -30); c.lineTo(0.4, -25.4); c.lineTo(4.4, -30); c.stroke()
   }
   c.fillStyle = sk; c.beginPath(); c.moveTo(-3, -30.2); c.lineTo(3.8, -30.2); c.lineTo(0.4, -26.2); c.closePath(); c.fill()
@@ -351,7 +364,7 @@ function arm(c, o, x, ang, col, front) {
 }
 /** 그린 얼굴(수비) — 머리 모양 hs: 0 짧은 머리 · 1 아프로 · 2 하이 탑 · 3 민머리 · 4 콘로우 */
 function face(c, o) {
-  const sk = o.skin, k = o.kind, hc = o.hair, hs = o.hs || 0
+  const sk = liftSkin(o.skin), k = o.kind, hc = o.hair, hs = o.hs || 0
   rr(c, -2.4, -33.6, 4.8, 5, 1.6, shade(sk, 0.7))
   if (hs === 1) for (const [x, y, r] of [[-5.4, -46.4, 5.4], [0.6, -49, 5.8], [6.2, -46.6, 5], [-7.8, -41.4, 4.2], [8.4, -42, 3.6]]) ell(c, x, y, r, r, hc)
   if (hs === 2) rr(c, -8.6, -53.4, 18.6, 12, [2.6, 2.6, 0, 0], hc)
@@ -787,16 +800,16 @@ function start() {
     kills: 0, lvl: 1, xp: 0, next: need(1), queue: [], cheer: 0, jackpots: 0, bosses: 0, lastHit: 0, freeze: 0, spawnT: 0.5,
     nextMascot: 140, nextSwarm: 100, got: [], dying: 0, bodyT: 0, banner: null,
     haz: [], sts: {}, pi: 0, nextEvt: 930, nextWave: 1800, mids: 0, late: 0, breaks: 0,   // 바닥 경고(폭격 · 러시 · 착지) · 상태이상(끝나는 시각) · PLAN 다음 차례
-    rr: 2, skips: 2, bans: 2, banned: new Set(),   // 상자에서 쓰는 리롤 · 스킵 · 제외(한 판에 두 번씩) · 제외한 카드(t + id)
+    rr: 2 + (ch.mod.boxes || 0), skips: 2 + (ch.mod.boxes || 0), bans: 2 + (ch.mod.boxes || 0), banned: new Set(),   // 상자에서 쓰는 리롤 · 스킵 · 제외(한 판에 두 번씩) · 제외한 카드(t + id)
   }
   S = null; addWeapon(ch.w); stats(); pl.hp = S.maxHp
   cam.x = cam.y = 0; calm()
   mode = 'play'; ui.hidden = true; ui.classList.remove('is-box'); pauseBtn.hidden = false
 }
 function playerSprites(ch) {
-  const o = { jersey: ch.c[0], trim: ch.c[1], shorts: ch.c[0], skin: ch.skin || '#b9825a', hair: '#1d140e', shoe: '#f4f4f4', num: NBA_NUM[ch.id] ?? '', head: ch.head, kind: 'me' }
+  const o = { jersey: ch.c[0], trim: ch.c[1], shorts: ch.c[0], skin: ch.skin || '#b9825a', hair: '#1d140e', shoe: '#f4f4f4', num: NBA_NUM[ch.id] ?? '', head: ch.head, kind: 'me', ...ch.fit }
   const paint = (frame, mirror) => sprite(36, 66, 18, 62, c => { if (mirror) c.scale(-1, 1); person(c, { ...o, frame, mirror }) })
-  return { R: [0, 1, 2, 3].map(f => paint(f)), L: [0, 1, 2, 3].map(f => paint(f, true)), mate: sprite(36, 66, 18, 62, c => person(c, { ...o, jersey: ch.c[1], trim: ch.c[0], shorts: ch.c[1], head: null, kind: 'screen' })) }
+  return { R: [0, 1, 2, 3].map(f => paint(f)), L: [0, 1, 2, 3].map(f => paint(f, true)), mate: sprite(36, 66, 18, 62, c => person(c, { ...o, jersey: ch.c[1], trim: ch.c[0], shorts: ch.c[1], side: ch.c[0], pin: null, head: null, kind: 'screen' })) }
 }
 function stats() {
   const m = G.ch.mod, L = id => G.passives[id] || 0, old = S?.maxHp
@@ -1517,6 +1530,7 @@ function label(o) {
   if (o.t === 'w') { const w = G.weapons.find(x => x.id === o.id), d = WEAP[o.id]; return w ? { name: d.name, lv: `Lv ${w.lv} → ${w.lv + 1}`, note: Object.entries(d.ups[w.lv - 1]).map(([k, v]) => UP[k](v)).join(' · ') } : { name: d.name, lv: '새 스킬', note: d.note } }
   const lv = G.passives[o.id]; return { name: PASS[o.id].name, lv: lv ? `Lv ${lv} → ${lv + 1}` : '새 아이템', note: PASS[o.id].note }
 }
+const LV8 = { three: 'three8', dunk: 'dunk8', shotclock: 'clock8', cross: 'cross8', hook: 'hook8', screen: 'screen8' }   // 최고 레벨 업적
 function take(o) {
   if (o.t === 'b') {
     G.weapons.find(x => x.id === o.id).br = true
@@ -1526,9 +1540,7 @@ function take(o) {
   } else if (o.t === 'w') {
     const w = G.weapons.find(x => x.id === o.id)
     if (w) { w.lv++; w.st = wstat(w) } else addWeapon(o.id)
-    if (o.id === 'three' && w?.lv === 8) gain('three8')
-    if (o.id === 'dunk' && w?.lv === 8) gain('dunk8')
-    if (o.id === 'shotclock' && w?.lv === 8) gain('clock8')
+    if (w?.lv === 8 && LV8[o.id]) gain(LV8[o.id])
     if (G.weapons.length === 6) { gain('full6'); if (G.weapons.every(x => x.lv === 8)) gain('max6') }
   } else if (o.t === 'p') { G.passives[o.id] = (G.passives[o.id] || 0) + 1; stats() }
   else if (o.id === 'drink') pl.hp = Math.min(S.maxHp, pl.hp + S.maxHp * 0.4)
@@ -1747,7 +1759,7 @@ function world(c) {
   let si = 0   // 상태이상 — 발밑에 그 색 고리
   for (const id in STATUS) if (sick(id)) { const r = 22 + si++ * 5; c.strokeStyle = rgba(STATUS[id].col, 0.6 + Math.sin(t * 8) * 0.3); c.lineWidth = 2.6; c.beginPath(); c.ellipse(pl.x, pl.y, r, r * 0.4, 0, 0, TAU); c.stroke() }
   // 내 발밑 — 유니폼 색 고리 + 도는 빛
-  const ring = G.ch.c[0] === '#fdb927' ? '#ffd23f' : shade(G.ch.c[0], 1.6)
+  const ring = G.ch.c[0] === '#fdb927' ? '#ffd23f' : liftSkin(G.ch.c[0], 40) === G.ch.c[0] ? shade(G.ch.c[0], 1.6) : G.ch.c[1]   // 아주 어두운 유니폼(히트 검정)은 보조색
   c.strokeStyle = rgba(ring, 0.55); c.lineWidth = 2.4; c.beginPath(); c.ellipse(pl.x, pl.y, 17, 6.6, 0, 0, TAU); c.stroke()
   c.strokeStyle = '#fff'; c.lineWidth = 2.6; c.beginPath(); c.ellipse(pl.x, pl.y, 17, 6.6, 0, t * 3, t * 3 + 1.1); c.stroke()
   // ---- 아이템 · 경험치
@@ -2176,6 +2188,10 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-02', title: '새 캐릭터 셋 · 팀 유니폼', items: [
+    '새 캐릭터 — 자말 크로포드(크로스오버 · 「식스맨」 리롤 · 스킵 · 제외 한 번씩 더, 이동 속도 +10%), 더크 노비츠키(스카이훅 · 「언블로커블」 범위 +15% · 치명타 +10%), 밤 아데바요(스크린 · 「핸드오프」 지속 +25% · 받는 피해 -1). 각각 그 스킬을 최고 레벨로 만드는 업적(크로스오버 킹 · 스카이훅 마스터 · 철벽 스크리너)으로 열어요',
+    '캐릭터마다 그 선수의 팀 유니폼 — 반바지 옆줄 · 양말 · 신발 색이 팀마다 달라요(라멜로 볼은 호네츠 세로 줄무늬, 알렉산더는 썬더 홈 흰 유니폼, 아데바요는 히트 검정)',
+    '피부가 아주 어두운 캐릭터 · 수비의 팔다리를 조금 밝게 — 어두운 바닥에서도 손발이 보여요'] },
   { date: '2026-11-02', title: '새 캐릭터 — 더마 드로잔', items: [
     '더마 드로잔 — 시작 스킬 샷 클락, 특성 「클러치 킹」: 체력이 절반 아래면 공격력 +30% · 쿨타임 -5%. 업적 「24초의 지배자」(샷 클락을 최고 레벨로)로 열어요',
     '새 업적 — 「케미스트리」(시너지 처음 완성하기) · 「드림 케미」(한 판에 시너지 3개)'] },
