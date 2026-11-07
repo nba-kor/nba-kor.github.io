@@ -3,7 +3,7 @@
 import { mountTop, faceOf, startDrag, pickMenu, loadKakao } from './app.js?v=f44b46d8'
 import { api, chooseLogin, IS_MOBILE } from './auth.js?v=bdb31bdc'
 import { $, h, P, loadData, startAuth, auth, me } from './board.js?v=813dd8d2'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES, ALLPOS } from './profile.js?v=8ff8e95b'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel, charNames, roleTags, roleLabel, ROLES, ALLPOS } from './profile.js?v=9288b12f'
 
 await loadData()
 mountTop('/arena/')
@@ -404,6 +404,10 @@ function membersCard(at) {
       : h('p', { className: 'rc-muted' }, '아직 참가 신청이 없어요.'))
 }
 
+const CHARS_MAX = 3   // 팀별 편성 명단의 칸마다 처음 보이는 캐릭터 수 — 나머지는 「+N개」 뱃지
+let charsAll = false   // 「캐릭터 전체보기」 — 모든 칸을 펼친다
+const charsOpen = new Set()   // 「+N개」 를 눌러 펼친 칸 '<시간대>:<계정 key>' — 누른 시간대의 그 칸만
+
 /** 팀별 편성 명단 — 탭: 전체 · 시간대 */
 function teamsCard() {
   const tabs = h('div', { className: 'ar-tabs', role: 'tablist' },
@@ -415,29 +419,35 @@ function teamsCard() {
       h('div', { className: 'ar-slot-head' }, h('b', {}, s.short), h('span', {}, `(${teams.length}팀)`), h('small', {}, slotWhen(week, s))),
       teams.length ? h('div', { className: 'ar-teams' }, teams.map((tm, i) => h('div', { className: `ar-team${canEarly(s, tm) ? ' is-early' : ''}` },
         h('div', { className: 'ar-team-head' }, `${s.short} - ${i + 1}팀`, canEarly(s, tm) && earlyTag()),
-        h('div', { className: 'ar-members' }, tm.map((x, j) => memberCard(accts.get(key(x.u, x.n)) || { u: x.u, n: x.n, owner: '', chars: [] }, j === 0))))))
+        h('div', { className: 'ar-members' }, tm.map((x, j) => memberCard(accts.get(key(x.u, x.n)) || { u: x.u, n: x.n, owner: '', chars: [] }, j === 0, `${s.id}:${key(x.u, x.n)}`))))))
         : h('p', { className: 'rc-muted ar-none' }, '아직 편성 전이에요'))
     return el
   })
-  return foldCard('teams', '팀별 편성 명단', tabs, blocks)
+  // 접힌 캐릭터가 있을 때만 — 누르면 다 펼치고, 한 번 더 누르면 다시 「+N개」
+  const many = SLOTS.flatMap(s => teamsOf(s.id)).flat().some(x => accts.get(key(x.u, x.n))?.chars.length > CHARS_MAX)
+  const showAll = many && h('button', { type: 'button', className: 'ar-all ar-detail-btn', 'aria-pressed': charsAll, onclick: () => { charsAll = !charsAll; charsOpen.clear(); renderPlan() } }, charsAll ? '캐릭터 접기' : '캐릭터 전체보기')
+  return foldCard('teams', '팀별 편성 명단', h('div', { className: 'ar-teams-bar' }, tabs, showAll), blocks)
 }
 
 // 팀장 = 그 팀에 처음 넣은 계정(팀 배열의 맨 앞). 팀장을 빼면 다음 사람이 팀장이 된다
 const leadTag = () => h('span', { className: 'ar-lead' }, '팀장')
 
-function memberCard(a, lead) {
+function memberCard(a, lead, at) {
   const mine = auth === 'in' && a.u === me?.id
   const el = h('div', { className: `ar-member${mine ? ' is-me' : ''}${lead ? ' is-lead' : ''}` },
     lead && leadTag(),
     a.chars[0] ? h('img', { src: faceOf(P(a.chars[0])), alt: '' }) : h('span', { className: 'rc-hole' }),
     h('div', { className: 'ar-who' }, a.count ? nickEl(a) : h('b', {}, a.n), h('small', {}, a.owner && a.owner !== a.n ? a.owner : ''), a.roles && roleTags(a.roles)),
-    charTags(a, 3))   // 캐릭터가 많으면 앞 3개 + 나머지 수
+    charTags(a, CHARS_MAX, at))
   return el
 }
 
-/** 캐릭터 뱃지(레벨). max 를 주면 앞 max 개 + 나머지 수 */
-function charTags(a, max = Infinity) {
-  return h('div', { className: 'ar-chars' }, a.chars.slice(0, max).map(id => h('span', {}, `${P(id).short || P(id).name}${a.bt?.[id] ? ` ${a.bt[id]}렙` : ''}`)), a.chars.length > max && h('em', { title: charNames(a.chars.slice(max), a.bt) }, `+${a.chars.length - max}`))
+/** 캐릭터 뱃지(레벨). max 를 주면 앞 max 개 + 「+N개」 뱃지 — 누르면 그 칸(at)만 펼치고 「접기」 로 닫는다. 「캐릭터 전체보기」 중엔 다 보여 뱃지가 없다 */
+function charTags(a, max = Infinity, at) {
+  const open = charsAll || charsOpen.has(at)
+  return h('div', { className: 'ar-chars' }, (open ? a.chars : a.chars.slice(0, max)).map(id => h('span', {}, `${P(id).short || P(id).name}${a.bt?.[id] ? ` ${a.bt[id]}렙` : ''}`)),
+    !charsAll && a.chars.length > max && h('button', { type: 'button', className: 'ar-chars-more', 'aria-expanded': open, title: open ? '' : charNames(a.chars.slice(max), a.bt), onclick: () => { open ? charsOpen.delete(at) : charsOpen.add(at); renderPlan() } },
+      open ? '접기' : `+${a.chars.length - max}개`))
 }
 
 /** 막대 한 줄 — 이름 · 비율(0~1) · 뒤에 붙는 수. 막대는 CSS 로만 그린다 */
@@ -606,7 +616,7 @@ function editor() {
   const bySlot = !poolPick.size ? view
     : view.filter(a => [...poolPick].some(id => fits(a, id)) && (!allOf || [...poolPick].every(id => a.slots.includes(id))))
   // 포지션 필터 — 1순위나 2순위가 그 포지션인 계정(올포는 모든 포지션). 고른 포지션이 1순위인 계정이 있는 사람이 먼저(사람 묶음은 그대로 — 안정 정렬)
-  const plays = (a, r) => a.roles.includes(r) || a.roles[0] === ALLPOS
+  const plays = (a, r) => a.roles.includes(r) || a.roles.includes(ALLPOS)
   const pool = !rolePick.size ? bySlot : bySlot.filter(a => match(rolePick, r => plays(a, r)))
   const top = new Set(pool.filter(a => rolePick.has(a.roles[0])).map(a => a.u))
   pool.sort((x, y) => top.has(y.u) - top.has(x.u))

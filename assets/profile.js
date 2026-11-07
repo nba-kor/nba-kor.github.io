@@ -14,7 +14,7 @@ const A = await arenaCfg()   // 주력 포지션 · 레벨 단계
 
 // 주력 포지션 — 스코어러 > 중열 > 센터(집계표 순서 = data/arena.json 의 roles 순서)
 export const ROLES = A.roles
-export const ALLPOS = 'allpos'   // 올포 — 스코어러 · 중열 · 센터 다. 1순위로만 고르고 2순위는 없다
+export const ALLPOS = 'allpos'   // 올포 — 스코어러 · 중열 · 센터 다. 1 · 2순위 어디든 고르고, 1순위가 올포면 2순위는 없다
 export const roleLabel = id => ROLES.find(r => r.id === id)?.label || '포지션 미정'
 const LINK_RE = /:\/\/|www\.|discord\.gg/i   // 서버와 같은 규칙 — 이름에 링크 금지
 
@@ -74,7 +74,7 @@ export async function editAccount(acct, accounts) {
   const nick = h('input', { type: 'text', maxLength: 20, value: acct?.nick || '', placeholder: '게임 닉네임(특수문자 그대로)', autocomplete: 'off', spellcheck: false, 'aria-label': '게임 닉네임' })
   const main = h('input', { type: 'checkbox', checked: isMain, disabled: isMain })
   const roleSel = (k, none) => {
-    const sel = h('select', { 'aria-label': `주력 포지션 ${k + 1}순위` }, h('option', { value: '', disabled: !k }, none), ROLES.filter(r => !k || r.id !== ALLPOS).map(r => h('option', { value: r.id }, r.label)))
+    const sel = h('select', { 'aria-label': `주력 포지션 ${k + 1}순위` }, h('option', { value: '', disabled: !k }, none), ROLES.map(r => h('option', { value: r.id }, r.label)))
     sel.value = acct?.roles?.[k] || ''
     return sel
   }

@@ -61,7 +61,7 @@ const CONTROL = /[\x00-\x1f\x7f]/
 const JSON_TYPE = /^application\/json\b/i
 // 아레나전: 시간대(토 · 일 1팟 · 2팟) + 토 · 일 FA(그날 시간 미정 · 용병) · 사유불참. 주는 그 주 토요일 날짜. 1.5차는 retired(지난 신청에만 남는다)
 const SLOTS = new Set(ARENA.slots.map(s => s.id))
-const ROLES = new Set(ARENA.roles.map(r => r.id))   // 계정의 주력 포지션 1 · 2순위 — 스코어러 · 중열 · 센터 · 올포(allpos, 1순위로만 · 2순위 없이)
+const ROLES = new Set(ARENA.roles.map(r => r.id))   // 계정의 주력 포지션 1 · 2순위 — 스코어러 · 중열 · 센터 · 올포(allpos, 1순위면 2순위 없이 · 2순위로도)
 // 같은 날 시간이 겹치는 두 시간대(지금은 1차 · 2차라 같은 시간대만). 한 사람은 겹치는 시간대에 한 번만 들어간다(계정 둘을 동시에 못 한다)
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT_AT = new Map(ARENA.slots.map(s => [s.id, s]))
@@ -164,7 +164,7 @@ function profile(v) {
     seen.add(key)
     // 아레나 — 계정의 주력 포지션(1 · 2순위, 그 계정의 줄마다 같은 값)과 캐릭터 레벨(1~7, 저장 이름은 breakthrough). 둘 다 없어도 된다(팀원모집 · 옛 프로필)
     const roles = e.roles ?? []
-    if (!listOf(roles, 2) || roles.some(r => !ROLES.has(r)) || new Set(roles).size !== roles.length || roles.includes('allpos') && roles.length > 1) fail(400, '주력 포지션을 다시 골라 주세요')
+    if (!listOf(roles, 2) || roles.some(r => !ROLES.has(r)) || new Set(roles).size !== roles.length || roles[0] === 'allpos' && roles.length > 1) fail(400, '주력 포지션을 다시 골라 주세요')
     const bt = e.breakthrough ?? null
     if (bt !== null && !(Number.isInteger(bt) && bt >= 1 && bt <= ARENA.breakthrough)) fail(400, `레벨은 1~${ARENA.breakthrough} 중에 골라 주세요`)
     return { nick, tier, char: e.char, ...(roles.length && { roles }), ...(bt && { breakthrough: bt }) }

@@ -664,13 +664,14 @@ test('검증: 프로필(마이크 O/X · 계정 1~maxEntries 줄) 이 잘못되�
     if (error) assert.equal(r.body.error, error, why)
   }
   const ok = { mic: true, entries: [entry()] }
+  assert.notEqual((await api('PUT', '/api/me/profile', { ...ok, entries: [entry({ roles: ['mid', 'allpos'] })] }, { as })).status, 400, '2순위 올포는 된다')
   await bad({ entries: [entry()] }, '마이크 없음', '마이크 사용 여부를 골라 주세요')
   await bad({ ...ok, mic: 'true' }, '마이크 문자열')
   await bad({ ...ok, mic: 1 }, '마이크 숫자')
   await bad({ ...ok, mic: null }, '마이크 null')
   await bad({ ...ok, entries: [entry({ tier: '마스터' })] }, '없는 티어(티어는 안 적어도 되지만 적으면 목록 안에서)')
   await bad({ ...ok, entries: [entry({ char: 'nope' })] }, '없는 캐릭터')
-  for (const [roles, why] of [[['x'], '없는 포지션'], [['scorer', 'mid', 'center'], '포지션 3개'], [['mid', 'mid'], '같은 포지션 두 번'], [['allpos', 'mid'], '올포는 2순위 없이'], [['mid', 'allpos'], '올포는 1순위로만'], ['scorer', '포지션이 배열 아님']]) await bad({ ...ok, entries: [entry({ roles })] }, why)
+  for (const [roles, why] of [[['x'], '없는 포지션'], [['scorer', 'mid', 'center'], '포지션 3개'], [['mid', 'mid'], '같은 포지션 두 번'], [['allpos', 'mid'], '1순위가 올포면 2순위 없이'], ['scorer', '포지션이 배열 아님']]) await bad({ ...ok, entries: [entry({ roles })] }, why)
   for (const breakthrough of [0, 8, 2.5, '3']) await bad({ ...ok, entries: [entry({ breakthrough })] }, `레벨 ${breakthrough}`)
   await bad({ ...ok, entries: [entry({ char: UPCOMING })] }, '미출시 캐릭터')
   await bad({ ...ok, entries: Array.from({ length: CFG.maxEntries + 1 }, (_, i) => entry({ nick: `n${i}` })) }, `${CFG.maxEntries + 1}개`)

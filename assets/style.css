@@ -1328,7 +1328,11 @@ label.ac-pick { cursor: pointer; }
 .ar-more[aria-expanded="true"] { color: var(--text); border-color: var(--muted); }
 .ar-tally .ar-sub td { background: #ffffff06; font-size: 12.5px; }
 .ar-tally .ar-sub .ac-kind { margin-right: 2px; }
-.ar-chars em { font-style: normal; font-size: 10.5px; color: var(--muted); align-self: center; }
+.ar-chars-more { padding: 0 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; color: var(--bg); background: var(--text); border-color: var(--text); white-space: nowrap; }
+.ar-chars-more[aria-expanded="true"] { color: var(--muted); background: var(--chip, transparent); border-color: var(--muted); }
+.ar-teams-bar { display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 8px; }
+.ar-teams-bar .ar-tabs { min-width: 0; }
+.ar-teams-bar .ar-all { margin: 0 0 12px auto; }
 .ar-tally .ac-roles { margin: 0; }
 .ar-absent { margin: 0 0 4px; padding-left: 14px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 
