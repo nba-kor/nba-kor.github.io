@@ -18,6 +18,7 @@ const ACCENT = '#f5a623'
 const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT = Object.fromEntries(SLOTS.map(s => [s.id, s]))
 const FAS = A.extra.filter(c => c.day != null), FA_DAY = Object.fromEntries(FAS.map(c => [c.id, c.day]))
+const SOLO = new Set(A.extra.filter(c => c.solo).map(c => c.id)), soloOf = s => s.slots.find(x => SOLO.has(x))   // 혼자만 고르고 계정 없이 — 자율참여(편성 없이 알아서) · 사유불참
 const clash = (x, y) => { const a = SLOT[x], b = SLOT[y]; return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
 // 배치 현황 · 팀 고르기 메뉴의 FA — 직접 고른 시간대가 먼저, 그날 FA 를 골랐으면 직접 고른 시간대와 안 겹치는 그날 시간대(FA 만 골랐으면 그날 전부)
 const viaFa = (slots, s) => !slots.includes(s.id) && slots.some(x => FA_DAY[x] === s.day) && !slots.some(x => SLOT[x] && clash(x, s.id))
@@ -93,14 +94,14 @@ function renderSignup() {
     h('p', { className: 'rc-note' }, '로그인하면 내 프로필의 게임 계정으로 이번 주 아레나전에 신청할 수 있어요.'),
     h('div', { className: 'rc-actions' }, h('button', { type: 'button', className: 'primary rc-big', onclick: chooseLogin }, '로그인')))
 
-  const mine = mineOf(), absent = mine?.slots.includes('absent')
+  const mine = mineOf(), solo = mine && soloOf(mine)
   sec.replaceChildren(
     h('div', { className: 'ar-form-head' }, h('h2', {}, '참가 신청'),
       h('span', { className: `ar-state${mine ? ' is-on' : ''}` }, mine ? `신청 완료 · ${mine.slots.map(s => TAG[s] || LABEL[s]).join(' ')}` : '미신청')),
     h('p', { className: 'rc-note' }, !mine ? '아직 이번 주 신청을 안 했어요. 참석할 시간과 계정을 골라 신청해 주세요.'
-      : absent ? `사유불참${mine.memo ? ` · ${mine.memo}` : ''}`
+      : solo ? `${LABEL[solo]}${mine.memo ? ` · ${mine.memo}` : ''}`
       : `계정 ${mine.accounts.map(a => a.nick).join(', ')}${mine.memo ? ` · 메모 ${mine.memo}` : ''}`),
-    mine && !absent ? myTeams() : '',   // replaceChildren 은 undefined 를 글자로 넣는다
+    mine && !solo ? myTeams() : '',   // replaceChildren 은 undefined 를 글자로 넣는다
     h('div', { className: 'rc-actions' },
       mine && h('button', { type: 'button', className: 'danger', onclick: cancel }, '신청 취소'),
       h('button', { type: 'button', className: 'primary rc-big', onclick: openSignup }, mine ? '신청 수정' : '신청하기')))
@@ -168,13 +169,13 @@ function renderForm() {
       if (pick.length) { draft.nicks = new Set(pick); renderForm() }
     }).catch(() => {})
   }
-  const d = draft, absent = d.slots.has('absent'), err = errBox()
+  const d = draft, solo = [...d.slots].find(x => SOLO.has(x)), err = errBox()
 
   const opt = (c, sub) => {
     const box = h('input', { type: 'checkbox', checked: d.slots.has(c.id), onchange: () => {
       if (box.checked) {
-        if (c.id === 'absent') d.slots.clear()
-        else d.slots.delete('absent')
+        if (SOLO.has(c.id)) d.slots.clear()
+        else for (const x of SOLO) d.slots.delete(x)
         d.slots.add(c.id)
       } else d.slots.delete(c.id)
       renderForm()
@@ -200,27 +201,27 @@ function renderForm() {
     renderForm()
   }
   const picked = d.accounts.filter(a => d.nicks.has(a.nick)).length, full = picked >= cap
-  const list = h('ul', { className: `ac-list${absent ? ' is-off' : ''}` }, d.accounts.length
+  const list = h('ul', { className: `ac-list${solo ? ' is-off' : ''}` }, d.accounts.length
     ? d.accounts.map((a, i) => accountRow(a, i, { checked: d.nicks.has(a.nick), disabled: full && !d.nicks.has(a.nick), onCheck: on => { on ? d.nicks.add(a.nick) : d.nicks.delete(a.nick); renderForm() }, onEdit: () => edit(a) }))
     : h('li', { className: 'ac-empty' }, '등록된 계정이 없어요 — 「+ 계정 추가」 로 게임 닉네임과 캐릭터를 넣어 주세요'))
   const allOn = picked === Math.min(cap, d.accounts.length)
   // 계정이 둘 이상이면 한 번에 고르거나 빼기 — 최대 개수보다 많으면 앞에서부터 그만큼
-  const toggleAll = d.accounts.length > 1 && h('button', { type: 'button', className: 'ar-all', disabled: absent,
+  const toggleAll = d.accounts.length > 1 && h('button', { type: 'button', className: 'ar-all', disabled: !!solo,
     onclick: () => { d.nicks = new Set(allOn ? [] : d.accounts.slice(0, cap).map(a => a.nick)); renderForm() } }, allOn ? '전체 해제' : d.accounts.length > cap ? `앞 ${cap}개 선택` : '전체 선택')
-  const memo = h('input', { type: 'text', maxLength: A.memo, value: d.memo, placeholder: absent ? '불참 사유 (선택)' : '예) 2차는 늦게 들어가요', oninput: () => { d.memo = memo.value } })
+  const memo = h('input', { type: 'text', maxLength: A.memo, value: d.memo, placeholder: solo === 'absent' ? '불참 사유 (선택)' : solo ? '예) 다른 아레나 팀과 같이 뛰어요' : '예) 2차는 늦게 들어가요', oninput: () => { d.memo = memo.value } })
 
   const submit = h('button', { type: 'submit', className: 'primary rc-big' }, mine ? '신청 수정' : '신청하기')
   const form = h('form', { className: 'ar-form', novalidate: true },
     h('h3', {}, '1. 참석 가능한 시간'),
     h('div', { className: 'ar-opts' }, SLOTS.map(s => opt(s, `${s.time} ~ ${s.end === A.closeAt ? '종료' : s.end}`))),
     h('div', { className: 'ar-opts is-extra' }, A.extra.map(c => opt(c))),
-    h('p', { className: 'rc-muted' }, '여러 개 선택 가능 · 실제 배정은 운영진이 진행해요'),
-    h('div', { className: 'ar-acc-head' }, h('h3', {}, '2. 이번 주 참가 계정 ', h('small', { className: 'ar-count' }, absent ? '불참' : `${picked}${cap < Infinity ? ` / ${cap}` : ''}개 계정`)), toggleAll),
+    h('p', { className: 'rc-muted' }, '여러 개 선택 가능(자율참여 · 사유불참은 하나만) · 실제 배정은 운영진이 진행해요 — 자율참여는 편성 없이 알아서 뛰어요'),
+    h('div', { className: 'ar-acc-head' }, h('h3', {}, '2. 이번 주 참가 계정 ', h('small', { className: 'ar-count' }, solo ? LABEL[solo] : `${picked}${cap < Infinity ? ` / ${cap}` : ''}개 계정`)), toggleAll),
     person && h('div', { className: 'ar-first' }, h('p', { className: 'rc-muted' }, '처음이에요 — 프로필에 쓸 이름과 마이크도 한 번 정해 주세요'), person.el),
     list,
     h('div', { className: 'rc-add' }, h('button', { type: 'button', onclick: () => edit(null) }, '+ 계정 추가')),
     h('p', { className: 'rc-muted' }, `아레나전에 실제로 쓸 계정만 골라 주세요${cap < Infinity ? ` — 한 주에 최대 ${cap}개(뛸 수 있는 시간대가 ${cap}번이에요)` : ''}. 계정 · 포지션 · 캐릭터는 내 프로필에 저장되어 다음 주에도 그대로예요`),
-    h('label', { className: 'rc-fld ar-memo' }, h('span', {}, absent ? '불참 사유' : '메모 ', h('small', {}, '선택')), memo),
+    h('label', { className: 'rc-fld ar-memo' }, h('span', {}, solo === 'absent' ? '불참 사유' : '메모 ', h('small', {}, '선택')), memo),
     err,
     h('div', { className: 'rc-actions' },
       mine && h('button', { type: 'button', className: 'danger', onclick: cancel }, '신청 취소'),
@@ -228,16 +229,16 @@ function renderForm() {
   form.onsubmit = async e => {
     e.preventDefault()
     const slots = [...d.slots], nicks = d.accounts.filter(a => d.nicks.has(a.nick)).map(a => a.nick)
-    const noRole = !absent && d.accounts.find(a => d.nicks.has(a.nick) && !a.roles.length)
+    const noRole = !solo && d.accounts.find(a => d.nicks.has(a.nick) && !a.roles.length)
     const bad = !slots.length ? '참석할 시간을 골라 주세요' : !d.accounts.length ? '계정을 하나 이상 등록해 주세요'
-      : !absent && !nicks.length ? '참가할 계정을 골라 주세요' : noRole ? `「${noRole.nick}」 계정의 주력 포지션을 정해 주세요 — ✎ 로 고쳐요` : ''
+      : !solo && !nicks.length ? '참가할 계정을 골라 주세요' : noRole ? `「${noRole.nick}」 계정의 주력 포지션을 정해 주세요 — ✎ 로 고쳐요` : ''
     if (bad) return show(err, bad)
     const p = person && person.read()
     if (person && !p) return
     submit.disabled = true
     try {
       if (p) await saveProfile({ ...p, accounts: d.accounts })
-      await api('/arena/signup', { method: 'PUT', withToken: true, body: { slots, nicks: absent ? [] : nicks, memo: d.memo } })
+      await api('/arena/signup', { method: 'PUT', withToken: true, body: { slots, nicks: solo ? [] : nicks, memo: d.memo } })
       draft = null
       dlg.close()
       await load()
@@ -297,7 +298,7 @@ function renderPlan() {
   const sec = $('#plan')
   sec.hidden = false
   const at = placements(), done = doneKeys()
-  const players = data.signups.filter(s => !s.slots.includes('absent'))
+  const players = data.signups.filter(s => !soloOf(s))   // 자율참여 · 사유불참은 편성하지 않는다 — 자율참여는 따로 카드
   const left = s => s.accounts.some(a => !at.has(key(s.userId, a.nick)) && !done.has(key(s.userId, a.nick)))   // 아직 안 끝난 계정이 있다
   const nTeams = SLOTS.reduce((n, s) => n + teamsOf(s.id).length, 0), edit = PLAN_PAGE && canEdit()
   const stat = (label, n, unit, cls = '') => h('div', { className: `ar-stat ${cls}` }, h('small', {}, label), h('b', {}, n, h('span', {}, unit)))
@@ -320,7 +321,7 @@ function renderPlan() {
   if (PLAN_PAGE && !edit) return sec.replaceChildren(head, h('p', { className: 'card rc-note' },
     auth === 'loading' ? '로그인 확인 중…' : auth !== 'in' ? '관리자로 로그인해야 편성할 수 있어요.' : '관리자만 편성할 수 있어요.'))
   const keep = new Map([...sec.querySelectorAll('[data-keep]')].map(el => [el.dataset.keep, el.scrollTop]))   // 다시 그려도 계정 · 팀 목록 스크롤 그대로
-  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), teamsCard(), membersCard(at), chartCard(), mixCard(), weeklyCard()].filter(Boolean))
+  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), freeCard(), teamsCard(), membersCard(at), chartCard(), mixCard(), weeklyCard()].filter(Boolean))
   for (const el of sec.querySelectorAll('[data-keep]')) el.scrollTop = keep.get(el.dataset.keep) || 0
   if (nTeams && !edit) queueShot()
 }
@@ -358,9 +359,9 @@ function tallyCard() {
   }
   const sections = groups.filter(g => tallyTab === 'all' || tallyTab === g.c.id).map(({ c, who, rows }) => {
     const sec = h('div', { className: 'ar-slot' },
-      h('div', { className: 'ar-slot-head' }, h('b', {}, c.short), h('span', {}, c.id === 'absent' ? `${who.length}명` : `${who.length}명 · ${who.reduce((n, s) => n + s.accounts.length, 0)}계정`),
+      h('div', { className: 'ar-slot-head' }, h('b', {}, c.short), h('span', {}, SOLO.has(c.id) ? `${who.length}명` : `${who.length}명 · ${who.reduce((n, s) => n + s.accounts.length, 0)}계정`),
         SLOT[c.id] && h('small', {}, slotWhen(week, SLOT[c.id]))),
-      c.id === 'absent'
+      SOLO.has(c.id)
         ? h('p', { className: 'ar-absent' }, who.map(s => s.memo ? `${s.owner}(${s.memo})` : s.owner).join(', ') || '-')
         : rows.length ? h('div', { className: 'ar-table-wrap' }, h('table', { className: 'ar-table ar-tally' },
           h('thead', {}, h('tr', {}, ['#', '본계정', '포지션', '보유 캐릭터', '계정 수', ''].map(t => h('th', {}, t)))),
@@ -377,6 +378,14 @@ function missingCard() {
   const names = [...data.missing].sort((a, b) => a.localeCompare(b, 'ko'))
   return foldCard('missing', `이번 주 미신청 ${names.length}명`,
     names.length ? h('ol', { className: 'ar-missing' }, names.map(n => h('li', {}, n))) : h('p', { className: 'rc-muted' }, '모두 신청했어요'))
+}
+
+/** 자율참여 — 편성 없이 알아서 뛰는 사람(본계정 · 메모). 운영 · 편성 페이지 둘 다 */
+function freeCard() {
+  const who = data.signups.filter(s => s.slots.includes('free')).sort((x, y) => x.owner.localeCompare(y.owner, 'ko'))
+  return foldCard('free', `자율참여 ${who.length}명`, who.length
+    ? h('ol', { className: 'ar-missing ar-free' }, who.map(s => h('li', {}, s.owner, s.memo && h('small', {}, s.memo))))
+    : h('p', { className: 'rc-muted' }, '자율참여를 신청한 사람이 없어요'))
 }
 
 /** 멤버별 배치 현황 — 행 = 사람(본계정), 칸 = 시간대마다 몇 팀. 한 사람은 한 시간대에 한 팀뿐이라(겹치는 시간대 규칙) 부계정 배치도 그 줄에 — 뱃지에 마우스를 올리면 뛰는 계정.
@@ -503,9 +512,9 @@ const showWho = (title, list, extra = () => null) => modal(title,
   h('ul', { className: 'ar-who-list' }, list.map(a => h('li', {},
     h('span', {}, h('b', {}, a.n), h('small', {}, a.owner !== a.n ? ` 본계 ${a.owner}` : ' 본계정')), roleTags(a.roles), extra(a)))))
 
-/** 요일 · 시간대별 참여 — 이번 주 신청한 사람(사유불참 빼고) 중 그 시간대를 고른 비율 */
+/** 요일 · 시간대별 참여 — 이번 주 신청한 사람(자율참여 · 사유불참 빼고) 중 그 시간대를 고른 비율 */
 function chartCard() {
-  const players = data.signups.filter(s => !s.slots.includes('absent')), n = players.length
+  const players = data.signups.filter(s => !soloOf(s)), n = players.length
   const pct = k => n ? Math.round(k / n * 100) : 0
   const bar = (id, label) => {
     const who = players.filter(s => s.slots.includes(id)), accounts = who.reduce((k, s) => k + s.accounts.length, 0)
@@ -518,13 +527,13 @@ function chartCard() {
       SLOTS.filter(s => s.day === day).map(s => bar(s.id, `${s.short.split(' ').slice(1).join(' ')} ${s.time}`)),
       A.extra.filter(c => c.day === day).map(c => bar(c.id, 'FA 시간 미정')))
   })
-  const absent = data.signups.length - n
+  const out = A.extra.filter(c => c.solo).map(c => [c.label, data.signups.filter(s => s.slots.includes(c.id)).length]).filter(([, k]) => k)
   return foldCard('chart', '요일 · 시간대별 참여',
-    h('p', { className: 'rc-muted' }, n ? `참가 신청 ${n}명 기준(한 사람이 여러 시간대를 고를 수 있어 합이 100% 를 넘어요)${absent ? ` · 사유불참 ${absent}명 제외` : ''}` : '아직 참가 신청이 없어요'),
+    h('p', { className: 'rc-muted' }, n ? `참가 신청 ${n}명 기준(한 사람이 여러 시간대를 고를 수 있어 합이 100% 를 넘어요)${out.length ? ` · ${out.map(([l, k]) => `${l} ${k}명`).join(' · ')} 제외` : ''}` : '아직 참가 신청이 없어요'),
     n > 0 && h('div', { className: 'ar-chart' }, days))
 }
 
-/** 포지션 · 캐릭터 비율 — 이번 주 참가 계정(사유불참은 계정이 없다) 기준. 포지션은 1순위와 1 · 2순위 합, 캐릭터는 계정마다 고른 주력 캐릭터.
+/** 포지션 · 캐릭터 비율 — 이번 주 참가 계정(자율참여 · 사유불참은 계정이 없다) 기준. 포지션은 1순위와 1 · 2순위 합, 캐릭터는 계정마다 고른 주력 캐릭터.
  *  줄을 누르면 누가 골랐는지 모달로 */
 function mixCard() {
   const list = [...accts.values()], n = list.length
@@ -689,7 +698,7 @@ function editor() {
       h('div', { className: 'ar-drop is-new', 'data-drop': `${s.id}:new` }, '+ 새 팀 — 여기에 놓기'),
       grip(list, 'maxHeight', px => { teamH = px; try { localStorage.setItem(TEAM_H_KEY, px) } catch {} }, () => [...document.querySelectorAll('.ar-slot-body')])), `edit:${s.id}`)
   }))
-  return [poolBox, status, grid, picksCard()]
+  return [poolBox, status, grid, freeCard(), picksCard()]
 }
 
 // 신청 현황 칸은 요일 순(토 1 · 2 · FA → 일 … → 불참), 줄은 불참이 맨 아래 · 그 밖은 본계정 가나다 — 화면 표 · 엑셀이 같이 쓴다

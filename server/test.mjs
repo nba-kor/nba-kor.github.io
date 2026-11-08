@@ -1802,7 +1802,7 @@ test('아레나 주: 그 주 토요일(KST) · 일요일 21:30 이 지나면 다
   ]) assert.equal(arenaWeek(Date.parse(at)), week, at)
 })
 
-dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 혼자) · 보기는 공개 · 미신청 · 프로필을 고치면 신청에도 · 편성표는 관리자만(같은 시간대 한 사람 한 번 · 3명 · 409) · 이력', async () => {
+dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 자율참여 · 사유불참은 혼자) · 보기는 공개 · 미신청 · 프로필을 고치면 신청에도 · 편성표는 관리자만(같은 시간대 한 사람 한 번 · 3명 · 409) · 이력', async () => {
   const { arenaWeek } = await import('./index.mjs')
   let clock = futureBase()
   const { api } = start({ now: () => clock })
@@ -1821,7 +1821,7 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   // 신청 검증
   for (const [body, why] of [
     [{ slots: [], nicks: ['A본'] }, '시간대 없음'], [{ slots: ['mon1'], nicks: ['A본'] }, '없는 시간대'], [{ slots: ['sat15'], nicks: ['A본'] }, '없앤 시간대(1.5차)'], [{ slots: ['sat1', 'sat1'], nicks: ['A본'] }, '같은 시간대 두 번'],
-    [{ slots: ['absent', 'sat1'], nicks: ['A본'] }, '사유불참 + 시간대'], [{ slots: ['sat1'], nicks: [] }, '계정 없음'], [{ slots: ['sat1'], nicks: [`B${RUN}`] }, '남의 계정'],
+    [{ slots: ['absent', 'sat1'], nicks: ['A본'] }, '사유불참 + 시간대'], [{ slots: ['free', 'sat1'], nicks: ['A본'] }, '자율참여 + 시간대'], [{ slots: ['free', 'absent'], nicks: [] }, '자율참여 + 사유불참'], [{ slots: ['sat1'], nicks: [] }, '계정 없음'], [{ slots: ['sat1'], nicks: [`B${RUN}`] }, '남의 계정'],
     [{ slots: ['sat1'], nicks: ['A본', 'A본'] }, '같은 계정 두 번'], [{ slots: ['sat1'], nicks: ['A본'], memo: 'x'.repeat(51) }, '메모 51자'], [{ slots: 'sat1', nicks: ['A본'] }, '시간대가 배열 아님'],
   ]) assert.equal((await signup(a, body)).status, 400, why)
   assert.equal((await api('PUT', '/api/arena/signup', { slots: ['sat1'], nicks: ['x'] }, { as: web(uid()) })).status, 428, '프로필 없음')
@@ -2080,10 +2080,10 @@ dbTest('멤버 관리: 관리자만 · 목록(등급 · 본계정 · 계정 수 
   assert.deepEqual([l[at(boss.id)].role, l[at(adm.id)].role, l[at(m2.id)].lastWeek], ['master', 'admin', null])
   assert.ok(at(boss.id) < at(adm.id) && at(adm.id) < at(m1.id), '슈퍼관리자 → 관리자 → 멤버 순')
 
-  // 출석: 이번 주에 아직 신청 안 한 m2 — 지난주 · 2주 전 · 4주 전에 나왔고 3주 전은 사유불참 → 사유불참은 건너뛰어 3주 연속(이번 주는 아직)
+  // 출석: 이번 주에 아직 신청 안 한 m2 — 지난주(자율참여 — 출석이다) · 2주 전 · 4주 전에 나왔고 3주 전은 사유불참 → 사유불참은 건너뛰어 3주 연속(이번 주는 아직)
   const cur = arenaWeek(clock), wk = n => new Date(Date.parse(`${cur}T00:00:00Z`) - n * 7 * 86_400_000).toISOString().slice(0, 10)
   const sign = (u, week, slots = ['sat1']) => rest('/arena_signups', post({ week, user_id: u, slots, nicks: [], updated_at: clock }))
-  for (const r of [await sign(m2.id, wk(1)), await sign(m2.id, wk(2)), await sign(m2.id, wk(3), ['absent']), await sign(m2.id, wk(4))]) assert.equal(r.status, 201)
+  for (const r of [await sign(m2.id, wk(1), ['free']), await sign(m2.id, wk(2)), await sign(m2.id, wk(3), ['absent']), await sign(m2.id, wk(4))]) assert.equal(r.status, 201)
   // adm — 5주 전에 가입, 그 뒤로 한 번도 안 나왔고 2주 전만 사유불참 → 사유불참 주는 빼고 4주째 미참석(이번 주 사유불참도 안 센다)
   await rest(`/recruit_profiles?discord_user_id=eq.${adm.id}`, { method: 'PATCH', body: JSON.stringify({ created_at: clock - 35 * 86_400_000 }) })
   for (const r of [await sign(adm.id, cur, ['absent']), await sign(adm.id, wk(2), ['absent'])]) assert.equal(r.status, 201)

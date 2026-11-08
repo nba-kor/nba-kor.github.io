@@ -185,7 +185,7 @@ const watchMembers = (box, paint) => {
   draw()
 }
 
-// ------------------------------------------------ 관리자 — 아레나 출석 현황. 출석 = 그 주에 참가 신청(사유불참 빼고). 이번 주에 아직 안 했으면 지난주까지로 센다
+// ------------------------------------------------ 관리자 — 아레나 출석 현황. 출석 = 그 주에 참가 신청(사유불참 빼고, 자율참여는 출석). 이번 주에 아직 안 했으면 지난주까지로 센다
 
 function attendanceCard() {
   const box = h('div', {})
@@ -193,7 +193,7 @@ function attendanceCard() {
     h('thead', {}, h('tr', {}, ['#', '본계정', '이번 주', ...cols.map(c => c[0])].map(t => h('th', {}, t)))),
     h('tbody', {}, rows.map((m, i) => h('tr', {}, h('td', {}, i + 1),
       h('td', { className: 'ar-nick' }, h('b', {}, m.main), m.name !== m.main && h('small', {}, m.name)),
-      h('td', {}, h('span', { className: `mp-now is-${m.attend.now || 'none'}` }, { in: '신청', absent: '사유불참' }[m.attend.now] || '미신청')),
+      h('td', {}, h('span', { className: `mp-now is-${m.attend.now || 'none'}` }, { in: '신청', free: '자율참여', absent: '사유불참' }[m.attend.now] || '미신청')),
       ...cols.map(c => h('td', {}, c[1](m))))))))
   watchMembers(box, list => {
     const going = list.filter(m => m.attend.streak).sort((a, b) => b.attend.streak - a.attend.streak || a.main.localeCompare(b.main, 'ko'))

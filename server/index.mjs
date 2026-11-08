@@ -59,7 +59,7 @@ const GUEST_ID = /^g(\d{1,15})$/   // 비회원 · 팀장이 넣은 팀원의 us
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const CONTROL = /[\x00-\x1f\x7f]/
 const JSON_TYPE = /^application\/json\b/i
-// 아레나전: 시간대(토 · 일 1팟 · 2팟) + 토 · 일 FA(그날 시간 미정 · 용병) · 사유불참. 주는 그 주 토요일 날짜. 1.5차는 retired(지난 신청에만 남는다)
+// 아레나전: 시간대(토 · 일 1팟 · 2팟) + 토 · 일 FA(그날 시간 미정 · 용병) · 자율참여 · 사유불참. 주는 그 주 토요일 날짜. 1.5차는 retired(지난 신청에만 남는다)
 const SLOTS = new Set(ARENA.slots.map(s => s.id))
 const ROLES = new Set(ARENA.roles.map(r => r.id))   // 계정의 주력 포지션 1 · 2순위 — 스코어러 · 중열 · 센터 · 올포(allpos, 1순위면 2순위 없이 · 2순위로도)
 // 같은 날 시간이 겹치는 두 시간대(지금은 1차 · 2차라 같은 시간대만). 한 사람은 겹치는 시간대에 한 번만 들어간다(계정 둘을 동시에 못 한다)
@@ -67,6 +67,7 @@ const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3)
 const SLOT_AT = new Map(ARENA.slots.map(s => [s.id, s]))
 const clash = (x, y) => { const a = SLOT_AT.get(x), b = SLOT_AT.get(y); return a.day === b.day && minutes(a.time) < minutes(b.end) && minutes(b.time) < minutes(a.end) }
 const CHOICES = [...SLOTS, ...ARENA.extra.map(c => c.id)]
+const SOLO = new Set(ARENA.extra.filter(c => c.solo).map(c => c.id))   // 혼자만 고르고 계정 없이 — 자율참여 · 사유불참
 const DAY_OF = Object.fromEntries([...ARENA.slots, ...ARENA.extra, ...ARENA.retired].filter(c => c.day != null).map(c => [c.id, c.day]))   // 시간대 · FA(· 지난 1.5차) → 0 토 · 1 일
 const WEEK = /^\d{4}-\d{2}-\d{2}$/
 const prevWeek = w => new Date(Date.parse(`${w}T00:00:00Z`) - 7 * 86_400_000).toISOString().slice(0, 10)   // 아레나 주(토요일) 한 주 전
@@ -459,15 +460,15 @@ export function arenaWeek(ms) {
   return d.toISOString().slice(0, 10)
 }
 
-/** 아레나 신청: 시간대(여럿 · 사유불참은 혼자) + 참가 계정(내 프로필의 게임 닉네임, 사유불참이면 없음 · maxAccountsFrom 주부터 maxAccounts 개까지) + 메모.
+/** 아레나 신청: 시간대(여럿 · 자율참여 · 사유불참은 혼자) + 참가 계정(내 프로필의 게임 닉네임, 자율참여 · 사유불참이면 없음 · maxAccountsFrom 주부터 maxAccounts 개까지) + 메모.
  *  nicks = 내 프로필의 계정 닉네임 → 주력 포지션 — 집계표가 1순위로 나누므로 참가 계정은 1순위가 있어야 한다 */
 function arenaSignup(v, nicks, week) {
   if (!isObj(v)) fail(400, '신청 정보가 없어요')
   if (!listOf(v.slots, CHOICES.length, 1) || v.slots.some(s => !CHOICES.includes(s)) || new Set(v.slots).size !== v.slots.length) fail(400, '참석할 시간을 골라 주세요')
-  const absent = v.slots.includes('absent')
-  if (absent && v.slots.length > 1) fail(400, '사유불참은 다른 시간과 같이 고를 수 없어요')
-  const picked = absent ? [] : v.nicks
-  if (!absent && (!listOf(picked, nicks.size, 1) || picked.some(n => !nicks.has(n)) || new Set(picked).size !== picked.length)) fail(400, '참가할 계정을 내 프로필에서 골라 주세요')
+  const solo = v.slots.some(s => SOLO.has(s))
+  if (solo && v.slots.length > 1) fail(400, '자율참여 · 사유불참은 다른 시간과 같이 고를 수 없어요')
+  const picked = solo ? [] : v.nicks
+  if (!solo && (!listOf(picked, nicks.size, 1) || picked.some(n => !nicks.has(n)) || new Set(picked).size !== picked.length)) fail(400, '참가할 계정을 내 프로필에서 골라 주세요')
   if (week >= ARENA.maxAccountsFrom && picked.length > ARENA.maxAccounts) fail(400, `아레나전 참가 계정은 ${ARENA.maxAccounts}개까지예요`)
   const noRole = picked.find(n => !nicks.get(n)?.length)
   if (noRole) fail(400, `「${noRole}」 계정의 주력 포지션(1순위)을 정해 주세요`)
@@ -1373,7 +1374,7 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       const role = new Map([...admins.map(a => [a.user_id, 'admin']), ...masters.map(m => [m.user_id, 'master'])])
       const last = new Map()
       for (const w of weeks) if (!last.has(w.user_id)) last.set(w.user_id, w.week)
-      // 출석 = 그 주에 신청(사유불참 빼고). 이번 주에 신청했으면 이번 주부터, 아직이면 지난주부터 거꾸로 센다 —
+      // 출석 = 그 주에 신청(사유불참 빼고, 자율참여는 출석). 이번 주에 신청했으면 이번 주부터, 아직이면 지난주부터 거꾸로 센다 —
       // streak = 연속 참석 주, missed = 연속 미참석 주(가입한 주 · 아레나 신청을 받기 시작한 주 앞은 안 센다).
       // 사유불참한 주는 건너뛴다 — 연속 참석을 끊지도, 미참석으로 세지도 않는다
       const cur = arenaWeek(t), back = prevWeek
@@ -1381,12 +1382,12 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       const went = new Map(), excused = new Map(), now = new Map()
       for (const w of weeks) {
         const absent = w.slots.includes('absent'), by = absent ? excused : went
-        if (w.week === cur) now.set(w.user_id, absent ? 'absent' : 'in')
+        if (w.week === cur) now.set(w.user_id, absent ? 'absent' : w.slots.includes('free') ? 'free' : 'in')
         by.set(w.user_id, (by.get(w.user_id) || new Set()).add(w.week))
       }
       const attend = p => {
         const set = went.get(p.discord_user_id) || new Set(), off = excused.get(p.discord_user_id) || new Set(), start = [first, arenaWeek(p.created_at)].sort().at(-1)
-        let w = now.get(p.discord_user_id) === 'in' ? cur : back(cur), streak = 0, missed = 0
+        let w = set.has(cur) ? cur : back(cur), streak = 0, missed = 0
         for (; ; w = back(w)) {
           if (off.has(w)) continue
           if (set.has(w)) { if (missed) break; streak++ }
