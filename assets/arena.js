@@ -321,7 +321,7 @@ function renderPlan() {
   if (PLAN_PAGE && !edit) return sec.replaceChildren(head, h('p', { className: 'card rc-note' },
     auth === 'loading' ? '로그인 확인 중…' : auth !== 'in' ? '관리자로 로그인해야 편성할 수 있어요.' : '관리자만 편성할 수 있어요.'))
   const keep = new Map([...sec.querySelectorAll('[data-keep]')].map(el => [el.dataset.keep, el.scrollTop]))   // 다시 그려도 계정 · 팀 목록 스크롤 그대로
-  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), missingCard(), freeCard(), teamsCard(), membersCard(at), chartCard(), mixCard(), weeklyCard()].filter(Boolean))
+  sec.replaceChildren(head, stats, ...edit ? editor() : [tallyCard(), teamsCard(), freeCard(), missingCard(), membersCard(at), chartCard(), mixCard(), weeklyCard()].filter(Boolean))
   for (const el of sec.querySelectorAll('[data-keep]')) el.scrollTop = keep.get(el.dataset.keep) || 0
   if (nTeams && !edit) queueShot()
 }
