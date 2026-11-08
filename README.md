@@ -84,7 +84,7 @@ assets/share/*.jpg    카카오톡 공유용 얼굴 (300x300, 위 PNG 로 생성
 ```sh
 # 1) data/upcoming.json 에서 해당 선수의 server 를 kr 로
 tools/cn-faces/.venv/bin/python tools/share-faces.py     # 2) 카카오 공유 얼굴 굽기
-npx supabase functions deploy recruit --project-ref lgchgqxjjlapszmxarun   # 3) 함수가 선수 목록을 번들로 들고 있다
+sh tools/deploy-api.sh   # 3) 함수가 선수 목록을 번들로 들고 있다
 # 4) 봇은 재시작(사이트 데이터를 프로세스당 한 번만 읽는다)
 ```
 
@@ -530,10 +530,10 @@ export SUPABASE_ACCESS_TOKEN=sbp_...
    웹 로그인 토큰은 함수가 Auth 에 직접 확인한다.
 
    ```sh
-   npx supabase functions deploy recruit --project-ref lgchgqxjjlapszmxarun
+   npx supabase@3 functions deploy recruit --remote=lgchgqxjjlapszmxarun --yes
    ```
 
-   `sh tools/deploy-api.sh` 가 같은 일을 한다(`.env` 의 토큰을 읽고, 끝나면 `/api/health` 를 찍는다).
+   `sh tools/deploy-api.sh` 가 같은 일을 한다(`.env` 의 토큰을 읽고, 끝나면 `/api/health` 를 찍는다). CLI 는 3.x 로 고정 — 3.0 부터 운영 배포는 확인을 묻는데, 스크립트를 돌리는 게 확인이라 `--yes` 로 바로 배포한다. v4 가 나오면 옵션을 확인하고 올린다.
 
 5. 확인:
 

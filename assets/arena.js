@@ -122,7 +122,7 @@ function myTeams() {
       canEarly(s, tm) && h('p', { className: 'ar-early-note' }, EARLY),
       h('div', { className: 'ar-mine-me' }, h('span', { className: 'ar-mine-k' }, '내 계정'), ...who(a), roleTags(a.roles), lead(self), charTags(a)),
       h('div', { className: 'ar-mine-mates' }, h('span', { className: 'ar-mine-k' }, '같은 팀'),
-        mates.length ? mates.map(m => h('span', { className: 'ar-mate' }, ...who(m), roleTags(m.roles), lead(m), charTags(m))) : h('span', { className: 'rc-muted' }, '아직 혼자예요')))
+        mates.length ? mates.map(m => h('span', { className: 'ar-mate' }, h('span', { className: 'ar-mate-head' }, ...who(m), roleTags(m.roles), lead(m)), charTags(m))) : h('span', { className: 'rc-muted' }, '아직 혼자예요')))
     return [row]
   }))
   return h('div', { className: 'ar-mine' }, h('p', { className: 'ar-mine-title' }, '내 배정'),
