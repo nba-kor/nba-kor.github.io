@@ -1791,6 +1791,8 @@ test('감사 로그 내용: 한글 이름 · 프로필 · 아레나 신청 · �
   assert.deepEqual(planChanges(undefined, { sat1: [[p('1', 'A')]] }), ['+A: 토 1차 1팀'], '처음 저장')
   assert.deepEqual(planChanges({ sat1: [[p('9', 'Z')], [p('1', 'A')]] }, { sat1: [[p('1', 'A')]] }), ['−Z: 토 1차 1팀', 'A: 토 1차 2팀 → 1팀'], '앞 팀이 비어 번호가 당겨지면 옮긴 것으로')
   assert.deepEqual(planChanges({ done: [p('1', 'A')] }, { done: [p('2', 'B')] }), ['+B: 팀 없이 완료', '−A: 팀 없이 완료'])
+  assert.deepEqual(planChanges({ sat1: [[p('1', 'A')]] }, { sat1: [[{ ...p('1', 'A'), full: true }]] }), ['+토 1차 1팀: 편성완료'])
+  assert.deepEqual(planChanges({ sat1: [[{ ...p('1', 'A'), full: true }, p('2', 'B')]] }, { sat1: [[p('2', 'B')]] }), ['−A: 토 1차 1팀', '−토 1차 1팀: 편성완료'], '팀장이 빠지면 풀린다')
 })
 
 test('아레나 주: 그 주 토요일(KST) · 일요일 21:30 이 지나면 다음 주 · 연말을 넘는다', async () => {
@@ -1871,6 +1873,12 @@ dbTest('아레나: 신청(시간대 · 내 프로필 계정 · 사유불참은 �
   clock += MIN
   const done = await plan(boss, { ...p1, done: [{ u: b.id, n: `B${RUN}` }, { u: b.id, n: `B${RUN}` }] }, saved.body.planAt)
   assert.deepEqual([done.status, done.body.plan.done], [200, [{ u: b.id, n: `B${RUN}` }]], '팀 없이 완료 — 한 계정에 한 번')
+  clock += MIN
+  const full = await plan(boss, { ...done.body.plan, sat1: [[{ u: a.id, n: 'A본', full: true }, { u: b.id, n: `B${RUN}`, full: true }]], sat2: [[{ u: a.id, n: 'A부', full: 'yes' }]] }, done.body.planAt)
+  assert.deepEqual([full.status, full.body.plan.sat1, full.body.plan.sat2], [200, [[{ u: a.id, n: 'A본', full: true }, { u: b.id, n: `B${RUN}` }]], [[{ u: a.id, n: 'A부' }]]], '편성완료 — 팀장 자리의 true 만')
+  clock += MIN
+  const back = await plan(boss, done.body.plan, full.body.planAt)
+  assert.equal(back.status, 200, '원래대로')
   await rest(`/arena_plans?week=eq.${week}`, { method: 'PATCH', body: JSON.stringify({ plan: { ...done.body.plan, sat15: [[{ u: a.id, n: 'A본' }]] } }) })
   assert.equal('sat15' in (await view()).plan, false, '없앤 시간대(1.5차)는 저장돼 있어도 편성표에서 안 보인다(지난 이력에는 남는다)')
   await rest(`/arena_plans?week=eq.${week}`, { method: 'PATCH', body: JSON.stringify({ plan: done.body.plan }) })
