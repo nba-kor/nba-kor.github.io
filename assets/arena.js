@@ -36,7 +36,7 @@ const show = (box, msg) => { box.textContent = msg; box.hidden = !msg }
 const PLAN_PAGE = location.pathname.startsWith('/arena/plan')   // 편성 페이지 — 이번 주만
 let week = PLAN_PAGE ? '' : new URLSearchParams(location.search).get('w') || ''   // '' = 이번 주(서버가 정한다)
 let data = null      // GET /api/arena — { week, current, signups, plan, planAt, missing }
-let plan = {}        // 편성표 사본 { 시간대: [[{ u, n, full? }]], done?: [{ u, n }] } — 관리자가 고친다. done = 팀 없이 완료(강제 배정), 팀장(맨 앞)의 full = 편성완료(모자란 팀을 강제로 완료)
+let plan = {}        // 편성표 사본 { 시간대: [[{ u, n }]], done?: [{ u, n }] } — 관리자가 고친다. done = 팀 없이 완료(강제 배정)
 let accts = new Map()   // 신청한 계정 key → { u, n, owner(본계 닉네임), roles, chars, bt, slots, count(소유자의 참가 계정 수), i(그 사람 계정 중 프로필 순서, 0 = 대표) }
 let tab = 'all'
 // 편성 대기 목록 — 「배정 대기」(팀에 안 들어간 계정) · 「배정 완료」(팀에 들어갔거나 팀 없이 완료) 탭, 그 안에서 시간대 · 포지션 필터(비어 있으면 전체)
@@ -677,13 +677,11 @@ function editor() {
   const grid = h('div', { className: 'ar-edit-grid' }, SLOTS.map(s => {
     const teams = teamsOf(s.id)
     const list = h('div', { className: 'ar-slot-body', 'data-keep': s.id },
-      teams.map((tm, i) => h('div', { className: `ar-drop${tm.length >= A.teamSize || tm[0].full ? ' is-full' : ''}`, 'data-drop': `${s.id}:${i}` },
-        h('div', { className: 'ar-drop-head' }, h('span', {}, `${i + 1}팀`, canEarly(s, tm) && earlyTag()),
-          h('span', { className: 'ar-drop-meta' }, h('small', {}, tm[0].full ? `${tm.length}/${A.teamSize} · 완료` : `${tm.length}/${A.teamSize}`),
-            tm.length < A.teamSize && h('button', { type: 'button', className: 'ar-full-btn', 'aria-pressed': !!tm[0].full, onclick: () => setFull(s.id, i, !tm[0].full) }, tm[0].full ? '원래대로' : '편성완료'))),
-        // 팀원 셋이 한 줄(팀별 편성 명단처럼) — 빈자리도 칸으로(편성완료면 타 아레나원 자리)
+      teams.map((tm, i) => h('div', { className: `ar-drop${tm.length >= A.teamSize ? ' is-full' : ''}`, 'data-drop': `${s.id}:${i}` },
+        h('div', { className: 'ar-drop-head' }, h('span', {}, `${i + 1}팀`, canEarly(s, tm) && earlyTag()), h('small', {}, `${tm.length}/${A.teamSize}`)),
+        // 팀원 셋이 한 줄(팀별 편성 명단처럼) — 빈자리도 칸으로
         h('div', { className: 'ar-seats' }, tm.map((x, j) => chip(accts.get(key(x.u, x.n)), { slot: s.id, ti: i }, j === 0)),
-          Array.from({ length: A.teamSize - tm.length }, () => h('span', { className: 'ar-seat' }, tm[0].full ? '타 아레나원' : '빈자리'))))))
+          Array.from({ length: A.teamSize - tm.length }, () => h('span', { className: 'ar-seat' }, '빈자리'))))))
     if (teamH) list.style.maxHeight = `${teamH}px`
     return foldable(h('details', { className: 'ar-slot ar-edit' },
       h('summary', { className: 'ar-slot-head' }, h('b', {}, s.label), h('small', {}, `${s.time} · ${teams.length}팀`)),
@@ -758,7 +756,6 @@ function move(a, from, to, ok) {
     if (SLOTS.some(o => clash(slot, o.id) && (next[o.id] || []).some(tm => tm.some(x => x.u === a.u)))) return say(`${a.owner} 님은 겹치는 시간대에 이미 들어가 있어요`, true)
     const ti = t === 'new' ? teams.length : +t, team = teams[ti] ||= []
     if (team.length >= A.teamSize) return say(`${ti + 1}팀은 이미 ${A.teamSize}명이에요`, true)
-    if (plan[slot]?.[ti]?.[0].full) return say(`${ti + 1}팀은 편성완료했어요 — 넣으려면 「원래대로」 를 먼저 눌러 주세요`, true)   // 옮기기 전 팀으로 본다 — 팀장을 제 팀에 다시 놓아도 안 풀린다
     // 신청 안 한 시간대(그날 FA 로도 안 되는 칸)면 한 번 더 묻고, 확인하면 그때의 편성으로 다시 넣는다 · 같은 시간대 안에서 팀만 옮길 땐 묻지 않는다
     if (!ok && from?.slot !== slot && !a.slots.includes(slot) && !viaFa(a.slots, SLOT[slot])) return void askOff(a, slot).then(y => y && move(a, from, to, true))
     team.push({ u: a.u, n: a.n })
@@ -792,16 +789,6 @@ function setDone(a, on) {
   save()
 }
 
-/** 편성완료(강제) — 모자란 팀(1 · 2명)을 다 찬 팀처럼: 나머지는 타 아레나원과 뛴다, 더 못 넣는다. 「원래대로」 로 푼다.
- *  표시는 팀장 자리의 full — 팀장을 빼면 같이 풀린다 */
-function setFull(slot, ti, on) {
-  const lead = plan[slot][ti][0]
-  if (on) lead.full = true
-  else delete lead.full
-  renderPlan()
-  save()
-}
-
 function menu(a, from) {
   const items = []
   if (from) items.push({ label: '빼기 (대기로)', pick: () => move(a, from, 'pool') })
@@ -813,7 +800,7 @@ function menu(a, from) {
     // 배치 현황과 같은 기준 — 직접 고른 시간대는 그대로, FA 로 되는 시간대는 「FA」, 그 밖은 「신청 안 함」
     const note = a.slots.includes(s.id) ? '' : viaFa(a.slots, s) ? ' · FA' : ' · 신청 안 함'
     teams.forEach((tm, ti) => {
-      if (tm.length < A.teamSize && !tm[0].full && !(from?.slot === s.id && from.ti === ti)) items.push({ label: `${s.short} · ${ti + 1}팀 (${tm.length}/${A.teamSize}) · 팀장 ${accts.get(key(tm[0].u, tm[0].n))?.owner || tm[0].n}${note}`, pick: () => move(a, from, `${s.id}:${ti}`) })
+      if (tm.length < A.teamSize && !(from?.slot === s.id && from.ti === ti)) items.push({ label: `${s.short} · ${ti + 1}팀 (${tm.length}/${A.teamSize}) · 팀장 ${accts.get(key(tm[0].u, tm[0].n))?.owner || tm[0].n}${note}`, pick: () => move(a, from, `${s.id}:${ti}`) })
     })
     items.push({ label: `${s.short} · 새 팀${note}`, pick: () => move(a, from, `${s.id}:new`) })
   }

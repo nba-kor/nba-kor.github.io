@@ -447,11 +447,6 @@ export function planChanges(old, now) {
   const done = plan => new Set((plan?.done || []).map(a => `${a.u}\n${a.n}`)), was = done(old), is = done(now)
   for (const k of is) if (!was.has(k)) out.push(`+${k.split('\n')[1]}: 팀 없이 완료`)
   for (const k of was) if (!is.has(k)) out.push(`−${k.split('\n')[1]}: 팀 없이 완료`)
-  // 편성완료 — 팀은 팀장으로 알아본다(팀장이 빠지면 풀린 것)
-  const full = plan => new Map(ARENA.slots.flatMap(s => (plan?.[s.id] || []).flatMap((tm, i) => tm[0]?.full ? [[`${s.id}\n${tm[0].u}\n${tm[0].n}`, at(s.id, i + 1)]] : [])))
-  const wasF = full(old), isF = full(now)
-  for (const [k, t] of isF) if (!wasF.has(k)) out.push(`+${t}: 편성완료`)
-  for (const [k, t] of wasF) if (!isF.has(k)) out.push(`−${t}: 편성완료`)
   return out
 }
 
@@ -479,8 +474,8 @@ function arenaSignup(v, nicks, week) {
   return { slots: CHOICES.filter(c => v.slots.includes(c)), nicks: picked, memo: text(v.memo ?? '', ARENA.memo, '메모', 0) }
 }
 
-/** 편성표: { 시간대: [[{ u, n, full? }]], done?: [{ u, n }] } — 신청한 계정만, 팀당 teamSize 명까지, 한 사람은 겹치는 시간대에 한 번(계정 둘을 동시에 못 한다). 빈 팀은 버린다.
- *  done = 팀 없이 완료(따로 팀을 꾸려 뛴 계정) — 한 계정에 한 번. 팀장(맨 앞)의 full = 편성완료(모자란 팀을 타 아레나원과 — 다 찬 팀처럼) */
+/** 편성표: { 시간대: [[{ u, n }]], done?: [{ u, n }] } — 신청한 계정만, 팀당 teamSize 명까지, 한 사람은 겹치는 시간대에 한 번(계정 둘을 동시에 못 한다). 빈 팀은 버린다.
+ *  done = 팀 없이 완료(따로 팀을 꾸려 뛴 계정) — 한 계정에 한 번 */
 function arenaPlan(v, signups) {
   if (!isObj(v)) fail(400, '편성표 형식이 잘못됐어요')
   const ok = new Set(signups.flatMap(s => s.accounts.map(a => `${s.userId}\n${a.nick}`)))
@@ -500,11 +495,11 @@ function arenaPlan(v, signups) {
     if (!SLOTS.has(slot) || !listOf(teams, ARENA.maxTeams) || !teams.every(Array.isArray)) fail(400, '편성표 형식이 잘못됐어요')
     out[slot] = teams.filter(team => team.length).map(team => {
       if (team.length > ARENA.teamSize) fail(400, `한 팀은 ${ARENA.teamSize}명까지예요`)
-      return team.map((m, i) => {
+      return team.map(m => {
         const a = acct(m), mine = at.get(a.u) || []
         if (mine.some(x => clash(x, slot))) fail(400, '한 사람은 겹치는 시간대에 한 번만 넣을 수 있어요')
         at.set(a.u, [...mine, slot])
-        return i === 0 && m.full === true && team.length < ARENA.teamSize ? { ...a, full: true } : a   // 편성완료 — 모자란 팀의 팀장 자리에만
+        return a
       })
     })
   }
