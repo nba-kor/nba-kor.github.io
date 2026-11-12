@@ -2051,6 +2051,26 @@ dbTest('감사 로그: 바꾼 요청(성공)만 누가 · 무엇을 · 무엇에
   } finally { await rest(`/site_masters?user_id=eq.${boss}`, { method: 'DELETE' }) }
 })
 
+test('멤버 관리: 로그인 수단 — Auth 사용자 목록의 providers 를 프로필의 auth_user_id 로 잇고(디스코드 먼저), 못 읽으면 ID 로 짐작', async () => {
+  const [admin, both, bot, kakao] = ['100000000000000001', '100000000000000002', '100000000000000003', 'k4242']
+  const rows = {
+    '/rest/v1/site_admins': [{ user_id: admin }],
+    '/rest/v1/recruit_profiles': [admin, both, bot, kakao].map(id => ({ discord_user_id: id, discord_name: id, auth_user_id: id === bot ? null : fakeUuid(id), entries: [], created_at: 0, updated_at: 0 })),
+  }
+  const app = start({ db: u => [200, u.pathname === '/rest/v1/rpc/recruit_hit' ? '1' : JSON.stringify(rows[u.pathname] ?? [])] })
+  const users = [[admin, ['discord']], [both, ['kakao', 'discord']], [kakao, ['kakao']]].map(([id, providers]) => ({ id: fakeUuid(id), app_metadata: { providers } }))
+  const logins = async reply => {
+    app.net.outReply = u => u.pathname === '/auth/v1/admin/users' ? reply : [204]
+    const r = await app.api('GET', '/api/members', undefined, { as: web(admin) })
+    assert.equal(r.status, 200, r.text)
+    return Object.fromEntries(r.body.members.map(m => [m.userId, m.logins]))
+  }
+  assert.deepEqual(await logins([200, { users }]), { [admin]: ['discord'], [both]: ['discord', 'kakao'], [bot]: ['discord'], [kakao]: ['kakao'] })
+  const call = app.net.out.find(o => o.url.includes('/auth/v1/admin/users'))
+  assert.deepEqual([new URL(call.url).search, call.headers.apikey], ['?per_page=1000', 'sb_secret_test'])
+  assert.deepEqual(await logins([500, {}]), { [admin]: ['discord'], [both]: ['discord'], [bot]: ['discord'], [kakao]: ['kakao'] }, 'Auth 장애 — 목록은 그대로')
+})
+
 dbTest('멤버 관리: 관리자만 · 목록(등급 · 본계정 · 계정 수 · 마지막 신청 주) · 임명 · 해제 · 탈퇴(프로필 · 신청 · 권한 · 이끌던 팀) · 슈퍼관리자와 본인은 못 바꾼다', async () => {
   const { arenaWeek } = await import('./index.mjs')
   const clock = futureBase()
@@ -2076,7 +2096,7 @@ dbTest('멤버 관리: 관리자만 · 목록(등급 · 본계정 · 계정 수 
   assert.equal(team.status, 201)
   let l = (await list(adm)).body.members
   const at = id => l.findIndex(m => m.userId === id)
-  assert.deepEqual(l[at(m1.id)], { userId: m1.id, name: m1.name, main: `일${RUN}`, accounts: 2, role: 'member', lastWeek: arenaWeek(clock), attend: { now: 'in', streak: 1, missed: 0, total: 1 }, updatedAt: clock })
+  assert.deepEqual(l[at(m1.id)], { userId: m1.id, name: m1.name, main: `일${RUN}`, accounts: 2, role: 'member', lastWeek: arenaWeek(clock), attend: { now: 'in', streak: 1, missed: 0, total: 1 }, updatedAt: clock, logins: ['discord'] })
   assert.deepEqual([l[at(boss.id)].role, l[at(adm.id)].role, l[at(m2.id)].lastWeek], ['master', 'admin', null])
   assert.ok(at(boss.id) < at(adm.id) && at(adm.id) < at(m1.id), '슈퍼관리자 → 관리자 → 멤버 순')
 

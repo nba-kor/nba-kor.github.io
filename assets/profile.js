@@ -3,8 +3,8 @@
 // 계정의 주력 포지션(roles: 1 · 2순위)은 그 계정의 줄마다 같은 값을 넣고 첫 줄 것을 읽는다. 레벨(저장 이름은 breakthrough, 1~7)은 캐릭터 줄마다.
 // 팀원모집(숨김) · 디스코드 알림도 이 줄을 읽으므로 모양을 바꾸지 않았다. 티어는 더 받지 않는다(예전에 적은 값은 계정에 남겨 둔다)
 import { faceOf } from './app.js?v=f44b46d8'
-import { api } from './auth.js?v=bdb31bdc'
-import { h, P, me, charGrid } from './board.js?v=813dd8d2'
+import { api } from './auth.js?v=653410db'
+import { h, P, me, charGrid } from './board.js?v=9a40ea1b'
 
 const json = p => fetch(p, { cache: 'no-cache' }).then(r => r.json())
 let recruitP, arenaP

@@ -1366,10 +1366,11 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
     if (!await isAdmin(user)) fail(403, '관리자만 멤버를 관리할 수 있어요')
 
     if (action === 'GET') {   // 슈퍼관리자 → 관리자 → 멤버, 각각 본계정 닉네임 순. lastWeek = 마지막으로 아레나 신청한 주, attend = 출석(아래)
-      const [profiles, masters, admins, weeks] = await Promise.all([
-        db('/recruit_profiles?select=discord_user_id,discord_name,entries,created_at,updated_at&order=updated_at.desc&limit=1000'),
+      const [profiles, masters, admins, weeks, logins] = await Promise.all([
+        db('/recruit_profiles?select=discord_user_id,discord_name,auth_user_id,entries,created_at,updated_at&order=updated_at.desc&limit=1000'),
         db('/site_masters?select=user_id'), db('/site_admins?select=user_id'),
         db('/arena_signups?select=user_id,week,slots&order=week.desc&limit=10000'),
+        loginsByAuth(),
       ])
       const role = new Map([...admins.map(a => [a.user_id, 'admin']), ...masters.map(m => [m.user_id, 'master'])])
       const last = new Map()
@@ -1401,6 +1402,8 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
         members: profiles.map(p => ({
           userId: p.discord_user_id, name: p.discord_name, main: p.entries[0]?.nick ?? p.discord_name, accounts: new Set(p.entries.map(e => e.nick)).size,
           role: role.get(p.discord_user_id) || 'member', lastWeek: last.get(p.discord_user_id) ?? null, attend: attend(p), updatedAt: p.updated_at,
+          // 로그인 수단 — Auth 에서 못 읽었거나(봇으로만 쓴 사람 · Auth 장애) 비었으면 ID 로 짐작: k… 카카오, 나머지 디스코드
+          logins: logins.get(p.auth_user_id)?.length ? logins.get(p.auth_user_id) : [p.discord_user_id.startsWith('k') ? 'kakao' : 'discord'],
         })).sort((a, b) => ORDER[a.role] - ORDER[b.role] || a.main.localeCompare(b.main, 'ko')),
       }]
     }
@@ -1450,6 +1453,17 @@ export function createHandler({ env = {}, now = Date.now, fetch = globalThis.fet
       log(`${what} ${res.status}: ${(await res.text()).slice(0, 200)}`)
       fail(503, `${what}에 실패했어요. 잠시 뒤에 다시 시도해 주세요`)
     }
+  }
+  /** 멤버 관리의 로그인 수단 — auth 사용자 id → 연결된 것(디스코드 먼저). Auth 관리 API 사용자 목록의 app_metadata.providers(연결 · 해제 때 Auth 가 고친다).
+   *  목록에는 identities 가 안 실려 프로필의 auth_user_id 로 잇는다. 못 읽으면 빈 Map — 부르는 쪽이 ID 로 짐작한다
+   *  ponytail: 한 번에 1000명(멤버 목록도 1000명) — 넘으면 page 를 넘겨 돈다 */
+  async function loginsByAuth() {
+    try {
+      const res = await fetch(`${authBase()}/auth/v1/admin/users?per_page=1000`, { headers: { apikey: secret }, signal: AbortSignal.timeout(5000) })
+      if (!res.ok) throw new Error(`${res.status}`)
+      const { users } = await res.json()
+      return new Map(users.map(u => [u.id, ['discord', 'kakao'].filter(p => u.app_metadata?.providers?.includes(p))]))
+    } catch (e) { log(`로그인 수단 읽기 실패: ${errText(e)}`); return new Map() }
   }
   /** 카카오 「연결 끊기」 — 우리 서비스와 그 카카오계정의 연결을 카카오 쪽에서도 끊는다(카카오 로그인 서비스는 탈퇴 때 하게 돼 있다).
    *  어드민 키(KAKAO_ADMIN_KEY)로 회원번호를 지정한다. 키가 없거나 실패해도 탈퇴 · 해제는 진행한다(함수 로그만) */

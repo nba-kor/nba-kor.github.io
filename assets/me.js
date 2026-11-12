@@ -1,8 +1,8 @@
 // 마이페이지 — 프로필(표시 이름 · 마이크) · 게임 계정 · 보유 캐릭터 · 아레나 신청 이력 · 로그인 연결(카카오 연결 · 해제) · 탈퇴 · (관리자) 숨긴 메뉴 · (마스터) 사이트 접근 비밀번호 · 변경 기록
 import { mountTop, copyLink } from './app.js?v=f44b46d8'
-import { api, session, hasProvider, linkKakao, unlinkKakao, withdraw, saveGate, chooseLogin, KAKAO_SVG } from './auth.js?v=bdb31bdc'
-import { $, h, loadData, startAuth, auth, me } from './board.js?v=813dd8d2'
-import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=9288b12f'
+import { api, session, hasProvider, linkKakao, unlinkKakao, withdraw, saveGate, chooseLogin, KAKAO_SVG, DISCORD_SVG } from './auth.js?v=653410db'
+import { $, h, loadData, startAuth, auth, me } from './board.js?v=9a40ea1b'
+import { accountsOf, accountRow, editAccount, applyEdit, personFields, saveProfile, arenaCfg, weekLabel } from './profile.js?v=436f20cc'
 
 await loadData()
 mountTop('/me/')
@@ -163,6 +163,9 @@ const adminCard = () => fold('admin', '관리자 메뉴',
 // ------------------------------------------------ 관리자 — 멤버 관리(프로필이 있는 사람). 슈퍼관리자(마스터) · 본인은 못 바꾼다 — 서버도 막는다
 
 const ROLE_KO = { master: '슈퍼관리자', admin: '관리자', member: '멤버' }
+// 가입한 로그인 수단(m.logins) — 머리의 「누구로 들어와 있는지」 처럼 둘 다면 겹쳐 보인다
+const LOGIN = { discord: ['디스코드', DISCORD_SVG], kakao: ['카카오', KAKAO_SVG] }
+const loginIcons = list => { const t = list.map(p => LOGIN[p][0]).join(' · '); return h('span', { className: 'mp-logins', role: 'img', title: t, 'aria-label': t, innerHTML: list.map(p => `<i class="is-${p}">${LOGIN[p][1]}</i>`).join('') }) }
 // 출석 상태 — 연속 미참석(attend.missed, 사유불참 주는 서버가 건너뛴다) 2주 경고 · 3주 위험 · 4주 이상 강제탈퇴 대상. 탈퇴는 관리자가 멤버 관리의 「탈퇴」 로 한다
 const STATUS = [[4, 'out', '강제탈퇴'], [3, 'risk', '위험'], [2, 'warn', '경고'], [0, 'ok', '정상']]
 const statusOf = m => STATUS.find(([n]) => m.attend.missed >= n)
@@ -236,7 +239,7 @@ function membersCard() {
       h('thead', {}, h('tr', {}, ['#', '본계정', '등급', '계정', '최근 신청', '상태 · 관리'].map(t => h('th', {}, t)))),
       h('tbody', {}, rows.map((m, i) => h('tr', {},
         h('td', {}, i + 1),
-        h('td', { className: 'ar-nick' }, h('b', {}, m.main), m.name !== m.main && h('small', {}, m.name)),
+        h('td', { className: 'ar-nick' }, loginIcons(m.logins || []), h('b', {}, m.main), m.name !== m.main && h('small', {}, m.name)),
         h('td', {}, h('span', { className: `mp-role is-${m.role}` }, ROLE_KO[m.role])),
         h('td', {}, `${m.accounts}개`),
         h('td', {}, m.lastWeek ? weekLabel(m.lastWeek).split(' ~ ')[0] : '-'),

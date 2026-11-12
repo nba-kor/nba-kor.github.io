@@ -906,11 +906,15 @@ a.cl-row:hover .cl-title b { text-decoration: underline; }
   font-size: 12.5px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px;
 }
 .rc-whoami > span:not(:has(i)) { padding-left: 12px; }
-.rc-whoami i { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #5865f2; }
-.rc-whoami i + i { margin-left: -12px; box-shadow: 0 0 0 2px var(--panel-2); }   /* 둘 다 연결했으면 겹쳐 보인다 */
-.rc-whoami i svg { width: 13px; height: 13px; fill: #fff; }
-.rc-whoami i.is-kakao { background: #fee500; }
-.rc-whoami i.is-kakao svg { fill: #000; }
+:is(.rc-whoami, .mp-logins) i { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #5865f2; }
+:is(.rc-whoami, .mp-logins) i + i { margin-left: -12px; box-shadow: 0 0 0 2px var(--panel-2); }   /* 둘 다 연결했으면 겹쳐 보인다 */
+:is(.rc-whoami, .mp-logins) i svg { width: 13px; height: 13px; fill: #fff; }
+:is(.rc-whoami, .mp-logins) i.is-kakao { background: #fee500; }
+:is(.rc-whoami, .mp-logins) i.is-kakao svg { fill: #000; }
+.mp-logins { display: inline-flex; vertical-align: middle; margin-right: 6px; }   /* 멤버 관리 — 본계정 앞, 표 글자에 맞춰 작게 */
+.mp-logins i { width: 18px; height: 18px; }
+.mp-logins i + i { margin-left: -9px; box-shadow: 0 0 0 2px var(--panel); }
+.mp-logins i svg { width: 11px; height: 11px; }
 .rc-whoami b { font-weight: 700; overflow-wrap: anywhere; }
 .rc-whoami small { flex: none; padding: 1px 7px; font-size: 11px; font-weight: 700; color: var(--bg); background: var(--text); border-radius: 999px; }
 

@@ -1,8 +1,8 @@
 // 전술판 — 하프코트 3:3 배치 / 동선 / 프리셋(기본 + 커스텀) / 재생 / 공유(링크 · 카카오톡)
 import { loadPlayers, mountFilters, chipEl, faceOf, startDrag, pickMenu, mountTop, decodeState, encodeState, share, POS_KO, KAKAO_JS_KEY, loadKakao, shareKakao, kakaoList, shareFace } from './app.js?v=f44b46d8'
 import { drawCourt, renderTokens, presetTokens, play } from './court.js?v=61e6bdd8'
-import { api } from './auth.js?v=bdb31bdc'
-import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=813dd8d2'
+import { api } from './auth.js?v=653410db'
+import { h, startAuth, loggedIn, authFirst, auth, me } from './board.js?v=9a40ea1b'
 
 const STORE = 'dc.tactics'
 

@@ -222,7 +222,7 @@ VIRTUAL_ENV=tools/cn-faces/.venv uv pip install "opencv-python-headless<5" numpy
    내 배정은 이름 옆 뱃지, 카톡 이미지는 얼굴 아래 뱃지, 엑셀은 「팀장」 열.
 
 **관리자** = `site_admins` 에 있는 계정 + 마스터(`site_masters` = **슈퍼관리자**, 갓보노). 관리자는 마이페이지의 **멤버 관리**에서
-멤버(프로필을 등록한 사람)를 **관리자로 임명 · 일반 멤버로 변경 · 탈퇴**시킨다. 슈퍼관리자는 등급을 바꾸거나 탈퇴시킬 수 없고, 본인도 못 바꾼다(서버가 막는다).
+멤버(프로필을 등록한 사람)를 **관리자로 임명 · 일반 멤버로 변경 · 탈퇴**시킨다. 본계정 앞 아이콘이 가입한 로그인 수단(디스코드 · 카카오, 둘 다면 머리처럼 겹친다). 슈퍼관리자는 등급을 바꾸거나 탈퇴시킬 수 없고, 본인도 못 바꾼다(서버가 막는다).
 탈퇴 = 관리자 권한 · 프로필(게임 계정 · 아레나 신청 · 팀원모집 자리는 cascade)을 지우고 팀장이던 모집 팀은 해제 — 다시 로그인하면 새로 가입할 수 있다(차단은 없다).
 슈퍼관리자는 화면이 없다 — `site_masters` 를 SQL 로. 관리자도 SQL Editor 에서 표시 이름으로 넣고 뺄 수 있다:
 
@@ -242,7 +242,7 @@ delete from public.site_admins where user_id = '<디스코드 ID 또는 k카카�
 | `DELETE /api/arena/signup` | 로그인 | 이번 주 신청 취소 |
 | `PUT /api/arena/plan` | 관리자 | `{ week, version: 읽어 온 planAt, plan }` → `{ plan, planAt }`. 이번 주만 · 버전이 다르거나 신청 안 한 계정이면 409 · 겹치는 시간대에 같은 사람이면 400. 10분에 300번(끌 때마다 저장) |
 | `GET /api/arena/mine` | 로그인 | 최근 10주 내 신청 + 배정 `{ history: [{ week, slots, nicks, memo, assigned: [{ slot, team, nick }] }] }` |
-| `GET /api/members` | 관리자 | `{ members: [{ userId, name, main(본계정), accounts, role: master\|admin\|member, lastWeek, attend: { now: in\|absent\|null, streak, missed, total }, updatedAt }] }` — 슈퍼관리자 → 관리자 → 멤버, 각각 본계정 순(최근에 고친 1000명) |
+| `GET /api/members` | 관리자 | `{ members: [{ userId, name, main(본계정), accounts, role: master\|admin\|member, lastWeek, attend: { now: in\|free\|absent\|null, streak, missed, total }, updatedAt, logins: [discord\|kakao] }] }` — 슈퍼관리자 → 관리자 → 멤버, 각각 본계정 순(최근에 고친 1000명). `logins` = 가입한 로그인 수단(디스코드 먼저) — Auth 관리 API 사용자 목록(`GET /auth/v1/admin/users`, secret key)의 `app_metadata.providers` 를 프로필의 `auth_user_id` 로 잇는다. 봇으로만 쓴 사람 · Auth 장애면 ID 로 짐작(`k…` 카카오, 나머지 디스코드) |
 | `PUT /api/members/:id` | 관리자 | `{ role: admin\|member }` 임명 · 해제. 슈퍼관리자 403 · 본인 400 |
 | `DELETE /api/members/:id` | 관리자 | 탈퇴(위). 슈퍼관리자 403 · 본인 400 |
 
