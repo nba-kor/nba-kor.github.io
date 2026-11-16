@@ -924,7 +924,7 @@ let hidAt = 0
 setInterval(() => {
   if (!document.hidden || mode !== 'play' || !G?.auto) { hidAt = 0; return }
   const now = performance.now()
-  let left = Math.min(60, hidAt ? (now - hidAt) / 1000 : 1); hidAt = now
+  let left = Math.min(60, hidAt ? (now - hidAt) / 1000 : 1) * pace; hidAt = now   // 배속도 그대로
   while (left > 0 && mode === 'play') { const d = Math.min(1 / 30, left); step(d); left -= d }
 }, 1000)
 // 손가락 스틱 — 화면 아무 데나 누른 자리가 가운데. 멀리 끌면 원이 손가락을 따라온다
@@ -1873,6 +1873,17 @@ const autoBtn = h('button', { type: 'button', className: 'sv-icon sv-autobtn', h
   keepAuto(); autoUI()
 } })
 pauseBtn.before(autoBtn)
+/** 배속(모든 맵, 판 중) — 1× ↔ 2×. 그림 한 장에 step 을 그만큼 돌린다(dt 는 그대로라 부딪힘 · 판정이 같다). 이 브라우저에 기억.
+ *  기록 · 랭킹은 게임 안 시간이라 그대로 센다. 일시정지 버튼이 보일 때만 보인다(CSS #sv-pause[hidden] + .sv-speed) */
+const PACE_KEY = 'survive.speed'
+let pace = 1
+try { if (localStorage.getItem(PACE_KEY) === '2') pace = 2 } catch {}
+const paceBtn = h('button', { type: 'button', className: 'sv-icon sv-autobtn sv-speed', onclick: () => {
+  pace = pace === 1 ? 2 : 1; paceBtn.blur(); paceUI()
+  try { localStorage.setItem(PACE_KEY, String(pace)) } catch {}
+} })
+const paceUI = () => { paceBtn.textContent = `${pace}×`; paceBtn.setAttribute('aria-label', `${pace}배속 — 누르면 바꿔요`); paceBtn.classList.toggle('is-on', pace > 1) }
+pauseBtn.after(paceBtn); paceUI()
 function autoUI() {
   autoBtn.hidden = !(G?.map.farm && (mode === 'play' || mode === 'box' || mode === 'pause'))
   autoBtn.textContent = !G?.auto ? '자동 끔' : G.auto === 'atk' ? '자동 · 공격형' : '자동 · 수비형'
@@ -2834,6 +2845,10 @@ function refresh() {
 
 // ---------------------------------------------------------------- 패치 노트 — 새 것이 위. 게임을 고치면 맨 위에 한 덩어리(아래 「패치 노트」 탭 · 첫 화면 버튼)
 const NOTES = [
+  { date: '2026-11-16', title: '2배속', items: [
+    '판 중 위의 일시정지 버튼 옆 「1×」를 누르면 2배속, 한 번 더 누르면 원래 속도예요. 모든 맵에서 되고, 고른 배속은 다음 판에도 그대로예요',
+    '빨라져도 판정은 같고 기록 · 랭킹 · 업적도 그대로 세요(게임 안 시간으로). 자동사냥에도 먹어요',
+  ] },
   { date: '2026-11-03', title: '상점 고침', items: [
     '휴대폰(사파리)에서 상점 · 마이페이지 판이 옆으로 통째로 끌리던 것 — 이제 위아래로만 넘어가고 끝에서 튕기지 않아요',
   ] },
@@ -2987,7 +3002,11 @@ function frame(ts) {
   last = ts
   let dt = Math.min(0.05, ms / 1000)
   tnow += dt
-  if (mode === 'play' && G) { if (G.dying > 0) dt *= 0.3; step(dt) }
+  if (mode === 'play' && G) {   // 배속이면 step 을 여러 번 — 상자가 열리면(mode 'box') 거기서 멈춘다. 쓰러지는 연출은 1배로
+    const n = G.dying > 0 ? 1 : pace
+    if (G.dying > 0) dt *= 0.3
+    for (let i = 0; i < n && mode === 'play'; i++) step(dt)
+  }
   else if (mode === 'shop' && G) demoStep(dt)
   else if (!G) cam.x += dt * 24
   if (mode !== lastMode) { lastMode = mode; still = 2 }

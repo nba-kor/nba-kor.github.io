@@ -1716,6 +1716,8 @@ dialog, .ac-body { overscroll-behavior: contain; }
 .sv-again { margin: 0; color: #7ff3ff; font-weight: 800; }
 .sv-autobtn { width: auto !important; padding: 7px 10px !important; font: 800 12px/1 system-ui, sans-serif; white-space: nowrap; }
 .sv-autobtn.is-on { background: #0f6b78e0 !important; box-shadow: 0 0 0 2px #3ce6ff, 0 0 12px #3ce6ff88; opacity: 1 !important; }
+.sv-speed { min-width: 34px; }
+#sv-pause[hidden] + .sv-speed { display: none; }   /* 배속 — 판 중(일시정지 버튼이 보일 때)만 */
 .sv-map { display: grid; gap: 3px; padding: 6px 6px 8px; border-radius: 12px; border: 2px solid transparent; background: #ffffff10; color: #fff; text-align: left; }
 .sv-map canvas { width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 8px; }
 .sv-map small { color: #c9d1e0; font-size: .82em; }
