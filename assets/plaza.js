@@ -14,8 +14,8 @@ import { clone as cloneRig } from 'https://cdn.jsdelivr.net/npm/three@0.170.0/ex
 import { mountTop, faceOf } from './app.js?v=f44b46d8'
 import { loadData, data, kr, startAuth, me as who, auth, loggedIn, charGrid, h } from './board.js?v=9a40ea1b'
 import { sb } from './auth.js?v=653410db'
-import { TEAMS, NUMS, NBA_NUM, cutHead, skinOf, SKIN } from './vipers.js?v=8939ed12'
-import { R3, RIM, sm, wx, wz, LIFT, RIM_Y, RIM_Z, scene, part, toon, tex, floorMat, rimG, net as hoopNet, scenery, BALL, ballMat, hairOf, yaw } from './court3d.js?v=68dc2ff3'
+import { TEAMS, NUMS, NBA_NUM, cutHead, skinOf, SKIN } from './vipers.js?v=213863d9'
+import { R3, RIM, sm, wx, wz, LIFT, RIM_Y, RIM_Z, scene, part, toon, tex, floorMat, rimG, net as hoopNet, scenery, BALL, ballMat, hairOf, yaw } from './court3d.js?v=5e18d108'
 
 mountTop('/plaza/')
 

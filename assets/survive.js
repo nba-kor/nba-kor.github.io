@@ -8,7 +8,7 @@
 import { mountTop, faceOf } from './app.js?v=f44b46d8'
 import { api, chooseLogin } from './auth.js?v=653410db'
 import { loadData, P, startAuth, auth, me, h } from './board.js?v=9a40ea1b'
-import { cutHead, skinOf, NBA_NUM } from './vipers.js?v=8939ed12'
+import { cutHead, skinOf, NBA_NUM } from './vipers.js?v=213863d9'
 
 mountTop('/survive/')
 

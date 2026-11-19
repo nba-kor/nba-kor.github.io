@@ -9,8 +9,8 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js'
 import { mountTop, faceOf } from './app.js?v=f44b46d8'
 import { loadData, data, startAuth } from './board.js?v=9a40ea1b'
-import { TEAMS, NUMS, NBA_NUM, lineup, cutHead, skinOf } from './vipers.js?v=8939ed12'
-import { CW, CH, R3, RIM_H, RIM, BRK, sm, K, wx, wz, RIM_Z, scene, part, floorMat, rimG, net, scenery, BALL, ballMat, hairOf, rigOf, NP, Q, trunk, arm, leg, arms, legs, yaw, dunkPose, setRig } from './court3d.js?v=68dc2ff3'
+import { TEAMS, NUMS, NBA_NUM, lineup, cutHead, skinOf } from './vipers.js?v=213863d9'
+import { CW, CH, R3, RIM_H, RIM, BRK, sm, K, wx, wz, RIM_Z, scene, part, floorMat, rimG, net, scenery, BALL, ballMat, hairOf, rigOf, NP, Q, trunk, arm, leg, arms, legs, yaw, dunkPose, setRig } from './court3d.js?v=5e18d108'
 
 mountTop('/street/')
 startAuth('', () => {})   // 머리의 로그인 · 이름 줄 — 다른 페이지와 같다
