@@ -136,9 +136,11 @@
     const go = n => { cur = new Date(cur.getFullYear(), cur.getMonth() + n, 1); render() }
     document.getElementById('cal-prev').onclick = () => go(-1); document.getElementById('cal-next').onclick = () => go(1)
     render()
-    // 목록: 그림 · 이름 · 기간
+    // 목록: 오늘 진행 중인 것만(시작일 ≤ 오늘 ≤ 끝일) — 그림 · 이름 · 기간
     const list = document.getElementById('cal-list')
-    for (const c of CAL) {
+    const now = CAL.filter(c => +day(c.s) <= +today && +today <= +day(c.e))
+    if (!now.length) list.append(el('li', 'cal-none', '지금 진행 중인 일정이 없어요. 달력에서 지난 · 다가올 일정을 보세요.'))
+    for (const c of now) {
       const li = clickable(el('li', `g-${c.g}`), c)
       if (c.img) { const i = el('img'); i.src = pic(c); i.alt = ''; i.loading = 'lazy'; li.append(i) } else li.append(el('b', 'ev-ico', c.ico))
       li.append(el('span', '', c.t), el('time', '', `${c.g} · ${when(c)}`)); list.append(li)

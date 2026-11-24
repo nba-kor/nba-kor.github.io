@@ -1048,6 +1048,7 @@ a.cl-row:hover .cl-title b { text-decoration: underline; }
 .cal-list li:hover, .cal-list li:focus-visible { background: #ffffff0d; outline: none; }
 .cal-list img, .cal-list .ev-ico { grid-row: span 2; width: 52px; height: 52px; border-radius: 10px; object-fit: cover; }
 .cal-list .ev-ico { display: grid; place-items: center; background: var(--line); font-size: 1.6rem; }
+.cal-list li.cal-none { display: block; cursor: default; color: var(--muted, #9aa); border-left: 0; }
 .cal-list time { color: var(--muted, #9aa); font-size: .75rem; }
 .ev-dlg { max-width: min(92vw, 420px); padding: 18px; background: var(--panel); color: inherit; border: 1px solid var(--line); border-radius: 16px; }
 .ev-dlg::backdrop { background: #0009; } .ev-dlg img { display: block; width: 100%; max-height: 220px; object-fit: contain; border-radius: 12px; background: #0b0e14; }
