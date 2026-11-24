@@ -1050,10 +1050,14 @@ a.cl-row:hover .cl-title b { text-decoration: underline; }
 .cal-list .ev-ico { display: grid; place-items: center; background: var(--line); font-size: 1.6rem; }
 .cal-list li.cal-none { display: block; cursor: default; color: var(--muted, #9aa); border-left: 0; }
 .cal-list time { color: var(--muted, #9aa); font-size: .75rem; }
-.ev-dlg { max-width: min(92vw, 420px); padding: 18px; background: var(--panel); color: inherit; border: 1px solid var(--line); border-radius: 16px; }
+.ev-dlg { width: min(92vw, 420px); box-sizing: border-box; padding: 18px; background: var(--panel); color: inherit; border: 1px solid var(--line); border-radius: 16px; }
 .ev-dlg::backdrop { background: #0009; } .ev-dlg img { display: block; width: 100%; max-height: 220px; object-fit: contain; border-radius: 12px; background: #0b0e14; }
-.ev-dlg .cal-pick { display: block; width: 100%; margin: 0 0 6px; text-align: left; }
 .ev-dlg h3 { margin: 10px 0 2px; } .ev-dlg .ev-when { margin: 0 0 8px; color: var(--muted, #9aa); font-size: .85rem; } .ev-dlg form { text-align: right; }
+.ev-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.ev-track::-webkit-scrollbar { display: none; }
+.ev-slide { flex: 0 0 100%; scroll-snap-align: start; min-width: 0; }
+.ev-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 6px 0; } .ev-nav[hidden] { display: none; } .ev-nav .btn { padding: 2px 12px; }
+.ev-count { font-size: .85rem; color: var(--muted, #9aa); }
 .cal-card > .rc-muted { margin: 12px 0 0; font-size: .75rem; }
 .me-main { display: flex; align-items: center; gap: 14px; }
 .me-main > img, .me-main > .rc-hole { width: 54px; height: 54px; border-radius: 50%; background: #0b0f16; flex: none; }

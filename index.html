@@ -67,7 +67,7 @@
     <div class="cal-months" id="cal-months"></div>
     <ul class="cal-list" id="cal-list"></ul>
     <p class="rc-muted">참고용이며 실제 게임 내 적용 내용과 다를 수 있습니다. 상세 내용은 <a href="https://game.naver.com/lounge/Dunk_City_Dynasty/board" target="_blank" rel="noopener">네이버 게임 라운지 게시판</a> · <a href="https://www.instagram.com/nbadunkcitykr" target="_blank" rel="noopener">공식 인스타그램</a>에서 확인하세요.</p>
-    <dialog class="ev-dlg" id="ev-dlg"><img alt=""><h3></h3><p class="ev-when"></p><div class="ev-body"></div><p class="ev-src"></p><form method="dialog"><button class="btn">닫기</button></form></dialog>
+    <dialog class="ev-dlg" id="ev-dlg"><div class="ev-track"></div><div class="ev-nav"><button type="button" class="btn" data-go="-1" aria-label="이전">‹</button><span class="ev-count" aria-live="polite"></span><button type="button" class="btn" data-go="1" aria-label="다음">›</button></div><form method="dialog"><button class="btn">닫기</button></form></dialog>
   </section>
   <script>/* 달력(11월 · 12월) + 목록. 날짜 칸 막대나 목록 줄을 누르면 상세 모달 */
   {
@@ -95,17 +95,25 @@
     const when = c => c.s === c.e ? `${md(c.s)} 출시` : `${md(c.s)} – ${md(c.e)}`
     const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n }
     const dlg = document.getElementById('ev-dlg')
+    // 상세: 일정 하나가 한 장. 묶인 막대면 여러 장을 옆으로 넘긴다(스와이프 · ‹ › · ← →) — CSS scroll-snap
+    const track = dlg.querySelector('.ev-track'), count = dlg.querySelector('.ev-count')
+    const slide = c => {
+      const n = el('article', 'ev-slide')
+      if (c.img) { const i = el('img'); i.src = pic(c); i.alt = ''; n.append(i) }
+      const a = el('a', '', '공지 원문 보기'); a.href = c.src; a.target = '_blank'; a.rel = 'noopener'
+      n.append(el('h3', '', c.t), el('p', 'ev-when', `${c.g} · ${when(c)}`),
+        ...(c.d.length ? c.d : ['상세 보상 · 조건은 아직 공지 문구에 없어요. 게임 안이나 공지를 확인하세요.']).map(x => el('p', '', x)), el('p', 'ev-src'))
+      n.lastChild.append(a); return n
+    }
+    const at = () => Math.round(track.scrollLeft / track.clientWidth)
+    const show = () => { count.textContent = `${at() + 1} / ${track.children.length}` }
+    track.onscroll = show
+    dlg.querySelectorAll('[data-go]').forEach(b => b.onclick = () => track.scrollBy({ left: b.dataset.go * track.clientWidth, behavior: 'smooth' }))
+    dlg.onkeydown = e => (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && track.scrollBy({ left: (e.key === 'ArrowLeft' ? -1 : 1) * track.clientWidth, behavior: 'smooth' })
     const open = c => {
-      if (c.items) { // 달력에서 기간이 같은 일정을 묶은 막대 — 고르면 하나씩 연다
-        dlg.querySelector('img').hidden = true; dlg.querySelector('h3').textContent = `${c.g} ${c.items.length}개`; dlg.querySelector('.ev-when').textContent = when(c)
-        dlg.querySelector('.ev-body').replaceChildren(...c.items.map(x => { const b = el('button', 'btn cal-pick', x.t); b.type = 'button'; b.onclick = () => { dlg.close(); open(x) }; return b }))
-        dlg.querySelector('.ev-src').replaceChildren(); return dlg.showModal()
-      }
-      const img = dlg.querySelector('img'); img.hidden = !c.img; if (c.img) img.src = pic(c)
-      dlg.querySelector('h3').textContent = c.t; dlg.querySelector('.ev-when').textContent = `${c.g} · ${when(c)}`
-      const b = dlg.querySelector('.ev-body'); b.replaceChildren(...(c.d.length ? c.d : ['상세 보상 · 조건은 아직 공지 문구에 없어요. 게임 안이나 공지를 확인하세요.']).map(x => el('p', '', x)))
-      const a = el('a', '', '공지 원문 보기'); a.href = c.src; a.target = '_blank'; a.rel = 'noopener'; dlg.querySelector('.ev-src').replaceChildren(a)
-      dlg.showModal()
+      const l = c.items || [c]
+      track.replaceChildren(...l.map(slide)); dlg.querySelector('.ev-nav').hidden = l.length < 2
+      dlg.showModal(); track.scrollLeft = 0; show()
     }
     const clickable = (n, c) => { n.tabIndex = 0; n.setAttribute('role', 'button'); n.onclick = () => open(c); n.onkeydown = e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open(c)); return n }
     const today = new Date(); today.setHours(0, 0, 0, 0)
