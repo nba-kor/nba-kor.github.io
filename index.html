@@ -85,8 +85,7 @@
       { g: '코스튬', t: '행운의 보물찾기: [샌드 로즈]', s: '11-25', e: '12-08', img: 'sandrose', d: [], src: IG + 'Df6R6WClO1m/' },
       { g: '코스튬', t: '트렌디 의상 보물고: [젤리] · [모래알]', s: '11-25', e: '12-23', img: 'jelly', d: [], src: IG + 'Df_UpQkFHbe/' },
       { g: '코스튬', t: '[카니발 스쿼드]', s: '11-25', e: '12-22', img: 'carnival', d: [], src: IG + 'DgHDEWylFiP/' },
-      { g: '이벤트', t: '블랙 프라이데이 할인 상점', s: '11-25', e: '12-06', ico: '🛍️', d: ['특별 패키지를 구매하고 더욱 풍성한 보상을 받아 보세요.'], src: IG + 'DgByjS3gPyR/' },
-      { g: '이벤트', t: '블랙 프라이데이 교환 상점', s: '11-25', e: '12-06', ico: '🧾', d: ['특가 상품 구매 시 전용 토큰인 「블랙 프라이데이 영수증」을 획득할 수 있습니다.', '교환 보상: [허스키] 헤드웨어 · 블랙 카드 · 프로필 및 프로필 배경.'], src: IG + 'DgByjS3gPyR/' },
+      { g: '이벤트', t: '블랙 프라이데이 할인 · 교환 상점', s: '11-25', e: '12-06', ico: '🛍️', d: ['특별 패키지를 구매하고 더욱 풍성한 보상을 받아 보세요.', '특가 상품 구매 시 전용 토큰인 「블랙 프라이데이 영수증」을 획득할 수 있습니다.', '교환 보상: [허스키] 헤드웨어 · 블랙 카드 · 프로필 및 프로필 배경.'], src: IG + 'DgByjS3gPyR/' },
       { g: '이벤트', t: '누적 충전으로 좋은 선물 받기', s: '11-25', e: '12-06', ico: '🎁', d: ['누적 충전 금액에 따라 푸짐한 보상을 획득할 수 있습니다.'], src: IG + 'DgB5aErlMLJ/' },
       { g: '이벤트', t: '단돈 1,200원! 7일간 매일 특별 혜택', s: '11-25', e: '12-02', ico: '💸', d: ['7일간 매일 특별 혜택을 받는 특가 패키지.'], src: IG + 'DgG8HP1lHAI/' },
       { g: '이벤트', t: '티어 스프린트 혜택', s: '12-16', e: '12-23', ico: '🏆', d: [], src: LOUNGE },
@@ -97,6 +96,11 @@
     const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n }
     const dlg = document.getElementById('ev-dlg')
     const open = c => {
+      if (c.items) { // 달력에서 기간이 같은 일정을 묶은 막대 — 고르면 하나씩 연다
+        dlg.querySelector('img').hidden = true; dlg.querySelector('h3').textContent = `${c.g} ${c.items.length}개`; dlg.querySelector('.ev-when').textContent = when(c)
+        dlg.querySelector('.ev-body').replaceChildren(...c.items.map(x => { const b = el('button', 'btn cal-pick', x.t); b.type = 'button'; b.onclick = () => { dlg.close(); open(x) }; return b }))
+        dlg.querySelector('.ev-src').replaceChildren(); return dlg.showModal()
+      }
       const img = dlg.querySelector('img'); img.hidden = !c.img; if (c.img) img.src = pic(c)
       dlg.querySelector('h3').textContent = c.t; dlg.querySelector('.ev-when').textContent = `${c.g} · ${when(c)}`
       const b = dlg.querySelector('.ev-body'); b.replaceChildren(...(c.d.length ? c.d : ['상세 보상 · 조건은 아직 공지 문구에 없어요. 게임 안이나 공지를 확인하세요.']).map(x => el('p', '', x)))
@@ -124,7 +128,10 @@
         }
         // ponytail: 막대는 그 달 안에서만 자른다 — 주가 두 달에 걸치면 각 달에 따로 그린다
         const lo = Math.max(+ws, +first), hi = Math.min(+we, +last)
-        CAL.filter(c => +day(c.s) <= hi && +day(c.e) >= lo).forEach(c => {
+        // 같은 구분 · 같은 기간은 막대 하나로(「첫 이름 외 N」) — 줄이 쓸데없이 늘지 않게
+        const groups = new Map()
+        CAL.filter(c => +day(c.s) <= hi && +day(c.e) >= lo).forEach(c => { const k = `${c.g}|${c.s}|${c.e}`; groups.has(k) ? groups.get(k).push(c) : groups.set(k, [c]) })
+        ;[...groups.values()].map(l => l.length === 1 ? l[0] : { g: l[0].g, s: l[0].s, e: l[0].e, t: `${l[0].t} 외 ${l.length - 1}`, items: l }).forEach(c => {
           const a = new Date(Math.max(+day(c.s), lo)).getDay(), z = new Date(Math.min(+day(c.e), hi)).getDay()
           const bar = clickable(el('span', `cal-bar g-${c.g}`, c.t), c); bar.title = `${c.t} · ${when(c)}`
           bar.style.gridColumn = `${a + 1} / ${z + 2}`; row.append(bar)
