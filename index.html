@@ -65,6 +65,7 @@
     <h2>캘린더</h2>
     <div class="cal-nav"><button type="button" class="btn" id="cal-prev" aria-label="이전 달">‹</button><b id="cal-title" aria-live="polite"></b><button type="button" class="btn" id="cal-next" aria-label="다음 달">›</button></div>
     <div class="cal-months" id="cal-months"></div>
+    <h3 class="cal-now">진행 중인 이벤트 <small id="cal-now-n"></small></h3>
     <ul class="cal-list" id="cal-list"></ul>
     <p class="rc-muted">참고용이며 실제 게임 내 적용 내용과 다를 수 있습니다. 상세 내용은 <a href="https://game.naver.com/lounge/Dunk_City_Dynasty/board" target="_blank" rel="noopener">네이버 게임 라운지 게시판</a> · <a href="https://www.instagram.com/nbadunkcitykr" target="_blank" rel="noopener">공식 인스타그램</a>에서 확인하세요.</p>
     <dialog class="ev-dlg" id="ev-dlg"><div class="ev-track"></div><div class="ev-nav"><button type="button" class="btn" data-go="-1" aria-label="이전">‹</button><span class="ev-count" aria-live="polite"></span><button type="button" class="btn" data-go="1" aria-label="다음">›</button></div><form method="dialog"><button class="btn">닫기</button></form></dialog>
@@ -154,6 +155,7 @@
     // 목록: 오늘 진행 중인 것만(시작일 ≤ 오늘 ≤ 끝일) — 그림 · 이름 · 기간
     const list = document.getElementById('cal-list')
     const now = CAL.filter(c => +day(c.s) <= +today && +today <= +day(c.e))
+    document.getElementById('cal-now-n').textContent = now.length ? `${now.length}개` : ''
     if (!now.length) list.append(el('li', 'cal-none', '지금 진행 중인 일정이 없어요. 달력에서 지난 · 다가올 일정을 보세요.'))
     for (const c of now) {
       const li = clickable(el('li', `g-${c.g}`), c)

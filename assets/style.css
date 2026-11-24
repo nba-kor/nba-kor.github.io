@@ -1042,7 +1042,10 @@ a.cl-row:hover .cl-title b { text-decoration: underline; }
 .cal-bar { font-size: .66rem; line-height: 16px; padding: 0 5px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; color: #111; }
 .g-선수.cal-bar { background: #f5a04a; } .g-코스튬.cal-bar { background: #8fb8f0; } .g-이벤트.cal-bar { background: #7fd6a6; }
 .cal-bar:hover, .cal-bar:focus-visible { filter: brightness(1.15); outline: none; }
-.cal-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.cal-now { display: flex; align-items: center; gap: 8px; margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--line); font-size: .95rem; }
+.cal-now::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #7fd6a6; box-shadow: 0 0 0 3px #7fd6a633; }
+.cal-now small { color: var(--muted, #9aa); font-weight: 400; font-size: .8rem; }
+.cal-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
 .cal-list li { display: grid; grid-template-columns: 52px 1fr; align-content: center; gap: 0 10px; padding: 6px; border-radius: 10px; cursor: pointer; font-size: .85rem; border-left: 3px solid var(--line); }
 .cal-list li.g-선수 { border-left-color: #f5a04a; } .cal-list li.g-코스튬 { border-left-color: #8fb8f0; } .cal-list li.g-이벤트 { border-left-color: #7fd6a6; }
 .cal-list li:hover, .cal-list li:focus-visible { background: #ffffff0d; outline: none; }
