@@ -61,8 +61,8 @@
   <section class="me-card" id="me-card" aria-live="polite"><p class="rc-muted">로그인 확인 중…</p></section>
 
   <!-- 시즌 일정 — 공식 캘린더 이미지 · 인스타그램(@nbadunkcitykr) 공지를 옮긴 것. 시즌이 바뀌면 아래 CAL 만 고친다 -->
-  <section class="cal-card" aria-label="시즌2 후반기 캘린더">
-    <h2>시즌2 후반기 캘린더 <small>11/25 – 12/23</small></h2>
+  <section class="cal-card" aria-label="캘린더">
+    <h2>캘린더</h2>
     <div class="cal-nav"><button type="button" class="btn" id="cal-prev" aria-label="이전 달">‹</button><b id="cal-title" aria-live="polite"></b><button type="button" class="btn" id="cal-next" aria-label="다음 달">›</button></div>
     <div class="cal-months" id="cal-months"></div>
     <ul class="cal-list" id="cal-list"></ul>
@@ -73,25 +73,31 @@
   {
     const IG = 'https://www.instagram.com/nbadunkcitykr/p/', LOUNGE = 'https://game.naver.com/lounge/Dunk_City_Dynasty/board'
     const CAL = [ // g: 선수 · 코스튬 · 이벤트, s/e: 시작 · 끝(같으면 출시일), d: 공지 문구, src: 공지 글
+      { g: '선수', t: '[할리 마법] 타이리스 할리버튼', s: '10-28', e: '10-28', img: '/assets/players/tyrese-haliburton.png', d: ['10월 28일 대규모 업데이트로 신규 선수 출시.'], src: IG + 'De_RbzcFHf5/' },
+      { g: '선수', t: '[역경의 투사] 지미 버틀러', s: '10-28', e: '10-28', img: '/assets/players/jimmy-butler.png', d: ['10월 28일 대규모 업데이트로 신규 선수 출시.'], src: IG + 'De_RbzcFHf5/' },
+      { g: '선수', t: '[일식의 그림자] 브룩 로페즈', s: '10-28', e: '10-28', img: '/assets/players/brook-lopez.png', d: ['10월 28일 대규모 업데이트로 신규 선수 출시.'], src: IG + 'De_RbzcFHf5/' },
+      { g: '코스튬', t: '직판 코스튬 [사수자리]', s: '11-23', e: '12-21', ico: '🏹', d: ['신규 직판 코스튬 「사수자리」 출시.', '헤어스타일과 눈가 장식부터 장갑과 활·화살 모양의 등 장식까지.'], src: IG + 'DgEXWhSFFvF/' },
       { g: '선수', t: '[전능한 에이스] 제이슨 테이텀', s: '11-25', e: '11-25', img: 'tatum', d: ['11월 25일 업데이트로 신규 선수 출시.'], src: IG + 'DgEeRcVlHew/' },
       { g: '선수', t: '[창공의 폭군] 잭 라빈', s: '11-25', e: '11-25', img: 'lavine', d: ['11월 25일 업데이트로 신규 선수 출시.'], src: IG + 'DgEeRcVlHew/' },
       { g: '코스튬', t: '[테이텀 17-18] 유니폼', s: '11-25', e: '11-25', img: 'tatum-uniform', d: ['테이텀 출시와 동시 출시.'], src: IG + 'DgEeRcVlHew/' },
       { g: '코스튬', t: '[피얼리스] · [비행운]', s: '11-25', e: '12-22', img: 'fearless', d: ['코스튬 보급 상자 뽑기에 참여하면 [피얼리스] 관련 코스튬 파츠와 [비행운] 등 다양한 외형 보상을 획득할 기회가 주어집니다.'], src: IG + 'DgElHs1FOd1/' },
       { g: '코스튬', t: '패스 코스튬 [우주 워크]', s: '11-25', e: '12-22', img: 'spacewalk', d: ['신규 패스 오픈 — 한정 코스튬 「우주 워크」.', '패스 Lv.50 달성 시, 원하는 선수 1명을 영입할 수 있습니다.'], src: IG + 'DgB5b7lFAk2/' },
-      { g: '코스튬', t: '행운의 보물찾기: [샌드 로즈]', s: '11-25', e: '12-08', img: 'sandrose', d: [], src: IG + 'DgHDEWylFiP/' },
-      { g: '코스튬', t: '트렌디 의상 보물고: [젤리] · [모래알]', s: '11-25', e: '12-23', img: 'jelly', d: [], src: IG + 'DgHDEWylFiP/' },
+      { g: '코스튬', t: '행운의 보물찾기: [샌드 로즈]', s: '11-25', e: '12-08', img: 'sandrose', d: [], src: IG + 'Df6R6WClO1m/' },
+      { g: '코스튬', t: '트렌디 의상 보물고: [젤리] · [모래알]', s: '11-25', e: '12-23', img: 'jelly', d: [], src: IG + 'Df_UpQkFHbe/' },
       { g: '코스튬', t: '[카니발 스쿼드]', s: '11-25', e: '12-22', img: 'carnival', d: [], src: IG + 'DgHDEWylFiP/' },
-      { g: '이벤트', t: '블랙 프라이데이 할인 상점', s: '11-25', e: '12-06', ico: '🛍️', d: ['특별 패키지를 구매하고 더욱 풍성한 보상을 받아 보세요.'], src: IG + 'DgEeRcVlHew/' },
-      { g: '이벤트', t: '누적 충전으로 좋은 선물 받기', s: '11-25', e: '12-06', ico: '🎁', d: ['누적 충전 금액에 따라 푸짐한 보상을 획득할 수 있습니다.'], src: IG + 'DgEeRcVlHew/' },
+      { g: '이벤트', t: '블랙 프라이데이 할인 상점', s: '11-25', e: '12-06', ico: '🛍️', d: ['특별 패키지를 구매하고 더욱 풍성한 보상을 받아 보세요.'], src: IG + 'DgByjS3gPyR/' },
+      { g: '이벤트', t: '블랙 프라이데이 교환 상점', s: '11-25', e: '12-06', ico: '🧾', d: ['특가 상품 구매 시 전용 토큰인 「블랙 프라이데이 영수증」을 획득할 수 있습니다.', '교환 보상: [허스키] 헤드웨어 · 블랙 카드 · 프로필 및 프로필 배경.'], src: IG + 'DgByjS3gPyR/' },
+      { g: '이벤트', t: '누적 충전으로 좋은 선물 받기', s: '11-25', e: '12-06', ico: '🎁', d: ['누적 충전 금액에 따라 푸짐한 보상을 획득할 수 있습니다.'], src: IG + 'DgB5aErlMLJ/' },
       { g: '이벤트', t: '단돈 1,200원! 7일간 매일 특별 혜택', s: '11-25', e: '12-02', ico: '💸', d: ['7일간 매일 특별 혜택을 받는 특가 패키지.'], src: IG + 'DgG8HP1lHAI/' },
       { g: '이벤트', t: '티어 스프린트 혜택', s: '12-16', e: '12-23', ico: '🏆', d: [], src: LOUNGE },
     ]
     const Y = 2026, day = s => new Date(`${Y}-${s}T00:00`), md = s => s.replace(/^0?(\d+)-0?(\d+)$/, '$1/$2')
+    const pic = c => c.img.includes('/') ? c.img : `/assets/calendar/${c.img}.webp` // 이름만이면 assets/calendar/*.webp
     const when = c => c.s === c.e ? `${md(c.s)} 출시` : `${md(c.s)} – ${md(c.e)}`
     const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n }
     const dlg = document.getElementById('ev-dlg')
     const open = c => {
-      const img = dlg.querySelector('img'); img.hidden = !c.img; if (c.img) img.src = `/assets/calendar/${c.img}.webp`
+      const img = dlg.querySelector('img'); img.hidden = !c.img; if (c.img) img.src = pic(c)
       dlg.querySelector('h3').textContent = c.t; dlg.querySelector('.ev-when').textContent = `${c.g} · ${when(c)}`
       const b = dlg.querySelector('.ev-body'); b.replaceChildren(...(c.d.length ? c.d : ['상세 보상 · 조건은 아직 공지 문구에 없어요. 게임 안이나 공지를 확인하세요.']).map(x => el('p', '', x)))
       const a = el('a', '', '공지 원문 보기'); a.href = c.src; a.target = '_blank'; a.rel = 'noopener'; dlg.querySelector('.ev-src').replaceChildren(a)
@@ -134,7 +140,7 @@
     const list = document.getElementById('cal-list')
     for (const c of CAL) {
       const li = clickable(el('li', `g-${c.g}`), c)
-      if (c.img) { const i = el('img'); i.src = `/assets/calendar/${c.img}.webp`; i.alt = ''; i.loading = 'lazy'; li.append(i) } else li.append(el('b', 'ev-ico', c.ico))
+      if (c.img) { const i = el('img'); i.src = pic(c); i.alt = ''; i.loading = 'lazy'; li.append(i) } else li.append(el('b', 'ev-ico', c.ico))
       li.append(el('span', '', c.t), el('time', '', `${c.g} · ${when(c)}`)); list.append(li)
     }
   }
