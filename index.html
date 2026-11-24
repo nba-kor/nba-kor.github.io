@@ -77,12 +77,18 @@
       <li><img src="/assets/calendar/carnival.webp" alt="" loading="lazy"><span>[카니발 스쿼드]</span><time>11/25–12/22</time><i style="--s:24;--e:51"></i></li>
     </ul>
     <h3>이벤트</h3><ul>
-      <li><span>블랙 프라이데이 할인 상점</span><time>11/25–12/6</time><i style="--s:24;--e:35"></i></li>
-      <li><span>누적 충전으로 좋은 선물 받기</span><time>11/25–12/6</time><i style="--s:24;--e:35"></i></li>
-      <li><span>티어 스프린트 혜택</span><time>12/16–12/23</time><i style="--s:45;--e:52"></i></li>
+      <li class="ev" tabindex="0" role="button" aria-haspopup="dialog"><b class="ev-ico" aria-hidden="true">🛍️</b><span>블랙 프라이데이 할인 상점</span><time>11/25–12/6</time><i style="--s:24;--e:35"></i><div class="ev-detail" hidden><p>기간: 2026년 11/25–12/6</p><p>상세 보상 · 조건은 공식 공지를 확인하세요.</p></div></li>
+      <li class="ev" tabindex="0" role="button" aria-haspopup="dialog"><b class="ev-ico" aria-hidden="true">🎁</b><span>누적 충전으로 좋은 선물 받기</span><time>11/25–12/6</time><i style="--s:24;--e:35"></i><div class="ev-detail" hidden><p>기간: 2026년 11/25–12/6</p><p>상세 보상 · 조건은 공식 공지를 확인하세요.</p></div></li>
+      <li class="ev" tabindex="0" role="button" aria-haspopup="dialog"><b class="ev-ico" aria-hidden="true">🏆</b><span>티어 스프린트 혜택</span><time>12/16–12/23</time><i style="--s:45;--e:52"></i><div class="ev-detail" hidden><p>기간: 2026년 12/16–12/23</p><p>상세 보상 · 조건은 공식 공지를 확인하세요.</p></div></li>
     </ul>
     <p class="rc-muted">참고용이며 실제 게임 내 적용 내용과 다를 수 있습니다. 상세 내용은 <a href="https://game.naver.com/lounge/Dunk_City_Dynasty/board" target="_blank" rel="noopener">네이버 게임 라운지 게시판</a>에서 확인하세요.</p>
+    <dialog class="ev-dlg" id="ev-dlg"><h3></h3><div class="ev-body"></div><p><a href="https://game.naver.com/lounge/Dunk_City_Dynasty/board" target="_blank" rel="noopener">네이버 게임 라운지에서 공지 보기</a></p><form method="dialog"><button class="btn">닫기</button></form></dialog>
   </section>
+  <script>/* 캘린더 이벤트 줄을 누르면 그 줄의 .ev-detail 을 모달로 */
+  document.querySelectorAll('.cal-card .ev').forEach(li => {
+    const open = () => { const d = document.getElementById('ev-dlg'); d.querySelector('h3').textContent = li.querySelector('span').textContent; d.querySelector('.ev-body').innerHTML = li.querySelector('.ev-detail').innerHTML; d.showModal() }
+    li.addEventListener('click', open); li.addEventListener('keydown', e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open()))
+  })</script>
 
   <nav class="cats" aria-label="메뉴">
     <a class="cat" href="/arena/">

@@ -1039,6 +1039,12 @@ a.cl-row:hover .cl-title b { text-decoration: underline; }
 .cal-card li:has(img) { grid-template-columns: 56px 1fr auto; }
 .cal-card li img { grid-row: span 2; width: 56px; height: 56px; object-fit: cover; border-radius: 10px; }
 .cal-card li:has(img) i { grid-column: 2 / -1; }
+.cal-card li:has(.ev-ico) { grid-template-columns: 56px 1fr auto; }
+.cal-card .ev-ico { grid-row: span 2; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 10px; background: var(--line); font-size: 1.7rem; }
+.cal-card li:has(.ev-ico) i { grid-column: 2 / -1; }
+.cal-card .ev { cursor: pointer; border-radius: 10px; } .cal-card .ev:hover, .cal-card .ev:focus-visible { background: #ffffff0d; outline: none; }
+.ev-dlg { max-width: min(92vw, 420px); padding: 18px; background: var(--panel); color: inherit; border: 1px solid var(--line); border-radius: 16px; }
+.ev-dlg::backdrop { background: #0009; } .ev-dlg h3 { margin: 0 0 8px; } .ev-dlg form { text-align: right; }
 .cal-card time { color: var(--muted, #9aa); font-size: .8rem; }
 .cal-card li i { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--accent); margin-left: calc(var(--s) / 61 * 100%); width: calc((var(--e) - var(--s) + 1) / 61 * 100%); }
 .cal-axis { display: grid; grid-template-columns: 30fr 31fr; margin-top: 8px; font-size: .75rem; color: var(--muted, #9aa); }
