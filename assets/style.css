@@ -1033,7 +1033,7 @@ a.cl-row:hover .cl-title b { text-decoration: underline; }
 .me-card > .rc-muted { margin: 0; }
 .cal-card { padding: 16px 18px; margin-bottom: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
 .cal-card h2 { margin: 0 0 10px; font-size: 1.05rem; } .cal-card h2 small { color: var(--muted, #9aa); font-weight: 400; font-size: .8rem; margin-left: 6px; }
-.cal-months { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.cal-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 8px; } .cal-nav .btn { padding: 2px 12px; font-size: 1.1rem; }
 .cal-month h3 { margin: 0 0 6px; font-size: .95rem; color: var(--accent); }
 .cal-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; padding: 3px 0; border-top: 1px solid var(--line); grid-auto-flow: dense; }
 .cal-dow { border-top: 0; font-size: .7rem; color: var(--muted, #9aa); text-align: center; } .cal-dow span:first-child { color: #e66; }

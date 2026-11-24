@@ -63,6 +63,7 @@
   <!-- 시즌 일정 — 공식 캘린더 이미지 · 인스타그램(@nbadunkcitykr) 공지를 옮긴 것. 시즌이 바뀌면 아래 CAL 만 고친다 -->
   <section class="cal-card" aria-label="시즌2 후반기 캘린더">
     <h2>시즌2 후반기 캘린더 <small>11/25 – 12/23</small></h2>
+    <div class="cal-nav"><button type="button" class="btn" id="cal-prev" aria-label="이전 달">‹</button><b id="cal-title" aria-live="polite"></b><button type="button" class="btn" id="cal-next" aria-label="다음 달">›</button></div>
     <div class="cal-months" id="cal-months"></div>
     <ul class="cal-list" id="cal-list"></ul>
     <p class="rc-muted">참고용이며 실제 게임 내 적용 내용과 다를 수 있습니다. 상세 내용은 <a href="https://game.naver.com/lounge/Dunk_City_Dynasty/board" target="_blank" rel="noopener">네이버 게임 라운지 게시판</a> · <a href="https://www.instagram.com/nbadunkcitykr" target="_blank" rel="noopener">공식 인스타그램</a>에서 확인하세요.</p>
@@ -100,8 +101,11 @@
     const today = new Date(); today.setHours(0, 0, 0, 0)
     // 달력: 한 주가 한 줄, 그 주에 걸친 일정은 날짜 칸 아래 막대(grid-column 으로 시작 ~ 끝 요일)
     const months = document.getElementById('cal-months')
-    for (const m of [10, 11]) { // 0부터: 11월 · 12월
-      const box = el('div', 'cal-month'); box.append(el('h3', '', `${m + 1}월`))
+    let cur = new Date(today.getFullYear(), today.getMonth(), 1) // 보이는 달, 처음엔 이번 달
+    const render = () => {
+      const Y = cur.getFullYear(), m = cur.getMonth()
+      document.getElementById('cal-title').textContent = `${Y}년 ${m + 1}월`
+      const box = el('div', 'cal-month')
       const head = el('div', 'cal-week cal-dow'); '일월화수목금토'.split('').forEach(w => head.append(el('span', '', w))); box.append(head)
       const first = new Date(Y, m, 1), last = new Date(Y, m + 1, 0)
       for (let ws = new Date(Y, m, 1 - first.getDay()); ws <= last; ws.setDate(ws.getDate() + 7)) {
@@ -121,8 +125,11 @@
         })
         box.append(row)
       }
-      months.append(box)
+      months.replaceChildren(box)
     }
+    const go = n => { cur = new Date(cur.getFullYear(), cur.getMonth() + n, 1); render() }
+    document.getElementById('cal-prev').onclick = () => go(-1); document.getElementById('cal-next').onclick = () => go(1)
+    render()
     // 목록: 그림 · 이름 · 기간
     const list = document.getElementById('cal-list')
     for (const c of CAL) {
