@@ -1032,23 +1032,26 @@ a.cl-row:hover .cl-title b { text-decoration: underline; }
 .me-card { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; margin-bottom: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
 .me-card > .rc-muted { margin: 0; }
 .cal-card { padding: 16px 18px; margin-bottom: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
-.cal-card h2 { margin: 0 0 4px; font-size: 1.05rem; } .cal-card h2 small { color: var(--muted, #9aa); font-weight: 400; font-size: .8rem; margin-left: 6px; }
-.cal-card h3 { margin: 12px 0 4px; font-size: .85rem; color: var(--accent); }
-.cal-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.cal-card li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: .9rem; }
-.cal-card li:has(img) { grid-template-columns: 56px 1fr auto; }
-.cal-card li img { grid-row: span 2; width: 56px; height: 56px; object-fit: cover; border-radius: 10px; }
-.cal-card li:has(img) i { grid-column: 2 / -1; }
-.cal-card li:has(.ev-ico) { grid-template-columns: 56px 1fr auto; }
-.cal-card .ev-ico { grid-row: span 2; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 10px; background: var(--line); font-size: 1.7rem; }
-.cal-card li:has(.ev-ico) i { grid-column: 2 / -1; }
-.cal-card .ev { cursor: pointer; border-radius: 10px; } .cal-card .ev:hover, .cal-card .ev:focus-visible { background: #ffffff0d; outline: none; }
+.cal-card h2 { margin: 0 0 10px; font-size: 1.05rem; } .cal-card h2 small { color: var(--muted, #9aa); font-weight: 400; font-size: .8rem; margin-left: 6px; }
+.cal-months { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.cal-month h3 { margin: 0 0 6px; font-size: .95rem; color: var(--accent); }
+.cal-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; padding: 3px 0; border-top: 1px solid var(--line); grid-auto-flow: dense; }
+.cal-dow { border-top: 0; font-size: .7rem; color: var(--muted, #9aa); text-align: center; } .cal-dow span:first-child { color: #e66; }
+.cal-day { grid-row: 1; font-size: .75rem; padding: 0 3px; min-height: 18px; } .cal-day.out { visibility: hidden; }
+.cal-day.today { color: #111; background: var(--accent); border-radius: 6px; font-weight: 700; }
+.cal-bar { font-size: .66rem; line-height: 16px; padding: 0 5px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; color: #111; }
+.g-선수.cal-bar { background: #f5a04a; } .g-코스튬.cal-bar { background: #8fb8f0; } .g-이벤트.cal-bar { background: #7fd6a6; }
+.cal-bar:hover, .cal-bar:focus-visible { filter: brightness(1.15); outline: none; }
+.cal-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.cal-list li { display: grid; grid-template-columns: 52px 1fr; align-content: center; gap: 0 10px; padding: 6px; border-radius: 10px; cursor: pointer; font-size: .85rem; border-left: 3px solid var(--line); }
+.cal-list li.g-선수 { border-left-color: #f5a04a; } .cal-list li.g-코스튬 { border-left-color: #8fb8f0; } .cal-list li.g-이벤트 { border-left-color: #7fd6a6; }
+.cal-list li:hover, .cal-list li:focus-visible { background: #ffffff0d; outline: none; }
+.cal-list img, .cal-list .ev-ico { grid-row: span 2; width: 52px; height: 52px; border-radius: 10px; object-fit: cover; }
+.cal-list .ev-ico { display: grid; place-items: center; background: var(--line); font-size: 1.6rem; }
+.cal-list time { color: var(--muted, #9aa); font-size: .75rem; }
 .ev-dlg { max-width: min(92vw, 420px); padding: 18px; background: var(--panel); color: inherit; border: 1px solid var(--line); border-radius: 16px; }
-.ev-dlg::backdrop { background: #0009; } .ev-dlg h3 { margin: 0 0 8px; } .ev-dlg form { text-align: right; }
-.cal-card time { color: var(--muted, #9aa); font-size: .8rem; }
-.cal-card li i { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--accent); margin-left: calc(var(--s) / 61 * 100%); width: calc((var(--e) - var(--s) + 1) / 61 * 100%); }
-.cal-axis { display: grid; grid-template-columns: 30fr 31fr; margin-top: 8px; font-size: .75rem; color: var(--muted, #9aa); }
-.cal-axis span { border-left: 1px solid var(--line); padding-left: 4px; }
+.ev-dlg::backdrop { background: #0009; } .ev-dlg img { display: block; width: 100%; max-height: 220px; object-fit: contain; border-radius: 12px; background: #0b0e14; }
+.ev-dlg h3 { margin: 10px 0 2px; } .ev-dlg .ev-when { margin: 0 0 8px; color: var(--muted, #9aa); font-size: .85rem; } .ev-dlg form { text-align: right; }
 .cal-card > .rc-muted { margin: 12px 0 0; font-size: .75rem; }
 .me-main { display: flex; align-items: center; gap: 14px; }
 .me-main > img, .me-main > .rc-hole { width: 54px; height: 54px; border-radius: 50%; background: #0b0f16; flex: none; }
